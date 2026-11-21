@@ -40,7 +40,9 @@ const NOT_DRAWN = {
   "Home menu": "a data-name attribute (what the remote's OK opens), not drawn",
   "Photo ": "Photo 1, Photo 2: a choice's name built from the number",
   "Use the design's ": "with a widget setting's own label (widget-caps.js, its words come through caps-words.js)",
-  "Clear ": "with a widget setting's own label (widget-caps.js, its words come through caps-words.js)"
+  "Clear ": "with a widget setting's own label (widget-caps.js, its words come through caps-words.js)",
+  "Check in": "a guest's stay as an Agenda event's title, drawn on the home: its words come through widget-lines.js",
+  "Check out": "a guest's stay as an Agenda event's title, drawn on the home: its words come through widget-lines.js"
 };
 const files = ["tv-home/web/app.js", "tv-home/web/design.js", "tv-home/web/design-code.js"];
 const left = [];

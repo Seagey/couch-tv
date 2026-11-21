@@ -23,9 +23,19 @@
     for (var i = 0; i < kids.length; i++) {
       var k = kids[i];
       if (k === null || k === undefined || k === false || k === "") continue;
-      e.appendChild(typeof k === "string" || typeof k === "number" ? document.createTextNode(String(k)) : k);
+      e.appendChild(typeof k === "string" ? document.createTextNode(wl(k)) : typeof k === "number" ? document.createTextNode(String(k)) : k);
     }
     return e;
+  }
+  // the widgets' own words in the TV's language (widget-lines.js): wl("No rain coming") is the line drawn,
+  // tl("Rain from {time}", { time: t }) a line with a gap. A line that is not in that table stays as it is.
+  function wl(s) { var L = window.CouchWidgetLines, v = L && L.word ? L.word(s) : null; return v == null ? s : v; }
+  function tl(en, vars) { var L = window.CouchWidgetLines; return L && L.t ? L.t(en, vars) : String(en).replace(/\{(\w+)\}/g, function (m, k) { return vars && vars[k] != null ? String(vars[k]) : m; }); }
+  // a day's name in the TV's language: the English name on an English TV, else the TV's own words for it
+  function dayName(i, short) {
+    var I = window.I18N, l = I && I.lang ? I.lang() : "en";
+    if (l !== "en" && I.locale) try { return new Date(2023, 0, 1 + i).toLocaleDateString(I.locale(), { weekday: short ? "short" : "long" }); } catch (e) {}
+    return short ? DAYS[i].slice(0, 3) : DAYS[i];
   }
   // css is always built here from numbers, fixed words and checked colours, never from a design's words
   function E(tag, cls, css, kids) { var e = document.createElement(tag); if (cls) e.className = cls; if (css) e.style.cssText = css; return add(e, kids); }
@@ -345,7 +355,7 @@
     if (first < 0) return null;
     return { from: first === 0 ? "" : at(first - 1, first), to: last + 1 < hs.length ? at(last, last + 1) : "" };
   }
-  function uvLine(w) { return w.uvFrom && w.uvTo ? "Sun protection " + w.uvFrom + " to " + w.uvTo : w.uvTo ? "Sun protection until " + w.uvTo : ""; }
+  function uvLine(w) { return w.uvFrom && w.uvTo ? tl("Sun protection {from} to {to}", { from: w.uvFrom, to: w.uvTo }) : w.uvTo ? tl("Sun protection until {to}", { to: w.uvTo }) : ""; }
   // a heading that says where a weather widget's reading is from when it has a place of its own
   function wxHead(o, env, dflt, b) {
     var l = op(o).label || dflt, p = pickedPlace(o, env);
@@ -803,7 +813,7 @@
       var st = sunTimes(now(), own.lat, own.lon);
       s = st ? { rise: sunAt(st.rise, own.timezone), set: sunAt(st.set, own.timezone), frac: clamp((now() - st.rise) / (st.set - st.rise), -0.1, 1.1) } : null;
     }
-    if (!s) return empty(root, b, "sun", own ? "No sunrise in " + own.name + " today" : "Set your town for the sun", own ? "" : "Hold OK, then Edit on the TV, then Place");
+    if (!s) return empty(root, b, "sun", own ? tl("No sunrise in {place} today", { place: own.name }) : "Set your town for the sun", own ? "" : "Hold OK, then Edit on the TV, then Place");
     var at = arc(s.frac);
     add(root, [lab("sun", own && own.name ? own.name : op(o).label || "Sun"),
       svg("0 0 300 120", "100%", "100%", [S("path", { d: "M10 110 Q150 -40 290 110", fill: "none", stroke: "rgba(255,255,255,.28)", "stroke-width": 3, "stroke-dasharray": "2 9", "stroke-linecap": "round" }),
@@ -885,7 +895,8 @@
     var num = unit === "weeks" ? Math.round(n / 7) : n;
     var gone = n < 0;
     if (gone) n = -n;
-    var u = gone ? "It has been and gone" : n === 0 ? "It's today!" : unit === "weeks" ? (num === 1 ? "week to go" : "weeks to go") : unit === "days" ? (n === 1 ? "day to go" : "days to go") : (n === 1 ? "sleep to go" : "sleeps to go");
+    // the unit under the number: its words picked by that number in the TV's language (one, few, many)
+    var u = gone ? wl("It has been and gone") : n === 0 ? wl("It's today!") : unit === "weeks" ? tl(num === 1 ? "week to go" : "weeks to go", { n: num }) : unit === "days" ? tl(n === 1 ? "day to go" : "days to go", { n: n }) : tl(n === 1 ? "sleep to go" : "sleeps to go", { n: n });
     var tiny = b.h < 200, small = b.w < 300, inW = b.w - (small ? 28 : 48);
     if (small) root.style.padding = "14px";
     // the name whole: one line, else two, else left out (the number still says it all)
@@ -973,7 +984,7 @@
     var l = setting(o, env, "label"), m = +setting(o, env, "minutes");
     return { label: typeof l === "string" ? l.replace(/[\u0000-\u001f]/g, " ").trim().slice(0, 24) : "", minutes: isFinite(m) && m >= 1 && m <= 180 ? Math.round(m) : 0 };
   }
-  function minWordsShort(m) { return m === 60 ? "1 hour" : m + (m === 1 ? " minute" : " minutes"); }
+  function minWordsShort(m) { return m === 60 ? wl("1 hour") : tl(m === 1 ? "{n} minute" : "{n} minutes", { n: m }); }
   R.timer = function (root, o, b, env) {
     var draw = function () {
       while (root.lastChild && root.lastChild.className !== "cw-bg") root.removeChild(root.lastChild);
@@ -983,7 +994,7 @@
       var wide = b.w > b.h * 1.6, s = Math.min(wide ? b.h : b.w, b.h) - 48;
       if (!t) {
         // the widget's own name and Quick start, so OK does what it says
-        var l1 = own.label ? own.label : "No timer", l2 = own.minutes ? "OK starts " + minWordsShort(own.minutes) : "OK to start one";
+        var l1 = own.label ? own.label : "No timer", l2 = own.minutes ? tl("OK starts {time}", { time: minWordsShort(own.minutes) }) : "OK to start one";
         var small = b.w < 300, tw = wide ? b.w - 48 - 56 - 20 : b.w - (small ? 28 : 48);
         if (small) root.style.padding = "14px";
         var big1 = wide ? 29 : small ? 25 : 29, w1 = fitWords(root, l1, tw, big1, 1, 700, "color:var(--ink)") || fitWords(root, l1, tw, 24, 2, 700, "color:var(--ink)");
@@ -1015,7 +1026,7 @@
     var d = dataOf(env), p = pickedPlace(o, env);
     if (d.wxOff) return empty(root, b, "partly-cloudy", "Weather is off on this TV", "Turn it on in Home settings, Weather");
     // a place picked for this widget: its own forecast is on its way, never the home's under its name
-    if (p) return empty(root, b, "partly-cloudy", b.w < 300 ? "Getting the weather" : "Getting the weather for " + (p.name || "this place"), "It shows here in a moment");
+    if (p) return empty(root, b, "partly-cloudy", b.w < 300 ? "Getting the weather" : (p.name ? tl("Getting the weather for {place}", { place: p.name }) : "Getting the weather for this place"), "It shows here in a moment");
     return empty(root, b, "partly-cloudy", "Set your town for the weather", "Settings (hold OK), Home settings, Location");
   }
   R.weather = function (root, o, b, env, sh) {
@@ -1104,7 +1115,7 @@
     if (!w) return noWx(root, b, env, o);
     if (!w.rain) return empty(root, b, "rain", "Rain soon is on its way", "");
     var heavy = (w.rainMax || 3) >= 2.5;
-    add(root, [lab("rain", wxHead(o, env, "Rain soon", b)), E("div", "cw-t38", "margin-top:10px", [w.rainFrom ? (heavy ? "Heavy rain from " : "Rain from ") + w.rainFrom : "No rain coming"]),
+    add(root, [lab("rain", wxHead(o, env, "Rain soon", b)), E("div", "cw-t38", "margin-top:10px", [w.rainFrom ? tl(heavy ? "Heavy rain from {time}" : "Rain from {time}", { time: w.rainFrom }) : "No rain coming"]),
       E("div", "cw-grow cw-row", "align-items:flex-end;margin-top:14px", w.rain.map(function (v) { return E("i", "", "display:block;flex:1;margin:0 4px;height:" + v + "%;border-radius:6px;background:#64d2ff"); })),
       E("div", "cw-row cw-sp cw-t23", "margin-top:8px", [E("span", "", "", ["Now"]), E("span", "", "", ["+1h"]), E("span", "", "", ["+2h"]), E("span", "", "", ["+3h"])])]);
   };
@@ -1185,8 +1196,8 @@
   }
   R.surf = function (root, o, b, env) {
     var m = surfOf(env, o), pk = pickedPlace(o, env);
-    if (!m) return weather(env, o) || pk ? empty(root, b, "wind", "Waiting for the swell", pk && pk.name ? "At " + pk.name + ", from Open-Meteo's marine service" : "From Open-Meteo's marine service") : noWx(root, b, env, o);
-    if (!isFinite(m.wave)) return empty(root, b, "wind", "No surf reading here", "The sea is too far from " + (pk && pk.name ? pk.name : "your town"));
+    if (!m) return weather(env, o) || pk ? empty(root, b, "wind", "Waiting for the swell", pk && pk.name ? tl("At {place}, from Open-Meteo's marine service", { place: pk.name }) : "From Open-Meteo's marine service") : noWx(root, b, env, o);
+    if (!isFinite(m.wave)) return empty(root, b, "wind", "No surf reading here", (pk && pk.name ? tl("The sea is too far from {place}", { place: pk.name }) : "The sea is too far from your town"));
     var place = surfPlace(o, env);
     var swell = compass(m.dir) + " swell" + (isFinite(m.period) ? ", " + Math.round(m.period) + "s" : "");
     var u = env.demo ? { h: "m", w: "kmh" } : surfUnits(o, env);
@@ -1201,7 +1212,7 @@
     // too narrow for the wind beside the swell: the wind goes under it (shorter bars make the room)
     var hs = (m.hourly || []).slice(0, 12), top = Math.max.apply(null, hs.concat([0.5])), under = b.w < 460 && wind;
     add(root, [lab("wind", place, "rgba(255,255,255,.88)"),
-      E("div", "cw-row", "margin-top:10px;align-items:flex-end;min-width:0", [E("div", "", "margin-right:28px;min-width:0", [big, E("div", "cw-t25", "color:#fff", [swell]), under ? E("div", "cw-t25 cw-ell", "color:#fff;margin-top:2px", ["Wind " + wind]) : null]),
+      E("div", "cw-row", "margin-top:10px;align-items:flex-end;min-width:0", [E("div", "", "margin-right:28px;min-width:0", [big, E("div", "cw-t25", "color:#fff", [swell]), under ? E("div", "cw-t25 cw-ell", "color:#fff;margin-top:2px", [tl("Wind {speed}", { speed: wind })]) : null]),
         b.w >= 460 && wind ? E("div", "", "", [E("div", "cw-t38", "", ["Wind"]), E("div", "cw-t25", "color:#fff", [wind])]) : null]),
       E("div", "cw-grow"),
       hs.length ? E("div", "cw-row", "align-items:flex-end;flex:none;height:" + (under ? 44 : 70) + "px", hs.map(function (v) { return E("i", "", "display:block;flex:1;margin:0 3px;border-radius:5px;background:rgba(255,255,255,.7);height:" + Math.round(clamp(v / top, 0.08, 1) * 100) + "%"); })) : null,
@@ -1297,7 +1308,7 @@
     var card = E("div", "cw-layer", "", [E("div", "cw-fill", "background:#2a2a30 center/cover;" + (s.art ? "background-image:" + cssImg(s.art) : "")),
       E("div", "cw-fill", "background:linear-gradient(180deg,rgba(0,0,0,.05) 35%,rgba(0,0,0,.8))"),
       E("div", "", "position:absolute;left:24px;right:24px;bottom:22px;color:#fff", [
-        b.h >= 300 ? E("div", "cw-row", "", [s.app ? appIcon(s.app, logoA, env) : null, E("span", "cw-t23", "color:rgba(255,255,255,.88);margin-left:10px", [s.owner ? s.owner + " is watching" : "Keep watching"])]) : null,
+        b.h >= 300 ? E("div", "cw-row", "", [s.app ? appIcon(s.app, logoA, env) : null, E("span", "cw-t23", "color:rgba(255,255,255,.88);margin-left:10px", [s.owner ? tl("{name} is watching", { name: s.owner }) : "Keep watching"])]) : null,
         b.h >= 300 ? E("div", "cw-t38 cw-ell", "margin-top:10px;font-weight:720", [s.title]) : fitT(E("div", "", WRAP + "font-size:25px;line-height:1.15;font-weight:720;margin-top:10px", [s.title])), b.h >= 220 && s.sub ? E("div", "cw-t23 cw-ell", "color:rgba(255,255,255,.82)", [s.sub]) : null,
         s.progress ? E("div", "cw-bar", "margin-top:14px", [E("b", "", "width:" + Math.round(s.progress * 100) + "%;background:#fff")]) : null])]);
     stop(card, s.act || "show", s.arg !== undefined ? s.arg : i, s.title);
@@ -1335,7 +1346,7 @@
     var list = showsFor(o, env);
     if (!list.length) return noShows(root, b, env);
     var q = op(o), labelH = q.label === "" || b.h < 220 ? 0 : 50, gap = 28, n = clamp(q.shows || Math.floor((b.w + gap) / 380), 1, Math.min(5, list.length, Math.max(1, Math.floor((b.w + gap) / 260)))), cw = Math.floor((b.w - 48 - (n - 1) * gap) / n);   // inside the padding
-    add(root, [labelH ? E("div", "cw-lab", "color:var(--ink);margin-bottom:16px;text-shadow:0 2px 12px rgba(0,0,0,.3)", [q.label || (list[0].owner ? list[0].owner + " is watching" : "Keep watching")]) : null,
+    add(root, [labelH ? E("div", "cw-lab", "color:var(--ink);margin-bottom:16px;text-shadow:0 2px 12px rgba(0,0,0,.3)", [q.label || (list[0].owner ? tl("{name} is watching", { name: list[0].owner }) : "Keep watching")]) : null,
       E("div", "cw-row", "flex:1;align-items:stretch;min-height:0", list.slice(0, n).map(function (s, i) {
         var p = E("div", "cw-poster", "width:" + px(cw) + ";flex:none;" + (i ? "margin-left:" + gap + "px;" : "") + (s.art ? "background-image:" + cssImg(s.art) : ""), [E("div", "cap", "", [
           E("div", "cw-row", "", [s.app ? appIcon(s.app, 34, env) : null, E("div", "", "min-width:0;flex:1;margin-left:10px", [fitT(E("div", "", WRAP + "font-size:25px;line-height:1.2;color:#fff;font-weight:700", [s.title]))])]),
@@ -1375,8 +1386,8 @@
     if (want && !env.demo) list = list.filter(function (x) { return appIn(want, x.app); });
     if (!list.length) {
       // on a TV, never a demo and never an unrelated show: say plainly there is no game to pick up
-      if (only.length && !(env && dataOf(env).bridge === false)) return empty(root, b, "tv", "Nothing to keep watching from " + only.map(function (k) { return appName(k, env); }).slice(0, 3).join(", ") + (only.length > 3 ? " or the others picked" : ""), "Start a show in one of them and it shows here");
-      if (sport && !(env && dataOf(env).bridge === false)) { var sa = sportAppsHere(env); return empty(root, b, "tv", "No game to pick up", sa ? "Start a game in " + sa + " and it shows here" : "Start a game in a sport app and it shows here"); }
+      if (only.length && !(env && dataOf(env).bridge === false)) return empty(root, b, "tv", tl(only.length > 3 ? "Nothing to keep watching from {apps} or the others picked" : "Nothing to keep watching from {apps}", { apps: only.map(function (k) { return appName(k, env); }).slice(0, 3).join(", ") }), "Start a show in one of them and it shows here");
+      if (sport && !(env && dataOf(env).bridge === false)) { var sa = sportAppsHere(env); return empty(root, b, "tv", "No game to pick up", sa ? tl("Start a game in {apps} and it shows here", { apps: sa }) : "Start a game in a sport app and it shows here"); }
       return noShows(root, b, env);
     }
     var s = env.demo ? (sport ? { title: "Titans v Broncos", sub: "NRL, round 3. Kick off 7:50pm", app: "au.com.kayosports.tv", art: bgImg("scene-golden"), i: 0 }
@@ -1556,7 +1567,7 @@
     vol = isFinite(vol) ? clamp(Math.round(vol), 10, 100) : 50;
     // OK plays this widget's own sound at its own volume (app.js widgetSound), and stops it when it plays
     var on = !env.demo && !env.designer && !!window.Soundscape && window.Soundscape.current && window.Soundscape.current() === snd;
-    add(root, [ic(icons[snd], b.h < 200 ? 44 : 56, "currentColor"), E("div", "cw-grow"), E("div", b.w < 300 ? "cw-t25" : "cw-t29", "font-weight:680;color:var(--ink)", [names[snd]]), b.w >= 300 ? E("div", "cw-t23", "", [on ? "Playing. OK stops it" : b.h < 200 ? "Volume " + vol + "%" : "Soundscape, volume " + vol + "%"]) : null]);
+    add(root, [ic(icons[snd], b.h < 200 ? 44 : 56, "currentColor"), E("div", "cw-grow"), E("div", b.w < 300 ? "cw-t25" : "cw-t29", "font-weight:680;color:var(--ink)", [names[snd]]), b.w >= 300 ? E("div", "cw-t23", "", [on ? "Playing. OK stops it" : b.h < 200 ? tl("Volume {n}%", { n: vol }) : tl("Soundscape, volume {n}%", { n: vol })]) : null]);
     root.setAttribute("data-sound", snd + "|" + vol);
     stop(root, "sound", snd + "|" + vol, names[snd]);
   };
@@ -1578,7 +1589,7 @@
   }
   // the largest size, max down to 23 px, at which `text` fits `width` on at most `lines` lines; 0 if none
   function fitPxText(text, width, max, lines, weight, family, spacing) {
-    text = String(text == null ? "" : text);
+    text = wl(String(text == null ? "" : text));   // measured as it is drawn: in the TV's language (add() swaps the same way)
     if (!text) return max;
     var key = [text, Math.floor(width), max, lines, weight, family, spacing].join("|");
     if (MCACHE[key] !== undefined) return MCACHE[key];
@@ -1600,6 +1611,7 @@
   // words that fit, whole, or null (the caller leaves them out)
   function fitWords(root, text, width, max, lines, weight, css) {
     if (text == null || text === "") return null;
+    text = wl(String(text));
     var px = fitPxText(text, width, max, lines || 1, weight || 600, famOf(root));
     if (!px) return null;
     return E("div", "cw-fit", "font-size:" + px + "px;font-weight:" + (weight || 600) + ";line-height:1.2;max-width:" + Math.floor(width) + "px;overflow-wrap:normal;flex:none;" + (css || ""), [String(text)]);
@@ -1801,7 +1813,7 @@
     } else if (b.h < 200) {
       // a wide tile: the room and its mode beside the set temperature
       add(root, E("div", "cw-row", "height:100%", [E("div", "cw-col", "flex:1;min-width:0", [fitLab(root, "aircon", r.name || "Aircon", b.w - 48 - 140), E("div", "cw-row", "margin-top:8px", [dot, E("span", "cw-t25 cw-ell", "margin-left:12px;color:var(--ink);font-weight:650", [on ? roomMode(r) : "Off"])]),
-        E("div", "cw-t23 cw-ell", "margin-top:2px", ["Now " + tdeg(r.current, r, env)])]),
+        E("div", "cw-t23 cw-ell", "margin-top:2px", [tl("Now {temp}", { temp: tdeg(r.current, r, env) })])]),
         E("div", "cw-big", "font-size:84px;margin-left:16px;opacity:" + (on ? 1 : 0.55), [tdeg(r.target, r, env)])]));
     } else {
       // the room, its mode and the dial as one group in the middle (a tall box: not the dial alone)
@@ -1809,7 +1821,7 @@
       // a large square widget: the other rooms in a row under the dial (a wide one has them beside it)
       var under = !wideA && b.h >= 700 && b.w >= 700 && others.length && setting(o, env, "others") !== false;
       var s = Math.min(b.h - 130 - (under ? 90 : 0), wideA ? b.w * 0.5 : b.w - 48);
-      var chip = function (z, css) { var zo = roomOn(z); return E("div", "cw-chip" + (zo ? " on" : ""), css + (zo ? "background:" + (MODE_COL[z.state] || "#64d2ff") : ""), [z.name + (zo ? " " + tdeg(z.target, z, env) : " off")]); };
+      var chip = function (z, css) { var zo = roomOn(z); return E("div", "cw-chip" + (zo ? " on" : ""), css + (zo ? "background:" + (MODE_COL[z.state] || "#64d2ff") : ""), [zo ? z.name + " " + tdeg(z.target, z, env) : tl("{room} off", { room: z.name })]); };
       if (!wideA) root.style.justifyContent = "center";
       add(root, [E("div", "cw-row cw-sp", "", [lab("aircon", r.name || "Aircon"), E("div", "cw-chip on", "height:44px;font-size:23px;background:" + col + ";color:#1a1406", [on ? roomMode(r) : "Off"])]),
         E("div", (wideA ? "cw-grow " : "") + "cw-row cw-center", wideA ? "" : "margin-top:20px", [dial(s, r.target != null ? r.target : (roomUnit(r) === "f" ? 72 : 22), r.current != null ? Math.round(r.current * 10) / 10 : null, r, env), wideA && b.w >= 700 && others.length && setting(o, env, "others") !== false ? E("div", "cw-col", "margin-left:30px", others.map(function (z) {
@@ -2035,7 +2047,7 @@
       var bat = e.battery != null && wide ? fitWords(root, "Battery " + e.battery + "%", W * 0.4, 25, 1, 560, "color:var(--sub)") : null;
       add(root, [E("div", "cw-row", "width:100%;flex:none;" + (bat ? "justify-content:space-between" : justify(al)), [fitLab(root, "bolt", name + " today", bat ? W * 0.58 : W), bat]),
         E("div", "cw-row", "width:100%;flex:none;margin-top:10px;align-items:flex-end;" + justify(al), [stat(kwh(e.total), "kWh today"), wide && showNow ? E("div", "", "width:36px;flex:none") : null,
-          wide && showNow ? stat(kwh(e.power), String(e.power_unit || "kW") + " now", "#30d158") : null]),
+          wide && showNow ? stat(kwh(e.power), tl("{unit} now", { unit: String(e.power_unit || "kW") }), "#30d158") : null]),
         E("div", "cw-col cw-grow", "width:100%;justify-content:flex-end;margin-top:14px;min-height:0", [hourBars(hours, Math.max(40, b.h - (axis ? 260 : 220)), wide ? 3 : 1),
           axis ? E("div", "cw-row cw-sp cw-t23", "width:100%;margin-top:6px", ["12am", "6am", "12pm", "6pm", "12am"].map(function (x) { return E("span", "", "", [x]); })) : null])]);
     }
@@ -2214,7 +2226,7 @@
   function wordOf(o, env) {
     var W0 = window.CouchWords || {}, lang = String(setting(o, env, "lang") || "en"), list = (W0.wordsIn && W0.wordsIn[lang]) || null;
     if (!list) { lang = "en"; list = W0.words || [["Petrichor", "noun", "The smell of rain on dry ground."]]; }
-    return { w: list[dayOfYear() % list.length], lang: lang, head: lang === "en" ? "Word of the day" : "Word of the day, in " + WORD_LANG[lang], meaning: setting(o, env, "meaning") !== false };
+    return { w: list[dayOfYear() % list.length], lang: lang, head: lang === "en" ? "Word of the day" : tl("Word of the day, in {language}", { language: wl(WORD_LANG[lang]) }), meaning: setting(o, env, "meaning") !== false };
   }
   R.word = function (root, o, b, env) {
     var x = wordOf(o, env || {}), w = x.w;
@@ -2396,7 +2408,7 @@
     var want = newsWant(o, env), n = want || clamp(Math.floor((b.h - 70) / 110), 1, 5);
     // the number asked for fills the box: each headline as big as its share of the room allows
     var size = want ? clamp(((b.h - 48 - 54) / want - 40) / (3 * 1.22), 25, 40) : 29;
-    webBody(root, a, [webHead("info", N.name, a), N.stale ? line("Not updated lately", 24, "color:var(--sub)", a, 3) : N.from && b.h >= 300 ? line("From " + N.from, 24, "color:var(--sub)", a, 3) : null, E("div", "", "height:14px;flex:none")].concat(N.items.slice(0, n).map(function (x, i) { return headline(x, a, i === 0, size, !!want); })));
+    webBody(root, a, [webHead("info", N.name, a), N.stale ? line("Not updated lately", 24, "color:var(--sub)", a, 3) : N.from && b.h >= 300 ? line(tl("From {source}", { source: N.from }), 24, "color:var(--sub)", a, 3) : null, E("div", "", "height:14px;flex:none")].concat(N.items.slice(0, n).map(function (x, i) { return headline(x, a, i === 0, size, !!want); })));
   };
 
   // Scores: one league's round from ESPN's public scoreboard (widget-web.js), live games first, then
@@ -2422,19 +2434,19 @@
     var tname = known ? known.short || known.name : team, realIn = id === "cricket" ? "cricket" : real;
     if (mode !== "all" && !team) mode = mode === "mine" ? "nomine" : mode;
     if (mode === "nomine") { webEmpty(root, b, "tv", "Pick your team", "This widget shows only your team's games: pick it in this widget's settings, hold OK on the widget", "Pick a team"); root.setAttribute("data-setup", "sports"); return null; }
-    if (wrong && mode === "mine") { webEmpty(root, b, "tv", team + " is not in the " + realIn, "Pick your team again in this widget's settings: hold OK on the widget", "Not in the " + realIn); return null; }
+    if (wrong && mode === "mine") { webEmpty(root, b, "tv", tl("{team} is not in the {league}", { team: team, league: realIn }), "Pick your team again in this widget's settings: hold OK on the widget", tl("Not in the {league}", { league: realIn })); return null; }
     var season = WW ? WW.seasonOf(v.games || [], t) : { off: "" };
-    var offWords = season.off === "over" ? "The " + realIn + " season is over" : season.off === "soon" ? "The " + realIn + " season starts " + WW.kickoff(season.at, t, env.clock24) : "";
-    if (!v.games || !v.games.length) { webEmpty(root, b, "tv", "No " + realIn + " games right now", "Scores show here when the next round starts", "No games"); return null; }
+    var offWords = season.off === "over" ? tl("The {league} season is over", { league: realIn }) : season.off === "soon" ? tl("The {league} season starts {when}", { league: realIn, when: WW.kickoff(season.at, t, env.clock24) }) : "";
+    if (!v.games || !v.games.length) { webEmpty(root, b, "tv", tl("No {league} games right now", { league: realIn }), "Scores show here when the next round starts", "No games"); return null; }
     var games = WW ? WW.scoreFilter(v.games, known ? known.name : team, mode, t) : v.games;
     if (!games.length) {
       var next = WW ? WW.scoreFilter(v.games, known ? known.name : team, "all", t).filter(function (g) { return g.state === "pre"; }).sort(function (x, y) { return x.at - y.at; })[0] : null;
-      if (mode === "mine") webEmpty(root, b, "tv", offWords || "No " + tname + " game right now", offWords ? tname + "'s games show here when they play again" : "Their next game shows here once it is on the draw", "No game");
-      else webEmpty(root, b, "tv", offWords || "No live games right now", next ? "Next: " + gameStatus(next, env).text : "Live games show here when they start", "None live");
+      if (mode === "mine") webEmpty(root, b, "tv", offWords || tl("No {team} game right now", { team: tname }), offWords ? tl("{team}'s games show here when they play again", { team: tname }) : "Their next game shows here once it is on the draw", "No game");
+      else webEmpty(root, b, "tv", offWords || "No live games right now", next ? tl("Next: {game}", { game: gameStatus(next, env).text }) : "Live games show here when they start", "None live");
       return null;
     }
-    return { name: name, round: season.off ? "" : v.round || "", stale: v.stale, games: games, off: season.off === "over" ? "Season over" : season.off === "soon" ? "Starts " + WW.kickoff(season.at, t, env.clock24) : "",
-      warn: wrong ? team + " is not in the " + realIn : "", warnShort: wrong ? "Not in the " + realIn : "" };
+    return { name: name, round: season.off ? "" : v.round || "", stale: v.stale, games: games, off: season.off === "over" ? "Season over" : season.off === "soon" ? tl("Starts {when}", { when: WW.kickoff(season.at, t, env.clock24) }) : "",
+      warn: wrong ? tl("{team} is not in the {league}", { team: team, league: realIn }) : "", warnShort: wrong ? tl("Not in the {league}", { league: realIn }) : "" };
   }
   // a result in plain words: "Full time", "Full time, extra time", "Full time, penalties"
   var FULL = { ot: "extra time", aet: "extra time", pens: "penalties", so: "a shoot out" };
@@ -2490,7 +2502,7 @@
     raw = Object.prototype.toString.call(raw) === "[object Array]" ? raw : typeof raw === "string" && raw ? raw.split(",") : [];
     var bad = WW ? raw.map(function (x) { return String(x || "").trim(); }).filter(function (x) { return x && !WW.SYMBOL.test(x.toUpperCase()); }) : [];
     if (bad.length && bad.length === raw.filter(function (x) { return String(x || "").trim(); }).length) {
-      webEmpty(root, b, "info", "Not a share code: " + bad.slice(0, 3).join(", "), "Type codes like BHP.AX in this widget's settings: hold OK on the widget", "Check the codes");
+      webEmpty(root, b, "info", tl("Not a share code: {codes}", { codes: bad.slice(0, 3).join(", ") }), "Type codes like BHP.AX in this widget's settings: hold OK on the widget", "Check the codes");
       root.setAttribute("data-setup", "stocks"); return null;
     }
     if (env.demo) quotes = list.map(demoQuote);
@@ -2501,7 +2513,7 @@
     }
     if (!quotes.length) { webEmpty(root, b, "info", "None of these has a price right now", "Check the share codes in this widget's settings", "No prices"); return null; }
     var none = env.demo ? [] : list.filter(function (s) { return !quotes.some(function (x) { return x.symbol === s; }); }).concat(bad);
-    return { name: q.label || "Markets", quotes: quotes, stale: stale, price: setting(o, env, "price") !== false, none: none.length ? "No price for " + none.slice(0, 3).join(", ") : "" };
+    return { name: q.label || "Markets", quotes: quotes, stale: stale, price: setting(o, env, "price") !== false, none: none.length ? tl("No price for {codes}", { codes: none.slice(0, 3).join(", ") }) : "" };
   }
   function upDown(c) { return c > 0 ? "#30d158" : c < 0 ? "#ff453a" : "rgba(255,255,255,.3)"; }
   function moveChip(x) {
@@ -2546,8 +2558,15 @@
     var WW = window.CouchWidgetWeb, spare = bufS === undefined || !isFinite(+bufS) ? 10 : +bufS, ah = hasAh ? +ahS : env.demo ? 8 : undefined, am = hasAh ? +amS || 0 : 30;
     var lb = WW && ah !== undefined ? WW.leaveBy(v.minutes, ah, am, spare, now().getTime(), wdS) : null;
     var arrive = ah !== undefined ? fmt12(new Date(2000, 0, 1, ah, am)) : "";
-    return { minutes: v.minutes, km: v.km, label: (tvSet(o, env, "label") || (o.__design || q).label) || "To " + (c.to.name || "work"), leave: lb ? (lb.day ? lb.day + ", leave by " : "Leave by ") + fmt12(lb.at) : "", leaveAt: lb ? fmt12(lb.at) : "", leaveDay: lb ? (lb.day === "Tomorrow" ? lb.day : lb.day.slice(0, 3)) : "", arrive: arrive, stale: !env.demo && !!(webOf(env, "commute", c.key) || {}).stale };
+    return { minutes: v.minutes, km: v.km, label: (tvSet(o, env, "label") || (o.__design || q).label) || (c.to.name ? tl("To {place}", { place: c.to.name }) : "To work"), leave: lb ? (lb.day ? lb.day + ", leave by " : "Leave by ") + fmt12(lb.at) : "", leaveAt: lb ? fmt12(lb.at) : "", leaveWhen: lb && lb.day ? lb.day : "", leaveDay: lb ? (lb.day === "Tomorrow" ? lb.day : lb.day.slice(0, 3)) : "", arrive: arrive, stale: !env.demo && !!(webOf(env, "commute", c.key) || {}).stale };
   }
+  // the leave by day ("Tomorrow", "Monday" or its first three letters, widget-web.js leaveBy) in the TV's language
+  function dayWords(d) {
+    if (d === "Tomorrow") return wl(d);
+    for (var i = 0; i < 7; i++) if (DAYS[i] === d || DAYS[i].slice(0, 3) === d) return dayName(i, DAYS[i] !== d);
+    return d;
+  }
+  function leaveWords(V) { return V.leaveWhen ? tl("{day}, leave by {time}", { day: dayWords(V.leaveWhen), time: V.leaveAt }) : tl("Leave by {time}", { time: V.leaveAt }); }
   function line(text, size, extra, a, drop) { var e = fitT(E("div", "", WRAP + "font-size:" + size + "px;line-height:1.22;flex:none;text-align:" + a + ";" + (extra || ""), [text])); return drop ? dropT(e, drop) : e; }
   R.commute = function (root, o, b, env) {
     var V = commuteOf(root, o, b, env), a = alignOf(o);
@@ -2557,7 +2576,7 @@
       E("div", "cw-row", "justify-content:" + jc(a) + ";align-items:baseline;flex-wrap:wrap;margin-top:8px;flex:none", [fitT(E("span", "cw-big", "font-size:" + px(big) + ";line-height:1", [String(V.minutes)]), 40), E("span", "cw-t29", "margin-left:12px", ["min"]),
         wide ? E("span", "cw-t25", "margin-left:24px;color:var(--sub)", [V.km + " km by road"]) : null]),
       line(V.stale ? "Not updated lately" : "The usual drive, no live traffic", 24, "color:var(--sub);margin-top:6px", a, 3),
-      line(V.leave ? V.leave + (V.arrive ? " for " + V.arrive : "") : "Set an arrive by time in this widget's settings", 25, "font-weight:680;margin-top:12px", a)]);
+      line(V.leave ? (V.arrive ? tl("{leave} for {arrive}", { leave: leaveWords(V), arrive: V.arrive }) : leaveWords(V)) : "Set an arrive by time in this widget's settings", 25, "font-weight:680;margin-top:12px", a)]);
   };
 
   // guests and the room
@@ -2571,9 +2590,10 @@
   // short: for a widget one or two rows high ("Check out Mon 10:00am")
   function stayLine(v, env, short) {
     var t = now(), today = new Date(t.getFullYear(), t.getMonth(), t.getDate()).getTime();
-    var dayWord = function (ms) { var d = new Date(ms).setHours(0, 0, 0, 0), w = DAYS[new Date(ms).getDay()]; return d === today ? "today" : d === today + 86400000 ? "tomorrow" : short ? w.slice(0, 3) : w; };
-    if (v.phase === "arrival" || v.phase === "before") return "Check in " + (v.phase === "before" ? "tomorrow " : "") + "from " + hhmm(v.checkin, env);
-    if (v.phase === "during" || v.phase === "lastday") return "Check out " + dayWord(v.checkout) + (short ? " " : " at ") + hhmm(v.checkout, env);
+    var dayWord = function (ms) { var d = new Date(ms).setHours(0, 0, 0, 0); return d === today ? "today" : d === today + 86400000 ? "tomorrow" : dayName(new Date(ms).getDay(), short); };
+    if (v.phase === "arrival" || v.phase === "before") return tl(v.phase === "before" ? "Check in tomorrow from {time}" : "Check in from {time}", { time: hhmm(v.checkin, env) });
+    if (v.phase === "during" || v.phase === "lastday") var cd = dayWord(v.checkout), ct = hhmm(v.checkout, env);
+      return cd === "today" ? tl(short ? "Check out today {time}" : "Check out today at {time}", { time: ct }) : cd === "tomorrow" ? tl(short ? "Check out tomorrow {time}" : "Check out tomorrow at {time}", { time: ct }) : tl(short ? "Check out {day} {time}" : "Check out {day} at {time}", { day: cd, time: ct });
     return "";
   }
   function withName(text, name) {
@@ -2748,13 +2768,13 @@
     // sky, the line says the high
     // (in the evening, "Tomorrow" and its high on two lines)
     var q = op(o), hl = q.hilo !== false, narrow = b.w < 460, sky = w.ahead ? w.ahead.label + (hl && !narrow ? ", " + w.ahead.hi + "°" : "")
-      : hl && w.hi !== undefined ? (narrow ? "High " + w.hi + "°" : wxWords(w.code) + ", " + w.hi + "°") : wxWords(w.code);
-    var more = w.ahead && hl && narrow ? E("div", "cw-t23 cw-ell", "color:var(--ink)", ["High " + w.ahead.hi + "°"]) : null;
+      : hl && w.hi !== undefined ? (narrow ? tl("High {temp}", { temp: w.hi + "°" }) : wl(wxWords(w.code)) + ", " + w.hi + "°") : wxWords(w.code);
+    var more = w.ahead && hl && narrow ? E("div", "cw-t23 cw-ell", "color:var(--ink)", [tl("High {temp}", { temp: w.ahead.hi + "°" })]) : null;
     var lines = q.place === false ? [E("div", (narrow ? "cw-t25" : "cw-t29") + " cw-ell", "font-weight:680", [sky]), more] : [E("div", (narrow ? "cw-t25" : "cw-t29") + " cw-ell", "font-weight:680", [w.place || "Here"]), E("div", "cw-t23 cw-ell", "color:var(--ink)", [sky]), more];
     // under 460 wide: no icon, so the place and the sky's words have the room; the high on a line of its own
     if (narrow) {
       sky = w.ahead ? w.ahead.label : wxWords(w.code);
-      var hiL = hl && (w.ahead ? w.ahead.hi : w.hi) !== undefined ? E("div", "cw-t23 cw-ell", "color:var(--ink)", ["High " + (w.ahead ? w.ahead.hi : w.hi) + "°"]) : null;
+      var hiL = hl && (w.ahead ? w.ahead.hi : w.hi) !== undefined ? E("div", "cw-t23 cw-ell", "color:var(--ink)", [tl("High {temp}", { temp: (w.ahead ? w.ahead.hi : w.hi) + "°" })]) : null;
       lines = [q.place === false ? null : E("div", "cw-t25 cw-ell", "font-weight:680", [w.place || "Here"]), E("div", "cw-t23 cw-ell", "color:var(--ink)" + (q.place === false ? ";font-weight:680" : ""), [sky]), hiL];
       // in the evening, tomorrow's sky in words too (the icon is gone): four tighter lines
       if (w.ahead) {
@@ -2795,7 +2815,7 @@
     if (!w) return noWx(root, b, env, o);
     if (!w.rain) return empty(root, b, "rain", "Rain soon is on its way", "");
     var heavy = (w.rainMax || 3) >= 2.5;
-    var pr = pickedPlace(o, env), rl = w.rainFrom ? (heavy ? "Heavy rain from " : "Rain from ") + w.rainFrom : "No rain coming";
+    var pr = pickedPlace(o, env), rl = w.rainFrom ? tl(heavy ? "Heavy rain from {time}" : "Rain from {time}", { time: w.rainFrom }) : "No rain coming";
     // a place of its own: its name over the rain line, never squeezed into it
     add(root, [pr && pr.name ? lab("rain", pr.name) : null, E("div", (pr && pr.name ? "cw-t25" : "cw-t29") + " cw-ell", "font-weight:700" + (pr && pr.name ? ";margin-top:2px" : ""), [rl]),
       E("div", "cw-grow cw-row", "align-items:flex-end;margin-top:" + (pr && pr.name ? 6 : 10) + "px", w.rain.map(function (v) { return E("i", "", "display:block;flex:1;margin:0 3px;height:" + v + "%;border-radius:5px;background:#64d2ff"); }))]);
@@ -2813,7 +2833,7 @@
         E("div", "cw-t23", "color:var(--ink);" + TWO, [pu.name])]);
       return;
     }
-    mini(root, b, pu && pu.name ? null : "sun", String(w.uv), pu && pu.name ? pu.name : "UV index", band + (w.uvFrom && w.uvTo ? ", " + w.uvFrom + " to " + w.uvTo : w.uvTo ? ", until " + w.uvTo : ""));
+    mini(root, b, pu && pu.name ? null : "sun", String(w.uv), pu && pu.name ? pu.name : "UV index", (w.uvFrom && w.uvTo ? tl("{band}, {from} to {to}", { band: wl(band), from: w.uvFrom, to: w.uvTo }) : w.uvTo ? tl("{band}, until {to}", { band: wl(band), to: w.uvTo }) : band));
   };
   CR.moon = function (root, o, b, env) {
     var m = moon(now()), r = 44, f = m.f, waxing = f < 0.5, k = Math.cos(f * 2 * Math.PI), ex = Math.abs(k) * r, flip = moonSouth(o, env) ? MIRROR : "";
@@ -2897,11 +2917,11 @@
     var V = commuteOf(root, o, b, env), a = alignOf(o);
     if (!V) return;
     // an arrive by time: when to leave, the day too when it is not today (Weekdays only off can make it Saturday)
-    if (b.w < 300 && V.leaveAt) return webBody(root, a, [line(V.leaveDay ? V.leaveDay + ", leave" : "Leave", 24, "color:var(--sub);font-weight:650", a), line(V.leaveAt, 36, "font-weight:740;margin-top:2px", a), line(V.minutes + " min drive", 23, "color:var(--sub);margin-top:2px", a, 2)]);
-    if (b.w < 300) return webBody(root, a, [E("div", "cw-row", "justify-content:" + jc(a) + ";flex:none", [ic("location", 30, "currentColor")]), line(V.minutes + " min", 44, "font-weight:740;margin-top:4px", a), V.label.length <= 10 ? line(V.label, 24, "font-weight:650;margin-top:2px", a, 2) : null]);
+    if (b.w < 300 && V.leaveAt) return webBody(root, a, [line(V.leaveDay ? tl("{day}, leave", { day: dayWords(V.leaveDay) }) : "Leave", 24, "color:var(--sub);font-weight:650", a), line(V.leaveAt, 36, "font-weight:740;margin-top:2px", a), line(tl("{n} min drive", { n: V.minutes }), 23, "color:var(--sub);margin-top:2px", a, 2)]);
+    if (b.w < 300) return webBody(root, a, [E("div", "cw-row", "justify-content:" + jc(a) + ";flex:none", [ic("location", 30, "currentColor")]), line(tl("{n} min", { n: V.minutes }), 44, "font-weight:740;margin-top:4px", a), V.label.length <= 10 ? line(V.label, 24, "font-weight:650;margin-top:2px", a, 2) : null]);
     // when to leave, short enough for one line ("Tomorrow, leave 7:53am"); the place goes first if room runs out
-    webBody(root, a, [line(V.minutes + " min", 44, "font-weight:740", a), line(V.label, 25, "font-weight:650;margin-top:2px", a, 3),
-      V.leaveAt ? line((V.leaveDay ? V.leaveDay + ", leave " : "Leave by ") + V.leaveAt, 24, "font-weight:680;margin-top:2px", a) : line("The usual drive, no live traffic", 24, "color:var(--sub);margin-top:2px", a, 2)]);
+    webBody(root, a, [line(tl("{n} min", { n: V.minutes }), 44, "font-weight:740", a), line(V.label, 25, "font-weight:650;margin-top:2px", a, 3),
+      V.leaveAt ? line(V.leaveDay ? tl("{day}, leave {time}", { day: dayWords(V.leaveDay), time: V.leaveAt }) : tl("Leave by {time}", { time: V.leaveAt }), 24, "font-weight:680;margin-top:2px", a) : line("The usual drive, no live traffic", 24, "color:var(--sub);margin-top:2px", a, 2)]);
   };
 
   // ---------------- things typed at home (athome.js, through app.js): kept on this TV only ----------------
@@ -2971,9 +2991,9 @@
     var day = tomorrow ? "Tomorrow" : "Today", l = String(label || "").trim();
     if (!l || DAY_WORDS.test(l) || l.toLowerCase() === day.toLowerCase()) return day;
     if (/\b(today|tonight|tomorrow)\b/i.test(l)) return day;
-    return l + ", " + day.toLowerCase();
+    return tl(tomorrow ? "{label}, tomorrow" : "{label}, today", { label: l });
   }
-  function agendaWeek(label) { var l = String(label || "").trim(); return !l || DAY_WORDS.test(l) || /\b(today|tonight|tomorrow)\b/i.test(l) ? "This week" : l + ", this week"; }
+  function agendaWeek(label) { var l = String(label || "").trim(); return !l || DAY_WORDS.test(l) || /\b(today|tonight|tomorrow)\b/i.test(l) ? "This week" : tl("{label}, this week", { label: l }); }
   R.agenda = function (root, o, b, env) {
     var a = ahAlign(root, o), ag = agendaOf(root, b, env, o);
     if (!ag) return;
@@ -2987,7 +3007,7 @@
         var k1 = nx ? (wk ? nx.k || 0 : ag.today.length ? 0 : 1) : 0, d1 = new Date(dayStart(d) + k1 * 86400000 + 43200000);
         add(root, ahCol(a, [one1("cw-t23", "font-weight:750;color:#ff453a", DAYS[d1.getDay()].slice(0, 3).toUpperCase() + " " + d1.getDate()),
           E("div", "cw-t25", "flex:none;max-width:100%;font-weight:700;color:var(--ink);margin-top:4px;line-height:1.15;" + lines(2), [nx ? nx.title : "Nothing on"]),
-          one1("cw-t23", "", nx ? (wk && nx.k ? nx.when.replace(/^\S+ /, "") : nx.when) : ag.days === "two" ? "till " + DAYS[new Date(dayStart(d) + 2 * 86400000 + 43200000).getDay()].slice(0, 3) : none)]));
+          one1("cw-t23", "", nx ? (wk && nx.k ? nx.when.replace(/^\S+ /, "") : nx.when) : ag.days === "two" ? tl("till {day}", { day: dayName(new Date(dayStart(d) + 2 * 86400000 + 43200000).getDay(), true) }) : none)]));
         return;
       }
       add(root, ahCol(a, [one1("cw-t23", "font-weight:750;color:#ff453a", day + (ag.today.length || !nx || wk ? "" : ", tomorrow")),
@@ -2998,7 +3018,7 @@
       // a square: the day and the date, then what is next
       add(root, ahCol(a, [one1("cw-t23", "font-weight:700;text-transform:uppercase;letter-spacing:.06em", DAYS[d.getDay()]), E("div", "cw-big", "flex:none;font-size:" + px(clamp(b.w / 3.4, 64, 110)), [String(d.getDate())]),
         one1("cw-t29", "font-weight:680;margin-top:16px", nx ? nx.title : "Nothing on"),
-        one1("cw-t23", "", nx ? (ag.today.length || wk ? "" : "Tomorrow, ") + nx.when + (list.length > 1 ? ", then " + (list.length - 1) + " more" : "") : none)]));
+        one1("cw-t23", "", nx ? tl((ag.today.length || wk ? "" : "Tomorrow, ") + "{when}" + (list.length > 1 ? ", then {n} more" : ""), { when: nx.when, n: list.length - 1 }) : none)]));
       return;
     }
     var n = clamp(Math.floor((b.h - 48 - 50) / (b.w < 600 ? 92 : 72)), 1, 8), more = list.length > n ? list.length - (n - 1) : 0, shown = more ? list.slice(0, n - 1) : list;
@@ -3006,7 +3026,7 @@
       list.length ? E("div", "cw-col", "max-width:100%;margin-top:14px;flex:none;align-items:" + (a === "right" ? "flex-end" : "flex-start"), shown.map(function (e) {
         if (b.w < 600) return E("div", "cw-ev", "max-width:100%;margin-top:14px", [E("i", "", "background:" + e.col), E("div", "cw-col", "flex:0 1 auto;min-width:0", [E("div", "cw-t29 cw-ell", "max-width:100%", [e.title]), E("div", "cw-t23", "", [e.when])])]);
         return E("div", "cw-ev", "max-width:100%;margin-top:14px", [E("i", "", "background:" + e.col), E("div", "cw-t29 cw-ell", "flex:0 1 auto;min-width:0", [e.title]), E("div", "cw-t25", "flex:none;margin-left:16px", [e.when])]);
-      }).concat(more ? [one1("cw-t23", "margin-top:14px", "and " + more + " more")] : [])) : b.w < 600 ? E("div", "cw-t29", "font-weight:680;margin-top:16px;max-width:100%;" + lines(2), ["Nothing on " + none]) : one1("cw-t29", "font-weight:680;margin-top:16px", "Nothing on " + none)]));
+      }).concat(more ? [one1("cw-t23", "margin-top:14px", tl("and {n} more", { n: more }))] : [])) : b.w < 600 ? E("div", "cw-t29", "font-weight:680;margin-top:16px;max-width:100%;" + lines(2), [tl("Nothing on {when}", { when: wl(none) })]) : one1("cw-t29", "font-weight:680;margin-top:16px", tl("Nothing on {when}", { when: wl(none) }))]));
   };
   CR.agenda = R.agenda;
 
@@ -3048,11 +3068,11 @@
     // what is still to do first, then what is ticked
     var items = l.items.filter(function (x) { return !x.done; }).concat(setting(o, env, "done") === false ? [] : l.items.filter(function (x) { return x.done; }));
     var left = items.filter(function (x) { return !x.done; }), lc = l.todo ? "#0a84ff" : root.classList.contains("cw-paper") ? "#1f9d55" : "#30d158", icon = op(o).icon || "check";
-    var count = left.length ? left.length + (l.todo ? " to do" : " left") : l.items.length ? "All done" : "Nothing on it yet";
+    var count = left.length ? tl(l.todo ? "{n} to do" : "{n} left", { n: left.length }) : l.items.length ? "All done" : "Nothing on it yet";
     if (b.h < 200) {
       // Show ticked items, on a short list: how many are ticked, after what is left
       var ticked = items.length - left.length;
-      add(root, ahCol(a, [ahLab(icon, l.name, lc), one1("cw-t29", "font-weight:700;color:var(--ink);margin-top:4px", count + (left.length && ticked ? ", " + ticked + " ticked" : "")),
+      add(root, ahCol(a, [ahLab(icon, l.name, lc), one1("cw-t29", "font-weight:700;color:var(--ink);margin-top:4px", left.length && ticked ? tl("{count}, {n} ticked", { count: count, n: ticked }) : count),
         left.length ? one1("cw-t23", "", left.slice(0, 4).map(function (x) { return x.t; }).join(", ")) : null]));
       return;
     }
@@ -3060,7 +3080,7 @@
     add(root, ahCol(a, [ahLab(icon, l.name + (items.length ? " · " + count : ""), lc),
       items.length ? E("div", "cw-col", "max-width:100%;flex:none;align-items:" + (a === "right" ? "flex-end" : "flex-start"), shown.map(function (x) {
         return E("div", "cw-li" + (x.done ? " done" : ""), "max-width:100%;margin-top:14px", [E("span", "bx"), E("span", "cw-ell", "flex:0 1 auto;min-width:0", [x.t])]);
-      }).concat(more ? [one1("cw-t23", "margin-top:14px", "and " + more + " more")] : []))
+      }).concat(more ? [one1("cw-t23", "margin-top:14px", tl("and {n} more", { n: more }))] : []))
         : E("div", "cw-col", "flex:none;max-width:100%;margin-top:14px;align-items:" + FLEX[a], [one1("cw-t29", "font-weight:680", "Nothing on this list"), one1("cw-t23", "margin-top:4px", "Add to it in Home settings")])]));
   };
   CR.list = R.list;
@@ -3116,7 +3136,7 @@
 
   // ---- On this day: the household's own photos taken on this date in other years (athome.js reads
   // each photo's date). Nothing from today: it says so, never another day's photo ----
-  function yearsAgo(n) { return n === 1 ? "A year ago" : n + " years ago"; }
+  function yearsAgo(n) { return n === 1 ? wl("A year ago") : tl("{n} years ago", { n: n }); }
   // Photos from (this widget's setting): this day only, or this week (three days either side), in other years
   function memoryWeek(o, env) { return String(setting(o, env, "range", "day")) === "week"; }
   function memoryList(o, env) { var m = (athome(env) || {}).memory || {}; return (memoryWeek(o, env) ? m.week : m.today) || []; }
@@ -3127,7 +3147,7 @@
     if ((!m || !m.today || !m.today.length) && root.classList.contains("cw-photo")) { root.classList.remove("cw-photo"); root.classList.add("cw-glass"); if (!root.querySelector(".cw-bg")) root.insertBefore(E("div", "cw-bg"), root.firstChild); }
     if (!m || !m.photos) { soon(root, b, "picture", "memory"); return null; }
     if (!m.dated) { empty(root, b, "picture", b.w < 300 ? "No dates yet" : "Your photos have no dates yet", "Add them again in Home settings, Your photos"); return null; }
-    if (!m.today || !m.today.length) { empty(root, b, "picture", b.w < 300 ? (wk ? "None this week" : "None today") : wk ? "No photos from this week" : "No photos from this day", m.dated === 1 ? "One of your photos has a date" : m.dated + " of your photos have dates"); return null; }
+    if (!m.today || !m.today.length) { empty(root, b, "picture", b.w < 300 ? (wk ? "None this week" : "None today") : wk ? "No photos from this week" : "No photos from this day", m.dated === 1 ? "One of your photos has a date" : tl("{n} of your photos have dates", { n: m.dated })); return null; }
     return m.today;
   }
   R.memory = function (root, o, b, env) {
@@ -3167,7 +3187,7 @@
     // the total as big as fits the room it has (beside the apps, half the box)
     var appsW = Math.min(340, (b.w - 48) * 0.45), room = apps.length ? b.w - 48 - appsW - 40 : b.w - 48, fs = clamp(Math.min((b.h - 48 - (b.h < 200 ? 64 : 110)) / 0.92, room / (total.length * 0.6)), 24, 140);
     var main = ahCol(apps.length ? "center" : a, [b.h >= 200 || b.w >= 300 ? ahLab("timer", "Screen time") : ic("timer", 30, "currentColor"), E("div", "cw-big", "flex:none;max-width:100%;white-space:nowrap;font-size:" + px(fs) + ";margin-top:" + (b.h < 200 ? 2 : 12) + "px", [total]),
-      one1(gl ? "cw-t25" : "cw-t23", "color:var(--ink);font-weight:650;margin-top:" + (b.h < 200 ? 0 : 8) + "px", b.w < 300 ? (s.goal ? (s.minutes > s.goal ? hm(s.minutes - s.goal) + " over" : s.minutes < s.goal ? hm(s.goal - s.minutes) + " left" : "On goal") : "Today") : gl || "In apps today"),
+      one1(gl ? "cw-t25" : "cw-t23", "color:var(--ink);font-weight:650;margin-top:" + (b.h < 200 ? 0 : 8) + "px", b.w < 300 ? (s.goal ? (s.minutes > s.goal ? tl("{time} over", { time: hm(s.minutes - s.goal) }) : s.minutes < s.goal ? tl("{time} left", { time: hm(s.goal - s.minutes) }) : "On goal") : "Today") : gl || "In apps today"),
       s.goal && b.h >= 200 ? E("div", "cw-bar", "flex:none;width:100%;max-width:320px;margin-top:16px;height:14px;border-radius:7px;background:rgba(255,255,255,.25)", [E("b", "", "width:" + Math.round(clamp(s.minutes / s.goal, 0, 1) * 100) + "%;background:" + (s.minutes > s.goal ? "#ffd60a" : "#fff"))]) : null], apps.length ? "width:auto;max-width:" + px(room) + ";flex:0 1 auto" : "");
     if (!apps.length) { add(root, main); return; }
     // beside the apps: the two side by side, as one group in the middle (or to the side picked)
@@ -3302,7 +3322,7 @@
     timeWords: timeWords, moon: moon, sunTimes: sunTimes, daysTo: daysTo,
     timer: Timer,
     // the building blocks and data readers the detail layers share (widget-detail.js)
-    kit: { E: E, S: S, svg: svg, ic: ic, add: add, empty: empty, px: px, clamp: clamp, rgba: rgba, avatar: avatar, cssImg: cssImg, now: now, dataOf: dataOf,
+    kit: { tl: tl, wl: wl, dayName: dayName, E: E, S: S, svg: svg, ic: ic, add: add, empty: empty, px: px, clamp: clamp, rgba: rgba, avatar: avatar, cssImg: cssImg, now: now, dataOf: dataOf,
       weather: weather, wxIcon: wxIcon, wxWords: wxWords, shows: shows, showsFor: showsFor, music: music, photos: photos, people: people,
       appNode: appNode, appsFor: appsFor, appName: appName, appIcon: appIcon, demoImg: demoImg, bgImg: bgImg,
       sunToday: sunToday, sunTimes: sunTimes, moon: moon, tzTime: tzTime, CITY: CITY, DAYS: DAYS, MONTHS: MONTHS, longDate: longDate, clockParts: clockParts,

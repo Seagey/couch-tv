@@ -46,6 +46,10 @@
   var STAGE = { w: 1920, h: 1080 }, PANEL = { left: 80, top: 60, width: 1760, height: 960 };
   function kit() { return K || (K = window.CouchWidgets && window.CouchWidgets.kit); }
   function E() { return kit().E.apply(null, arguments); }
+  // the layer's own words in the TV's language (widget-lines.js, through the widgets kit): E() swaps a whole
+  // line by itself; tl() fills a line with a gap, wl() is for words set straight into textContent
+  function tl(en, vars) { var k = kit(); return k && k.tl ? k.tl(en, vars) : en; }
+  function wl(en) { var k = kit(); return k && k.wl ? k.wl(en) : en; }
   function ic(n, s, c, st) { return kit().ic(n, s, c || "currentColor", st); }
   function px(n) { return Math.round(n) + "px"; }
   function clamp(x, a, b) { return Math.max(a, Math.min(b, x)); }
@@ -67,7 +71,7 @@
   function label(t) { return E("div", "cwd-label", "", [t]); }
   function msg(t, keep) {
     if (!S || !S.msgEl) return;
-    S.msgEl.textContent = t || "";
+    S.msgEl.textContent = t ? wl(t) : "";
     S.msgEl.classList.toggle("on", !!t);
     clearTimeout(S.msgT);
     if (t && !keep) S.msgT = setTimeout(function () { if (S && S.msgEl) S.msgEl.classList.remove("on"); }, 3600);
@@ -319,7 +323,7 @@
     // Show each message and Show who sent it, as on the widget: an older message waits quietly here too
     var keep = kit().setting(o, env, "keep"), who = kit().setting(o, env, "who");
     if (m && !env.demo && ((keep === "hour" && m.at && Date.now() - m.at > 3600000) || (keep === "day" && m.at && Date.now() - m.at > 86400000))) m = null;
-    S.body.appendChild(head("phone", "From your AI", m ? (who === false ? "From your AI" : "From " + m.from) : "Your own AI agent can write to this TV", "#5e5ce6"));
+    S.body.appendChild(head("phone", "From your AI", m ? (who === false ? "From your AI" : tl("From {name}", { name: m.from })) : "Your own AI agent can write to this TV", "#5e5ce6"));
     if (m) S.body.appendChild(E("div", "cwd-note", "margin-top:24px;font-size:" + px(clamp(Math.sqrt(1500 * 300 / Math.max(10, m.text.length) / 1.6), 36, 84)), [m.text]));
     var C = window.CouchWidgetCaps, steps = C ? C.steps("agent", "android") : [];
     S.body.appendChild(E("div", "cwd-col cwd-grow", "margin-top:24px", [label("Connect your AI agent"),
@@ -328,7 +332,7 @@
   B.note = function (o, env) {
     var n = env.demo ? { text: "Dinner at 6. Feed Max!", from: "Mum" } : (kit().athome(env) || {}).note;
     if (!n || !n.text) return B.setup(o, env);
-    S.body.appendChild(head("edit", "Family note", n.from ? "From " + n.from : "Change it in Home settings, Designs, At home", "#c79a00"));
+    S.body.appendChild(head("edit", "Family note", n.from ? tl("From {name}", { name: n.from }) : "Change it in Home settings, Designs, At home", "#c79a00"));
     var fs = clamp(Math.sqrt(1500 * 640 / Math.max(10, n.text.length) / 1.6), 44, 120);
     S.body.appendChild(E("div", "cwd-col cwd-grow cwd-center", "", [E("div", "cwd-note", "font-size:" + px(fs), [n.text])]));
   };
@@ -379,7 +383,7 @@
     S.body.appendChild(head("timer", "Screen time today", goal && CA ? CA.goalLine(s.minutes, goal) : "Time in apps on this TV today", "#5e5ce6"));
     var max = Math.max(1, (s.apps[0] || {}).minutes || 1);
     var left = E("div", "cwd-col", "width:560px", [E("div", "cwd-huge", "font-size:180px", [hm(s.minutes)]), goal ? E("div", "cwd-bar", "margin-top:30px", [E("b", "", "width:" + Math.round(clamp(s.minutes / goal, 0, 1) * 100) + "%;background:" + (s.minutes > goal ? "#ffd60a" : "#fff"))]) : null,
-      E("div", "cwd-small", "margin-top:20px", [goal ? "Daily goal " + hm(goal) + ", set in Home settings" : "Set a daily goal in Home settings, Designs, At home"])]);
+      E("div", "cwd-small", "margin-top:20px", [goal ? tl("Daily goal {time}, set in Home settings", { time: hm(goal) }) : "Set a daily goal in Home settings, Designs, At home"])]);
     var right = E("div", "cwd-col", "margin-left:80px;flex:1;min-width:0", [label("By app")].concat(s.apps.length ? s.apps.slice(0, 7).map(function (a) {
       return F(E("div", "cwd-app-time", "", [E("span", "cwd-ell", "", [a.name || a.package || ""]), E("div", "cwd-bar", "", [E("b", "", "width:" + Math.round(a.minutes / max * 100) + "%")]), E("b", "", "", [hm(a.minutes)])]), null, a.name || a.package);
     }) : [E("div", "cwd-text", "", ["No apps yet today."])]));
@@ -399,7 +403,7 @@
     var grid = E("div", "cwd-mgrid cwd-moons", "");
     for (var i = 0; i < 28; i++) {
       var dd = new Date(d.getTime() + i * 86400000), mm = kit().moon(dd);
-      grid.appendChild(E("div", "cwd-col", "align-items:center", [moonSvg(mm.f, 74, south), E("div", "cwd-small", "", [i === 0 ? "Tonight" : kit().DAYS[dd.getDay()].slice(0, 3) + " " + dd.getDate()])]));
+      grid.appendChild(E("div", "cwd-col", "align-items:center", [moonSvg(mm.f, 74, south), E("div", "cwd-small", "", [i === 0 ? "Tonight" : (kit().dayName ? kit().dayName(dd.getDay(), true) : kit().DAYS[dd.getDay()].slice(0, 3)) + " " + dd.getDate()])]));
     }
     S.body.appendChild(E("div", "cwd-row cwd-grow", "align-items:center", [E("div", "cwd-col", "align-items:center;width:520px", [moonSvg(m.f, 380, south), E("div", "cwd-big", "margin-top:24px", [m.name])]), grid]));
   };
@@ -410,9 +414,9 @@
     if (!a) return B.setup(o, env);
     var q = kit().airIn(a, o, env), v = q.v, band = q.band;
     var SAY = { "Unhealthy for some": "Anyone with asthma or a heart or lung problem should take it easy outside.", Unhealthy: "Everyone should take it easy outside.", "Very unhealthy": "Best to stay inside and keep windows shut.", Hazardous: "Stay inside. Smoke or dust is likely.", Good: "A good day to open the windows.", Fair: "Fine for nearly everyone.", Moderate: "Sensitive people may want to take it easy outside.", Poor: "Keep windows shut if anyone has asthma.", "Very poor": "Best to stay inside and keep windows shut.", "Extremely poor": "Stay inside. Smoke or dust is likely." };
-    S.body.appendChild(head("wind", kit().wxHead(o, env, "Air quality"), band[0] + ". " + (SAY[band[0]] || ""), band[1]));
+    S.body.appendChild(head("wind", kit().wxHead(o, env, "Air quality"), wl(band[0]) + ". " + wl(SAY[band[0]] || ""), band[1]));
     var hs = q.hourly, top = Math.max.apply(null, hs.concat([q.top]));
-    S.body.appendChild(E("div", "cwd-row cwd-grow", "align-items:center", [E("div", "cwd-col", "width:560px", [E("div", "cwd-huge", "color:" + band[1], [String(v)]), E("div", "cwd-big", "", [band[0]]), E("div", "cwd-small", "margin-top:12px", [q.name + ", from Open-Meteo"])]),
+    S.body.appendChild(E("div", "cwd-row cwd-grow", "align-items:center", [E("div", "cwd-col", "width:560px", [E("div", "cwd-huge", "color:" + band[1], [String(v)]), E("div", "cwd-big", "", [band[0]]), E("div", "cwd-small", "margin-top:12px", [tl("{index}, from Open-Meteo", { index: wl(q.name) })])]),
       hs.length ? E("div", "cwd-col cwd-grow", "", [label("Next 12 hours"), E("div", "cwd-bars", "", hs.slice(0, 12).map(function (x) { return E("i", "", "height:" + Math.round(clamp(x / top, 0.06, 1) * 100) + "%;background:" + q.bandOf(x)[1]); })),
         E("div", "cwd-row cwd-small", "justify-content:space-between;margin-top:10px", [E("span", "", "", ["Now"]), E("span", "", "", ["+6h"]), E("span", "", "", ["+12h"])])]) : null]));
   };
@@ -420,7 +424,7 @@
     var m = kit().surfOf(env, o);
     if (!m || !isFinite(m.wave)) return B.setup(o, env);
     var place = kit().surfPlace(o, env), u = env.demo ? { h: "m", w: "kmh" } : kit().surfUnits(o, env);
-    S.body.appendChild(head("wind", place, kit().compass(m.dir) + " swell, " + Math.round(m.period || 0) + " seconds" + (isFinite(m.wind) ? ". Wind " + kit().compass(m.windDir) + " " + kit().windIn(m.wind, u) : ""), "#0a6e8a"));
+    S.body.appendChild(head("wind", place, tl(isFinite(m.wind) ? "{dir} swell, {n} seconds. Wind {wdir} {wind}" : "{dir} swell, {n} seconds", { dir: m.dir == null ? "" : kit().compass(m.dir), n: Math.round(m.period || 0), wdir: kit().compass(m.windDir), wind: kit().windIn(m.wind, u) }), "#0a6e8a"));
     var hs = m.hourly || [], top = Math.max.apply(null, hs.concat([0.5]));
     S.body.appendChild(E("div", "cwd-row cwd-grow", "align-items:center", [E("div", "cwd-col", "width:560px", [E("div", "cwd-huge", "", [kit().waveIn(m.wave, u), E("span", "", "font-size:.36em", [u.h === "ft" ? " ft" : " m"])]), E("div", "cwd-big", "", ["Swell now"])]),
       hs.length ? E("div", "cwd-col cwd-grow", "", [label("Swell, the next 12 hours"), E("div", "cwd-bars", "", hs.slice(0, 12).map(function (x) { return E("i", "", "height:" + Math.round(clamp(x / top, 0.06, 1) * 100) + "%;background:#64d2ff"); })),
@@ -441,7 +445,7 @@
     set(a, list[at]); b.style.opacity = "0";
     var dots = E("div", "cwd-pdots"), count = E("div", "cwd-pcount"), pause = E("div", "cwd-pchip", "", [ic("pause", 30, "#fff", "solid"), "Paused"]);
     var paint = function () {
-      count.textContent = (mem ? (kit().memoryWeek(o, env) ? "This week, " : "On this day, ") + (kit().setting(o, env, "ago") === false ? "in " + (mem[at].year || kit().now().getFullYear() - mem[at].years) : kit().yearsAgo(mem[at].years).toLowerCase()) + (list.length > 1 ? ". " : "") : "") + (list.length > 1 || !mem ? (at + 1) + " of " + list.length : "");
+      count.textContent = (mem ? tl(kit().setting(o, env, "ago") === false ? (kit().memoryWeek(o, env) ? "This week, in {year}" : "On this day, in {year}") : (kit().memoryWeek(o, env) ? "This week, {ago}" : "On this day, {ago}"), { year: mem[at].year || kit().now().getFullYear() - mem[at].years, ago: kit().yearsAgo(mem[at].years).toLowerCase() }) + (list.length > 1 ? ". " : "") : "") + (list.length > 1 || !mem ? tl("{n} of {total}", { n: at + 1, total: list.length }) : "");
       while (dots.firstChild) dots.removeChild(dots.firstChild);
       for (var i = 0; i < Math.min(list.length, 12); i++) dots.appendChild(E("i", i === at % 12 ? "on" : ""));
       pause.style.opacity = paused ? "1" : "0";
@@ -466,7 +470,7 @@
     var list = (kit().showsFor ? kit().showsFor(o, env) : kit().shows(env)).slice(0, 10);
     if (!list.length) return B.setup(o, env);
     var d = kit().dataOf(env), who = (d.people || []).filter(function (p) { return p.id === d.who; })[0], name = env.demo ? "Alex" : list[0].owner || (who ? who.name : "");
-    S.body.appendChild(head("tv", "Keep watching", name ? "What " + name + " has on the go" : "What you have on the go", "#e50914"));
+    S.body.appendChild(head("tv", "Keep watching", name ? tl("What {name} has on the go", { name: name }) : "What you have on the go", "#e50914"));
     var track = E("div", "cwd-track");
     list.forEach(function (s, i) {
       track.appendChild(F(E("div", "cwd-show", "", [E("div", "cwd-art", s.art ? "background-image:" + kit().cssImg(s.art) : "", [s.progress ? E("div", "cwd-prog", "", [E("b", "", "width:" + Math.round(s.progress * 100) + "%")]) : null,
@@ -588,7 +592,7 @@
       side.appendChild(E("div", "cwd-grid", "", rooms.slice(0, 9).map(function (z, i) {
         var zo = kit().roomOn(z);
         return F(E("div", "cwd-room" + (i === sel ? " sel" : "") + (zo ? " on" : ""), "width:" + rw + "px;height:" + (big ? 116 : 136) + "px", [E("div", "cwd-row", "justify-content:space-between", [E("span", "cwd-mid cwd-ell", "min-width:0", [z.name]), E("span", "cwd-big", "font-size:" + (big ? 40 : 48) + "px;margin-left:10px", [kit().tdeg(z.current, z, env)])]),
-          E("div", "cwd-small cwd-ell", "color:" + (zo ? kit().MODE_COL[z.state] || "#64d2ff" : "rgba(255,255,255,.6)"), [z.ok === false ? "Not answering" : zo ? kit().roomMode(z) + " to " + kit().tdeg(z.target, z, env) : "Off"])]), function () { sel = i; draw(); }, "Room " + z.name);
+          E("div", "cwd-small cwd-ell", "color:" + (zo ? kit().MODE_COL[z.state] || "#64d2ff" : "rgba(255,255,255,.6)"), [z.ok === false ? "Not answering" : zo ? tl("{mode} to {temp}", { mode: wl(kit().roomMode(z)), temp: kit().tdeg(z.target, z, env) }) : "Off"])]), function () { sel = i; draw(); }, "Room " + z.name);
       })));
       var modes = (r.modes || []).filter(function (x) { return x !== "off"; });
       if (modes.length) {
@@ -915,7 +919,7 @@
     var WW = window.CouchWidgetWeb, q = op(o), feed = WW ? WW.feedOf(kit().feedFor(kit().setting(o, env, "feed"), env)) : "abc", src = WW ? WW.FEEDS[feed].name : "", name = kit().webName(q.label, src, WW ? WW.FEEDS : null) || src || "Headlines", rec = null, items;
     if (env.demo) items = (wk().DEMO_NEWS || []).map(function (x) { return { title: x[0], at: Date.now() - x[1] * 3600000 }; });
     else { rec = webRec(env, "news", feed); if (!rec || !rec.ok || !rec.v || !rec.v.length) return B.setup(o, env); items = rec.v; }
-    S.body.appendChild(head("info", name, [name !== src && src ? "From " + src : "", rec ? updated(rec) : ""].filter(Boolean).join(". ") || "The latest headlines", "#ff453a"));
+    S.body.appendChild(head("info", name, [name !== src && src ? tl("From {name}", { name: src }) : "", rec ? updated(rec) : ""].filter(Boolean).join(". ") || "The latest headlines", "#ff453a"));
     // two columns of three: six headlines, each on three lines at most
     S.body.appendChild(E("div", "cwd-grid cwd-grow", "align-content:flex-start;margin-top:30px", items.slice(0, 6).map(function (x) {
       return F(E("div", "cwd-news", "width:780px", [x.at ? E("div", "cwd-small", "color:#ff453a;font-weight:700", [wk().agoOf ? wk().agoOf(x.at) : ""]) : null,
@@ -971,7 +975,7 @@
     var tile = function (name, big, sub) { return F(E("div", "cwd-game", "width:520px", [E("div", "cwd-small", "", [name]), E("div", "cwd-big", "font-size:72px;margin-top:8px", [big]), sub ? E("div", "cwd-small", "margin-top:6px", [sub]) : null]), null, name); };
     var lb = V.leave ? V.leave.replace(/^(.*?)(leave by|Leave by) /, "") : "";
     S.body.appendChild(E("div", "cwd-grid", "align-content:flex-start;margin-top:30px", [tile("Drive", V.minutes + " min", "Without traffic"), tile("Distance", V.km + " km", "By road"),
-      tile(V.leave ? (/^Leave/.test(V.leave) ? "Leave by" : V.leave.replace(/, leave by .*/, "") + ", leave by") : "Leave by", lb || "Not set", V.leave ? (V.arrive ? "To arrive by " + V.arrive : "") : "Set an arrive by time in this widget's settings")]));
+      tile(V.leave ? (/^Leave/.test(V.leave) ? "Leave by" : tl("{day}, leave by", { day: wl(V.leave.replace(/, leave by .*/, "")) })) : "Leave by", lb || "Not set", V.leave ? (V.arrive ? tl("To arrive by {time}", { time: V.arrive }) : "") : "Set an arrive by time in this widget's settings")]));
     S.body.appendChild(E("div", "cwd-grow"));
     S.body.appendChild(E("div", "cwd-small", "", ["Route by OSRM from OpenStreetMap. Map data © OpenStreetMap contributors."]));
   };
