@@ -436,14 +436,14 @@
     clock: "format ampm seconds date align", tallclock: "format align", glassclock: "format scene", analog: "seconds", flipclock: "format",
     wordclock: "", solar: "", worldclock: "label cities", countdown: "label month day year unit icon", date: "show dfmt align place", month: "", timer: "label minutes",
     weather: "place hilo night", bigtemp: "place", hourly: "place hours", week: "place", rain: "label", uv: "label", sun: "label", moon: "", air: "label", surf: "label",
-    photo: "image fit caption sub", slideshow: "seconds_each caption sub shuffle", mosaic: "count", artframe: "image mat caption sub", memory: "align",
+    photo: "image fit caption sub", slideshow: "seconds_each caption sub shuffle", mosaic: "count", artframe: "image mat caption sub", memory: "align range ago",
     keep: "", keeprow: "label shows", upnext: "apps sport", picks: "label align",
     app: "apps", folder: "label apps cols", dock: "apps more", appgrid: "apps cols names", games: "label apps",
     nowplaying: "", soundscape: "sound", queue: "", speakers: "",
     aircon: "entity others", scenes: "label", controls: "label controls cols", camera: "label", doorbell: "", energy: "", sensor: "label", battery: "low",
-    bins: "label weekday alt anchor lid_a lid_b bin_a bin_b", people: "", agenda: "label align days", note: "align", list: "label icon align",
+    bins: "label weekday alt anchor lid_a lid_b bin_a bin_b", people: "names", agenda: "label align days", note: "align byline", list: "label icon align done",
     card: "label text icon", quote: "text sub", word: "", news: "feed label align count", sports: "label league team align games", stocks: "label tickers align price", commute: "label arrive_h arrive_m buffer weekdays align",
-    welcome: "kicker text sub align source times", quick: "quick align", wifi: "align", guide: "align", screentime: "align", ask: "label align", agent: "label align", stack: ""
+    welcome: "kicker text sub align source times", quick: "quick align", wifi: "align", guide: "align", screentime: "align appcount", ask: "label align", agent: "label align", stack: ""
   };
   // The smart home and music widgets: which of the TV's own Home Assistant things a widget shows,
   // named by entity id only (never a reading, a state or an address). A TV shows one only when it is
@@ -462,6 +462,11 @@
   OPT.others = SAN.b; OPT.picture = SAN.b; OPT.now = SAN.b;
   OPT.low = function (v) { return SAN.n(v, 5, 50, true); };
   OPT.times = SAN.b;
+  // the family and photo widgets' own choices (widget-caps.js settings, store "design"): who the note is
+  // from, ticked items on a list, On this day's days and how long ago, the apps beside screen time
+  OPT.byline = SAN.b; OPT.done = SAN.b; OPT.ago = SAN.b;
+  OPT.range = function (v) { return SAN.pick(v, ["day", "week"]); };
+  OPT.appcount = function (v) { return v === "auto" ? "auto" : SAN.n(v, 0, 8, true); };
   // align: centred unless the design says left or right (seagey, 18 Nov 2026)
   WOPT.controls = "label controls cols switches align"; WOPT.camera = "label cam align"; WOPT.doorbell = "label align picture"; WOPT.energy = "label align now";
   WOPT.sensor = "label reading align"; WOPT.speakers = "label players align"; WOPT.queue = "label align";

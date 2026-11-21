@@ -171,7 +171,21 @@ console.log("Running at home tests...");
   eq(A.nameDate("2022-11-18 beach.jpeg"), { y: 2022, m: 11, d: 18 }, "a date with dashes");
   ok(A.nameDate("p1kz3-4521.jpg") === null && A.nameDate("photo-1234567890.jpg") === null && A.nameDate("20221399.jpg") === null && A.nameDate("x120221118.jpg") === null, "no date, a long number and a wrong date are not dates");
   const photos = [{ src: "a", date: { y: 2019, m: 11, d: 18 } }, { src: "b", date: { y: 2024, m: 11, d: 18 } }, { src: "c", date: { y: 2024, m: 11, d: 17 } }, { src: "d", date: { y: 2026, m: 11, d: 18 } }, { src: "e" }];
-  eq(A.onThisDay(photos, new Date(2026, 10, 18)), [{ src: "a", years: 7 }, { src: "b", years: 2 }], "this day in other years, the longest ago first (not today's, not the day before)");
+  eq(A.onThisDay(photos, new Date(2026, 10, 18)), [{ src: "a", years: 7, year: 2019 }, { src: "b", years: 2, year: 2024 }], "this day in other years, the longest ago first (not today's, not the day before)");
+  // This week (three days either side), in other years; how long ago counts from the photo's own day
+  eq(A.nearDay(photos, new Date(2026, 10, 18), 3), [{ src: "a", years: 7, year: 2019 }, { src: "b", years: 2, year: 2024 }, { src: "c", years: 2, year: 2024 }], "this week: the longest ago first, the nearest day first in a year");
+  // New Year: on 1 January 2027 a photo from 30 December 2026 is two days old, not "a year ago"
+  const ny = [{ src: "dec30-2026", date: { y: 2026, m: 12, d: 30 } }, { src: "dec30-2025", date: { y: 2025, m: 12, d: 30 } }, { src: "jan2-2026", date: { y: 2026, m: 1, d: 2 } }, { src: "jan1-2026", date: { y: 2026, m: 1, d: 1 } }];
+  const jan1 = A.nearDay(ny, new Date(2027, 0, 1), 3);
+  ok(!jan1.some((p) => p.src === "dec30-2026"), "1 January: a photo from two days ago (30 December) is not in other years");
+  eq(jan1.find((p) => p.src === "dec30-2025"), { src: "dec30-2025", years: 1, year: 2025 }, "1 January 2027: 30 December 2025 is a year ago (taken in 2025)");
+  eq(jan1.find((p) => p.src === "jan1-2026"), { src: "jan1-2026", years: 1, year: 2026 }, "1 January 2027: 1 January 2026 is a year ago");
+  eq(jan1.find((p) => p.src === "jan2-2026"), { src: "jan2-2026", years: 1, year: 2026 }, "and 2 January 2026 too");
+  // 30 December 2026: 2 January 2026 is about a year ago (362 days), though it is the same year
+  const dec30 = A.nearDay(ny, new Date(2026, 11, 30), 3);
+  eq(dec30.find((p) => p.src === "jan2-2026"), { src: "jan2-2026", years: 1, year: 2026 }, "30 December 2026: 2 January 2026 is a year ago, taken in 2026");
+  ok(!dec30.some((p) => p.src === "dec30-2026"), "30 December 2026: today's own photo is not in other years");
+  eq(dec30.find((p) => p.src === "dec30-2025"), { src: "dec30-2025", years: 1, year: 2025 }, "30 December 2026: 30 December 2025 is a year ago");
 }
 
 // 6. screen time words

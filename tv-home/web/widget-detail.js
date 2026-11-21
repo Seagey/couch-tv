@@ -219,7 +219,9 @@
     S.body.appendChild(head("calendar", "Calendar", kit().longDate(d), "#ff453a"));
     var todayCol = E("div", "cwd-col", "width:430px", [E("div", "cwd-label", "color:#ff453a", [kit().DAYS[d.getDay()]]), E("div", "cwd-huge", "font-size:220px;line-height:.9", [String(d.getDate())]),
       E("div", "cwd-mid", "", [kit().MONTHS[m] + " " + y]), E("div", "cwd-small", "margin-top:10px", ["Day " + doy + " of the year, week " + week])]);
-    var evs = o.kind === "agenda" ? (env.demo ? kit().demoEvents() : ((kit().athome(env) || {}).cal || {}).events) : null;
+    // the Agenda: the calendars picked for this widget on this TV (widgets.js agendaEvents)
+    var ae = o.kind === "agenda" && !env.demo ? kit().agendaEvents(o, env) : null;
+    var evs = o.kind === "agenda" ? (env.demo ? kit().demoEvents() : ae && ae.events) : null;
     if (o.kind === "agenda" && !evs) return B.setup(o, env);
     if (evs) return agendaDay(evs, env, todayCol);
     S.body.appendChild(E("div", "cwd-row cwd-grow", "align-items:flex-start;margin-top:36px", [todayCol, E("div", "cwd-row", "margin-left:60px;align-items:flex-start", [monthGrid(y, m, d.getDate()), E("div", "", "width:56px"), monthGrid(m === 11 ? y + 1 : y, (m + 1) % 12, -1)])]));
@@ -341,14 +343,14 @@
     var w = kit().wifiOf(env);
     if (!w || !w.ssid) return B.setup(o, env);
     S.body.appendChild(head("wifi", "Guest Wi-Fi", "Join from a phone", "#0a84ff"));
-    var code = kit().qrNode(w.qr, 600), nopass = w.sec === "nopass" || !w.pass;
+    var code = kit().qrNode(w.qr, 600), nopass = w.sec === "nopass" || !w.pass, hide = !nopass && !!code && kit().setting(o, env, "hidepass") === true;
     S.body.appendChild(E("div", "cwd-row cwd-grow", "margin-top:30px", [
       E("div", "cwd-qr", "", [code || E("div", "cwd-text", "color:#111", ["The name and password are too long for a code. Type them in instead."])]),
-      E("div", "cwd-col", "margin-left:80px;min-width:0;flex:1", [label("Network"), E("div", "cwd-big cwd-ell", "", [w.ssid]), label(nopass ? "No password" : "Password"), nopass ? null : E("div", "cwd-big cwd-ell", "", [w.pass]),
+      E("div", "cwd-col", "margin-left:80px;min-width:0;flex:1", [label("Network"), E("div", "cwd-big cwd-ell", "", [w.ssid]), label(nopass ? "No password" : hide ? "The password is in the code" : "Password"), nopass || hide ? null : E("div", "cwd-big cwd-ell", "", [w.pass]),
         label("How to join"), E("div", "cwd-list", "", ["Open the camera on your phone.", "Point it at the code.", "Tap the Wi-Fi note that comes up, then Join."].map(function (t, i) { return E("div", "cwd-li", "", [E("b", "", "flex:none;width:44px", [String(i + 1) + "."]), E("span", "", "", [t])]); }))])]));
   };
   B.guide = function (o, env) {
-    var g = kit().guideOf(env);
+    var g = kit().guidePart(o, env);
     if (!g.length) return B.setup(o, env);
     S.body.appendChild(head("info", "House guide", g.length === 1 ? "One thing to know" : g.length + " things to know", "#5e5ce6"));
     var w = g.length > 4 ? 520 : 800;
@@ -413,7 +415,7 @@
 
   // photos: full screen, Left and Right flick, OK pauses
   B.photos = function (o, env) {
-    var q = op(o), mem = o.kind === "memory" ? (env.demo ? [{ src: kit().demoImg("camp"), years: 2 }] : (((kit().athome(env) || {}).memory || {}).today || [])) : null;
+    var q = op(o), mem = o.kind === "memory" ? (env.demo ? [{ src: kit().demoImg("camp"), years: 2 }] : kit().memoryList(o, env)) : null;
     var list = mem ? mem.map(function (m) { return m.src; }) : q.image ? [q.image] : (o.kind === "artframe" && env.demo ? [kit().demoImg("art")] : kit().photos(env, o));
     if (!list.length) return B.setup(o, env);
     S.full = true;
@@ -425,7 +427,7 @@
     set(a, list[at]); b.style.opacity = "0";
     var dots = E("div", "cwd-pdots"), count = E("div", "cwd-pcount"), pause = E("div", "cwd-pchip", "", [ic("pause", 30, "#fff", "solid"), "Paused"]);
     var paint = function () {
-      count.textContent = (mem ? "On this day, " + kit().yearsAgo(mem[at].years).toLowerCase() + (list.length > 1 ? ". " : "") : "") + (list.length > 1 || !mem ? (at + 1) + " of " + list.length : "");
+      count.textContent = (mem ? (kit().memoryWeek(o, env) ? "This week, " : "On this day, ") + (kit().setting(o, env, "ago") === false ? "in " + (mem[at].year || kit().now().getFullYear() - mem[at].years) : kit().yearsAgo(mem[at].years).toLowerCase()) + (list.length > 1 ? ". " : "") : "") + (list.length > 1 || !mem ? (at + 1) + " of " + list.length : "");
       while (dots.firstChild) dots.removeChild(dots.firstChild);
       for (var i = 0; i < Math.min(list.length, 12); i++) dots.appendChild(E("i", i === at % 12 ? "on" : ""));
       pause.style.opacity = paused ? "1" : "0";
