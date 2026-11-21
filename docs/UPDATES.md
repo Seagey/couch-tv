@@ -139,7 +139,7 @@ Opening a YouTube video card from Keep watching now plays that very video instea
 
 ### 19 November 2026: release 0.13, and TV home designs from couch-tv Studio (opt in)
 
-0.13 is on [the Releases page](https://github.com/Seagey/couch-tv/releases), with everything below marked "since 0.13". It also brings designs from couch-tv Studio: make a home there, then type its code on the TV in Home settings, couch-tv Studio, Get a design. A design can place the clock, the dock and the rest anywhere, and add any of 66 widgets on a 9 by 5 grid (Scores and Markets are Beta), including Home Assistant ones such as Control Centre and Camera (a still picture every two seconds, never video), and a short looping video background. Nothing changes until someone at the TV turns it on, and **Back to my classic home** puts the old home back in one step. Things typed at home (a note, lists, the guest Wi-Fi, a calendar address) and a Home Assistant token never leave the TV in a design or in Share this home. Keys are in [CONFIG.md](CONFIG.md).
+0.13 is on [the Releases page](https://github.com/Seagey/couch-tv/releases), with everything below marked "since 0.13". It also brings designs from couch-tv Studio: make a home there, then type its code on the TV in Home settings, couch-tv Studio, Get a design. A design can place the clock, the dock and the rest anywhere, and add any of 66 widgets on a 9 by 5 grid (Scores and Markets were new and had not yet run on a real TV), including Home Assistant ones such as Control Centre and Camera (a still picture every two seconds, never video), and a short looping video background. Nothing changes until someone at the TV turns it on, and **Back to my classic home** puts the old home back in one step. Things typed at home (a note, lists, the guest Wi-Fi, a calendar address) and a Home Assistant token never leave the TV in a design or in Share this home. Keys are in [CONFIG.md](CONFIG.md).
 
 ### 18 November 2026: Fire TV app packages, YouTube videos as a list of their own, and a Keep watching row that follows the app (options A and B, since 0.13)
 
@@ -219,7 +219,7 @@ Thanks Anshul7171 (#219) and adri07 (#220). An LG NANO80TNA (webOS 5.6.2) ran ap
 
 ### 14 November 2026: VIZIO, couch-tv's home in the TV's own webview, tried on one set (since 0.13)
 
-Thanks lukionsp (#206). On a VIZIO, `scripts/vizio-web.py` can now load couch-tv's home (the bridge's `/tv/`) in the TV's own webview, through VIZIO OS's web app launcher. `--probe` finds which launcher id your set accepts with a test page that reports back, and `--url` puts the home up. It is Beta and has been tried on one set, a V4K65X-0810 on VIZIO OS 86.920.9.3; the webview is slow, so a single scene works best. It is off unless you run it: the bridge never opens it by itself, and a new install behaves exactly as before. For safety, couch-tv only sends a page with name space 4 and an allow listed launcher id (3001 or 17), checked in the one function that builds the request, and only a plain `http://` or `https://` address. It refuses `APP_ID` 1, the TV's main menu, where a saved address can leave the menus dead until a factory reset. Steps and the safety note: [VIZIO.md](VIZIO.md#the-home).
+Thanks lukionsp (#206). On a VIZIO, `scripts/vizio-web.py` can now load couch-tv's home (the bridge's `/tv/`) in the TV's own webview, through VIZIO OS's web app launcher. `--probe` finds which launcher id your set accepts with a test page that reports back, and `--url` puts the home up. It has been tried on one set, a V4K65X-0810 on VIZIO OS 86.920.9.3; the webview is slow, so a single scene works best. It is off unless you run it: the bridge never opens it by itself, and a new install behaves exactly as before. For safety, couch-tv only sends a page with name space 4 and an allow listed launcher id (3001 or 17), checked in the one function that builds the request, and only a plain `http://` or `https://` address. It refuses `APP_ID` 1, the TV's main menu, where a saved address can leave the menus dead until a factory reset. Steps and the safety note: [VIZIO.md](VIZIO.md#the-home).
 
 ### 14 November 2026: input tiles for each TV, and a picture on an input tile (since 0.13)
 
@@ -305,7 +305,7 @@ Holding OK on a card in Keep watching opens a small menu with **Remove from Keep
 
 On a Xiaomi MiTV-AXSO2 (Android TV 9, Google's older Android TV home), a Home press left the Google home up for 5 seconds, and a second press in that time kept it there. It is the same Android 9 hold as on Fire OS 7 (#162), so the Home button watch now moves couch-tv's own task to the front on every TV with Android 9 or older, not only on Fire TV. Android 10 and newer are unchanged.
 
-### 13 November 2026: Bell Streamer with Fibe TV as its home (Beta, since 0.13)
+### 13 November 2026: Bell Streamer with Fibe TV as its home (since 0.13)
 
 On a Bell Streamer (Bell Canada's Android TV 12 box) the home is Bell's Fibe TV app, so the Home key opened Fibe and never reached couch-tv. The Home button watch now knows Fibe's home screen and puts couch-tv back on top, and `apply.sh` switches the watch on when Fibe is installed. Fibe is never switched off. Opening Fibe from couch-tv's own tile works and is left alone while it stays in front. Untested on a real box so far (thanks Sparkybabcia, [#168](https://github.com/Seagey/couch-tv/issues/168)). What to expect: Fibe may flash up for a moment before couch-tv comes back, and a Fibe button on the remote will bring couch-tv back instead of Fibe, because the watch cannot tell it from a Home press.
 
@@ -313,7 +313,7 @@ On a Bell Streamer (Bell Canada's Android TV 12 box) the home is Bell's Fibe TV 
 
 After opening TV Settings or an app's settings, a TV that was short of memory could drop the home page and start it again at the first tile, because the page did not remember where you were. The home now saves the row and tile you were on when it goes into the background (and a moment after each move), and puts you back there for the next 20 minutes. Pressing Home still goes to the first tile. Reported on a Hisense Google TV with 1.8 GB of RAM (thanks IshMehta, [#166](https://github.com/Seagey/couch-tv/issues/166)).
 
-### 13 November 2026: Privacy clean, Beta (on main)
+### 13 November 2026: Privacy clean, opt in (on main)
 
 `apply.sh` has a new opt in step, `PRIVACY=1`, that switches off known tracking, ad and ACR (automatic content recognition) apps it can find on your TV, reversibly: Samba TV on Sony, Alphonso, Xiaomi analytics and ads, Fire TV's ACR, ad ID and metrics apps, and Google's feedback and ad services apps. It goes through the same safety check as everything else `apply.sh` switches off, so the TV's home, setup, the remote (Bluetooth, voice, HDMI CEC) and Keep watching (the TV provider that holds Watch Next) are never touched, and `undo.sh` switches it all back on. `PRIVACY=1 DRY_RUN=1` shows what it would do first. It cannot remove every bit of tracking, so [PRIVACY.md](PRIVACY.md) also lists the menu switches to turn off on each brand, Samsung and LG included. Nothing changes unless you set it. The step runs on your computer, so `git pull` brings it.
 
@@ -381,7 +381,7 @@ The home's quick buttons for Bluetooth and Network now open the TV's settings st
 
 Off unless you switch it on in Home settings, under Look. After a wait on the home screen (5 minutes to an hour) it shows a dim, pure black clock that drifts a few pixels so nothing burns in, or turns the screen or the TV off. It can also turn the TV off after paused playback (Android TV and Roku; never an HDMI input or a game), with a "TV auto-off" warning and an "I'm still here" button on the phone remote for the last five minutes. Optional quiet hours shorten the wait overnight. See [CONFIG.md](CONFIG.md), `smart_idle`. Thanks ekagra-codes (#132).
 
-### 13 November 2026: Hisense VIDAA, working on a real TV (Beta, since 0.13)
+### 13 November 2026: Hisense VIDAA, working on a real TV (one set so far, since 0.13)
 
 Matthew Klette (#128) got couch-tv running on a real Hisense 55U7N (VIDAA 9): login, pairing, the phone remote, opening apps and a native Couch TV tile all work. New `keep_home` option (off by default) brings couch-tv back when the TV falls to VIDAA's home. Setup: [VIDAA.md](VIDAA.md). Thanks Matthew.
 
@@ -391,13 +391,13 @@ On a Xiaomi TV the Home button watch now also catches the Home key and the Mi lo
 
 ### 13 November 2026: Philips Titan OS, first read only look at a real TV (since 0.13)
 
-A 43PUS8909/12 answered the check: its remote API, its network announcement and a browser activity are real. Pairing, keys, volume, apps and the home have not run on it yet, so Titan OS stays Beta, phone remote only. Also better: connections are reused, a TV that does not answer now says why, and the serial number is hidden in what the check prints. `scripts/find-tvs.py` lists a Philips TV and `scripts/philips-setup.py <address>` goes from address to a config entry. See [PHILIPS-TITAN.md](PHILIPS-TITAN.md). Thanks googlarz (#144).
+A 43PUS8909/12 answered the check: its remote API, its network announcement and a browser activity are real. Pairing, keys, volume, apps and the home have not run on it yet, so on Titan OS it is the phone remote only, and pairing has not been tried on a real TV yet. Also better: connections are reused, a TV that does not answer now says why, and the serial number is hidden in what the check prints. `scripts/find-tvs.py` lists a Philips TV and `scripts/philips-setup.py <address>` goes from address to a config entry. See [PHILIPS-TITAN.md](PHILIPS-TITAN.md). Thanks googlarz (#144).
 
 ### 12 November 2026: Kids mode, New and optional (since 0.13)
 
 Off unless you switch it on for someone. A kids profile's home shows only a shelf of shows a parent picked, as big posters that open straight into each show, plus the few apps you allow. No other apps, no settings, no grown ups' Keep watching. Leaving it needs the parent PIN, typed with the remote's arrows. Now in the Apple TV app (Couch TV) too. See [Kids mode](../README.md#kids-mode). Idea from Natalie Bruss (@nataliebruss on Instagram).
 
-### 12 November 2026: Philips, Panasonic and Fire TV on Vega OS, Beta
+### 12 November 2026: Philips, Panasonic and Fire TV on Vega OS, not yet run on real TVs
 
 Four more paths, each with a computer at home that stays on, and on each the maker's own Home button still opens the maker's home:
 - **Philips with Titan OS:** the phone remote (power, keys, volume, inputs, apps; one real TV has answered the read only check, pairing is still to be tried). couch-tv's home needs a Titan app, from Titan's store or its DevView developer app, which is not there yet ([PHILIPS-TITAN.md](PHILIPS-TITAN.md)).
@@ -407,7 +407,7 @@ Four more paths, each with a computer at home that stays on, and on each the mak
 
 If you have one of these TVs, each has a short read only first test, and an issue saying how it went helps everyone after you.
 
-### 12 November 2026: VIZIO, New (Beta)
+### 12 November 2026: VIZIO, the phone remote (not yet run on a real VIZIO then)
 
 couch-tv can now drive a VIZIO on SmartCast or VIZIO OS from the phone remote: power, volume, inputs and opening apps, with a computer at home. couch-tv's own home page does not open on a VIZIO by itself (no browser, no sideloading, and VIZIO's app programme is closed to outsiders). It is new and has not been on a real VIZIO yet: if you have one, the first test only reads and takes about 15 minutes ([VIZIO-TESTING.md](VIZIO-TESTING.md)). Setup and limits: [VIZIO.md](VIZIO.md).
 
@@ -415,7 +415,7 @@ couch-tv can now drive a VIZIO on SmartCast or VIZIO OS from the phone remote: p
 
 couch-tv now has a Roku version. Roku channels are not web pages, so the home is drawn again as a native channel (the Night scenes with the clock in them, date and weather, the people switch, Keep watching and your apps), and the bridge talks to the Roku over its own network protocol and opens the channel every time the TV is switched on. It was built from Roku's documentation and tested against a test Roku and a BrightScript simulator. **Update, 13 November 2026:** it has now run on a real Roku TV (an Element, Roku OS 16, channel only). Roku OS 16 refuses a channel's own network calls to its TV, so with no computer at home the app row came up empty. The build now has `roku/build.py --apps-from <roku address>`, which copies the Roku's apps and icons into the channel (rebuild after installing new apps; a computer at home does not have this limit), the dock opens apps directly when the Roku says no, and `--install` takes `--password` for Windows (thanks mjiles, #152). The bridge path and the power on hook are still not seen on a real Roku, so if you have one, please open an issue saying how it went. Setup and limits: [ROKU.md](ROKU.md).
 
-### 10 November 2026: Android 6 (experimental, since 0.13)
+### 10 November 2026: Android 6 (checked on an emulator only, since 0.13)
 
 Both TV apps now install on Android 6.0 (a Xiaomi Mi TV 4A with PatchWall, for example, [issue #59](https://github.com/Seagey/couch-tv/issues/59)). The 0.12 apps on the Releases page still need Android 7.1, so for now build them yourself ([Building the app](SETUP.md#building-the-app-instead-of-downloading-it)). Checked on an Android 6 emulator only, not a real TV. There both apps install and open, but that emulator's built in browser engine (Chrome 44, the oldest a TV can ship) lays the home out badly: the shelf stacks up instead of running across. A TV whose engine is newer may look right. The on-TV app (option C) cannot pair by Wi-Fi on Android 6 (that needs Android 11): set it up from a computer with USB or network debugging (port 5555), as the steps in [SETUP.md](SETUP.md) already do. If you try it, please open an issue saying what you see.
 
