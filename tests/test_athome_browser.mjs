@@ -178,9 +178,11 @@ console.log("Running at home browser tests...");
 
 // 2b. On this day, from a photo whose name has a date two years ago today
 {
-  const page = await home([["memory", 0, 0, 4, 4], ["memory", 4, 0, 2, 2]], { "mock:tvhome.settings": { s: { photos: [{ id: "a", url: "demo/IMG_" + twoYearsAgo.replace(/-/g, "") + "_101500.jpg" }, { id: "b", url: "demo/beach.jpg" }] } } });
+  const page = await home([["memory", 0, 0, 4, 4], ["memory", 4, 0, 2, 2], ["memory", 6, 0, 2, 2, { ago: false }]], { "mock:tvhome.settings": { s: { photos: [{ id: "a", url: "demo/IMG_" + twoYearsAgo.replace(/-/g, "") + "_101500.jpg" }, { id: "b", url: "demo/beach.jpg" }] } } });
   ok(/On this day/.test(await text(page, "w0")) && /2 years ago/.test(await text(page, "w0")), "On this day: the photo from two years ago today");
-  ok((await text(page, "w1")).indexOf(String(today.getFullYear() - 2)) >= 0, "and on a tile, the year it was taken");
+  // ws2-home (0.13.9): Show how long ago is on by default, also on a tile; off shows the year it was taken
+  ok(/(^|\D)2\s*years ago/.test(await text(page, "w1")), "and on a tile, how long ago: " + await text(page, "w1"));
+  ok((await text(page, "w2")).indexOf(String(today.getFullYear() - 2)) >= 0, "and on a tile with Show how long ago off, the year it was taken: " + await text(page, "w2"));
   await page.close();
   const none = await home([["memory", 0, 0, 4, 4]], { "mock:tvhome.settings": { s: { photos: [{ id: "a", url: "demo/IMG_20200101_101500.jpg" }] } } });
   const t = await text(none, "w0");

@@ -47,7 +47,24 @@ ok(listW.opts && listW.opts.label === "Shopping" && Object.keys(listW.opts).ever
 ok(!/4471/.test(JSON.stringify(CD.sanitize({ v: 1, objects: [{ id: "a", type: "widget", kind: "list", x: 0, y: 0, w: 360, h: 360, opts: { label: "Code 4471" } }] }))), "a list name with digits is refused (a design never carries numbers typed as words)");
 const WOPT = CD.wopts();
 // (days: the Agenda's Today, Today and tomorrow or This week, a fixed choice, never its data)
-KINDS.forEach((k) => ok(String(WOPT[k] || "").split(" ").filter(Boolean).every((o) => ["label", "icon", "align", "days"].indexOf(o) >= 0), k + ": the gate allows no option that could hold its data (" + (WOPT[k] || "none") + ")"));
+// ws2-home (0.13.9) added settings a design may carry: note byline, list done, memory range and ago,
+// screentime appcount. They are allowed only because the gate turns each into a yes/no or one of a few
+// fixed choices, so no household words or numbers can ride in them; this is checked on the gate itself.
+const SAFE_OPTS = { byline: "yes/no", done: "yes/no", ago: "yes/no", range: ["day", "week"], appcount: ["auto", 0, 1, 2, 3, 4, 5, 6, 7, 8] };
+const PROBES = [true, false, "Dinner at six then bath", "summer-swell-42", "Granny Smith", 95, 120, 4471, -3, 2.5, "week", "day", "auto", 3, null, ["Milk"], { t: "Milk" }];
+const kindOf = (o) => KINDS.filter((k) => String(WOPT[k] || "").split(" ").indexOf(o) >= 0)[0];
+Object.keys(SAFE_OPTS).forEach((o) => {
+  const k = kindOf(o);
+  ok(!!k, o + ": an at home widget carries it (" + JSON.stringify(WOPT) + ")");
+  const seen = PROBES.map((p) => {
+    const c = CD.sanitize({ v: 1, objects: [{ id: "a", type: "widget", kind: k, x: 0, y: 0, w: 360, h: 360, opts: { [o]: p } }] });
+    return ((c.objects[0] || {}).opts || {})[o];
+  }).filter((v) => v !== undefined);
+  const allowed = SAFE_OPTS[o] === "yes/no" ? [true, false] : SAFE_OPTS[o];
+  ok(seen.every((v) => allowed.indexOf(v) >= 0), k + "." + o + ": the gate keeps only " + JSON.stringify(allowed) + ", got " + JSON.stringify(seen));
+  ok(!seen.some((v) => typeof v === "string" && /Dinner|swell|Granny|Milk/.test(v)) && seen.indexOf(95) < 0 && seen.indexOf(120) < 0 && seen.indexOf(4471) < 0, k + "." + o + ": no household words or numbers get through");
+});
+KINDS.forEach((k) => ok(String(WOPT[k] || "").split(" ").filter(Boolean).every((o) => ["label", "icon", "align", "days"].concat(Object.keys(SAFE_OPTS)).indexOf(o) >= 0), k + ": the gate allows no option that could hold its data (" + (WOPT[k] || "none") + ")"));
 
 // 2. Share this home
 const snap = { scenes: ["night"], builtIn: ["night"], clock24: false, dock: ["com.netflix.ninja"], design: { v: 1, objects: widgets } };
