@@ -222,9 +222,13 @@ console.log("Running Matter UI browser tests...");
   await press(page, "ArrowRight");
   for (let i = 0; i < 80 && !/^Smart home/.test(await page.evaluate(() => (document.querySelector(".srow.focus") || {}).textContent || "")); i++) await press(page, "ArrowDown", 90);
   await press(page, "Enter", 500);
-  // the TV's language changes (Home settings, Language) and the screen draws again
+  // the TV's language changes (Home settings, Language) and the screen draws again. Up and Down only
+  // move the focus since #301 (moveFocusInPlace, no rebuild), so go back to Designs and into Smart home
+  // again, as someone who just changed the language would; the Language row itself redraws at once.
   await page.evaluate(() => window.I18N.set("de"));
-  await press(page, "ArrowDown", 200); await press(page, "ArrowUp", 300);
+  await press(page, "ArrowLeft", 300);
+  for (let i = 0; i < 80 && !/^Smart Home|^Smart home/.test(await page.evaluate(() => (document.querySelector(".srow.focus") || {}).textContent || "")); i++) await press(page, "ArrowDown", 90);
+  await press(page, "Enter", 500);
   const t = await page.evaluate(() => document.querySelector("#settings").textContent);
   ok(/Matter-Geräte/.test(t) && /Ein Matter-Gerät hinzufügen/.test(t) && /Lampe, an/.test(t) && !/Add a Matter device/.test(t), "German: heading, device words and Add: " + (t.match(/Matter-Ger[^|]{0,80}/) || [""])[0]);
   for (let i = 0; i < 80 && !/^Ein Matter-Gerät hinzufügen/.test(await page.evaluate(() => (document.querySelector(".srow.focus") || {}).textContent || "")); i++) await press(page, "ArrowDown", 90);
