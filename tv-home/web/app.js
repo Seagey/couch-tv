@@ -4243,6 +4243,16 @@
           var nx = g + dx;
           g = nx > last ? first : nx < first ? last : nx;
         }
+      } else if (dy < 0 && row === 0 && expanded) {
+        // Up from the top row of More apps folds it back to the dock first, the next Up leaves it:
+        // on the same app if it is in the dock, else the app it was opened from, else More apps
+        var was = gridItems[g] ? gridKey(gridItems[g]) : null, from = dockBack;
+        expanded = false; dockBack = null; renderGrid();
+        var pick = function (key) { var at = -1; if (key) gridItems.forEach(function (x, i) { if (at < 0 && gridKey(x) === key) at = i; }); return at; };
+        var at = pick(was);
+        if (at < 0) at = pick(from);
+        if (at < 0) gridItems.forEach(function (x, i) { if (at < 0 && x.kind === "more") at = i; });
+        zone = "grid"; g = Math.max(0, at);
       } else if (dy < 0 && row === 0) {
         if (footballEnabled && NIGHT && !LOOP && npReach() && gridEls[g] && gridEls[g].getBoundingClientRect().left < $("np").getBoundingClientRect().right) zone = "np";
         else if (footballEnabled && NIGHT && !LOOP && (!cards.length || (gridEls[g] && gridEls[g].getBoundingClientRect().left < $("football-scores").getBoundingClientRect().right))) zone = "football";
