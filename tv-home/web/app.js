@@ -209,6 +209,11 @@
   // (two strikes), so one busy stretch never locks Lighter home on; that answer is then kept for 30 days.
   var LOW_END = false, LOW_END_WHY = "", LOW_END_KEY = "tvhome.lowend", LOW_END_DAYS = 7, LOW_END_TOLD = "tvhome.lighter_told";
   var LOW_END_NAV = "tvhome.lowend_nav", LOW_END_MOVING_DAYS = 30, LOW_END_WAIT = 20000, LOW_END_NAV_FROM = 30000;
+  // A median frame over 250 ms is not a slow TV but a screen that was not being drawn: a Samsung Frame (2021,
+  // Tizen 6) kept a 2849.7 ms measurement from Art Mode, where the page stays loaded and visible to itself
+  // (document.hidden false) but gets almost no frames, and ran Lighter home for a week on that. Measured
+  // with its screen on it gives 19 ms. Such a reading, kept or new, is thrown away and measured again later.
+  var LOW_END_STALL = 250;
   function lowEndDecision(o) {
     if (o.setting === true || o.setting === false) return { low: o.setting, why: "setting" };
     if (typeof o.memory === "number" && o.memory > 0 && o.memory <= 1) return { low: true, why: "memory" };
@@ -216,10 +221,11 @@
     // slow: over 22 ms, or 1.3 frames of a slower screen (its refresh at rest, at most 42 ms: 24 Hz)
     var lim = Math.max(22, Math.min(o.idleMs || 16.7, 42) * 1.3);
     // the focus moving along a row stuttered: low end on the second start that says so, a first strike otherwise
-    if (typeof o.navMs === "number" && o.navMs > lim) return o.navStrike ? { low: true, why: "moving" } : { low: false, why: "strike" };
+    if (typeof o.navMs === "number" && o.navMs > lim && o.navMs <= LOW_END_STALL) return o.navStrike ? { low: true, why: "moving" } : { low: false, why: "strike" };
     var days = o.cached && o.cached.moving ? (o.movingDays || 30) : o.days;
-    if (o.cached && typeof o.cached.low === "boolean" && o.now >= o.cached.t && o.now - o.cached.t < days * 86400000) return { low: o.cached.low, why: "measured" };
-    if (typeof o.medianMs === "number") return { low: o.medianMs > lim, why: "measured" };
+    var stalled = o.cached && typeof o.cached.ms === "number" && o.cached.ms > LOW_END_STALL;
+    if (o.cached && !stalled && typeof o.cached.low === "boolean" && o.now >= o.cached.t && o.now - o.cached.t < days * 86400000) return { low: o.cached.low, why: "measured" };
+    if (typeof o.medianMs === "number" && o.medianMs <= LOW_END_STALL) return { low: o.medianMs > lim, why: "measured" };
     return null;   // measure first
   }
   // the screen's own frame time at rest: the 20th percentile of 20 frames with nothing added (a slow frame or
@@ -291,10 +297,15 @@
     // measure once the home has drawn and start up is over (once, however often settings apply)
     if (lowEnd.pending) return;
     lowEnd.pending = true;
-    whenShown(LOW_END_WAIT, function () {
+    var tries = 0;
+    whenShown(LOW_END_WAIT, function measure() {
       measureFrames(function (ms, idle) {
-        o.medianMs = ms; o.idleMs = idle; lowEnd.pending = false;
+        o.medianMs = ms; o.idleMs = idle;
         var m = lowEndDecision(o);
+        // the screen was not being drawn (Art Mode, a screen off with the app still up): nothing is decided or
+        // kept; again in a minute, up to five times this start
+        if (!m) { if (++tries < 5) whenShown(60000, measure); else lowEnd.pending = false; return; }
+        lowEnd.pending = false;
         try { localStorage.setItem(LOW_END_KEY, JSON.stringify({ low: m.low, t: Date.now(), ms: Math.round(ms * 10) / 10, idle: Math.round(idle * 10) / 10 })); } catch (e) {}
         apply(m, true);
         if (!m.low) lowEndNav(o, apply);
@@ -327,6 +338,7 @@
       window.removeEventListener("keydown", onKey, true);
       d.sort(function (x, y) { return x - y; });
       o.navMs = d[d.length >> 1];
+      if (o.navMs > LOW_END_STALL) return;   // the screen stopped drawing (Art Mode): no answer, the strike as it was
       var m = lowEndDecision(o);
       try {
         if (m && m.why === "strike") localStorage.setItem(LOW_END_NAV, JSON.stringify({ strike: 1, t: Date.now(), ms: Math.round(o.navMs * 10) / 10 }));
@@ -2512,7 +2524,9 @@
     el.innerHTML = ICONS.check + "<span>" + esc(text) + "</span>";
     el.classList.add("on");
     clearTimeout(toastTimer);
-    toastTimer = setTimeout(function () { el.classList.remove("on"); }, 9000);
+    // and its words go once it has faded, so the page does not keep saying it (a Frame's page read later still
+    // had "This TV is a bit slow" in it, long after it was shown once)
+    toastTimer = setTimeout(function () { el.classList.remove("on"); toastTimer = setTimeout(function () { el.innerHTML = ""; }, 1000); }, 9000);
   }
   function bedtimeOn() { return HOME.bedtime_dim === true; }   // off unless config.json home.bedtime_dim is true
   function refreshBedtimeDim() {

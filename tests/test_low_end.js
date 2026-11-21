@@ -11,7 +11,7 @@ const js = fs.readFileSync(path.join(web, 'app.js'), 'utf8');
 const css = fs.readFileSync(path.join(web, 'app.css'), 'utf8');
 const m = js.match(/function lowEndDecision\(o\) \{[\s\S]*?\n  \}/);
 assert(m, 'lowEndDecision is in app.js');
-const decide = new Function(m[0] + '; return lowEndDecision;')();
+const decide = new Function(js.match(/var LOW_END_STALL = \d+;/)[0] + m[0] + '; return lowEndDecision;')();
 const now = Date.parse('2026-11-17T08:00:00Z'), day = 86400000;
 const base = { now: now, days: 7 };
 const d = (o) => decide(Object.assign({}, base, o));
@@ -52,6 +52,21 @@ assert(idf, 'idleFrames is in app.js');
   assert.deepStrictEqual(r2.waits, [2000], 'an arrow 0.3 s ago: read again 2 s later');
   assert(Math.abs(r2.got - 16.7) < 0.01, 'and then read');
 }
+// a screen that was not being drawn (#lowend-fix, a 2021 Samsung Frame, Tizen 6, 21 Nov 2026): Lighter home had been
+// on for days from a reading taken in Art Mode, kept as {"low":true,"ms":2849.7}; with the screen on it measured
+// a 19.2 ms median (idle 13.1 ms). A reading over 250 ms, kept or new, decides nothing and is measured again.
+const decideS = new Function(js.match(/var LOW_END_STALL = \d+;/)[0] + m[0] + '; return lowEndDecision;')();
+const ds = (o) => decideS(Object.assign({}, base, o));
+assert.strictEqual(ds({ setting: 'auto', memory: 2, cached: { low: true, t: now - 2 * day, ms: 2849.7 } }), null, "the Frame's kept Art Mode reading is measured again");
+assert.deepStrictEqual(ds({ setting: 'auto', memory: 2, cached: { low: true, t: now - 2 * day, ms: 2849.7 }, medianMs: 19.2, idleMs: 13.1 }), { low: false, why: 'measured' }, 'and its screen on reading leaves Lighter home off');
+assert.strictEqual(ds({ setting: 'auto', memory: 2, medianMs: 2849.7, idleMs: 13.1 }), null, 'a new stalled reading decides nothing');
+assert.strictEqual(ds({ setting: 'auto', memory: 2, medianMs: 251 }), null, 'over 250 ms: stalled');
+assert.deepStrictEqual(ds({ setting: 'auto', memory: 2, medianMs: 249 }), { low: true, why: 'measured' }, 'just under: a very slow TV');
+assert.deepStrictEqual(ds({ setting: 'auto', memory: 2, cached: { low: true, t: now - day, ms: 45 } }), { low: true, why: 'measured' }, 'a real slow reading is still kept');
+assert.deepStrictEqual(ds({ setting: 'auto', memory: 2, cached: { low: false, t: now - day, ms: 19 }, navMs: 900, navStrike: true }), { low: false, why: 'measured' }, 'moving frames from a stalled screen are no strike');
+assert(/if \(!m\) \{ if \(\+\+tries < 5\) whenShown\(60000, measure\); else lowEnd\.pending = false; return; \}/.test(js), 'a stalled reading is not kept, and measured again a minute later, up to five times');
+assert(/if \(o\.navMs > LOW_END_STALL\) return;/.test(js), 'a stalled moving reading leaves the strike as it was');
+assert(/el\.classList\.remove\("on"\); toastTimer = setTimeout\(function \(\) \{ el\.innerHTML = ""; \}, 1000\);/.test(js), "the note's words leave the page once it has faded");
 // the setting wins, either way
 assert.deepStrictEqual(d({ setting: true, memory: 8 }), { low: true, why: 'setting' });
 assert.deepStrictEqual(d({ setting: false, memory: 1 }), { low: false, why: 'setting' });
