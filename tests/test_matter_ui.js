@@ -367,6 +367,28 @@ const SHARED = () => [
     ok(!U.sb.CouchMatter.on(), "refused by the launcher: Matter stays off, nothing shows");
   }
 
+  // ---- final gate B1: the Couch TV home app WITH a home computer asks the bridge, never its own TVMATTER,
+  // so the TV and the phone page (served by the bridge) see the same devices ----
+  {
+    const T = page({ devices: SHARED() });
+    const sb = T.sb;
+    const nat = [];
+    sb.TVMATTER = { request: (id, method, p, body) => { nat.push([method, p, body]); setTimeout(() => sb.CouchMatter.reply(id, JSON.stringify({ devices: [], ready: true, version: 1 })), 0); } };
+    // read again with TVMATTER there from the start (the launcher's WebView), then app.js hands the bridge over
+    vm.runInContext(fs.readFileSync(path.join(WEB, "matter.js"), "utf8"), sb);
+    T.H.useBridge(T.api); await flush(); await flush();
+    const M = sb.CouchMatter;
+    const before = nat.length;
+    await M.refresh(); await flush();
+    ok(M.count() === 6, "with a bridge the TV lists the bridge's devices, not the launcher's empty list: " + M.count());
+    ok(T.asked.some((a) => a[0] === "api" && a[2] === "/api/matter/devices"), "devices asked of the bridge");
+    const add = await M.commission("34970112332");
+    ok(add.ok && T.asked.some((a) => a[0] === "api" && a[2] === "/api/matter/commission"), "commission goes to the bridge: " + JSON.stringify(add));
+    await M.ask("set", "light.matter_1_1", "off");
+    ok(T.asked.some((a) => a[0] === "api" && a[2] === "/api/matter/command"), "a command goes to the bridge");
+    ok(nat.length === before && !nat.some((a) => /commission|command/.test(a[1])), "nothing after the hand over goes to TVMATTER: " + JSON.stringify(nat));
+  }
+
   // ---- coordinator 21 Nov (Fable on nl-matter-bridge): reason keys, names that would hide a device ----
   {
     const T = page({ tvha: true, devices: [], ready: false, note: "Node.js 18 or newer is needed." });

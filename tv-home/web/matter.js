@@ -103,11 +103,12 @@
   }
 
   // ---------------- asking the controller ----------------
-  // the launcher's own Matter (window.TVMATTER, when it has one), else the on-TV app's server or the
-  // home computer's bridge (app.js hands its api over), else a preview's pretend one (mock.js)
+  // the home computer's bridge or the on-TV app's server once app.js hands its api over (the same
+  // controller the phone page asks); else the launcher's own Matter (window.TVMATTER, the Couch TV
+  // home app on its own); else a preview's pretend one (mock.js)
   var seq = 0, waiting = {};
   function call(method, path, body, ms) {
-    var nat = root.TVMATTER;
+    var nat = MT.api ? null : root.TVMATTER;   // with a home computer (app.js handed its api over) the bridge is the controller, as on the phone page
     if (nat && typeof nat.request === "function") {
       return new Promise(function (resolve, reject) {
         var id = "m" + (++seq).toString(36);
@@ -165,7 +166,7 @@
   // that stream is not there or not allowed, the screens keep asking as they do for Home Assistant.
   var ES = null;
   function listen() {
-    if (ES !== null || MT.api == null || root.TVMATTER || typeof root.EventSource !== "function" || !/^https?:$/.test((root.location || {}).protocol || "")) return;
+    if (ES !== null || MT.api == null || typeof root.EventSource !== "function" || !/^https?:$/.test((root.location || {}).protocol || "")) return;
     var opened = false;
     // the bridge's own address with the pairing key in the address (an EventSource sends no header):
     // app.js gives the api an events(path) that builds it; else this page's own server
@@ -384,7 +385,7 @@
 
   root.CouchMatter = {
     // app.js hands over the same api it uses for the bridge (or the on-TV app's server)
-    use: function (api) { if (typeof api !== "function" || MT.api === api) return; MT.api = api; refresh(); },
+    use: function (api) { if (typeof api !== "function" || MT.api === api) return; MT.api = api; MT.pending = null; refresh(); },   // a question the launcher was still answering is not the bridge's answer
     reply: reply,
     // is there a Matter controller answering for this TV?
     on: function () { return MT.reached; },
