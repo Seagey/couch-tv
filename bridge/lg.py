@@ -38,6 +38,7 @@ import re
 import shutil
 import socket
 import time
+from urllib.parse import urlsplit
 
 import aiohttp
 
@@ -51,6 +52,7 @@ from tv import TVUnavailable
 COUCH_APP = "app.couchtv.home"
 HOME_PACKAGE = "app.couchtv.launcher"
 DEVMODE_APP = "com.palmdts.devmode"
+HELPER_APP = "app.couchtv.helper"   # lg/helper: makes the Magic Remote's Home open couch-tv
 FG_SUB = "fg-sub"   # the id of the subscription to the app in front
 # How often the Developer Mode countdown is read from LG (it needs the TV on).
 LEFT_EVERY_HOURS = 6
@@ -158,6 +160,8 @@ class LGTV:
         self.leave_inputs = cfg.get("leave_inputs", False) is True
         # true: an app closing to LG's home reopens couch-tv. Home pressed from couch-tv is left alone.
         self.back_to_couch = cfg.get("back_to_couch", False) is True
+        # true: start the Home button Helper (lg/helper, app.couchtv.helper) each time the TV comes on
+        self.home_helper = cfg.get("home_helper", False) is True
         # true (with back_to_couch): an app closing straight to an HDMI input reopens couch-tv too
         self.back_to_couch_inputs = cfg.get("back_to_couch_inputs", False) is True
         self.ares_device = cfg.get("ares_device") or self.id
@@ -185,6 +189,7 @@ class LGTV:
         self._left_app = (None, 0.0)   # (LG id, when) the last app that went to an empty screen
         self.ids = {}               # LG id -> android-style package, for what is installed
         self.launch_points = []     # every app the TV lists: {"id", "title", "icon"}
+        self._icons = {}            # app id -> (bytes, content type), from icon()
         self._ids_checked = 0.0
         self._vol = {}
         self._listeners = set()
@@ -556,6 +561,34 @@ class LGTV:
         await self.refresh_installed()
         return self.launch_points
 
+    async def icon(self, lid):
+        """An app's icon (bytes, content type), kept in memory. The TV serves them on its self-signed
+        port 3001, which the couch-tv page refuses, so the bridge fetches them with the check off."""
+        if lid in self._icons:
+            return self._icons[lid]
+        await self.refresh_installed()
+        url = next((p["icon"] for p in self.launch_points if p["id"] == lid), None) or ""
+        u = urlsplit(url)
+        # Only an icon file on this TV's own address: never a fetch to anywhere else.
+        if u.scheme != "https" or u.hostname != self.ip \
+                or not u.path.startswith("/resources/") or ".." in u.path:
+            raise ValueError(f"the TV lists no icon for {lid}")
+        s = await self._http()
+        async with s.get(url, ssl=False, allow_redirects=False) as r:
+            data = b""
+            if r.status == 200:
+                async for chunk in r.content.iter_chunked(65536):
+                    data += chunk
+                    if len(data) > 1_000_000:
+                        data = b""   # too big to be an app icon
+                        break
+        # The TV sends no Content-Type (an OLED B5, webOS 11.2), so the bytes decide.
+        kind = "image/png" if data.startswith(b"\x89PNG") else "image/jpeg" if data.startswith(b"\xff\xd8") else None
+        if not kind:
+            raise ValueError(f"the TV has no icon for {lid} ({r.status})")
+        self._icons[lid] = (data, kind)
+        return self._icons[lid]
+
     # ---------- the watcher and the hook ----------
     async def start(self):
         self._tasks = [asyncio.create_task(self._watch())]
@@ -687,6 +720,13 @@ class LGTV:
         # Only the watcher calls this, once per switch-on (a Samsung also has its art channel, so it
         # skips a second call within 15 s; an LG switched off and on quickly should still get it).
         self._hook_at = time.monotonic()
+        if self.home_helper:
+            # A copy already running keeps its lock and the new one exits, so this is safe to repeat.
+            try:
+                await self._launch(HELPER_APP, quiet=False)
+                self._note("TV came on, started the Home button Helper")
+            except Exception as e:
+                self._note(f"TV came on, could not start the Home button Helper: {e}")
         if time.monotonic() < self.home_on_wake_until:
             # switched on from the phone: the home, even if a command (a Home press, an app opened
             # just before it went off) still holds the quiet time

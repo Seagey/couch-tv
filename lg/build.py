@@ -331,6 +331,8 @@ def main():
         raise SystemExit("tv-home/web/index.html no longer loads config.js; update lg/build.py")
     html = html.replace(tag, '<script src="settings.js"></script>\n<script src="webos-apps.js"></script>\n'
                              '<script src="webos.js"></script>\n' + tag)
+    # the loading screen covers the ~4 s before the home first paints on a real LG (OLED B5)
+    html = html.replace("<body>", '<body>\n<script src="loader.js"></script>', 1)
     with open(index, "w") as f:
         f.write(html)
 

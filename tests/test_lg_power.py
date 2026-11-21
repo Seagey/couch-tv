@@ -82,6 +82,15 @@ class Hook(unittest.TestCase):
         self.assertEqual(self.run_hook(t), [t.app_id])
         self.assertEqual(t.home_on_wake_until, 0.0)
 
+    def test_home_helper_starts_at_every_power_on_even_in_the_quiet_time(self):
+        t = lg.LGTV(dict(CFG, home_helper=True))
+        t.devmode_file = make_tv().devmode_file
+        t.quiet_until = time.monotonic() + 20
+        self.assertEqual(self.run_hook(t), ["app.couchtv.helper"])
+
+    def test_no_home_helper_by_default(self):
+        self.assertEqual(self.run_hook(make_tv()), ["app.couchtv.home"])
+
     def test_power_key_while_off_marks_a_wake(self):
         t = make_tv()
 

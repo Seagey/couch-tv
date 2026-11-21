@@ -1,0 +1,13 @@
+{
+  "id": "app.couchtv.helper",
+  "version": "0.1.0",
+  "vendor": "couch-tv",
+  "type": "native",
+  "main": "detach",
+  "title": "Couch TV Home Button",
+  "icon": "icon.png",
+  "requiredACG": ["application.launcher"],
+  "noWindow": true,
+  "noSplashOnLaunch": true,
+  "spinnerOnLaunch": false
+}

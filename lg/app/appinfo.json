@@ -8,6 +8,7 @@
   "icon": "icon.png",
   "largeIcon": "largeIcon.png",
   "bgColor": "#0b0d12",
+  "noSplashOnLaunch": true,
   "resolution": "1920x1080",
   "disableBackHistoryAPI": true
 }

@@ -81,15 +81,17 @@
     (m.ids || []).forEach(function (id) { byLg[id] = pkg; });
     [m.name].concat(m.names || []).forEach(function (n) { if (n) byName[plain(n)] = pkg; });
   });
-  // LG's own parts (live TV, inputs, settings, the store, Developer Mode) are not shown on the home.
+  // LG's own parts (live TV, inputs, settings, Developer Mode) are not shown on the home,
   var SYSTEM = /^(com\.webos\.|com\.palm\.|com\.lge\.|com\.palmdts\.)/;
+  // except LG's store ("Apps"), which takes the home's App Store tile, the Play Store's place on Android
+  var STORE = { "com.webos.app.discovery": "com.android.vending" };
   var byPkg = {}, shown = [];
   lgApps.forEach(function (a) {
-    if (a.id === SELF) return;
-    var pkg = byLg[a.id] || byName[plain(a.title)];
+    if (a.id === SELF || a.id === "app.couchtv.helper") return;   // lg/helper has no window
+    var pkg = STORE[a.id] || byLg[a.id] || byName[plain(a.title)];
     if (pkg && !byPkg[pkg]) {
       byPkg[pkg] = a;
-      shown.push({ package: pkg, label: MAP[pkg].name || a.title });
+      shown.push({ package: pkg, label: (MAP[pkg] || {}).name || a.title });
     } else if (!pkg && !SYSTEM.test(a.id || "") && !byPkg[a.id]) {
       byPkg[a.id] = a;
       shown.push({ package: a.id, label: a.title });
@@ -127,8 +129,15 @@
     var m = MAP[pkg];
     if ((m && m.logo) || LOGOS[pkg]) return "logos/" + pkg + ".png";
     var a = byPkg[pkg];
-    if (a && a.icon) return /^[a-z]+:/.test(a.icon) ? a.icon : "file://" + a.icon;
-    return null;
+    if (!a || !a.icon) return null;
+    // the TV gives most icons on its self-signed port 3001, which this page refuses: the bridge fetches them
+    if (BRIDGE && /^https:/.test(a.icon)) {
+      var q = [];
+      if (TV_ID) q.push("tv=" + TV_ID);
+      if (S.key) q.push("key=" + encodeURIComponent(S.key));
+      return BRIDGE + "/api/webos/icon/" + encodeURIComponent(a.id) + (q.length ? "?" + q.join("&") : "");
+    }
+    return /^[a-z]+:/.test(a.icon) ? a.icon : "file://" + a.icon;
   }
 
   // ---------- Developer Mode: press its own Extend ----------

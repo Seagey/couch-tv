@@ -1,4 +1,5 @@
 """lg/build.py downloads the TV's own icon for a baked app with no bundled logo (#56)."""
+import asyncio
 from http.server import BaseHTTPRequestHandler, HTTPServer
 import os
 from pathlib import Path
@@ -8,15 +9,19 @@ import subprocess
 import sys
 import tempfile
 import threading
+import time
 import unittest
 
 sys.path.insert(0, str(Path(__file__).parents[1] / "lg"))
+sys.path.insert(0, str(Path(__file__).parents[1] / "bridge"))
 import build
+import lg
 
 PNG = b"\x89PNG\r\n\x1a\n" + b"\0" * 32
 
 
 class Icons(BaseHTTPRequestHandler):
+    """Like the TV's port 3001: no Content-Type, the bytes are the only clue."""
     def do_GET(self):
         body = b"<html>not an icon</html>" if self.path == "/page.html" else PNG
         self.send_response(200)
@@ -54,6 +59,22 @@ class FetchTvIcons(unittest.TestCase):
     def setUp(self):
         self.logos_dir = tempfile.mkdtemp()
         self.addCleanup(shutil.rmtree, self.logos_dir)
+
+    def bridge_tv(self, icon):
+        t = lg.LGTV({"id": "test", "name": "Test", "kind": "lg", "ip": "127.0.0.1"})
+        t.ip, t._ids_checked = "127.0.0.1", time.time()
+        t.launch_points = [{"id": "com.fubotv.app", "title": "Fubo", "icon": icon}]
+        return t
+
+    def test_bridge_fetches_an_icon_from_the_tv_self_signed_port(self):
+        t = self.bridge_tv(self.base + "/resources/abc/fubo_130x130.png")
+        self.assertEqual(asyncio.run(t.icon("com.fubotv.app")), (PNG, "image/png"))
+
+    def test_bridge_fetches_nothing_off_the_tv(self):
+        for icon in ("https://198.51.100.7:3001/resources/abc/x.png", self.base + "/page.html",
+                     "file:///usr/palm/applications/com.fubotv.app/icon.png"):
+            with self.assertRaises(ValueError):
+                asyncio.run(self.bridge_tv(icon).icon("com.fubotv.app"))
 
     def test_saves_icons_under_the_name_the_app_looks_for(self):
         logos = {"com.netflix.ninja"}
