@@ -771,6 +771,8 @@ is optional:
 | `moving_tiles` | The focused tile's slow sway: `true` or `false`. |
 | `dock` | The dock: `mac` (the focused app and its neighbours grow in a wave, the name in a bubble above it) or `classic`. |
 | `lighter` | Lighter home for a slow box (no blur, no soft shadows, a still photo, smaller pictures): `true` or `false`. |
+| `show_clock` | Look, Show the clock: `true` or `false`. |
+| `hi_res` | Look, Sharp pictures on a 4K TV: `"auto"`, `"always"` or `"off"`. |
 | `glass_amount` | How clear the glass is: `1` (frosted) to `5` (very clear). |
 | `clock_style` | The Night clock: `frosted` or `liquid`. |
 | `glass_focus` | Glass app icons, the focused app: `colour` or `glass`. |

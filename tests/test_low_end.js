@@ -16,14 +16,73 @@ const now = Date.parse('2026-11-17T08:00:00Z'), day = 86400000;
 const base = { now: now, days: 7 };
 const d = (o) => decide(Object.assign({}, base, o));
 
+// a kept answer from the future (a clock set back) is not trusted: measured again
+assert.strictEqual(d({ setting: 'auto', memory: 4, cached: { low: true, t: now + day } }), null, 'a kept answer dated tomorrow is redone');
+assert.strictEqual(d({ setting: 'auto', memory: 4, cached: { low: true, t: now + 60 * day, moving: true }, movingDays: 30 }), null, 'a moving answer from the future too');
+// a strike: this week counts, older or from the future does not
+const sk = js.match(/function strikeOk\(k, now, days\) \{[^\n]*\}/);
+assert(sk, 'strikeOk is in app.js');
+const strikeOk = new Function(sk[0] + '; return strikeOk;')();
+assert.strictEqual(strikeOk({ strike: 1, t: now - 2 * day }, now, 7), true, 'a strike two days old counts');
+assert.strictEqual(strikeOk({ strike: 1, t: now - 8 * day }, now, 7), false, 'a strike eight days old does not');
+assert.strictEqual(strikeOk({ strike: 1, t: now + day }, now, 7), false, 'a strike dated tomorrow does not');
+assert.strictEqual(strikeOk(null, now, 7), false, 'no strike');
+assert.strictEqual(strikeOk({ strike: 1 }, now, 7), false, 'a strike with no time does not');
+// the rest frame time: the 20th percentile of 20 frames, read again 2 s later after an arrow press
+const idf = js.match(/  function idleFrames\(done\) \{[\s\S]*?\n  \}\n/);
+assert(idf, 'idleFrames is in app.js');
+{
+  const runIdle = (frames, keyAgo) => {
+    let i = 0, now = 5000, waits = [], got;
+    const raf = (cb) => { const t = frames[Math.min(i, frames.length - 1)]; i++; cb(t); };
+    const perf = { now: () => now };
+    const st = (fn, ms) => { waits.push(ms); now += ms; fn(); };
+    const f = new Function('requestAnimationFrame', 'performance', 'setTimeout', 'LOW_END_KEY_AT', idf[0] + '; return idleFrames;')(raf, perf, st, now - keyAgo);
+    f((ms) => { got = ms; });
+    return { got, waits };
+  };
+  // 21 timestamps: 16 frames of 16.7 ms and 4 slow ones of 50 ms; the median would still be 16.7, the 20th percentile is
+  const ts = [0]; for (let k = 0; k < 20; k++) ts.push(ts[ts.length - 1] + (k % 5 === 4 ? 50 : 16.7));
+  const r1 = runIdle(ts, 10000);
+  assert(Math.abs(r1.got - 16.7) < 0.01 && r1.waits.length === 0, 'no recent press: read at once, the 20th percentile (' + r1.got + ')');
+  // a 30 Hz screen with a few 66 ms frames: 33.3
+  const ts2 = [0]; for (let k = 0; k < 20; k++) ts2.push(ts2[ts2.length - 1] + (k % 4 === 3 ? 66.6 : 33.3));
+  assert(Math.abs(runIdle(ts2, 10000).got - 33.3) < 0.01, '30 Hz screen: 33.3');
+  const r2 = runIdle(ts, 300);
+  assert.deepStrictEqual(r2.waits, [2000], 'an arrow 0.3 s ago: read again 2 s later');
+  assert(Math.abs(r2.got - 16.7) < 0.01, 'and then read');
+}
 // the setting wins, either way
 assert.deepStrictEqual(d({ setting: true, memory: 8 }), { low: true, why: 'setting' });
 assert.deepStrictEqual(d({ setting: false, memory: 1 }), { low: false, why: 'setting' });
 // memory decides where it is clear
 assert.deepStrictEqual(d({ setting: 'auto', memory: 1 }), { low: true, why: 'memory' });
 assert.deepStrictEqual(d({ setting: 'auto', memory: 0.5 }), { low: true, why: 'memory' });
-assert.deepStrictEqual(d({ setting: 'auto', memory: 4 }), { low: false, why: 'memory' });
 assert.deepStrictEqual(d({ setting: 'auto', memory: 8 }), { low: false, why: 'memory' });
+// 4 GB is measured, not trusted (g01, #197, #213: a 4 GB Google TV Streamer, Homatics and TCL stuttered)
+assert.strictEqual(d({ setting: 'auto', memory: 4 }), null, '4 GB is measured');
+assert.deepStrictEqual(d({ setting: 'auto', memory: 4, medianMs: 30 }), { low: true, why: 'measured' }, '4 GB at 30 ms frames is low end');
+assert.deepStrictEqual(d({ setting: 'auto', memory: 4, medianMs: 14 }), { low: false, why: 'measured' }, '4 GB at 14 ms frames is not');
+assert.deepStrictEqual(d({ setting: false, memory: 4, medianMs: 30 }), { low: false, why: 'setting' }, 'a chosen setting always wins');
+assert.deepStrictEqual(d({ setting: true, memory: 8, medianMs: 10 }), { low: true, why: 'setting' }, 'a chosen setting always wins');
+// the frames while the focus moves along a row: two strikes (a stutter on a second start within a week)
+assert.deepStrictEqual(d({ setting: 'auto', memory: 4, medianMs: 15, navMs: 33 }), { low: false, why: 'strike' }, 'a first stutter is only a strike');
+assert.deepStrictEqual(d({ setting: 'auto', memory: 4, medianMs: 15, navMs: 33, navStrike: true }), { low: true, why: 'moving' }, 'the second one turns it on');
+assert.deepStrictEqual(d({ setting: 'auto', memory: 4, cached: { low: false, t: now - day }, navMs: 33, navStrike: true }), { low: true, why: 'moving' }, 'a kept "not low end" gives way to a second stutter');
+assert.deepStrictEqual(d({ setting: 'auto', memory: 4, cached: { low: false, t: now - day }, navMs: 17, navStrike: true }), { low: false, why: 'measured' }, 'smooth this time: not low end');
+// slow is against the screen's own refresh (#review: a smooth 30, 25 or 24 Hz screen is not a slow TV)
+assert.deepStrictEqual(d({ setting: 'auto', memory: 4, idleMs: 33.3, medianMs: 34 }), { low: false, why: 'measured' }, '30 Hz screen, 34 ms frames: smooth');
+assert.deepStrictEqual(d({ setting: 'auto', memory: 4, idleMs: 40, medianMs: 41 }), { low: false, why: 'measured' }, '25 Hz screen: smooth');
+assert.deepStrictEqual(d({ setting: 'auto', memory: 4, idleMs: 41.7, medianMs: 42 }), { low: false, why: 'measured' }, '24 Hz screen: smooth');
+assert.deepStrictEqual(d({ setting: 'auto', memory: 4, idleMs: 16.7, medianMs: 30 }), { low: true, why: 'measured' }, '60 Hz screen, 30 ms frames: low end');
+assert.deepStrictEqual(d({ setting: 'auto', memory: 4, idleMs: 33.3, medianMs: 50 }), { low: true, why: 'measured' }, '30 Hz screen, 50 ms frames: low end');
+assert.deepStrictEqual(d({ setting: 'auto', memory: 4, idleMs: 33.3, medianMs: 15, navMs: 34, navStrike: true }), { low: false, why: 'measured' }, '30 Hz screen moving at its own rate: smooth');
+assert.deepStrictEqual(d({ setting: 'auto', memory: 4, idleMs: 200, medianMs: 60 }), { low: true, why: 'measured' }, 'a refresh over 42 ms counts as 42 (a stalled measurement is not a screen)');
+// a stutter result is kept 30 days, a still measurement a week
+assert.deepStrictEqual(d({ setting: 'auto', memory: 4, cached: { low: true, t: now - 20 * day, moving: true }, movingDays: 30 }), { low: true, why: 'measured' }, 'moving: kept 30 days');
+assert.strictEqual(d({ setting: 'auto', memory: 4, cached: { low: true, t: now - 31 * day, moving: true }, movingDays: 30 }), null, 'and redone after');
+assert.strictEqual(d({ setting: 'auto', memory: 4, cached: { low: true, t: now - 8 * day } }), null, 'a still measurement: a week');
+assert.deepStrictEqual(d({ setting: 'auto', memory: 8, navMs: 40 }), { low: false, why: 'memory' }, '8 GB is not measured');
 // 2 GB (the measured TV) or no figure: a measurement, unless one from this week is kept
 assert.strictEqual(d({ setting: 'auto', memory: 2 }), null, '2 GB is measured');
 assert.strictEqual(d({ setting: 'auto' }), null, 'no deviceMemory is measured');
@@ -37,6 +96,10 @@ assert.deepStrictEqual(d({ setting: 'auto', memory: 2, medianMs: 22 }), { low: f
 // a low end TV gets Lighter home itself (no second switch), only when nobody has chosen
 assert(/function lowEnd\(\) \{\n    var chosen = typeof ST\.lighter === "boolean" \|\| typeof HOME\.lighter === "boolean";\n    if \(chosen \|\| OLD_ENGINE\) return;/.test(js), 'a choice in Home settings or home.lighter, or an old WebView, is never overridden');
 assert(/LIGHTER = LOW_END;\n      document\.documentElement\.classList\.toggle\("lighter", LIGHTER\);/.test(js), 'a low end TV turns on Lighter home');
+assert(/if \(LIGHTER === LOW_END \|\| typeof ST\.lighter === "boolean" \|\| typeof HOME\.lighter === "boolean"\) return;/.test(js), 'a choice made meanwhile, here or in config.json, is never overridden');
+assert(/LOW_END_WAIT = 20000, LOW_END_NAV_FROM = 30000/.test(js), 'the still check 20 s after start, presses counted from 30 s');
+assert(/if \(performance\.now\(\) < LOW_END_NAV_FROM \|\| document\.hidden \|\| !o\.idleMs\) return;/.test(js), 'presses at start up, or with an app in front, do not count');
+assert(/function whenShown\(ms, fn\) \{\n    setTimeout\(function go\(\) \{ if \(document\.hidden\) setTimeout\(go, 5000\); else fn\(\); \}, ms\);/.test(js), 'nothing is measured while the home is hidden');
 assert(!/frost-lite|low_end/.test(js) && !/frost-lite/.test(css), 'no separate low end switch or style');
 // the settled focus holds still
 assert(/html\.settled \.tile\.focus \.face, html\.settled \.tile\.focus \.face::after \{ animation-play-state: paused; \}/.test(css), 'settled pauses the sway and the glint');

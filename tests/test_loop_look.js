@@ -572,7 +572,7 @@ const tick = () => new Promise((r) => setImmediate(r));
   assert(/^\.loop-glass \{[^}]*transition: opacity 400ms ease; \}/m.test(sec), 'and fades back with them');
   // Home settings, Look: no Glass or Mac-style dock row in Loop (neither does anything there)
   assert(/if \(!LOOP\) rows\.push\(\{ kind: "cycle", key: "glass",/.test(source), 'no Glass row in Loop');
-  assert(/if \(NIGHT && !LOOP\) rows\.push\(\{ kind: "toggle", key: "dock-mac",/.test(source), 'no Mac-style dock row in Loop');
+  assert(/if \(NIGHT && !LOOP\) rows\.push\((heldByLighter\()?\{ kind: "toggle", key: "dock-mac",/.test(source), 'no Mac-style dock row in Loop');
   // a couch-tv Studio design does not start in the Loop look (the Loop look wins); in the other looks as before
   assert(/var designOn = typeof CouchDesign !== "undefined" && !!\(GATE\.design \|\| GATE\.preview\);\n(\s*\/\/[^\n]*\n)*\s*if \(designOn && LOOP\) \{ designOn = false; console\.log\(/.test(source), 'no design in Loop');
   assert(source.indexOf('if (designOn && LOOP)') < source.indexOf('if (designOn && typeof CouchDesigner !== "undefined") CouchDesigner.lockPage'), 'decided before the page policy and CouchDesign.start');

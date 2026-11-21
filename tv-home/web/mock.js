@@ -22,6 +22,7 @@
 //   dock=mac            home.dock: the Mac-style dock (mac, or classic)
 //   ambient=1           home.ambient_music: the full screen music view (needs music=1; ambient=off: off)
 //   lighter=1           home.lighter: Lighter home for a slow box (no blur, no soft shadows, a still photo)
+//   showclock=off       home.show_clock: no clock on the home   hires=always|off   home.hi_res (the 4K pictures)
 //   icons=glass         home.glass_icons: Apple style clear app icons on glass
 //   amount=1..5         home.glass_amount, how clear the glass is (1 frosted, 3 the default, 5 very clear)
 //   clockstyle=liquid   home.clock_style: the Night clock as liquid glass
@@ -80,7 +81,7 @@
   var BRIDGE_KEYS = ["lang", "place", "wx_show", "wx_unit", "wx_every", "look", "idle_photo_seconds", "keep_photo", "keep_photo_pick", "glass", "glass_icons",
     "moving_tiles", "dock", "lighter", "glass_amount", "clock_style", "now_playing", "keep_watching", "ambient_music", "sun_sync", "ambient_weather",
     "ambient_sun_grade", "nav_sound", "start_focus", "glass_focus", "video", "video_url", "scene_order", "scenes_off", "scene_seconds", "clock", "photos",
-    "hidden_apps", "quick", "soundscape", "smart_idle", "input_tile", "shelf_follows_app", "widgets", "widgets_design", "icon_set"];
+    "hidden_apps", "quick", "soundscape", "smart_idle", "input_tile", "shelf_follows_app", "widgets", "widgets_design", "show_clock", "hi_res", "icon_set"];
   if (arg("reset")) {
     try { Object.keys(localStorage).forEach(function (k) { if (k.indexOf("mock:") === 0) localStorage.removeItem(k); }); } catch (e) {}
   }
@@ -140,6 +141,8 @@
   if (arg("moving")) cfg.home.moving_tiles = arg("moving") !== "off";
   if (arg("dock")) cfg.home.dock = arg("dock");
   if (arg("lighter")) cfg.home.lighter = arg("lighter") !== "off";
+  if (arg("showclock")) cfg.home.show_clock = arg("showclock") !== "off";   // home.show_clock
+  if (arg("hires")) cfg.home.hi_res = arg("hires") === "always" ? "always" : arg("hires") === "off" ? false : true;   // home.hi_res
   if (arg("ambient")) cfg.home.ambient_music = arg("ambient") !== "off";   // the full screen music view (off unless set)
   if (arg("icons") === "glass") cfg.home.glass_icons = true;
   if (arg("gfocus")) cfg.home.glass_focus = arg("gfocus");   // glass: the focused app stays glass (#32)
