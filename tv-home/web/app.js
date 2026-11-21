@@ -3886,24 +3886,71 @@
   // and draw again whenever More apps opened or closed (an LG OLED65CX decodes every new <img> anew).
   // A kept tile gets back the classes it was made with (focus, pressed, off-window, end-row and the
   // like are put on again after this) and loses the dock's magnify transform (magnify sets it again).
+  // Tiles taken out of the grid (More apps folded away) wait here, out of the page, for the next time
+  // they are wanted, so opening More apps again does not make and draw their icons again.
+  var tileCache = {}, tileCached = 0;
+  function makeTile(html) {
+    var tmp = document.createElement("div");
+    tmp.innerHTML = html;
+    var made = tmp.firstChild;
+    made._html = html; made._cls = made.className;
+    return made;
+  }
+  function cachePut(el) {
+    if (tileCached >= 300) { tileCache = {}; tileCached = 0; }   // apps came and went a lot: start again
+    (tileCache[el._html] = tileCache[el._html] || []).push(el);
+    tileCached++;
+  }
+  function cacheTake(html) {
+    var a = tileCache[html];
+    while (a && a.length) {
+      var el = a.shift(); tileCached--;
+      // an icon that failed while out of the page never reached the error handler (it listens on the
+      // page), so it would stay a broken picture: make that tile again instead
+      var im = el.querySelector("img");
+      if (!(im && im.complete && !im.naturalWidth)) return el;
+    }
+    return null;
+  }
   function placeTiles(grid, htmls) {
-    var pool = {}, tmp = document.createElement("div"), kids = grid.children, i, el;
+    var pool = {}, kids = grid.children, i, el;
     for (i = 0; i < kids.length; i++) {
       el = kids[i];
       if (el._html !== undefined) (pool[el._html] = pool[el._html] || []).push(el);
     }
     var els = htmls.map(function (html) {
-      var old = pool[html] && pool[html].shift();
+      var old = (pool[html] && pool[html].shift()) || cacheTake(html);
       if (old) { old.className = old._cls; old.style.transform = ""; return old; }
-      tmp.innerHTML = html;
-      var made = tmp.firstChild;
-      made._html = html; made._cls = made.className;
-      return made;
+      return makeTile(html);
     });
     // move only what is out of place, so tiles that stay put are not taken out of the page
     els.forEach(function (want, at) { if (kids[at] !== want) grid.insertBefore(want, kids[at] || null); });
-    while (kids.length > els.length) grid.removeChild(kids[kids.length - 1]);
+    while (kids.length > els.length) {
+      el = grid.removeChild(kids[kids.length - 1]);
+      if (el._html !== undefined) cachePut(el);
+    }
     return els;
+  }
+  // A little after the dock is drawn, make the tiles More apps will show and decode their icons, out
+  // of the page, so even the first Down into More apps finds them ready.
+  var warmTimer = 0;
+  function warmMoreApps() {
+    clearTimeout(warmTimer);
+    warmTimer = setTimeout(function () {
+      if (expanded || lift || !gridItems.some(function (x) { return x.kind === "more"; })) return;
+      var htmls;
+      expanded = true;
+      try { htmls = gridList().map(appHTML); } catch (e) { htmls = []; } finally { expanded = false; }
+      var have = {}, kids = $("grid").children, i;
+      for (i = 0; i < kids.length; i++) have[kids[i]._html] = (have[kids[i]._html] || 0) + 1;
+      htmls.forEach(function (html) {
+        if (have[html]) { have[html]--; return; }
+        if (tileCache[html] && tileCache[html].length) return;
+        var el = makeTile(html), im = el.querySelector("img");
+        cachePut(el);
+        if (im && im.decode) im.decode().then(null, function () {});
+      });
+    }, 2000);
   }
 
   function renderGrid() {
@@ -3938,6 +3985,7 @@
     }
     clearIcons();
     renderHint();
+    if (!expanded) warmMoreApps();
   }
 
   // Glass app icons, Apple's clear style (#25): each icon's glyph without its background
