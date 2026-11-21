@@ -2,7 +2,7 @@
 
 This page has every step to put couch-tv on your TV, and to take it off again.
 
-**Before you start:** the easy way is the setup site, [couchtv.sites.underseage.studio](https://couchtv.sites.underseage.studio), from your phone, with the free Setup app on a Mac or Windows computer, or with your AI agent. First time, and not technical? [START-HERE.md](START-HERE.md) walks Google TV, Android TV and Samsung one step at a time. Not sure about your TV? See [Will it work on my TV?](../README.md#will-it-work-on-my-tv) and [PLATFORMS.md](PLATFORMS.md).
+**Before you start:** the easy way is [couchtv.joshuaseage.com/get](https://couchtv.joshuaseage.com/get/): the TV remote and your phone, or the free Setup app on a Mac or Windows computer, or your AI agent (Claude Code needs a paid Claude plan; any coding AI agent works). First time, and not technical? [START-HERE.md](START-HERE.md) walks Google TV, Android TV and Samsung one step at a time. Not sure about your TV? See [Will it work on my TV?](../README.md#will-it-work-on-my-tv) and [PLATFORMS.md](PLATFORMS.md).
 
 **On this page**
 

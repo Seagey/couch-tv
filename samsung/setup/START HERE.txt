@@ -19,15 +19,20 @@ Mac: double-click the zip. Windows: right-click the zip, Extract All, Extract.
 Use the unzipped folder, not the zip.
 
 
-STEP 2. Find your computer's address (you type it on the TV in step 3)
----------------------------------------------------------------------
-The setup in step 4 also shows it, so you can open that first and read it there.
+STEP 2. Start the setup on the computer
+------------------------------------
+Mac: double-click "Install on Mac.command".
+     If the Mac says it "cannot be opened" or "not verified": click Done, open System Settings,
+     Privacy & Security, scroll down, click Open Anyway next to "Install on Mac", then Open.
+     If the Mac asks to let Terminal find devices on your local network: click Allow.
+Windows: double-click "Install on Windows.cmd".
+     If Windows says "Windows protected your PC": click More info, then Run anyway.
+     If Windows Firewall asks about apps2samsung-cli: tick Private networks and click Allow.
 
-Mac: Apple menu, System Settings, Wi-Fi, the Details button next to your network, TCP/IP.
-     The address is next to "IP address": four numbers with dots between them.
-     (On a cable: System Settings, Network, Ethernet, Details, TCP/IP.)
-Windows: Start, Settings, Network & internet, Wi-Fi (or Ethernet), then your network's
-     Properties. The address is next to "IPv4 address": four numbers with dots between them.
+It shows "This computer's address is", like 192.0.2.20. Leave the window open: you type that
+address on the TV in step 3.
+(No address shown? Mac: System Settings, Wi-Fi, Details next to your network, TCP/IP, "IP address".
+Windows: Settings, Network & internet, Wi-Fi, your network's Properties, "IPv4 address".)
 
 
 STEP 3. Developer mode on the TV
@@ -43,57 +48,49 @@ STEP 3. Developer mode on the TV
    - 2022 and newer TVs: if nothing happens, scroll to the bottom of Apps, open
      App Settings, and enter 1 2 3 4 5 there.
 3. A Developer mode box opens. Switch Developer mode to On.
-4. Type your computer's address from step 2 and press OK. Type each number as it is:
+4. Type the address the setup showed in step 2 and press OK. Type each number as it is:
    1 is 1, not 001. Press Right to move to the next group of numbers.
 5. Restart the TV: hold the power button down for about 5 seconds, until the TV goes off and
    comes back on. (On The Frame a short press only goes to Art Mode. Hold it.)
    A "Developer mode" line at the top of the Apps screen means it worked.
 
 
-STEP 4. Run the setup on the computer
--------------------------------------
-Mac: double-click "Install on Mac.command".
-     If the Mac says it "cannot be opened" or "not verified": click Done, open System Settings,
-     Privacy & Security, scroll down, click Open Anyway next to "Install on Mac", then Open.
-     If the Mac asks to let Terminal find devices on your local network: click Allow.
-Windows: double-click "Install on Windows.cmd".
-     If Windows says "Windows protected your PC": click More info, then Run anyway.
-     If Windows Firewall asks about apps2samsung-cli: tick Private networks and click Allow.
-
-The setup then:
+STEP 4. Finish the setup on the computer
+----------------------------------------
+In the setup window press Return (Windows: Enter). The setup then:
 - downloads Apps2Samsung's free command line tool (open source, about 35 MB, checked before
   it runs). It is what signs and installs Samsung apps.
-- finds your TV and checks Developer mode. If something is not right, it says what to fix.
+- finds your TV and checks Developer mode. If something is not right, it says what to fix:
+  fix it on the TV, then press Return (Windows: Enter) again.
 - opens a browser for your Samsung account sign-in. This is Samsung's own page: couch-tv and
   the setup never see your password. It makes a certificate for your TV only. If Samsung asks
   you to agree or to allow access, say yes, then come back to the setup window.
   Apps2Samsung keeps that signing certificate on this computer, so the next update is signed
   the same way. Keep this computer for updates, and do not share the certificate.
-- puts couch-tv on the TV and opens it. (If it is not on screen, open Couch TV from the
-  TV's row of apps.)
+- puts couch-tv on the TV and opens it. Press Allow on the TV if it asks. (If it is not on
+  screen, open Couch TV from the TV's row of apps.)
 
 
-STEP 5. Make couch-tv come back by itself
------------------------------------------
+STEP 5. So Couch TV opens again when you switch the TV on
+---------------------------------------------------------
 On the TV: Settings, General, Smart Features (or Start Screen Option), Autorun Last App: On.
-Then, when you switch the TV on, couch-tv is back if it was the last app you used.
-To open couch-tv any time: press Home on the Samsung remote, move to Couch TV in the row of
+Then, when you switch the TV on, Couch TV is back if it was the last app you used.
+To open Couch TV any time: press Home on the Samsung remote, move to Couch TV in the row of
 apps, press OK. (Samsung's Home button itself always opens Samsung's menu.)
 
 
 STEP 6. Get a design from couch-tv Studio
 -----------------------------------------
-On your phone, make a design at couchtv.joshuaseage.com, press Send, then Make my code.
-On the TV, in couch-tv: move to the gear tile, press OK (Home settings), open couch-tv Studio,
-then Get a design. Press OK on the box: Samsung's on-screen keyboard opens. Type the code with
-the arrows and OK, then press Done. Say yes to "Use this design?".
+On the TV, open the gear (Home settings), then Designs, then Get a design from your phone.
+Scan the QR code with your phone, pick your design and press Send to my TV. Say yes to
+Use this design?
 
 
 Updates
 -------
 couch-tv on a Samsung does not update itself. When a new one is out, the TV says so on the
 home. Then download the newest "couch-tv-samsung-setup.zip" from
-github.com/Seagey/couch-tv/releases and run step 4 again. Your settings stay.
+github.com/Seagey/couch-tv/releases and run it again (steps 2 and 4). Your settings stay.
 Developer mode can switch itself off after a Samsung software update: then do step 3 again.
 
 The setup cannot find the TV? Switch the TV on with its remote first (on The Frame, a short
@@ -103,10 +100,10 @@ Settings, Power On with Mobile, On.
 
 Want more? (optional)
 ---------------------
-couch-tv opening by itself every time the TV comes on, and the phone remote, need a computer
-at home that stays on (the bridge). That part is in the full guide: docs/SAMSUNG.md on
-github.com/Seagey/couch-tv. An AI agent such as Claude Code can set it up for you, but you do
-not need one for anything above.
+Couch TV opening by itself every time the TV comes on (even when it was not the last app),
+and the phone remote, need a computer at home that stays on (the bridge). That part is in the full guide: docs/SAMSUNG.md on
+github.com/Seagey/couch-tv. An AI agent such as Claude Code (it needs a paid Claude plan; any coding
+AI agent works) can set it up for you, but you do not need one for anything above.
 
 Stuck? couchtv.joshuaseage.com/help/tv-samsung
 

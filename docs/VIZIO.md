@@ -1,16 +1,16 @@
 # couch-tv on a VIZIO TV (SmartCast and VIZIO OS)
 
-## Status: New
+## Status: tried on one set
 
-**This is new, and nobody has run it on a real VIZIO yet.** It was written in November 2026 from VIZIO's
-own public app list and from public notes on the SmartCast API (the open pyvizio library and the
-community Vizio_SmartCast_API notes), and tested against a pretend VIZIO on a computer
-(`tests/vizio_standin.py`). Nothing was copied from another project. If you have a VIZIO, please run the first test below and
-[open an issue](https://github.com/Seagey/couch-tv/issues) with what it printed.
+VIZIO: the phone remote works, with a computer left on at home. The home has been opened in the TV's
+web view by hand on one set. For the whole thing, plug in a Google TV box.
 
-**Update (14 Nov 2026):** a tester (lukionsp, #206) paired a real set, a V4K65X-0810 on VIZIO OS
-86.920.9.3, and loaded couch-tv's home in its webview with the webview path below. Other models and
-firmwares may differ, so please report how yours goes.
+One tester (lukionsp, #206) paired a real set, a V4K65X-0810 on VIZIO OS 86.920.9.3, on 14 Nov 2026
+and loaded couch-tv's home in its webview with the webview path below. Other models and firmwares may
+differ, so please [open an issue](https://github.com/Seagey/couch-tv/issues) with how yours goes. The
+code was written from VIZIO's own public app list and public notes on the SmartCast API (the open
+pyvizio library and the community Vizio_SmartCast_API notes), and tested against a pretend VIZIO on a
+computer (`tests/vizio_standin.py`). Nothing was copied from another project.
 
 Not technical? [VIZIO-TESTING.md](VIZIO-TESTING.md) is a step by step guide to the first test.
 

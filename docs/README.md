@@ -8,7 +8,7 @@ Every couch-tv guide in one place, grouped by what you want to do.
 |---|---|
 | [START-HERE.md](START-HERE.md) | First time? One step at a time for Google TV with a phone, Android TV with a phone, and Samsung with a computer |
 | [SETUP.md](SETUP.md) | Every setup step, from developer mode to the TV home, and how to undo it |
-| [Setup site](https://couchtv.sites.underseage.studio) | Set it up the easy way, from your phone, with the free Setup app or with your AI agent. It also checks whether your TV will work |
+| [Get it on your TV](https://couchtv.joshuaseage.com/get/) | Set it up the easy way: the TV remote and your phone, the free Setup app, or your AI agent. It also checks whether your TV will work |
 | [README](../README.md) | The front page: what couch-tv is and the three options |
 | [AGENTS.md](../AGENTS.md) | Instructions for the AI agent setting couch-tv up for someone who is not technical |
 | [PLATFORMS.md](PLATFORMS.md) | What works on each kind of TV, in full |

@@ -165,25 +165,34 @@ object UpdateRules {
     /** Offered: newer than this app, and the release has this app's file. */
     fun offered(latest: String, current: String, hasAsset: Boolean): Boolean = latest.isNotEmpty() && hasAsset && newer(latest, current)
 
-    /** The line above the steps. */
+    /**
+     * The line above the steps. The watch version is not always from a computer any more: from 0.13.9,
+     * Make Home open Couch TV (HomeKey.kt) puts it on with one press. Its update keeps the Home button only
+     * through Update to (asset(watch)) or the watch APK from a computer; Downloader's code gives the plain
+     * app, which has no Home button watch, so after that Home opens Google's home again until the press.
+     */
     fun how(watch: Boolean): String =
-        if (watch) "This is the Home button version of Couch TV. It was put on from a computer, and it updates from a computer the same way. Your settings stay."
+        if (watch) "This is the Home button version of Couch TV. Update it with Update to (Let the phone press keys on), or press Make Home open Couch TV again after a Downloader update. Your settings stay."
         else "Couch TV cannot install an update by itself on this TV right now. Put the new version on the same way as before, over this one. Your settings stay."
 
     /** The exact steps, one per row on the TV. */
     fun steps(watch: Boolean): List<String> =
         if (watch) listOf(
-            "On a computer, download $WATCH_ASSET from github.com/$REPO/releases/latest.",
-            "Put it on from the computer the same way as before, over this one. On the TV, Couch TV, More help, Home button from a computer, has every step.",
+            "Easiest: on the TV, open Couch TV, press More, then Let the phone press keys, and follow the steps. Then come back here and press Update to. It keeps the Home button.",
+            "Or with Downloader: type $CODE in Downloader and press Install. Downloader gets the plain version, so Home opens Google TV again: open Couch TV and press Make Home open Couch TV once more. Your settings stay.",
+            "Or on a computer: download $WATCH_ASSET from github.com/$REPO/releases/latest and put it on the same way as before, over this one. On the TV, Couch TV, More help, Home button from a computer, has every step.",
             "Open Couch TV again from your apps.")
         else listOf(
             "Press Home, then open Downloader from your apps. Not there? Find Downloader by AFTVnews in the TV's app store and install it first.",
-            "If Downloader opens on a web page, press Back until you see its Home screen with a box for a web address or code. Move to the box and press OK.",
-            "Type $CODE and press Go. If the TV asks whether Downloader may install apps, allow it.",
+            // the beginner tests (TCL, Toshiba, 19 to 21 Nov 2026): Back leaves Downloader. Up climbs the page
+            // until the Downloader button at the top left lights, then Right twice reaches the # code box.
+            "If Downloader opens on a news page, press Up again and again until the Downloader button at the top left turns light. Then press Right twice, to the # button, and press OK.",
+            "Type $CODE and press the tick (or Go). If the TV asks whether Downloader may install apps, allow it.",
             "Press Install, then Done. Your settings stay.",
             // a real TCL, 20 Nov 2026: Downloader kept five old copies, the TV ran short of space,
             // and Android said only "App not installed"
             "If it says App not installed, the TV is usually short of space. In Downloader, open Files, delete the old couch-tv-ontv files, then type $CODE again.",
             "Open Couch TV again from your apps.",
-            "If the code gives the version you already have, type this address in the box instead: github.com/$REPO/releases/latest/download/$ASSET")
+            "If the code gives the version you already have, type this address in the box instead: github.com/$REPO/releases/latest/download/$ASSET",
+            "Next time it is one button: open Couch TV, press More, then Let the phone press keys. After that, Home settings, Updates, Update to.")
 }

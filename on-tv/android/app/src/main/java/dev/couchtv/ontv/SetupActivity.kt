@@ -164,7 +164,7 @@ class SetupActivity : Activity() {
         more1.addView(button("Forget phones") { Auth.forgetAll(); refresh() })
         more.addView(more1)
         more.addView(text("For the arrow keys and typing from your phone, the TV has to let Couch TV press keys. One time only: " +
-            "on the TV open Settings, then System (or Device Preferences), then About, and press OK on Build seven times. " +
+            "on the TV open Settings, then System (or Device Preferences), then About, and press OK on Android TV OS build (on some TVs, Build) seven times. " +
             "Then in Developer options switch on USB debugging, and Network debugging or Wireless debugging if the TV has one. " +
             "These let Couch TV press keys on this TV. Only a device you press Allow for can use them. " +
             "Come back here and press Let the phone press keys, then Allow on the TV. " +

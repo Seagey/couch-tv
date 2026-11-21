@@ -108,8 +108,10 @@ size and SHA-256 GitHub lists, this app, newer, the same signing key) and instal
 then Couch TV opens again if it was on screen (an update started from a phone leaves the show on). Your settings stay. The app still leaves out Android's install permission
 on purpose, so Play Protect lets it through. Without that link (or on a Fire TV that blocks it), the
 page shows the steps instead, with a QR code that opens them on your phone: open Downloader, type
-8180170, Install. The watch version without the link updates from a computer with
-`adb install -r couch-tv-ontv-watch.apk`.
+8180170, Install. The watch version (the Home button version, put on from a computer or by Make Home open
+Couch TV) keeps its Home button through Update to, or from a computer with `adb install -r couch-tv-ontv-watch.apk`.
+Downloader's code gives the plain app, which has no Home button watch, so after a Downloader update Home
+opens Google's home again: press Make Home open Couch TV once more. The update page says so.
 
 If Downloader says **App not installed**, the TV is usually short of space: Downloader keeps every copy
 it fetched (a real TCL had five). In Downloader, open Files, delete the old couch-tv-ontv files, then
