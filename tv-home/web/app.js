@@ -912,6 +912,7 @@
     var iov = $("idle-ambient-overlay");
     if (iov) iov.classList.toggle("quiet-hours", isQuietHours(SMART_IDLE.quiet_hours));
     fitDate();
+    mood(false);
     document.body.classList.toggle("night", h >= 21 || h < 6);
     if (NIGHT) { glassClock(hm); if (SUN_SYNC) applySunSync(); updateAmbientWeather(); }
     if (quickReady) renderQuick();
@@ -1646,7 +1647,7 @@
   function pauseVideo() { stopSoundscape(); if (window.AmbientWeather) window.AmbientWeather.pause(); var v = $("bgvid"); if (v.getAttribute("src")) v.pause(); sceneVideos(false); if (LOOP) loopPause(); }
   document.addEventListener("visibilitychange", function () {
     if (document.hidden) { saveFocusNow(); pauseVideo(); }
-    else { setIdleAmbient(false); resetSmartIdle(); startVideo(); sceneVideos(true); if (window.AmbientWeather) window.AmbientWeather.resume(); resetIdlePhoto(); }
+    else { setIdleAmbient(false); resetSmartIdle(); startVideo(); sceneVideos(true); mood(true); if (window.AmbientWeather) window.AmbientWeather.resume(); resetIdlePhoto(); }
   });
 
   // A scene's own clip (home.my_scenes[].video): only the scene on screen plays, and only while the
@@ -1716,6 +1717,7 @@
       root.className = root.className.replace(/\b(scene|mine)-\w+/g, "").replace(/\s+/g, " ").trim() + cls;
       date.classList.remove("swap");
       fitDate();
+      placeMood();
     }, 600);
     sceneEls[i].classList.remove("out");
     sceneEls[i].classList.add("on");
@@ -1766,6 +1768,154 @@
     if (hitLeft || (LOOP && near(leftBox))) d.style.left = (leftBox.right + 1.5 * rem) + "px";
     if (d.scrollWidth > d.clientWidth + 1) d.classList.add("tight");
     if (d.scrollWidth > d.clientWidth + 1) d.classList.add("tighter");
+  }
+
+  // ---------------- Night: a greeting and a short line under the clock ----------------
+  // A warm greeting for whoever is watching, picked at random for the time of day, and a short
+  // encouraging line. A new pair when the home comes back on screen, when someone else is picked,
+  // and every 10 minutes. It sits under the scene's clock and steps aside (the line first, then
+  // the greeting) when there is no room above Keep watching.
+  var GREET = {
+    morning: ["Good morning, {n}", "Rise and shine, {n}", "Morning, {n}. Coffee first?", "Hello, sunshine", "A fresh start, {n}"],
+    afternoon: ["Good afternoon, {n}", "Hey {n}, taking a break?", "Afternoon, {n}", "Nice to see you, {n}", "Time for a breather, {n}"],
+    evening: ["Good evening, {n}", "Evening, {n}. Time to unwind", "Cozy night in, {n}?", "Welcome home, {n}", "Kick back, {n}"],
+    night: ["Hello, night owl", "Still up, {n}?", "One more episode, {n}?", "Late show, {n}?", "Quiet hours, {n}"],
+    any: ["Welcome back, {n}", "Hey there, {n}", "Settle in, {n}", "Make yourself comfy, {n}"]
+  };
+  var QUOTES = [
+    "Small steps still move you forward.",
+    "Rest is part of the work.",
+    "You don't have to do it all today.",
+    "Be gentle with yourself. You're doing fine.",
+    "The best things take a little time.",
+    "Today counts, even the quiet parts.",
+    "Breathe in. Let it go. Begin again.",
+    "Little joys add up to a good life.",
+    "Good enough is often just right.",
+    "You've handled hard days before.",
+    "Make room for what makes you smile.",
+    "Slow mornings, kind words, good company.",
+    "Every day is a new page.",
+    "Progress, not pressure.",
+    "Good things grow in calm places.",
+    "Share a laugh. It helps more than you think.",
+    "Tomorrow is a fresh try.",
+    "Curiosity keeps the heart young.",
+    "Home is where you can just be.",
+    "Choose the kind thought.",
+    "Your pace is the right pace.",
+    "Celebrate the small wins.",
+    "A cozy night is time well spent.",
+    "Good company makes any night better.",
+    "Some days are for doing, some for resting."
+  ];
+  // Each person's own style (home.person_styles in config.json, { "<person id>": "gentle" | "electric" }):
+  // their own greetings and lines, and the look in app.css (html.who-gentle, html.who-electric).
+  var STYLE_WORDS = {
+    gentle: {
+      greet: {
+        morning: ["Good morning, sweet {n}", "Rise and shine, {n}", "Hello, sunshine {n}", "Morning, {n}. Tea and cuddles?", "A soft new day, {n}"],
+        afternoon: ["Hi there, lovely {n}", "Afternoon, {n}. Snack time?", "Hey {n}, you're doing great", "A cozy afternoon, {n}", "Hello, sweet pea"],
+        evening: ["Good evening, lovely {n}", "Blankets and snacks, {n}?", "Welcome home, sweet {n}", "Cozy time, {n}", "Hi {n}, time to unwind"],
+        night: ["Sweet dreams soon, {n}", "Still up, little owl?", "One more episode, {n}?", "Snuggle in, {n}", "Hello, sleepy {n}"],
+        any: ["Hi {n}, so happy you're here", "Hello, lovely {n}", "Make yourself comfy, {n}"]
+      },
+      quotes: [
+        "You're a little ray of sunshine.", "Be soft. Be kind. Be you.", "Little joys are big joys.",
+        "You are loved more than you know.", "Rest, cuddle, repeat.", "Bloom at your own pace.",
+        "Kindness looks good on you.", "Every day has a tiny bit of magic.", "You deserve the cozy blanket.",
+        "A warm drink and a good show: just right.", "Smile, you're doing beautifully.", "Gentle days make strong hearts.",
+        "Sprinkle a little joy today.", "You make this home brighter.", "Soft hearts are strong hearts."
+      ]
+    },
+    electric: {
+      greet: {
+        morning: ["Systems online, {n}", "The day is waiting, {n}", "Morning, {n}. Charge up", "Wake the storm, {n}", "New signal, {n}"],
+        afternoon: ["Still running hot, {n}", "Afternoon, {n}. Stay sharp", "The current is yours, {n}", "Keep the spark, {n}", "In the zone, {n}"],
+        evening: ["The night is calling, {n}", "Evening, {n}. Lights low", "Enter the night, {n}", "Shadows rising, {n}", "Plug in, {n}"],
+        night: ["The city sleeps. Not you, {n}", "Midnight mode, {n}", "Into the unknown, {n}?", "Hello, night runner", "After hours, {n}"],
+        any: ["Welcome back, {n}", "Signal found, {n}", "Access granted, {n}"]
+      },
+      quotes: [
+        "Every storm begins with a spark.", "The quiet ones carry the thunder.", "Some doors only open at night.",
+        "Charge up. Then light it up.", "Be the signal, not the noise.", "Stars only shine in the dark.",
+        "Stay curious. Stay electric.", "There's power in the pause.", "The unknown is where it gets good.",
+        "Run on your own current.", "Sharpen the edge, keep the calm.", "Every legend starts in the shadows.",
+        "Trust the static. Something is coming.", "Fortune favours the restless.", "Focus is a kind of lightning."
+      ]
+    }
+  };
+  function styleOf(id) {
+    var m = HOME && HOME.person_styles, v = m && typeof m === "object" ? m[id] : null;
+    return STYLE_WORDS[v] ? v : "";
+  }
+  function applyStyle() {
+    var st = styleOf(who), root = document.documentElement;
+    root.classList.toggle("who-gentle", st === "gentle");
+    root.classList.toggle("who-electric", st === "electric");
+    return st;
+  }
+  var moodAt = 0, moodWho = null, moodLast = { hi: "", q: "" };
+  function anyOf(list, not) {
+    var pool = list.filter(function (x) { return x !== not; });
+    return (pool.length ? pool : list)[Math.floor(Math.random() * (pool.length || list.length))];
+  }
+  // home.greeting: off unless true, and only while the home speaks English (the words are English)
+  function greetingOn() {
+    var loc = "";
+    try { loc = String(I18N.locale() || ""); } catch (e) {}
+    return HOME.greeting === true && /^en/i.test(loc || "en");
+  }
+  function mood(force) {
+    var el = $("mood");
+    if (!el) return;
+    applyStyle();
+    if (!NIGHT || !greetingOn()) { el.classList.remove("on"); return; }
+    var now = Date.now();
+    if (!force && moodWho === who && now - moodAt < 600000 && moodLast.hi) { placeMood(); return; }
+    moodAt = now; moodWho = who;
+    var words = STYLE_WORDS[applyStyle()] || { greet: GREET, quotes: QUOTES };
+    var h = new Date().getHours(), part = h >= 5 && h < 12 ? "morning" : h < 17 && h >= 12 ? "afternoon" : h >= 17 && h < 21 ? "evening" : "night";
+    var p = personById(who), name = p && p.name ? p.name : "";
+    var list = words.greet[part].concat(words.greet.any);
+    if (!name) list = list.filter(function (g) { return g.indexOf("{n}") < 0 || /, \{n\}$/.test(g); });
+    var hi = anyOf(list, moodLast.hi);
+    moodLast.hi = hi;
+    hi = name ? hi.replace("{n}", name) : hi.replace(/,? \{n\}\??$/, function (m) { return m.slice(-1) === "?" ? "?" : ""; }).replace("{n}", "");
+    var q = anyOf(words.quotes, moodLast.q);
+    moodLast.q = q;
+    el.classList.remove("on");
+    setTimeout(function () {
+      $("mood-hi").textContent = hi;
+      $("mood-q").textContent = q;
+      placeMood();
+    }, 450);
+  }
+  // Under the clock of the scene on screen, lined up with it (centre, left or right).
+  function placeMood() {
+    var el = $("mood"), sc = sceneEls[scene];
+    if (!el || !NIGHT || !sc) return;
+    if (!greetingOn()) { el.classList.remove("on"); return; }
+    var c = sc.querySelector(".gclock");
+    if (!c || !c.offsetHeight) { el.classList.remove("on"); return; }
+    var rem = innerWidth / 120, cs = getComputedStyle(c), fs = parseFloat(cs.fontSize) || 25 * rem;
+    var water = !!SCENES[scene].water;
+    // under the clock's digits (its box, or about 1.05 of the font size for a tall line height),
+    // then a clear gap
+    var top = c.offsetTop + Math.min(c.offsetHeight || fs, fs * 1.05) + 2 * rem;
+    var shelf = $("shelf-section"), limit = innerHeight - 14 * rem;
+    if (shelf && shelf.offsetHeight && getComputedStyle(shelf).display !== "none" && $("shelf").children.length) limit = shelf.getBoundingClientRect().top - 0.75 * rem;
+    el.classList.remove("left", "right", "noq");
+    var align = cs.textAlign;
+    if (align === "left" || align === "start") { el.classList.add("left"); el.style.left = c.getBoundingClientRect().left + 0.5 * rem + "px"; el.style.right = "auto"; }
+    else if (align === "right" || align === "end") { el.classList.add("right"); el.style.right = (innerWidth - c.getBoundingClientRect().right + 0.5 * rem) + "px"; el.style.left = "auto"; }
+    else { el.style.left = ""; el.style.right = ""; }
+    el.style.top = top + "px";
+    var full = el.offsetHeight || 7 * rem, hiOnly = $("mood-hi").offsetHeight || 3.5 * rem;
+    if (water || top + hiOnly > limit) { el.classList.remove("on"); return; }
+    if (top + full > limit) el.classList.add("noq");
+    el.classList.toggle("dark", !!(SCENES[scene].mine && SCENES[scene].dark));
+    el.classList.add("on");
   }
 
   // Sun-synchronized day/night calculation (astronomical solar altitude from lat, lon and time)
@@ -3016,6 +3166,7 @@
     if (!NOBODY) api("POST", "/api/who", { who: who }).catch(function () {});
     renderShelf();
     kidSync();
+    mood(true);
   }
   // A person switch made elsewhere (the phone, another TV): when the bridge's "who" changes, show
   // that person here too.
@@ -7533,7 +7684,7 @@
       showScene(Math.max(0, SCENES.map(function (s) { return s.own ? "own" : s.id; }).indexOf(first)));
       if (SCENES.length > 1) setInterval(nextScene, SCENE_MS);
       // the clock font must be in before the glass is measured
-      if (document.fonts) document.fonts.load("300 10px Antonio").then(function () { glassShown = ""; clock(); });
+      if (document.fonts) document.fonts.load("300 10px Antonio").then(function () { glassShown = ""; clock(); mood(true); });
     }
     if (NIGHT) {
       // the soft tap's audio context, made while the home is idle: made on the first key press it

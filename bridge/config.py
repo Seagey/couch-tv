@@ -500,6 +500,16 @@ def _home(h):
     # the built-in scenes' slow depth zoom (off unless true)
     if isinstance(h.get("scene_zoom"), bool):
         out["scene_zoom"] = h["scene_zoom"]
+
+    # a greeting and a short line under the clock (off unless true)
+    if isinstance(h.get("greeting"), bool):
+        out["greeting"] = h["greeting"]
+    # each person's own style of greeting and lines: {"<person id>": "gentle" | "electric"}
+    ps = h.get("person_styles")
+    if isinstance(ps, dict):
+        ps = {k: v for k, v in ps.items() if isinstance(k, str) and v in ("gentle", "electric")}
+        if ps:
+            out["person_styles"] = ps
     if isinstance(h.get("ambient_weather"), bool):
         out["ambient_weather"] = h["ambient_weather"]
     if isinstance(h.get("ambient_sun_grade"), bool):
