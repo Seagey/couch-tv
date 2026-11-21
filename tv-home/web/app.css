@@ -234,6 +234,8 @@ html.settled .tile.focus .face, html.settled .tile.focus .face::after { animatio
 .ccard .cwords b, .ccard .cvalue { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--text); }
 .ccard .cwords b { font-size: 1.5rem; line-height: 1.875rem; font-weight: 600; color: var(--text-2); }
 .ccard .cvalue { font-size: 2.5rem; line-height: 3rem; font-weight: 650; letter-spacing: -0.01em; }
+/* a Keep watching picture that never came: the app's own banner, whole, on a soft plate (g03) */
+.face img.kw-banner, .ncard .thumb.kw-banner { object-fit: contain; background: rgba(255, 255, 255, 0.08); }
 .show .no-art {
   position: absolute; top: 0; right: 0; bottom: 0; left: 0; display: flex; align-items: center; justify-content: center; padding: 1.5rem;
   font-size: 2.25rem; font-weight: 650; text-align: center; color: var(--text-2);
@@ -278,6 +280,11 @@ html.lighter:not(.theme-night):not(.theme-loop) .apps { transition: none; }
   display: flex; align-items: center; justify-content: center;
 }
 .app .face.tool svg { width: 2.75rem; height: 2.75rem; stroke: var(--text); stroke-width: 1.6; fill: none; stroke-linecap: round; stroke-linejoin: round; }
+/* g24: a tile drawn from an icon set carries its own strokes and fills; the whole tile styles bring their own backing */
+.app .face.tool.iset { color: var(--text); }
+.app .face.tool.iset svg { stroke: none; width: 3rem; height: 3rem; }
+.app .face.tool.iset-full { background: none !important; box-shadow: none; }
+.app .face.tool.iset-full svg { width: 100%; height: 100%; }
 .app.busy .face { animation: none; opacity: 0.6; }
 
 /* Home settings, Look, Moving tiles: off (#52). The 3D sway gets its own layer, which flickers black on some slow GPUs. */

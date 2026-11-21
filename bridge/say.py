@@ -7,6 +7,8 @@ connected (bridge/mcp_server.py, or any program holding the pairing key) can:
   POST /api/say/message {"text", "from"?, "seconds"?}   a short message shown on the TV
   POST /api/say/design  {"code"}                        a couch-tv Studio design code; the TV gets it
                                                          and asks "Use this design?" first, as always
+  POST /api/say/scene   {"pick": "next" | "prev"}        the phone remote's Scene buttons: the home shows
+                                                         the next or the previous scene (or photo)
 
 Nothing here is kept on disk and nothing leaves this computer. A message is plain text (no links are
 made clickable, nothing is run), at most 280 characters. A design code is only a code: the TV fetches
@@ -74,10 +76,22 @@ def design(tv, code, sender=None):
     return d
 
 
+SCENE_PICKS = ("next", "prev")
+
+
+def scene(tv, pick):
+    """The phone remote's Scene buttons (g34): only "next" or "prev" ever reaches the TV."""
+    if pick not in SCENE_PICKS:
+        raise ValueError("pick must be next or prev")
+    sc = {"id": next(_ids), "pick": pick, "at": int(time.time() * 1000)}
+    _tv(tv)["scene"] = sc
+    return sc
+
+
 def snapshot(tv, last_ask=None):
     """What the TV shows now. last_ask is claude.py's record for this TV ({"text", "reply", "ts", ...})."""
     s = _tv(tv)
-    out = {"message": s.get("message"), "design": s.get("design"), "ask": None}
+    out = {"message": s.get("message"), "design": s.get("design"), "scene": s.get("scene"), "ask": None}
     if last_ask and last_ask.get("text"):
         out["ask"] = {"q": plain(last_ask.get("text"), 400), "a": plain(last_ask.get("reply"), 1200),
                       "at": int(float(last_ask.get("ts") or 0) * 1000), "pending": bool(last_ask.get("pending")),

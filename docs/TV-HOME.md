@@ -360,6 +360,14 @@ app (option C) only takes web addresses.
 Your photos take turns with the scenes and replace the Classic look's own. The home keeps up to 20
 photos (50 since 0.13).
 
+A web address that does not open as a photo says why, under the **Add a photo from a web address** row,
+and it stays there until the next try: the site answered with an error (404 and the like), the link opens
+a web page instead of the photo (open the photo on its own and copy that address, which usually ends in
+.jpg or .png), the site will not let a TV show its photos, the photo is too big for a TV (more than 6000
+pixels across or 30 MB), or the link took too long to answer. A photo that was added but later does not
+open on the home says so on its own Remove photo row. Thanks to the XGIMI Horizon 20 Max owner who found
+it said nothing.
+
 ## Your own app icons
 
 Since 0.13. Google TV and Android TV (options A and B). A picture you make for an
@@ -383,6 +391,9 @@ They go in the home's own folder on the TV (`Android/data/app.couchtv.launcher/f
 the home loads them straight away (the same as Home settings, About, Restart home). Taking the home
 off the TV takes them with it.
 
+- **Icon style** (Home settings, Look, or `home.icon_set`, since 0.13.9) draws the home's own tiles,
+  Settings, More apps, Inputs and Screens, in one of couch-tv's icon sets: Standard, Line, Solid, Two
+  tone, Colour tile, Glass or Playful. Your app pictures are not changed by it.
 - **Glass app icons** draws your picture in glass like the rest. Switch it off (Look) to see your
   pictures as they are.
 - The phone remote's app grid keeps the apps' own icons.

@@ -15,6 +15,7 @@
 //   scenes=fog,dawn     home.scenes     secs=8      home.scene_seconds     sunsync=1   home.sun_sync
 //   sunrotate=25        home.sun_rotate_minutes (own scenes tagged "when")     datebars=1   home.date_bars
 //   myscenes=[...]      home.my_scenes, as JSON (docs/MAKE-A-SCENE.md), for your own scenes
+//   iconset=solid       home.icon_set (g24): Settings and More apps drawn from an icon set
 //   lang=it             home.language (en, es, es-MX, it, de, tr, sr-Latn-RS, pl, pt); without it, the browser's own language
 //   glass=on            home.glass (on, lite: no blur)      video=<link>   home.video_url, an MP4 or MOV
 //   moving=off          home.moving_tiles: the focused tile's slow sway (off, or on)
@@ -79,7 +80,7 @@
   var BRIDGE_KEYS = ["lang", "place", "wx_show", "wx_unit", "wx_every", "look", "idle_photo_seconds", "keep_photo", "keep_photo_pick", "glass", "glass_icons",
     "moving_tiles", "dock", "lighter", "glass_amount", "clock_style", "now_playing", "keep_watching", "ambient_music", "sun_sync", "ambient_weather",
     "ambient_sun_grade", "nav_sound", "start_focus", "glass_focus", "video", "video_url", "scene_order", "scenes_off", "scene_seconds", "clock", "photos",
-    "hidden_apps", "quick", "soundscape", "smart_idle", "input_tile", "shelf_follows_app", "widgets", "widgets_design"];
+    "hidden_apps", "quick", "soundscape", "smart_idle", "input_tile", "shelf_follows_app", "widgets", "widgets_design", "icon_set"];
   if (arg("reset")) {
     try { Object.keys(localStorage).forEach(function (k) { if (k.indexOf("mock:") === 0) localStorage.removeItem(k); }); } catch (e) {}
   }
@@ -134,6 +135,7 @@
   if (arg("sunrotate")) cfg.home.sun_rotate_minutes = parseInt(arg("sunrotate"), 10);   // home.sun_rotate_minutes
   if (arg("datebars")) cfg.home.date_bars = arg("datebars") !== "off";   // home.date_bars
   if (arg("myscenes")) try { cfg.home.my_scenes = JSON.parse(arg("myscenes")); } catch (e) {}
+  if (arg("iconset")) cfg.home.icon_set = arg("iconset");   // g24
   if (arg("glass")) cfg.home.glass = arg("glass");
   if (arg("moving")) cfg.home.moving_tiles = arg("moving") !== "off";
   if (arg("dock")) cfg.home.dock = arg("dock");

@@ -273,9 +273,11 @@
     if (W.CouchDesignCode && W.CouchDesignCode.base && W.CouchDesignCode.base()) return true;
     try { return !!(DOC && DOC.querySelector && DOC.querySelector(".cw-k-ask, .cw-k-agent")); } catch (e) { return false; }
   }
-  function poll() {
+  // force: the slow look every 30 s while the home is on screen, even with nothing set up, so the phone
+  // remote's Scene buttons (g34) reach a TV with no design store and no Ask AI within half a minute
+  function poll(force) {
     var h = home();
-    if (!h.on || !wanted()) return;
+    if (!h.on || !(force || wanted())) return;
     var hd = {}; if (h.key) hd.Authorization = "Bearer " + h.key;
     xhr("GET", h.api + "/api/say?home=1" + (h.tv ? "&tv=" + h.tv : ""), hd, null, 8000).then(function (r) {
       var j = null; try { j = JSON.parse(r.text); } catch (e) {}
@@ -302,6 +304,12 @@
       seen.design = d.at || now; markSeen();
       if (now - (d.at || now) < 600000) useDesign(d.code, d.from === "phone" ? "phone" : "ai");
     }
+    // the phone remote's Scene buttons (g34): the next or the previous scene, if it was pressed in the last minute
+    var sc = j.scene;
+    if (sc && (sc.pick === "next" || sc.pick === "prev") && (sc.at || 0) > (seen.scene || 0)) {
+      seen.scene = sc.at || now; markSeen();
+      if (now - (sc.at || now) < 60000 && W.tv && W.tv.scene) W.tv.scene(sc.pick);
+    }
     firstPoll = false;
   }
   // couch-tv Studio is opt in: an agent's design is used only where the person at this TV turned couch-tv
@@ -327,7 +335,8 @@
   function startPolling() {
     if (pollT || !home().on) return;
     poll();
-    pollT = setInterval(function () { if (!DOC || !DOC.hidden) poll(); }, 6000);
+    var ticks = 0;
+    pollT = setInterval(function () { ticks++; if (!DOC || !DOC.hidden) poll(ticks % 5 === 0); }, 6000);
   }
 
   // ---------------- a message over the home ----------------

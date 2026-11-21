@@ -208,6 +208,10 @@ class Server(private val ctx: Context, port: Int) : NanoWSD(port) {
                 // listening false: the home is not open now; it shows the design when it opens (within 10 minutes)
                 json(200, ok().put("design", d).put("asks_first", true).put("listening", Say.listening()))   // the TV always asks "Use this design?" first
             }
+            "POST /api/say/scene" -> {
+                val sc = try { Say.scene(body(s).optString("pick")) } catch (e: IllegalArgumentException) { throw ApiError(400, e.message ?: "bad pick") }
+                json(200, ok().put("scene", sc).put("listening", Say.listening()))   // listening false: Couch TV is not on screen now
+            }
             "GET /api/recs" -> json(200, ok().put("updated", Now.iso()).put("continue", Now.continueItems(q("who"))).put("picks", JSONArray()))
             "GET /api/continue" -> json(200, ok().put("items", Now.continueItems(q("who"))))
             "GET /api/music" -> json(200, ok().put("music", Music.now() ?: JSONObject.NULL))

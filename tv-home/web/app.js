@@ -69,6 +69,7 @@
     else if (k === "word" && p) { p.className = "face word"; p.textContent = n.getAttribute("data-name"); }
     else if (k === "name" && p) p.textContent = n.getAttribute("data-n");
     else if (k === "kwretry" && window.kwArtRetry) window.kwArtRetry(n);   // a Keep watching picture is asked for again (#274)
+    else if (k === "kwgone" && window.kwArtGone) window.kwArtGone(n);   // its app's banner did not come either: the title (g03)
   }, true);
   // No place set yet (no config.json weather, nothing picked in Home settings, Location): no weather and
   // no made up town. The weather tiles ask for a town instead (widgets.js noWx), never a sample place.
@@ -548,6 +549,7 @@
     // a link set in Home settings wins over home.video_url; one from config.json alone means on
     VIDEO_URL = typeof ST.video_url === "string" ? ST.video_url : typeof HOME.video_url === "string" ? HOME.video_url : "";
     VIDEO_ON = !!VIDEO_URL && (typeof ST.video === "boolean" ? ST.video : true) && !LOOP;   // the Loop look has its own clip
+    ICON_SET = ICON_SETS.indexOf(ST.icon_set) >= 0 ? ST.icon_set : ICON_SETS.indexOf(HOME.icon_set) >= 0 ? HOME.icon_set : "builtin";
     GRID_COLS = NIGHT ? 12 : 8;
     DOCK_APPS = Math.max(1, Math.min(10, parseInt(HOME.dock_size, 10) || 10));
     DOCK_BANNERS = NIGHT && !LOOP && (typeof ST.dock_banners === "boolean" ? ST.dock_banners : HOME.dock_banners === true);
@@ -636,7 +638,8 @@
         if (badge) badge.className = "picon";
         box.removeChild(img);
         box.classList.add("plate");
-      }
+      } else kwArtGone(img);
+      KW_GAVE_UP = true;   // asked for again when the home comes back into view or the network returns (g03)
       return;
     }
     var src = img.getAttribute("data-src") || img.getAttribute("src") || "";
@@ -650,6 +653,35 @@
       else { img.removeAttribute("src"); img.src = src; }
     }, ART_RETRY_MS[n]);
   };
+  // g03 (a Sony KD43X75WL, #274): a Night or Classic card whose picture never came was left as an
+  // empty tile. It shows the app's own banner instead, and if that is missing too, the show's title.
+  var KW_GAVE_UP = false;
+  function kwArtGone(img) {
+    var pkg = img.getAttribute("data-pkg"), ban = pkg && !img.getAttribute("data-banner") ? iconUrl(pkg) : null;
+    if (ban) {
+      img.setAttribute("data-banner", "1");
+      img.setAttribute("data-err", "kwgone");
+      img.classList.add("kw-banner");
+      img.src = ban;
+      return;
+    }
+    var p = img.parentNode, s = document.createElement("span");
+    if (!p) return;
+    if (img.classList.contains("thumb")) s.className = "thumb none";
+    else { s.className = "no-art"; s.textContent = img.getAttribute("data-title") || ""; }
+    p.replaceChild(s, img);
+  }
+  // the home is back in view, or the network is: a row with given up pictures is drawn again, so each
+  // picture gets its tries again (the first ones ran out while the TV was still starting)
+  function kwArtAgain() {
+    if (!KW_GAVE_UP || zone === "shelfmenu") return;
+    KW_GAVE_UP = false;
+    renderShelf();
+    if (zone === "shelf") paintFocus();
+  }
+  window.kwArtGone = kwArtGone;
+  if (window.addEventListener) window.addEventListener("online", kwArtAgain);
+  if (document.addEventListener) document.addEventListener("visibilitychange", function () { if (!document.hidden) kwArtAgain(); });
   function glassSetting() { var g = ST.glass || HOME.glass; return g === "on" || g === "lite" ? g : "off"; }
   // no clock in Home settings or config.json: the TV's own setting, else the one usual for the language (24 hour in Italian, German, Turkish, French, Serbian, Polish and Brazilian Portuguese)
   // On the Android home the TV's own 12 or 24 hour setting (System, Date and time) comes before the language's usual clock (#221)
@@ -1030,7 +1062,10 @@
           img.dataset.tries = tries + 1;
           img.src = base + (base.indexOf("?") < 0 ? "?" : "&") + "retry=" + (tries + 1);
         }, RETRY_MS[tries]);
-      } else if (isPhoto && SCENES[scene] === s && SCENES.length > 1) showScene(nextFrom(scene));
+      } else {
+        if (isPhoto && s.own) PHOTO_FAIL[s.id] = true;   // its row in Home settings, Look says so (g05)
+        if (isPhoto && SCENES[scene] === s && SCENES.length > 1) showScene(nextFrom(scene));
+      }
     };
     img.onload = function () { delete img.dataset.tries; };
   }
@@ -1564,13 +1599,18 @@
   // really plays, and comes back if it fails or has not started within 20 s. It pauses while the
   // home is not on screen (the launcher calls tv.pause, and the page's own visibility).
   var vidTimer = null;
+  function greenTv() { return !!(window.CouchVideo && CouchVideo.greenMarked && CouchVideo.greenMarked()); }
   function startVideo() {
     var v = $("bgvid"), root = document.documentElement;
     if (LOOP) loopResume();
     if (!VIDEO_ON) return;
+    if (greenTv()) { stopVideo(); return; }   // this TV showed a clip as green this week: the photo (g33)
     if (v.getAttribute("src") !== VIDEO_URL) {
       root.classList.remove("has-video");
-      v.onplaying = function () { clearTimeout(vidTimer); root.classList.add("has-video"); };
+      v.onplaying = function () {
+        clearTimeout(vidTimer); root.classList.add("has-video");
+        if (window.CouchVideo && CouchVideo.watchGreen) CouchVideo.watchGreen(v, stopVideo);
+      };
       v.onerror = stopVideo;
       v.src = VIDEO_URL;
       clearTimeout(vidTimer);
@@ -1588,7 +1628,19 @@
     v.removeAttribute("src");
     try { v.load(); } catch (e) {}
   }
-  function pauseVideo() { stopSoundscape(); if (window.AmbientWeather) window.AmbientWeather.pause(); var v = $("bgvid"); if (v.getAttribute("src")) v.pause(); sceneVideos(false); if (LOOP) loopPause(); }
+  // g18 (a Fire TV Stick 4K Max): the app opened from a video link took the TV's video decoder, and the
+  // paused clip came back as a black frame with the photo still hidden under it. Now the clip lets go
+  // of the decoder while the home is away, and the photo shows again until the clip really plays.
+  function releaseBgVideo() {
+    var v = $("bgvid");
+    clearTimeout(vidTimer);
+    document.documentElement.classList.remove("has-video");
+    if (!v.getAttribute("src")) return;
+    v.pause();
+    v.removeAttribute("src");
+    try { v.load(); } catch (e) {}
+  }
+  function pauseVideo() { stopSoundscape(); if (window.AmbientWeather) window.AmbientWeather.pause(); releaseBgVideo(); sceneVideos(false); if (LOOP) loopPause(); }
   document.addEventListener("visibilitychange", function () {
     if (document.hidden) { saveFocusNow(); pauseVideo(); }
     else { setIdleAmbient(false); resetSmartIdle(); startVideo(); sceneVideos(true); if (window.AmbientWeather) window.AmbientWeather.resume(); resetIdlePhoto(); }
@@ -1601,15 +1653,20 @@
   function sceneVideos(on) {
     var calm = false;
     try { calm = !!(window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches); } catch (e) {}
-    on = on && NIGHT && !calm && !idleAmbientActive && !screenOffActive;
+    on = on && NIGHT && !calm && !idleAmbientActive && !screenOffActive && !greenTv();
     sceneEls.forEach(function (el, k) {
       var v = el.querySelector(".svid");
       if (!v) return;
       var s = SCENES[k];
-      if (on && k === scene && !LIGHTER && !VIDEO_ON && !document.hidden) {
+      // g33: a clip that fails or shows only green lets go, and that scene keeps its photo from then on
+      var drop = function () { s.clipBad = true; v.classList.remove("playing"); v.pause(); v.removeAttribute("src"); try { v.load(); } catch (e) {} };
+      if (on && k === scene && !LIGHTER && !VIDEO_ON && !document.hidden && !s.clipBad) {
         if (!v.getAttribute("src")) {
-          v.onplaying = function () { v.classList.add("playing"); };
-          v.onerror = function () { v.classList.remove("playing"); };
+          v.onplaying = function () {
+            v.classList.add("playing");
+            if (window.CouchVideo && CouchVideo.watchGreen) CouchVideo.watchGreen(v, function () { drop(); sceneVideos(false); });
+          };
+          v.onerror = function () { if (v.getAttribute("src")) drop(); };
           v.src = "backgrounds/" + s.photo + ".mp4";
         }
         var p = v.play();
@@ -1823,6 +1880,27 @@
       if (SUN_SYNC) applySunSync();
       else showScene(nextFrom(scene));
     }
+  }
+
+  // g34: the phone remote's Scene buttons (ask.js reads them from /api/say). The Night look shows the
+  // next or the previous scene that is switched on, Classic the next or the previous photo; the Loop
+  // look and a design keep their own background. Nothing on the phone closes or reloads.
+  function phoneScene(pick) {
+    var back = pick === "prev";
+    if (LOOP || (typeof CouchDesign !== "undefined" && CouchDesign.on && CouchDesign.on())) return false;
+    if (NIGHT) {
+      if (SCENES.length < 2 || switching) return false;
+      var to = scene;
+      for (var k = 1; k <= SCENES.length; k++) { var i = (scene + (back ? SCENES.length - k : k)) % SCENES.length; if (!SCENES[i].lost) { to = i; break; } }
+      if (to === scene) return false;
+      showScene(to);
+      return true;
+    }
+    var n = classicPhotos().length;
+    if (n < 2) return false;
+    photo = (photo + (back ? n - 1 : 1)) % n;
+    showPhoto();
+    return true;
   }
 
   function getSunPos() {
@@ -3120,7 +3198,7 @@
         var art = slim(it.backdrop || it.poster), pkg = it.app && it.app.package;
         var ep = it.kind === "video" ? t("video_card") : it.season && it.episode ? "S" + it.season + " E" + it.episode : (it.episode_title || "");
         return '<div class="tile ncard">' +
-          (art ? '<img class="thumb" src="' + esc(art) + '" alt="" decoding="async" data-err="kwretry">' : '<span class="thumb none"></span>') +
+          (art ? '<img class="thumb" src="' + esc(art) + '" alt="" decoding="async" data-err="kwretry" data-pkg="' + esc(pkg || "") + '">' : '<span class="thumb none"></span>') +
           '<div class="t"><div class="nap">' + (pkg && iconUrl(pkg) ? '<img src="' + esc(iconUrl(pkg)) + '" alt="" data-err="remove">' : "") +
           esc(it.app ? it.app.name : "") + "</div><b>" + esc(it.title) + "</b>" + (ep ? "<i>" + esc(ep) + "</i>" : "") +
           (it.progress ? '<span class="nbar"><i style="width:' + Math.round(it.progress * 100) + '%"></i></span>' : "") + "</div></div>";
@@ -3135,7 +3213,7 @@
       var badge = pkg && iconUrl(pkg) ? '<span class="badge"><img src="' + esc(iconUrl(pkg)) + '" alt="" data-err="parent"></span>' : "";
       var bar = it.progress ? '<span class="bar"><i style="width:' + Math.round(it.progress * 100) + '%"></i></span>' : "";
       return '<div class="tile show"><div class="face">' +
-        (art ? '<img src="' + esc(art) + '" alt="" decoding="async" data-err="kwretry">' : '<span class="no-art">' + esc(it.title) + "</span>") +
+        (art ? '<img src="' + esc(art) + '" alt="" decoding="async" data-err="kwretry" data-pkg="' + esc(pkg || "") + '" data-title="' + esc(it.title) + '">' : '<span class="no-art">' + esc(it.title) + "</span>") +
         badge + bar + '</div><div class="caption"><b>' + esc(it.title) + "</b><span>" + esc(subtitle(it)) + "</span></div></div>";
     }).join("");
     shelfEls = Array.prototype.slice.call(track.children);
@@ -3701,13 +3779,25 @@
     return '<div class="face tool input-ic ic-' + esc(it.icon || "hdmi") + '">' + drawn + "</div>";
   }
 
+  // g24 (icon packs, asked for by two people): the home's own tiles (Settings, More apps, Inputs,
+  // Screens) drawn in one of couch-tv's icon sets (icon-sets.js), from home.icon_set or Home settings,
+  // Look, Icon style. Your own app icons are tv-home/tools/app-icons.sh (since 0.13, docs/TV-HOME.md).
+  var ICON_SETS = ["builtin", "line", "solid", "duotone", "tile", "glass", "playful"], ICON_SET = "builtin";
+  var SET_CONCEPT = { gear: "settings", more: "apps", input: "input", screen: "tv" };
+  function toolFace(name) {
+    var T = window.TVIcons, svg = ICON_SET !== "builtin" && T && T.svg ? T.svg(ICON_SET, SET_CONCEPT[name], 0) : "";
+    if (!svg) return '<div class="face tool">' + ICONS[name] + "</div>";
+    var full = ICON_SET === "tile" || ICON_SET === "glass" || ICON_SET === "playful";
+    return '<div class="face tool iset iset-' + ICON_SET + (full ? " iset-full" : "") + '">' + svg + "</div>";
+  }
+
   function dockHTML(it) {
     var face;
-    if (it.kind === "screen") face = '<div class="face tool">' + ICONS.screen + "</div>";
+    if (it.kind === "screen") face = toolFace("screen");
     else if (it.kind === "input") face = inputFace(it);
-    else if (it.kind === "inputs") face = '<div class="face tool">' + ICONS.input + "</div>";
-    else if (it.kind === "more") face = '<div class="face tool">' + ICONS.more + "</div>";
-    else if (it.kind === "gear") face = '<div class="face tool">' + ICONS.gear + "</div>";
+    else if (it.kind === "inputs") face = toolFace("input");
+    else if (it.kind === "more") face = toolFace("more");
+    else if (it.kind === "gear") face = toolFace("gear");
     else if (it.kind === "devmode") face = '<div class="face tool">' + ICONS.devmode + "</div>";
     else if (it.kind === "smart") face = '<div class="face tool">' + window.smartHome.icon + "</div>";
     else if (DOCK_BANNERS && it.banner) face = '<div class="face banner"><img src="' + esc(it.banner) + '" alt="" decoding="async" data-err="word" data-name="' + esc(it.name) + '"></div>';
@@ -3755,11 +3845,11 @@
   function appHTML(it) {
     if (NIGHT) return dockHTML(it);
     var face;
-    if (it.kind === "screen") face = '<div class="face tool">' + ICONS.screen + "</div>";
+    if (it.kind === "screen") face = toolFace("screen");
     else if (it.kind === "input") face = inputFace(it);
-    else if (it.kind === "inputs") face = '<div class="face tool">' + ICONS.input + "</div>";
-    else if (it.kind === "more") face = '<div class="face tool">' + ICONS.more + "</div>";
-    else if (it.kind === "gear") face = '<div class="face tool">' + ICONS.gear + "</div>";
+    else if (it.kind === "inputs") face = toolFace("input");
+    else if (it.kind === "more") face = toolFace("more");
+    else if (it.kind === "gear") face = toolFace("gear");
     else if (it.kind === "devmode") face = '<div class="face tool">' + ICONS.devmode + "</div>";
     else if (it.kind === "smart") face = '<div class="face tool">' + window.smartHome.icon + "</div>";
     else if (it.banner) face = '<div class="face"><img src="' + esc(it.banner) + '" alt="" decoding="async"></div>';
@@ -4757,7 +4847,7 @@
     clock: "clock", "clock-style": "clockStyle", glass: "glass", "glass-amount": "glass", "glass-note": "glass",
     "moving-tiles": "dockLook", "dock-mac": "dockLook", "glass-icons": "dockLook", "glass-focus": "dockLook",
     "keep-watching": "keepWatching", "shelf-follows-app": "shelfFollow", "start-focus": "startFocus", "idle-photo-seconds": "startFocus", "input-tile": "inputTile",
-    video: "video", "video-url": "video", "video-rm": "video", "video-note": "video",
+    video: "video", "video-url": "video", "video-rm": "video", "video-note": "video", "video-green": "video",
     "photos-count": "photos", "photo-pick": "photos", "photo-nopick": "photos", "photo-url": "photos", "photos-note": "photos", "photos-storage": "photos",
     "wx-unit": "wxNumbers", "wx-every": "wxNumbers" };
   function rowRule(key) {
@@ -5323,6 +5413,9 @@
       LIGHTER = !LIGHTER; ST.lighter = LIGHTER; saveSettings();
       document.documentElement.classList.toggle("lighter", LIGHTER); if (LOOP) loopLighter(); ambientSync(); movingTiles(); renderShelf(); paintFocus();
     } });
+    rows.push({ kind: "toggle", key: "icon-style", label: t("icon_style"), value: t("icon_style_" + ICON_SET), sub: t("icon_style_sub"), act: function () {
+      ICON_SET = ICON_SETS[(ICON_SETS.indexOf(ICON_SET) + 1) % ICON_SETS.length]; ST.icon_set = ICON_SET; saveSettings(); renderGrid();
+    } });
     rows.push({ kind: "toggle", key: "glass-icons", label: t("glass_icons"), value: GLASS_ICONS ? t("on") : t("off"), act: function () {
       GLASS_ICONS = !GLASS_ICONS; ST.glass_icons = GLASS_ICONS; saveSettings();
       document.documentElement.classList.toggle("glass-icons", GLASS_ICONS);   // seen straight away
@@ -5368,6 +5461,12 @@
       ST.video_url = ""; VIDEO_URL = ""; ST.video = false; saveSettings();
     } });
     rows.push(info("video-note", t("video_note")));
+    // g33: why the photo is back, and the way to try the clips again (a TV update may have fixed the decoder)
+    if (greenTv()) rows.push({ kind: "action", key: "video-green", label: t("video_try_again"), sub: t("video_green"), act: function () {
+      try { localStorage.removeItem("couchtv.video.green"); localStorage.removeItem("couchtv.video.slow"); } catch (e) {}
+      VIDEO_ON = !!VIDEO_URL && (typeof ST.video === "boolean" ? ST.video : true) && !LOOP;
+      startVideo(); sceneVideos(true);
+    } });
     // Now playing (#31): the card with the song and its buttons; it needs the computer or the on-TV app
     rows.push(head(t("np_head")));
     rows.push({ kind: "toggle", key: "now-playing", label: t("np_show"), value: NP_ON ? t("on") : t("off"), act: function () {
@@ -5381,11 +5480,12 @@
     rows.push(info("photos-count", photoCountText()));
     if (canPick()) rows.push({ kind: "action", key: "photo-pick", label: t("photos_pick"), sub: t("photos_pick_sub"), act: pickPhotos });
     else rows.push(info("photo-nopick", t("photos_no_pick"), "", t("photos_no_pick_sub")));
-    rows.push({ kind: "input", key: "photo-url", label: t("photos_url"), act: function () {
+    rows.push({ kind: "input", key: "photo-url", label: t("photos_url"), sub: PHOTO_NOTE || undefined, act: function () {
       startTyping({ label: t("photos_url_type"), value: "", url: true, submit: addPhotoUrl });
     } });
     (Array.isArray(ST.photos) ? ST.photos : []).forEach(function (p, i) {
       rows.push({ kind: "action", key: "photo-rm:" + p.id, label: t("photo_remove", { n: i + 1 }), thumb: photoSrc(p), danger: true,
+        sub: PHOTO_FAIL["p-" + p.id] ? t("photo_failed_home") : undefined,
         act: function () { removePhoto(p.id); } });
     });
     rows.push(info("photos-note", t("photos_note")));
@@ -5441,6 +5541,7 @@
       v.removeAttribute("src");
       if (good) {
         ST.video_url = u; ST.video = true; VIDEO_URL = u;
+        if (window.CouchVideo && CouchVideo.clearGreen) CouchVideo.clearGreen();   // a new link gets its own chance (g33)
         saveSettings();
         SET.msg = t("video_added");
       // Apple's own server (the tvOS aerials) uses a certificate from Apple's private CA, which
@@ -5455,28 +5556,59 @@
     v.onerror = function () { finish(false); };
     v.src = u;
   }
+  // g05 (an XGIMI Horizon 20 Max): a photo added by its web address never showed and nothing said why.
+  // The link is now asked for first where the site allows it (the answer's error number, a web page
+  // instead of a photo, a file far too big), then opened as a picture (a photo too big for a TV to
+  // draw), and the reason stays under the row until the next try, so it is there when someone comes
+  // back to the page. A photo that later does not open on the home says so on its own row too.
+  var PHOTO_NOTE = "", PHOTO_FAIL = {}, PHOTO_MAX_PX = 6000, PHOTO_MAX_BYTES = 30 * 1024 * 1024;
+  function photoAsk(u) {
+    // what the site answers, where it lets a page ask (many photo sites do); null when it does not say
+    if (typeof fetch !== "function") return Promise.resolve(null);
+    var ctl = typeof AbortController === "function" ? new AbortController() : null;
+    var timer = setTimeout(function () { if (ctl) ctl.abort(); }, 12000);
+    return fetch(u, { method: "GET", mode: "cors", credentials: "omit", referrerPolicy: "no-referrer", signal: ctl ? ctl.signal : undefined })
+      .then(function (r) {
+        clearTimeout(timer);
+        var type = (r.headers.get("content-type") || "").toLowerCase(), len = Number(r.headers.get("content-length")) || 0;
+        if (ctl) try { ctl.abort(); } catch (e) {}   // the headers are enough: the picture comes next, as an image
+        if (!r.ok) return { why: "photos_bad_missing", code: r.status };
+        if (/^text\/html|^application\/xhtml/.test(type)) return { why: "photos_bad_page" };
+        if (len > PHOTO_MAX_BYTES) return { why: "photos_bad_big_mb", mb: Math.round(len / 1048576) };
+        return null;
+      }, function () { clearTimeout(timer); return null; });
+  }
   function addPhotoUrl(u) {
     u = (u || "").trim();
     if (!u) return;
     if (!/^https?:\/\//i.test(u)) u = "https://" + u;
     if ((ST.photos || []).length >= MAX_PHOTOS) { SET.msg = t("photos_full", { n: MAX_PHOTOS }); return; }
-    SET.msg = t("photos_checking");
-    var im = new Image(), done = false;
-    var finish = function (good) {
+    SET.msg = t("photos_checking"); PHOTO_NOTE = "";
+    var done = false, timer = null;
+    var finish = function (why, vars) {
       if (done) return;
       done = true;
       clearTimeout(timer);
-      if (good) {
+      if (!why) {
         ST.photos = (Array.isArray(ST.photos) ? ST.photos : []).concat([{ id: uid(), url: u }]);
         saveSettings();
         SET.msg = t("photos_added");
-      } else SET.msg = t("photos_bad");
+      } else SET.msg = PHOTO_NOTE = t(why, vars || {});
       if (zone === "settings") renderSettings();
     };
-    var timer = setTimeout(function () { finish(false); }, 20000);
-    im.onload = function () { finish(im.naturalWidth > 0); };
-    im.onerror = function () { finish(false); };
-    im.src = u;
+    timer = setTimeout(function () { finish("photos_slow"); }, 20000);
+    photoAsk(u).then(function (said) {
+      if (done) return;
+      if (said) { finish(said.why, said); return; }
+      var im = new Image();
+      im.onload = function () {
+        if (!(im.naturalWidth > 0)) finish("photos_bad_blocked");
+        else if (im.naturalWidth > PHOTO_MAX_PX || im.naturalHeight > PHOTO_MAX_PX) finish("photos_bad_big", { w: im.naturalWidth, h: im.naturalHeight, max: PHOTO_MAX_PX });
+        else finish("");
+      };
+      im.onerror = function () { finish("photos_bad_blocked"); };
+      im.src = u;
+    });
   }
   function removePhoto(id) {
     var p = (ST.photos || []).filter(function (x) { return x.id === id; })[0];
@@ -6391,18 +6523,35 @@
     paintFocus();
     return true;
   }
-  if (HAS_POINTER) {
+  // g29 (an Android 14 MediaTek TV with an air mouse remote): any other TV turns the pointer on the first
+  // time a real pointer moves over the home (an air mouse, a USB mouse), so a click opens a tile, a dock
+  // app or a Home settings row as OK does. A TV that never sends a moving pointer stays arrows only.
+  // It takes 8 px of movement within half a second, so a stray nudge (or a TV that sends a lone mousemove) does not.
+  var wake = { at: 0, px: 0 };
+  function pointerWakes(e) {
+    if (HAS_POINTER) return true;
+    var now = Date.now(), d = Math.abs(e.movementX || 0) + Math.abs(e.movementY || 0);
+    if (!(d > 0)) return false;
+    if (now - wake.at > 500) { wake.at = now; wake.px = 0; }   // a new half second starts at the first move
+    wake.px += d;
+    if (wake.px < 8) return false;
+    HAS_POINTER = true;
+    document.documentElement.classList.add("has-pointer");
+    return true;
+  }
+  {
     document.addEventListener("mousemove", function (e) {
       // Chrome sends a mousemove with no movement after the page moves under a parked pointer:
       // that must not pull focus back from the arrow keys
       if (e.movementX === 0 && e.movementY === 0) return;
+      if (!pointerWakes(e)) return;
       if (kidsOn()) return;
       var p = pointAt(e.target);
       if (p) { touched = true; pointTo(p); }
     });
     // the wheel (or two fingers on the phone's touchpad) scrolls Home settings' list
     document.addEventListener("wheel", function (e) {
-      if (zone !== "settings" || SET.typing) return;
+      if (!HAS_POINTER || zone !== "settings" || SET.typing) return;
       var box = $("set-rows");
       var d = e.deltaY * (e.deltaMode === 1 ? 40 : e.deltaMode === 2 ? box.clientHeight : 1);
       if (!d) return;
@@ -6412,6 +6561,7 @@
       box.style.scrollBehavior = "";
     }, { passive: false });
     document.addEventListener("click", function (e) {
+      if (!HAS_POINTER) return;   // a click with no pointer moved first (a remote's OK) is not a pointer's
       if (screenOffActive) {
         e.preventDefault();
         e.stopPropagation();
@@ -7457,10 +7607,11 @@
     settingsKey: function () { blip(0, 0); settingsKey(); },
     // the phone code changed (HomeActivity, Auth.onPin): the QR and computer line draw the new one
     phoneLink: function () { PHONE_QR.url = ""; phoneQr(); if (typeof CouchDesign !== "undefined" && CouchDesign.nav && CouchDesign.nav.phoneAgain) CouchDesign.nav.phoneAgain(); },
-    resume: function () { PAGE_PAUSED = false; clock(); designVideo("away", false); toggleScreenOff(false); setIdleAmbient(false); resetSmartIdle(); okReset(); refresh(); if (!OFFLINE) refreshQuick(); refreshWeather(); startVideo(); sceneVideos(true); refreshMusic(); refreshCards(true); if (window.AmbientWeather) window.AmbientWeather.resume(); resetIdlePhoto(); },
+    resume: function () { PAGE_PAUSED = false; clock(); designVideo("away", false); toggleScreenOff(false); setIdleAmbient(false); resetSmartIdle(); okReset(); refresh(); if (!OFFLINE) refreshQuick(); refreshWeather(); startVideo(); sceneVideos(true); refreshMusic(); refreshCards(true); if (window.AmbientWeather) window.AmbientWeather.resume(); resetIdlePhoto(); kwArtAgain(); },
     // an app is in front: the video background stops until the home is back
     // (and a design's video background lets go of the TV's decoder, which the app may need)
     pause: function () { saveFocusNow(); PAGE_PAUSED = true; pauseVideo(); designVideo("away", true); },
+    scene: function (pick) { return phoneScene(pick); },
     // the launcher's file picker has copied the chosen photos into its own storage (Home settings)
     photosAdded: function (names) { photosAdded(names); },
     // the launcher's updater has news (Updater.kt)

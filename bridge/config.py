@@ -401,6 +401,12 @@ def loop_version(folder, variants):
     return h.hexdigest()[:10] if variants else ""
 
 
+# g24: icon packs. home.icon_set (or Home settings, Look, Icon style) draws the home's own tiles (Settings,
+# More apps, Inputs, Screens) from couch-tv's icon sets (tv-home/web/icon-sets.js STYLES); "builtin" is
+# the usual drawing. Your own app icons are tv-home/tools/app-icons.sh (since 0.13, docs/TV-HOME.md).
+ICON_SETS = ("builtin", "line", "solid", "duotone", "tile", "glass", "playful")
+
+
 def _home(h):
     h = h if isinstance(h, dict) else {}
     mine = _my_scenes(h.get("my_scenes"))
@@ -419,6 +425,8 @@ def _home(h):
         # your own scenes, in backgrounds/mine/ (docs/MAKE-A-SCENE.md)
         "my_scenes": mine,
     }
+    if h.get("icon_set") in ICON_SETS:
+        out["icon_set"] = h["icon_set"]
     idle_photo_seconds = h.get("idle_photo_seconds")
     if type(idle_photo_seconds) is int and idle_photo_seconds in (0, 5, 10, 15, 30, 60):
         out["idle_photo_seconds"] = idle_photo_seconds
@@ -652,7 +660,10 @@ CUSTOM_CARDS = custom_cards.source((CONFIG.get("home") or {}).get("custom_cards"
                                    os.path.dirname(os.path.abspath(CONFIG_FILE)))
 
 # ---------- quick settings (per TV) and picture modes ----------
-QUICK_IDS = ["sleep", "picture", "look", "soundscape", "screen_off", "input", "screensaver", "headphones", "tvsettings", "extend"]
+# Every button the TV home offers (QUICK_ALL in tv-home/web/app.js): an id missing here is dropped from
+# the bridge's copy of Home settings, and the TV takes that copy back, so the button vanished (g31).
+QUICK_IDS = ["sleep", "picture", "look", "soundscape", "screen_off", "input", "screensaver", "headphones", "tvsettings", "extend",
+             "bluetooth", "network"]
 
 
 def quick_for(tv_cfg):
