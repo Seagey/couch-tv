@@ -193,7 +193,6 @@ class LGTV:
         self._ids_checked = 0.0
         self._vol = {}
         self._listeners = set()
-        self._icons = {}            # app id -> (bytes, content type), from icon()
         self._session = None
         self._ws = None             # the SSAP websocket, once the TV has accepted the remote
         self._url = None
@@ -571,11 +570,18 @@ class LGTV:
         url = next((p["icon"] for p in self.launch_points if p["id"] == lid), None) or ""
         u = urlsplit(url)
         # Only an icon file on this TV's own address: never a fetch to anywhere else.
-        if u.scheme != "https" or u.hostname != self.ip or not u.path.startswith("/resources/"):
+        if u.scheme != "https" or u.hostname != self.ip \
+                or not u.path.startswith("/resources/") or ".." in u.path:
             raise ValueError(f"the TV lists no icon for {lid}")
         s = await self._http()
-        async with s.get(url, ssl=False) as r:
-            data = await r.read() if r.status == 200 else b""
+        async with s.get(url, ssl=False, allow_redirects=False) as r:
+            data = b""
+            if r.status == 200:
+                async for chunk in r.content.iter_chunked(65536):
+                    data += chunk
+                    if len(data) > 1_000_000:
+                        data = b""   # too big to be an app icon
+                        break
         # The TV sends no Content-Type (an OLED B5, webOS 11.2), so the bytes decide.
         kind = "image/png" if data.startswith(b"\x89PNG") else "image/jpeg" if data.startswith(b"\xff\xd8") else None
         if not kind:
@@ -586,27 +592,6 @@ class LGTV:
     # ---------- the watcher and the hook ----------
     async def start(self):
         self._tasks = [asyncio.create_task(self._watch())]
-    async def icon(self, lid):
-        """An app's icon (bytes, content type), kept in memory. The TV serves them on its self-signed
-        port 3001, which the couch-tv page refuses, so the bridge fetches them with the check off."""
-        if lid in self._icons:
-            return self._icons[lid]
-        await self.refresh_installed()
-        url = next((p["icon"] for p in self.launch_points if p["id"] == lid), None) or ""
-        u = urlsplit(url)
-        # Only an icon file on this TV's own address: never a fetch to anywhere else.
-        if u.scheme != "https" or u.hostname != self.ip or not u.path.startswith("/resources/"):
-            raise ValueError(f"the TV lists no icon for {lid}")
-        s = await self._http()
-        async with s.get(url, ssl=False) as r:
-            data = await r.read() if r.status == 200 else b""
-        # The TV sends no Content-Type (an OLED B5, webOS 11.2), so the bytes decide.
-        kind = "image/png" if data.startswith(b"\x89PNG") else "image/jpeg" if data.startswith(b"\xff\xd8") else None
-        if not kind:
-            raise ValueError(f"the TV has no icon for {lid} ({r.status})")
-        self._icons[lid] = (data, kind)
-        return self._icons[lid]
-
 
     async def _watch(self):
         await self._resolve()
