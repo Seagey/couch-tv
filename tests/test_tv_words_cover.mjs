@@ -42,7 +42,19 @@ const NOT_DRAWN = {
   "Use the design's ": "with a widget setting's own label (widget-caps.js, its words come through caps-words.js)",
   "Clear ": "with a widget setting's own label (widget-caps.js, its words come through caps-words.js)",
   "Check in": "a guest's stay as an Agenda event's title, drawn on the home: its words come through widget-lines.js",
-  "Check out": "a guest's stay as an Agenda event's title, drawn on the home: its words come through widget-lines.js"
+  "Check out": "a guest's stay as an Agenda event's title, drawn on the home: its words come through widget-lines.js",
+  "Premier League": "a football competition's own name on the scores card (origin/main #299), kept like an app's name",
+  "Serie A": "a football competition's own name on the scores card (origin/main #299), kept like an app's name",
+  "Champions League": "a football competition's own name on the scores card (origin/main #299), kept like an app's name",
+  "Europa League": "a football competition's own name on the scores card (origin/main #299), kept like an app's name",
+  "World Cup": "a football competition's own name on the scores card (origin/main #299), kept like an app's name",
+  "UEFA Nations League": "a football competition's own name on the scores card (origin/main #299), kept like an app's name",
+  "La Liga": "a football competition's own name on the scores card (origin/main #299), kept like an app's name",
+  "Ligue 1": "a football competition's own name on the scores card (origin/main #299), kept like an app's name",
+  "Persian Gulf Pro League": "a football competition's own name on the scores card (origin/main #299), kept like an app's name",
+  "Coppa Italia": "a football competition's own name on the scores card (origin/main #299), kept like an app's name",
+  "Copa del Rey": "a football competition's own name on the scores card (origin/main #299), kept like an app's name",
+  "FA Cup": "a football competition's own name on the scores card (origin/main #299), kept like an app's name"
 };
 const files = ["tv-home/web/app.js", "tv-home/web/design.js", "tv-home/web/design-code.js"];
 const left = [];

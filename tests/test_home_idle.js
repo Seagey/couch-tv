@@ -33,7 +33,7 @@ assert(/if \(!SMART_IDLE\.enabled \|\| covered\(\)/.test(app), 'smart idle waits
 assert(/resume: function \(\) \{ PAGE_PAUSED = false; clock\(\);/.test(app), 'tv.resume redraws the clock first');
 
 let clockCalls = 0;
-const tick = { active: () => true, clock: () => { clockCalls++; }, clockMinute: '', NIGHT: true, glassShown: '21:07', Date: class extends Date { constructor() { super(2026, 10, 16, 21, 7, 30); } } };
+const tick = { active: () => true, refreshBingScene() {}, clock: () => { clockCalls++; }, clockMinute: '', NIGHT: true, glassShown: '21:07', Date: class extends Date { constructor() { super(2026, 10, 16, 21, 7, 30); } } };
 vm.runInNewContext(`${extractFunction('clockTick')}\nthis.tick = clockTick;`, tick);
 tick.tick(); assert.strictEqual(clockCalls, 1, 'a new minute redraws');
 tick.clockMinute = '21:7'; tick.tick(); assert.strictEqual(clockCalls, 1, 'the same minute does not');

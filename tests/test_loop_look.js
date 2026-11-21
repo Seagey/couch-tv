@@ -830,7 +830,7 @@ console.log('Loop look version tests passed.');
   np.getBoundingClientRect = () => rect(96, 76, 565, 32);
   const ctx = {
     document: { documentElement: { dir: 'ltr' } }, touched: false,
-    LOOP: true, NIGHT: true, expanded: false, AMBIENT_MUSIC: false, music: { state: 'playing' }, lift: null,
+    LOOP: true, NIGHT: true, footballEnabled: false, LOCAL_SPOTIFY: false, expanded: false, AMBIENT_MUSIC: false, music: { state: 'playing' }, lift: null,
     zone: 'shelf', s: 0, g: 0, qi: 0, pi: 0, npI: 1, GRID_COLS: 12, people: 1, quick: 2, reach: true,
     shelfEls: [1, 2, 3, 4, 5], gridItems: [], PEOPLE: [{ id: 'a' }, { id: 'b' }],
     gridEls: Array.from({ length: 6 }, (_, i) => ({ getBoundingClientRect: () => rect(564 + i * 136, 912, 112, 112) })),
