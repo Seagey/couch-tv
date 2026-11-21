@@ -388,6 +388,9 @@
     label: function (v) { return SAN.w(v, 40); }, text: function (v) { return SAN.w(v, 120); }, sub: function (v) { return SAN.w(v, 80); },
     kicker: function (v) { return SAN.w(v, 60); }, caption: function (v) { return SAN.w(v, 60); },
     format: function (v) { return SAN.pick(v, ["auto", "12h", "24h"]); }, ampm: SAN.b, seconds: SAN.b, date: SAN.b,
+    // the clocks' own settings (widget-caps.js): the analogue clock's numbers, the word clock's minute and
+    // day line, the month's first day of the week
+    numbers: SAN.b, precise: SAN.b, dayline: SAN.b, wstart: function (v) { return SAN.pick(v, ["mon", "sun"]); },
     align: function (v) { return SAN.pick(v, ["left", "center", "right"]); },
     show: function (v) { return SAN.pick(v, ["date", "weather", "both"]); }, dfmt: function (v) { return SAN.pick(v, DATE_KEYS); },
     cities: function (v) { return SAN.list(v, 4, tzOk); },
@@ -440,8 +443,8 @@
   var WEB_LEAGUES = ["afl", "nrl", "aleague", "epl", "nba", "bbl", "cricket"];
   var WEB_FEEDS = ["abc", "abc-justin", "abc-sport", "abc-business", "sbs", "guardian", "bbc", "rnz"];
   var WOPT = {
-    clock: "format ampm seconds date align", tallclock: "format align", glassclock: "format scene", analog: "seconds", flipclock: "format",
-    wordclock: "", solar: "", worldclock: "label cities", countdown: "label month day year unit icon", date: "show dfmt align place", month: "", timer: "label minutes",
+    clock: "format ampm seconds date align", tallclock: "format align", glassclock: "format scene", analog: "seconds numbers", flipclock: "format",
+    wordclock: "precise dayline", solar: "", worldclock: "label cities format", countdown: "label month day year unit icon", date: "show dfmt align place", month: "wstart", timer: "label minutes",
     weather: "place hilo night", bigtemp: "place", hourly: "place hours", week: "place", rain: "label", uv: "label", sun: "label", moon: "", air: "label", surf: "label",
     photo: "image fit caption sub", slideshow: "seconds_each caption sub shuffle", mosaic: "count", artframe: "image mat caption sub", memory: "align range ago",
     keep: "", keeprow: "label shows", upnext: "apps sport", picks: "label align",

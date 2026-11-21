@@ -34,6 +34,9 @@ const KEEP = {
   "The smell of rain on dry ground.": "the Word of the day's fallback meaning, with its English word",
   "Alex": "a name in couch-tv Studio's demo", "Backyard": "a camera's name in couch-tv Studio's demo", "Driveway": "a camera's name in couch-tv Studio's demo",
   "Room ": "an aria label with the room's own name",
+  "Inter, sans-serif": "a font name in an svg, never words",
+  "Twenty seven minutes past\neleven": "the Word clock in couch-tv Studio's demo: the Word clock writes the time in English words",
+  "Pizza": "a timer's name in couch-tv Studio's demo",
   "H:": "the day's high and low as H: and L:, written the way weather apps write them"
 };
 // a literal that only starts a line made with tl() or the table (a fragment of one of its lines)
@@ -51,7 +54,7 @@ try {
       for (const m of line.matchAll(/\btl\(\s*"((?:[^"\\]|\\.)*)"/g)) seen.add(JSON.parse('"' + m[1] + '"'));
       for (const m of line.matchAll(/"((?:[^"\\]|\\.)*)"/g)) {
         const s = JSON.parse('"' + m[1] + '"');
-        if (!/^[A-Z][a-z']*([ ,.:!?]|$)/.test(s) || /[<>=;#\/]|\.js|https?:|^[A-Z][a-z]+[A-Z]/.test(s) || /^[A-Z]$/.test(s)) continue;
+        if (!/^([A-Z][a-z']*|OK|UV|TV|AI)([ ,.:!?]|$)/.test(s) || /[<>=;#\/]|\.js|https?:|^[A-Z][a-z]+[A-Z]/.test(s) || /^[A-Z]$/.test(s)) continue;
         if (/\{\w+\}/.test(s) && !line.includes('tl("' + m[1])) continue;
         seen.add(s);
       }
@@ -62,7 +65,7 @@ try {
 } catch (e) { if (!/v0\.13\.8|git/.test(String(e))) throw e; console.log("SKIP part 1: no git or no v0.13.8 tag"); }
 if (process.argv.includes("--list")) { console.log(JSON.stringify(missing, null, 1)); process.exit(0); }
 ok(missing.length === 0, missing.length + " new widget lines with no row in widget-lines.js:\n  " + missing.join("\n  "));
-for (const s of Object.keys(KEEP)) ok((read("tv-home/web/widgets.js") + read("tv-home/web/widget-detail.js")).includes('"' + s + '"'), "still in the code: " + s);
+for (const s of Object.keys(KEEP)) ok((read("tv-home/web/widgets.js") + read("tv-home/web/widget-detail.js")).includes(JSON.stringify(s)), "still in the code: " + s);
 
 // every row: every language, the same gaps, no dashes or markup, the capital kept
 const gaps = (s) => (String(s).match(/\{\w+\}/g) || []).sort().join();
