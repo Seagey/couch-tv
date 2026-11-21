@@ -6,6 +6,7 @@ Every couch-tv guide in one place, grouped by what you want to do.
 
 | Guide | What it is for |
 |---|---|
+| [START-HERE.md](START-HERE.md) | First time? One step at a time for Google TV with a phone, Android TV with a phone, and Samsung with a computer |
 | [SETUP.md](SETUP.md) | Every setup step, from developer mode to the TV home, and how to undo it |
 | [Setup site](https://couchtv.sites.underseage.studio) | Set it up the easy way, from your phone, with the free Setup app or with your AI agent. It also checks whether your TV will work |
 | [README](../README.md) | The front page: what couch-tv is and the three options |

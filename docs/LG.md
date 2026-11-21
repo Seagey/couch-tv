@@ -503,6 +503,47 @@ Wi-Fi" on 2017 and later models, "IP control settings, Wake on LAN" on 2025 mode
 the TV's network or general settings). A cable is more reliable than Wi-Fi. If it does not wake,
 the phone says so and you use the TV's remote.
 
+## If LG says no
+
+Three things people hit on an LG, in plain words.
+
+**"Developer Mode won't start" or "it says it is not Android."** An LG is not Android. The Android
+steps you may have seen for couch-tv (Settings, About, press Build seven times, USB debugging,
+Wireless debugging) are for Google TV and Android TV, and an LG has none of them. On an LG,
+Developer Mode is **an app from LG**: open the LG Content Store (or Apps), search for **Developer
+Mode**, install it, open it and sign in with a free LG developer account made on
+[LG's developer site](https://webostv.developer.lge.com/). Then switch **Dev Mode Status** on (the
+TV restarts) and, for the install, **Key Server** on. Step 1 above has the details.
+
+**The TV refuses the `.ipk`.** An LG only takes couch-tv through Developer Mode, from a computer on
+the same network. Check these, in this order:
+
+1. **Opening the file on the TV does nothing.** An `.ipk` copied to a USB stick, or opened in the
+   TV's browser, is always refused: LG installs apps only from its store or through Developer Mode.
+   Install it from the computer (step 4, `ares-install`, or webOS Dev Manager).
+2. **Developer Mode is off or ran out.** Open the Developer Mode app on the TV. Dev Mode Status must
+   be on and the time left must be more than zero. If it ran out, switch it on again (the TV
+   restarts), then install again.
+3. **Key Server is off, or the passphrase is old.** Switch Key Server on in the Developer Mode app,
+   then run step 2 again with the passphrase it shows now. The passphrase changes when Developer
+   Mode is switched on again.
+4. **The TV has a new address.** If the router gave the TV a new address, `ares-install` talks to
+   nobody. Run step 2 again with the address in the Developer Mode app, and give the TV a fixed
+   address in the router.
+5. **An AI helper got it wrong.** If an AI agent set it up, ask it to run
+   `ares-install --device <name> <file>.ipk` and read you the whole error, and to follow this page
+   (docs/LG.md) rather than the Android steps. Still refused: open an issue on GitHub with the TV
+   model, the webOS version (Settings, General, About this TV) and that error.
+
+**Opening couch-tv when the TV switches on.** webOS has no setting that lets a Developer Mode app
+start itself when the TV comes on, and its Home button always opens LG's own menu. So what opens
+couch-tv at power on is the **bridge on a computer at home that stays on**: it sees the TV come on and
+opens couch-tv within a few seconds (see "How the hook works"). The same computer presses Developer
+Mode's Extend once a day, so couch-tv stays installed. With no computer, couch-tv still works as an
+app: open it from the app row, or pin it to a number key with Quick Access (see "Limits to know").
+If you want everything with no computer, a Google TV box (such as the Google TV Streamer) plugged
+into the LG runs the full couch-tv home.
+
 ## Limits to know
 
 - LG's Home button and the app row are LG's. couch-tv cannot hide LG's ads or menu. Leaving couch-tv
