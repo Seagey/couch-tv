@@ -230,6 +230,9 @@ class Hook(Base):
         self.assertEqual(got, ["dev"])
         self.assertIn("opened couch-tv", t.hook_log[-1][1])
 
+    async def test_roku_os_16_home_with_an_id_and_type_home_opens_couch_tv(self):
+        self.assertEqual((await self.run_hook(("562859", "Roku Dynamic Menu", "home")))[0], ["dev"])
+
     async def test_comes_on_in_live_tv_opens_couch_tv(self):
         self.assertEqual((await self.run_hook(("tvinput.dtv", "Live TV")))[0], ["dev"])
 

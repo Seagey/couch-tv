@@ -80,8 +80,9 @@ class StandIn:
                 "<device-info><model-name>Stand-in Roku TV</model-name><software-version>14.1.0</software-version>"
                 f"<is-tv>true</is-tv><power-mode>{self.power}</power-mode></device-info>"))
         if path == "query/active-app":
-            rid, name = self.active
-            inner = f'<app id="{rid}">{name}</app>' if rid else "<app>Roku</app>"
+            rid, name, *kind = self.active
+            attr = f' type="{kind[0]}"' if kind else ""
+            inner = f'<app id="{rid}"{attr}>{name}</app>' if rid else "<app>Roku</app>"
             return web.Response(content_type="text/xml", text=f"<active-app>{inner}</active-app>")
         if path == "query/apps":
             rows = "".join(f'<app id="{i}" type="appl" version="1.0">{n}</app>' for i, n in APPS)
