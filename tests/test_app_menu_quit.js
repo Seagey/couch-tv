@@ -10,10 +10,10 @@ function pull(name) {
   return source.slice(start, source.indexOf('\n  }', start) + 4);
 }
 
-function setup({ OFFLINE = false, PREVIEW = false, bridge = true, api = () => Promise.resolve({ ok: true }) } = {}) {
+function setup({ OFFLINE = false, PREVIEW = false, ON_TV = false, bridge = true, api = () => Promise.resolve({ ok: true }) } = {}) {
   const calls = { flash: [], api: [] };
   const context = {
-    TV: { uninstall() {}, appInfo() {} }, OFFLINE, PREVIEW, data: { bridge }, zone: 'grid', hintFlash: '',
+    TV: { uninstall() {}, appInfo() {} }, OFFLINE, PREVIEW, ON_TV, data: { bridge }, zone: 'grid', hintFlash: '',
     t: (key, vars) => key + (vars ? ':' + vars.name : ''),
     flash: text => calls.flash.push(text),
     setTimeout, paintFocus() {}, renderAppMenu() {}, closeAppMenu() {},
@@ -37,7 +37,7 @@ const choose = (context, act) => { context.amI = acts(context).indexOf(act); con
   assert.deepStrictEqual(acts(s.context), ['move', 'hide', 'restart', 'quit', 'uninstall', 'info']);
 
   // ... and are left out where nothing could really stop the app
-  for (const opts of [{ OFFLINE: true }, { bridge: false }, { PREVIEW: true }]) {
+  for (const opts of [{ OFFLINE: true }, { bridge: false }, { PREVIEW: true }, { ON_TV: true }]) {
     s = setup(opts);
     s.context.openAppMenu(app);
     assert.deepStrictEqual(acts(s.context), ['move', 'hide', 'uninstall', 'info'], JSON.stringify(opts));

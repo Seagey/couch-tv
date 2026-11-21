@@ -3575,7 +3575,8 @@
   // Quit app / Restart app: the bridge force stops the app (restart also opens it again on what was playing).
   // Restart says what it is doing at once, since it takes a few seconds; Quit says so when it is done.
   function bridgeCanStop(a) {
-    return !OFFLINE && !PREVIEW && a.package && a.package !== "app.couchtv.launcher" && data.bridge !== false;
+    // the on-TV app has no /api/quit-app or /api/restart-app, so it must not offer them (#308)
+    return !OFFLINE && !PREVIEW && !ON_TV && a.package && a.package !== "app.couchtv.launcher" && data.bridge !== false;
   }
   function stopApp(a, path, body, doneKey, failKey, early) {
     if (early) flash(t(doneKey, { name: a.name }));
