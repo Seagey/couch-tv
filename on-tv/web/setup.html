@@ -1023,6 +1023,14 @@
         ['photos', 'athome', 'widgets', 'dapps'].concat(home === 'none' ? ['town'] : []).forEach(function (id) { $(id).style.display = 'none'; var c = document.querySelector('.jump a[href="#' + id + '"]'); if (c) c.style.display = 'none'; });
         $('jump-widgets').style.display = 'none'; $('jump-dapps').style.display = 'none'; NO_ATHOME = true;
         $('intro-from').textContent = 'This page comes from your home computer, over your home Wi-Fi. ' + (home === 'none' ? 'This TV shows its own home, so only the people are here.' : 'Couch TV on this TV takes the town and the people from here.');
+        // a Roku or an Apple TV keeps the design it got by code on the TV itself, so the home computer cannot
+        // change a widget there: say where it is changed instead of leaving widgets out without a word
+        if (home === 'roku' || home === 'appletv') {
+          var tvw = home === 'roku' ? 'Roku' : 'Apple TV';
+          $('widgets').style.display = ''; $('jump-widgets').style.display = ''; $('w-list').innerHTML = '';
+          $('widgets').querySelector('p').textContent = 'Widgets on your ' + tvw + ' are changed in couch-tv Studio: open your design there, change the widget, then tap Send to my TV and type the new code on the ' + tvw + '. The town and the people below reach the ' + tvw + ' from here.';
+          $('widgets').setAttribute('data-native', home);
+        }
       }
       $('photos-where').textContent = 'They go straight from this phone to your home computer, which makes them screen size and keeps them for the TV.';
     } else {

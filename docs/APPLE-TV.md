@@ -290,6 +290,7 @@ Couch TV draws couch-tv Studio designs (from 0.13.4). It builds with Xcode and r
   config.json), shows the design small and asks "Use this design?". Nothing of it shows until you pick Yes. It is
   kept on the Apple TV, so it is still there after a restart, and it wins over the one in config.json.
 - **Plain home** in the same place goes back to the usual Couch TV home. **Design** turns the design back on.
+- **Changing a widget:** the Apple TV has no Hold OK menu, and the phone page cannot reach the design kept on it, so change the widget in couch-tv Studio and send the design again.
 
 What shows:
 

@@ -86,6 +86,17 @@ ok(CAPS.need("aircon", "Tizen") === "computer" && CAPS.need("aircon", "Google TV
 ok(CAPS.need("clock", "Roku OS") === "works" && CAPS.need("clock", "tvOS") === "works", "a Roku and an Apple TV draw the clock");
 ok(CAPS.need("surf", "Roku OS") === "no" && /^Shows on Google TV/.test(CAPS.steps("surf", "Roku OS")[0]), "a Roku: no surf, and says so");
 ok(CAPS.need("worldclock", "tvOS") === "works" && CAPS.need("worldclock", "Roku OS") === "no", "world clocks on an Apple TV, not on a Roku");
+// launch audit 0.13.9 (coord/AUDIT-0139-WIDGETS.md): only what works is offered as working
+ok(CAPS.need("note", "Roku OS") === "no" && CAPS.native("Roku OS").indexOf("note") < 0, "Family note: not on a Roku (it drew the word Note)");
+ok(CAPS.need("quote", "Roku OS") === "setup" && CAPS.need("quote", "tvOS") === "setup" && /own words/.test(CAPS.get("quote").platforms["Roku OS"].note), "Quote on a Roku or Apple TV: your own words, said so");
+["weather", "bigtemp", "keep", "keeprow", "people"].forEach((k) => ok(CAPS.need(k, "Roku OS") === "computer" && CAPS.need(k, "tvOS") === "works", k + ": needs the home computer on a Roku, works on an Apple TV"));
+ok(/once a minute/.test(CAPS.get("stack").platforms["Roku OS"].note), "a stack on a Roku says how it moves on");
+["clock", "weather", "note", "list", "quote", "welcome", "stack", "people", "card", "app", "dock", "appgrid"].forEach((k) => ["Tizen", "webOS"].forEach((p) => ok(CAPS.need(k, p) !== "computer" && !/home computer is on|has to be on/.test(CAPS.get(k).platforms[p].note), k + " on " + p + ": works in the app without a home computer")));
+["news", "stocks", "aircon", "agenda", "keep", "queue", "agent"].forEach((k) => ["Tizen", "webOS"].forEach((p) => ok(CAPS.need(k, p) === "computer", k + " on " + p + ": still needs the home computer")));
+["Saphi", "TiVo OS", "My Home Screen"].forEach((p) => ok(CAPS.need("clock", p) === "computer", "the clock on " + p + ": the computer opens the home there"));
+ok(CAPS.need("agent", "Google TV") === "setup" && CAPS.need("agent", "Fire OS") === "setup" && CAPS.get("agent").setup.where === "tv", "From your AI on an Android TV: set up, no computer needed");
+ok(CAPS.need("battery", "Tizen") === "no" && CAPS.need("nowplaying", "webOS") === "no" && CAPS.need("screentime", "Tizen") === "no", "Batteries, Now playing and Screen time stay off a Samsung and LG");
+["Roku OS", "tvOS"].forEach((p) => ["clock", "weather", "welcome"].forEach((k) => { const s = CAPS.steps(k, p); ok(/couch-tv Studio and send the design again/.test(s[s.length - 1]), k + " on " + p + ": says where to change it"); }));
 ok(CAPS.need("clock", "Vega OS") === "no" && /not possible/i.test(CAPS.steps("clock", "Vega OS")[0]), "a Fire TV on Vega OS: not possible, and says so");
 
 // 3. sizes: the shape of tools/tv-designer/app/grid.js W[kind]; named sizes smallest first, none under min

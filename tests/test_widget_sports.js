@@ -102,7 +102,7 @@ const sb = (t) => t.asked.filter((u) => !/\/standings$/.test(u));
   const b = K.kept(CD, "sports", { league: "https://x.example", team: "<b>x</b> https://x.example", url: "x" });
   ok(b.league === undefined && b.url === undefined && !/https?:|</.test(b.team || ""), "a link as a league, markup or a link as a team, and other options are dropped");
   const cap = T.C.get("sports");
-  ok(cap.status === "works" && T.C.need("sports", "Google TV") === "works" && T.C.need("sports", "VIDAA") === "works" && T.C.need("sports", "webOS") === "computer" && T.C.need("sports", "tvOS") === "no", "widget-caps: works, honest platforms");
+  ok(cap.status === "works" && T.C.need("sports", "Google TV") === "works" && T.C.need("sports", "VIDAA") === "works" && T.C.need("sports", "webOS") === "works" && T.C.need("sports", "Saphi") === "computer" && T.C.need("sports", "tvOS") === "no", "widget-caps: works, honest platforms");
   ok(["android", "web", "vidaa"].every((g) => T.C.steps("sports", g).length >= 3), "widget-caps: steps for each kind of TV");
   done();
 })().catch((e) => { console.error(e); process.exit(1); });

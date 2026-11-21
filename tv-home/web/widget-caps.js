@@ -54,8 +54,9 @@
   // kind is not on that TV. Both need a computer at home that stays on to open Couch TV.
   var NATIVE = {
     "Roku OS": ["clock", "tallclock", "glassclock", "analog", "flipclock", "wordclock", "countdown", "date", "month", "weather", "bigtemp", "moon", "photo", "artframe",
-      "keep", "keeprow", "app", "folder", "dock", "appgrid", "games", "people", "card", "quote", "welcome", "note",
-      // a smart stack: Roku draws its first widget (DesignLib.brs, the top of dlWidget)
+      "keep", "keeprow", "app", "folder", "dock", "appgrid", "games", "people", "card", "quote", "welcome",
+      // a smart stack: Roku draws one widget at a time, the next each minute (DesignLib.brs, the top of
+      // dlWidget). Family note is not here: the note lives in the web home's own store, which a Roku lacks.
       "stack"],
     tvOS: ["clock", "tallclock", "glassclock", "analog", "flipclock", "wordclock", "worldclock", "countdown", "date", "month", "weather", "bigtemp", "photo", "artframe",
       "keep", "keeprow", "app", "folder", "dock", "appgrid", "games", "people", "quick", "card", "quote", "welcome", "stack"]
@@ -68,7 +69,8 @@
   var NOT_HERE = ["Not possible on this TV: designs show on Google TV, Android TV, Fire TV, Samsung, LG, Hisense, Philips (older), TiVo OS, Panasonic, Roku and Apple TV."];
   var NOT_NATIVE = "Shows on Google TV, Android TV and Fire TV.";
   var NATIVE_PHOTO = { photo: true, artframe: true };
-  var NATIVE_PHOTO_NOTE = "Shows the photo put in the widget in couch-tv Studio. This TV's own photos do not show here.";
+  var NATIVE_CHANGE = "To change this widget, change it in couch-tv Studio and send the design again.";
+  var NATIVE_PHOTO_NOTE ="Shows the photo put in the widget in couch-tv Studio. This TV's own photos do not show here.";
   var NATIVE_SEND = { "Roku OS": "Tap Send to my TV, then on the Roku: press the star button, pick Get a design by code, and type the code.",
     tvOS: "Tap Send to my TV, then on the Apple TV: Settings, Home design, Get a design, and type the code." };
 
@@ -489,14 +491,14 @@
       sizes: sz(["wtile", "small", "medium", "wide", "large"], [4, 2]) },
     agent: { name: "From your AI", status: "setup", what: "Messages your own AI agent sends to the TV. The agent can also put a couch-tv Studio design on the TV (you press OK first)",
       needs: [AGENT_NEED, "An AI app that can use tools (MCP), such as Claude Desktop, Claude Code or Cursor, or any program on your network"],
-      setup: setup("computer", [
+      setup: setup("tv", [
         "Needs the Couch TV app on this TV, or a home computer running Couch TV: they hold the TV's own address for your agent.",
         "In your AI app, add Couch TV's TV tools with the TV app's or home computer's address and pairing key. The guide Connect your own AI agent has the lines to copy.",
         "Ask your AI: \"Show 'Dinner is ready' on the TV\". It shows over the home and in this widget.",
         "To change the home: ask it to design one with couch-tv Studio's tools and send it. The TV asks \"Use this design?\" first: press OK."]),
       until: "\"Connect your AI agent\", and OK shows how", build: "",
       ok: "Opens the last message in full, and how to connect your agent",
-      platforms: plat("computer", "computer", "computer", { android: "Through the Couch TV app on this TV (no computer at home needed) or a home computer.", web: "Works while the home computer is on.", vidaa: "Needs a home computer running Couch TV: the website home has nothing an agent can reach." }),
+      platforms: plat("setup", "computer", "computer", { android: "Through the Couch TV app on this TV (no computer at home needed) or a home computer.", web: "Works while the home computer is on.", vidaa: "Needs a home computer running Couch TV: the website home has nothing an agent can reach." }),
       sizes: sz(["wtile", "small", "medium", "wide"], [4, 2]) },
 
     // ---------- a smart stack (not a widget of its own: up to 10 widgets taking turns) ----------
@@ -815,6 +817,37 @@
   // a Roku draws the moon as a plain disc with its name and how much is lit, the same way round everywhere
   C.moon.platforms["Roku OS"].note += " On a Roku the moon is a plain disc with its name and how much is lit, the same way round everywhere, and no next full moon.";
 
+  // a Roku can run Couch TV as a channel alone (docs/ROKU.md): these read the home computer (HomeScene.brs,
+  // the weather, the people and Keep watching come from it), so on a Roku they need it. An Apple TV always
+  // has one.
+  ["weather", "bigtemp", "keep", "keeprow", "people"].forEach(function (k) {
+    C[k].platforms["Roku OS"] = { on: "setup", need: "computer", note: "Needs a home computer that stays on, running Couch TV: the Roku reads this from it." };
+  });
+  // a quote's built in lines are in the web home only: a Roku or an Apple TV shows the words typed in it
+  ["Roku OS", "tvOS"].forEach(function (p) {
+    C.quote.platforms[p] = { on: "setup", need: "setup", note: "Shows your own words only: type them in couch-tv Studio." };
+  });
+  // a smart stack on a Roku moves on once a minute, and the remote does not flick it
+  C.stack.platforms["Roku OS"].note += " On a Roku it moves on to the next widget once a minute; Left and Right do not flick it.";
+
+  // Samsung and LG: Couch TV is an app on the TV that runs with or without a home computer (docs/SAMSUNG.md,
+  // docs/LG.md option A). The app reads the weather itself (Open-Meteo), keeps notes, lists and photos by web
+  // address, and opens apps itself (samsung/app/tizen.js tizen.application, lg/app/webos.js luna
+  // applicationManager), so these work without the computer, as on a VIDAA with no computer. News, markets,
+  // the smart home, the agenda, Keep watching, the Spotify queue and the AI agent still need it.
+  var APP_ALONE = { works: "Works in the Couch TV app, with or without a home computer.", setup: "Works in the Couch TV app once it is set up, with or without a home computer." };
+  var OPENS_APPS = ["app", "folder", "dock", "appgrid", "games"], KEEP_PC = ["queue"];
+  ["Tizen", "webOS"].forEach(function (p) {
+    Object.keys(C).forEach(function (k) {
+      var x = C[k].platforms[p], v = C[k].platforms.VIDAA;
+      if (!x || x.need !== "computer" || KEEP_PC.indexOf(k) >= 0) return;
+      var need = OPENS_APPS.indexOf(k) >= 0 ? "works" : v && (v.need === "works" || v.need === "setup") ? v.need : "";
+      if (!need) return;
+      var partial = x.on === "partial" || (v && v.on === "partial");
+      C[k].platforms[p] = { on: partial ? "partial" : onOf(need, "web"), need: need, note: /computer/.test(x.note) ? APP_ALONE[need] : x.note };
+    });
+  });
+
   // the setup card a TV shows for a widget that has nothing real to show yet: the first line says what
   // is missing, the second where to go. Built only from this file, never from a design.
   var WHERE = { tv: "OK here shows the steps", phone: "Set up from the phone remote", computer: "OK here shows how to set it up", designer: "Set up in couch-tv Studio", nothing: "" };
@@ -876,6 +909,8 @@
       out.push(s);
     });
     if (onTv) out.push("Set on the home computer that opens Couch TV on your " + NATIVE_NAME[p] + ".");
+    // there is no Hold OK menu on a Roku or an Apple TV, and the phone page cannot reach the design there
+    out.push(NATIVE_CHANGE);
     return out;
   }
 

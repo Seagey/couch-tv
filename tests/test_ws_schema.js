@@ -221,8 +221,8 @@ ok(!CAPS.settings("list").some((s) => s.key === "label"), "list: draws its own n
 // the kinds each native TV draws (DesignLib.brs dlWNative, DesignModel.swift DesignWidgets.native)
 const ROOT = path.join(__dirname, "..");
 const brs = fs.readFileSync(path.join(ROOT, "roku/channel/components/DesignLib.brs"), "utf8").match(/function dlWNative[\s\S]*?\[([^\]]*)\]/)[1];
-// plus the smart stack, which Roku draws through its first widget (the top of dlWidget)
-ok(/if kind = "stack"\s+first = \{\}\s+first\.append\(o\.items\[0\]\)/.test(fs.readFileSync(path.join(ROOT, "roku/channel/components/DesignLib.brs"), "utf8")), "Roku's dlWidget handles a smart stack");
+// plus the smart stack, which Roku draws one widget at a time, the next each minute (the top of dlWidget)
+ok(/if kind = "stack"[\s\S]{0,400}?at = \(nw\.h \* 60 \+ nw\.mi\) mod n\s+first = \{\}\s+first\.append\(o\.items\[at\]\)/.test(fs.readFileSync(path.join(ROOT, "roku/channel/components/DesignLib.brs"), "utf8")), "Roku's dlWidget handles a smart stack");
 ok(JSON.stringify(JSON.parse("[" + brs + "]").concat(["stack"]).sort()) === JSON.stringify(CAPS.native("Roku OS").sort()), "the Roku list matches DesignLib.brs, plus the stack");
 const swift = fs.readFileSync(path.join(ROOT, "tvos/CouchTV/DesignModel.swift"), "utf8").match(/static let native: Set<String> = \[([^\]]*)\]/)[1];
 ok(JSON.stringify(JSON.parse("[" + swift + "]").sort()) === JSON.stringify(CAPS.native("tvOS").sort()), "the Apple TV list matches DesignModel.swift");

@@ -196,7 +196,33 @@ class RokuDraws(unittest.TestCase):
 
     def test_kinds_drawn_here_are_unchanged(self):
         self.assertTrue([t for t in self.t if re.match(r"^\d{1,2}:\d\d$", t)])   # the clock
-        self.assertEqual(len(native_kinds_roku()), 26)
+        self.assertEqual(len(native_kinds_roku()), 25)
+
+    def test_family_note_is_not_on_a_roku(self):
+        # it used to draw the word "Note": the note lives in the web home's own store, which a Roku lacks
+        self.assertNotIn("note", native_kinds_roku())
+        lay = rd.run_brs([("layout", [design([w("n", "note", 0, 0, 480, 360)]), rd.CTX])])[0]["layout"]
+        t = " ".join(i["text"] for i in rd.items(lay) if i["k"] == "label")
+        self.assertIn("Family note: not on this TV", t)
+
+
+@unittest.skipUnless(rd.BRS.exists(), "the BrightScript interpreter is not installed: npm ci --prefix roku")
+class RokuStack(unittest.TestCase):
+    """A smart stack on a Roku takes turns: the next widget each minute, counted from midnight."""
+    def layout(self, mi):
+        ctx = dict(rd.CTX, now=dict(rd.NOW, mi=mi))
+        st = {"id": "st", "type": "widget", "kind": "stack", "x": 0, "y": 0, "w": 900, "h": 300,
+              "items": [{"kind": "welcome", "opts": {"text": "First words"}}, {"kind": "welcome", "opts": {"text": "Second words"}}]}
+        r = rd.run_brs([("layout", [design([st]), ctx])])[0]
+        return " ".join(i["text"] for i in rd.items(r["layout"]) if i["k"] == "label"), r["time"]
+
+    def test_it_moves_on_each_minute(self):
+        a, time_a = self.layout(5)     # 21:05 is minute 1265 of the day: the second widget
+        b, _ = self.layout(6)
+        self.assertIn("Second words", a)
+        self.assertNotIn("First words", a)
+        self.assertIn("First words", b)
+        self.assertTrue(time_a, "a stack of two is drawn again each minute")
 
 
 ORIGINAL = {"v": 1, "home": {"dock": "classic"}, "elements": {"clock": {"at": "scene", "behind": True}}}
