@@ -51,6 +51,7 @@
     ["controls", "cameras", "sensors", "speakers"].forEach(function (k) { INFO[k] = Array.isArray(INFO[k]) ? INFO[k] : []; });
     // Matter devices shared from Google Home, Apple Home, SmartThings or Alexa (matter.js): the same lists
     if (window.CouchMatter) window.CouchMatter.merge(INFO);
+    INFO.controls = INFO.controls.filter(houseSafe); INFO.scenes = INFO.scenes.filter(houseSafe);
     INFO.energy = INFO.energy === true; INFO.doorbell = INFO.doorbell === true; INFO.doorbell_camera = INFO.doorbell_camera === true;
     return INFO;
   }
@@ -78,16 +79,63 @@
     return DIRECT.api("POST", "/api/ha", { action: action, entity: entity || "", value: value == null ? "" : String(value) }, 20000)
       .then(function (r) { return r && r.result && typeof r.result === "object" ? r.result : { ok: false }; }, function () { return { ok: false, error: "bridge" }; });
   }
+  // Nothing that opens the house ever shows on the TV: a lock, an alarm, a garage door, gate or door,
+  // nor a scene or script named for one (HomeAssistant.kt and bridge/smarthome.py OPENS_HOUSE, the same
+  // words). A blind Home Assistant itself calls a garage door, gate or door comes back "blocked" when it
+  // is read: from then on it is left out of every list too (Control Centre, its pick list, the phone).
+  // the same test as bridge/smarthome.py OPENS_HOUSE (and HaReadings.kt, home-config.py), written without
+  // lookbehind for older TV browsers: garage, gate, door, lock, alarm or disarm anywhere in a blind's,
+  // switch's, script's or scene's id, joined words too (frontgate, backdoor, smartlock, unlock), but not
+  // gateway, doorbell, indoor, outdoor, clock or block; and every lock and alarm panel
+  // (tests/fixtures/opens_house_ids.json holds the ids every copy is tested with)
+  function opensHouse(e) {
+    e = String(e || "");
+    if (/^(lock|alarm_control_panel)\./.test(e)) return true;
+    if (!/^(cover|switch|script|scene)\.[a-z0-9_]*$/.test(e)) return false;
+    var re = /garage|gate|door|lock|alarm|disarm/g, m, w, i, after;
+    while ((m = re.exec(e))) {
+      w = m[0]; i = m.index; after = e.slice(i + w.length); re.lastIndex = i + 1;
+      if (w === "gate" && after.slice(0, 3) === "way") continue;
+      if (w === "door" && (after.slice(0, 4) === "bell" || /[._](in|out)$/.test(e.slice(0, i)))) continue;
+      if (w === "lock" && /[._][cb]$/.test(e.slice(0, i))) continue;
+      return true;
+    }
+    return false;
+  }
+  var OPENERS = {};
+  function houseSafe(x) { var e = x && typeof x.entity === "string" ? x.entity : ""; return !!e && !x.blocked && !OPENERS[e] && !opensHouse(e); }
+  function safeControls(r) {
+    if (!r || !r.ok || !Array.isArray(r.controls)) return r;
+    r.controls.forEach(function (c) { if (c && c.blocked && typeof c.entity === "string") OPENERS[c.entity] = true; });
+    if (INFO) INFO.controls = INFO.controls.filter(houseSafe);
+    r.controls = r.controls.filter(houseSafe);
+    return r;
+  }
+  function ask(action, entity, value) {
+    if (action === "controls") return askMatter(action, entity, value).then(safeControls);
+    if (action === "scene") return askMatter(action, entity, value).then(function (r) { return sceneRefused(entity, r); });
+    return askMatter(action, entity, value);
+  }
+  // a scene or script picked earlier that the TV or computer refuses to run (it opens the house): its
+  // button goes from every list at once, as the bridge's info() leaves it out from then on
+  function sceneRefused(entity, r) {
+    if (r && r.ok === false && r.error === "refused" && typeof entity === "string" && entity) {
+      OPENERS[entity] = true;
+      if (INFO) INFO.scenes = INFO.scenes.filter(houseSafe);
+      changed("info", native() ? native().info() : "");
+    }
+    return r;
+  }
   function matterOn() { return !!(window.CouchMatter && window.CouchMatter.on()); }
   // a Matter device goes to its controller (matter.js); a list (rooms, switches, sensors) is the
   // launcher's or bridge's with Matter's added, the way the computer's Hue and AirTouch are
-  function ask(action, entity, value) {
+  function askMatter(action, entity, value) {
     var M = window.CouchMatter;
-    if (!M || !M.on()) return askHome(action, entity, value);
+    if (!M || !M.on()) return askAny(action, entity, value);
     if (entity && M.owns(entity)) return M.ask(action, entity, value);
     var key = M.reads(action);
-    if (!key || entity) return askHome(action, entity, value);
-    var home = native() ? askHome(action, "", value) : Promise.resolve({ ok: false, error: "off" });
+    if (!key || entity) return askAny(action, entity, value);
+    var home = native() ? askAny(action, "", value) : Promise.resolve({ ok: false, error: "off" });
     return Promise.all([home, M.read(action)]).then(function (a) {
       var list = { rooms: "climate", controls: "controls", sensors: "sensors" }[key];
       var mine = a[0] && a[0].ok ? (a[0][key] || []).filter(function (x) { return !(x && M.owns(x.entity)); })
@@ -97,7 +145,7 @@
       var o = { ok: true }; o[key] = mine.concat(far); return o;
     });
   }
-  function askHome(action, entity, value) {
+  function askAny(action, entity, value) {
     if (DIRECT && window.TVHA) {
       if (DIRECT_RE.test(entity || "")) return askBridge(action, entity, value);
       if (action === "climate" || action === "controls") {
@@ -542,6 +590,24 @@
       }
       return Promise.resolve({ ok: false, error: "refused" });
     },
-    scenes: function () { return available() ? info().scenes.map(function (s) { return { entity: s.entity, name: s.name }; }) : []; }
+    scenes: function () { return available() ? info().scenes.map(function (s) { return { entity: s.entity, name: s.name }; }) : []; },
+    // what a widget's own device setting can pick from (app.js, Widgets on this home and the phone):
+    // only what this TV already shows from Home Assistant (Home settings, Smart home), as
+    // [[entity, name], ...] for one Home Assistant domain or a list of them ("climate", ["scene", "script"])
+    devices: function (domain) {
+      if (!native()) return [];
+      var want = Object.prototype.toString.call(domain) === "[object Array]" ? domain : [domain], i = info(), out = [], seen = {};
+      [i.climate, i.controls, i.cameras, i.sensors, i.speakers, i.scenes].forEach(function (l) {
+        (Array.isArray(l) ? l : []).forEach(function (d) {
+          var e = d && typeof d.entity === "string" ? d.entity : "", dom = e.split(".")[0];
+          if (!e || seen[e] || want.indexOf(dom) < 0) return;
+          seen[e] = true;
+          out.push([e, String(d.name || e.split(".").slice(1).join(".").replace(/_/g, " ")).slice(0, 40)]);
+        });
+      });
+      return out;
+    }
   };
+  // the house test, for the tests (tests/test_ws2_smarthome.mjs runs every id in tests/fixtures/opens_house_ids.json)
+  window.smartHome.opensHouse = opensHouse;
 })();

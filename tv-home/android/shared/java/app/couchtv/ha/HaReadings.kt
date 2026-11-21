@@ -17,8 +17,61 @@ object HaReadings {
     class Named(val entity: String, val name: String)
 
     // Covers that open the house: never switched from a TV remote (locks and alarms are never even
-    // allowed in config.json). A cover with one of these device classes reads, but "set" refuses it.
+    // allowed in config.json). A cover with one of these device classes reads "blocked", which the page
+    // leaves out of every list (smarthome.js houseSafe), and "set" refuses it.
     val HOUSE_OPENERS = setOf("garage", "gate", "door")
+    // Nothing that opens the house: a cover, switch, script or scene named for a garage, gate, door, lock or
+    // alarm (or disarm). Joined words count (frontgate, backdoor, garagedoor, smartlock, unlock, garage2),
+    // harmless ones do not (gateway, doorbell, indoor, outdoor, clock, block). The same test as
+    // bridge/smarthome.py, home-config.py and smarthome.js/widgets.js; tests/fixtures/opens_house_ids.json
+    // holds the ids every copy is tested with (HomeAssistantTest).
+    val OPENS_HOUSE = Regex("(cover|switch|script|scene)\\.[a-z0-9_]*(garage|gate(?!way)|(?<![._]in)(?<![._]out)door(?!bell)|(?<![._]c)(?<![._]b)lock|alarm|disarm)[a-z0-9_]*")
+    // a door, gate, garage door or lock as a reading: never listed (a doorbell is not one of these)
+    val OPENING_SENSORS = setOf("door", "garage_door", "lock", "opening", "window")
+
+    private fun slug(name: String) = name.lowercase().replace(Regex("[^a-z0-9]+"), "_").trim('_')
+
+    /**
+     * By its id, or by the name Home Assistant gives it (a switch called "Garage Door"): the same test on
+     * domain + "." + the name in lower case with _ between words. Names in other languages are not caught.
+     */
+    fun opensHouse(entity: String, attrs: JSONObject?): Boolean {
+        if (OPENS_HOUSE.matches(entity)) return true
+        val n = slug(attrs?.optString("friendly_name").orEmpty())
+        return n.isNotEmpty() && OPENS_HOUSE.matches(entity.substringBefore('.') + "." + n)
+    }
+
+    /** What a scene sets (Home Assistant lists it in its "entity_id" attribute). */
+    fun sceneMembers(attrs: JSONObject?): List<String> {
+        val l = attrs?.optJSONArray("entity_id") ?: return emptyList()
+        return (0 until l.length()).map { l.optString(it) }
+    }
+
+    /**
+     * A scene that sets a lock, an alarm, a group (it may hold locks), or a garage door, gate or door (by
+     * its id, its name, or a blind whose device class says so) opens the house: never listed and never run
+     * from a TV. [member] gives a blind's or switch's attributes, or null when they could not be read, and
+     * then the scene counts as opening the house (bridge/smarthome.py scene_opens_house, the same).
+     */
+    fun sceneOpensHouse(attrs: JSONObject?, member: (String) -> JSONObject?): Boolean {
+        for (e in sceneMembers(attrs)) {
+            if (e.startsWith("lock.") || e.startsWith("alarm_control_panel.") || e.startsWith("group.") || OPENS_HOUSE.matches(e)) return true
+            if (e.startsWith("cover.") || e.startsWith("switch.")) {
+                val a = member(e) ?: return true
+                if (opensHouse(e, a) || (e.startsWith("cover.") && a.optString("device_class") in HOUSE_OPENERS)) return true
+            }
+        }
+        return false
+    }
+
+    /** One entity's attributes in Home Assistant's /api/states answer, or null. */
+    fun attributes(states: JSONArray, entity: String): JSONObject? {
+        for (k in 0 until states.length()) {
+            val st = states.optJSONObject(k) ?: continue
+            if (st.optString("entity_id") == entity) return st.optJSONObject("attributes") ?: JSONObject()
+        }
+        return null
+    }
 
     private val UNIT = Regex("[^\\u0000-\\u001f<>]{1,12}")
 
@@ -38,15 +91,17 @@ object HaReadings {
         val o = base(n, st)
         val domain = n.entity.substringBefore('.')
         o.put("kind", domain)
+        val a = st?.optJSONObject("attributes") ?: JSONObject()
+        // a garage door, gate or door (by its class, id or name): never shown on the TV, never switched,
+        // known even while it is not answering
+        if ((domain == "cover" && a.optString("device_class") in HOUSE_OPENERS) || ((domain == "cover" || domain == "switch") && opensHouse(n.entity, a))) o.put("blocked", true)
         val state = st?.optString("state")
         if (st == null || down(state)) return o.put("ok", false)
-        val a = st.optJSONObject("attributes") ?: JSONObject()
         o.put("ok", true).put("state", state)
         when (domain) {
             "cover" -> {
                 o.put("on", state == "open" || state == "opening")
                 if (a.has("current_position") && !a.isNull("current_position")) o.put("level", a.optInt("current_position").coerceIn(0, 100))
-                if (a.optString("device_class") in HOUSE_OPENERS) o.put("blocked", true)
             }
             "light" -> {
                 o.put("on", state == "on")

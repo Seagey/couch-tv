@@ -16,8 +16,9 @@ client id it was made for instead of a long-lived token; the 30 minute access to
 held in memory only.
 
 Only what is ticked may be read or changed. Nothing that opens the house: locks and alarms are never
-allowed, and a cover or switch whose id or device class says garage, gate, door or lock is read but
-never switched. Every call goes to the set up address only, never follows a redirect, and gives up
+allowed, a cover, switch, scene or script whose id says garage, gate, door, lock or alarm is never kept,
+a blind whose device class says garage, gate or door is read "blocked" (never shown on the TV) and
+never switched, and a scene that sets any of them never runs. Every call goes to the set up address only, never follows a redirect, and gives up
 after a few seconds.
 
     /api/ha/info    GET  { info, status }: names only (what HomeAssistant.kt info() and status() say)
@@ -44,10 +45,29 @@ SPEAKER = re.compile(r"media_player\.[a-z0-9_]{1,64}")
 TOKEN = re.compile(r"[A-Za-z0-9._-]{20,1024}")
 PICKABLE = re.compile(r"(climate|scene|script|light|switch|fan|cover|camera|sensor|media_player|event|binary_sensor|input_boolean)\.[a-z0-9_]{1,64}")
 # nothing that opens the house: a cover, switch, script or scene named for a garage, gate, door, lock or
-# alarm is never listed, kept or switched (HomeAssistant.kt OPENS_HOUSE, the same)
-OPENS_HOUSE = re.compile(r"(cover|switch|script|scene)\.[a-z0-9_]*(garage|gate|door|lock|alarm)[a-z0-9_]*")
+# alarm (or disarm) is never listed, kept, switched or run. Joined words count (frontgate, backdoor,
+# garagedoor, doorlock, smartlock, unlock, garage2), harmless ones do not: outdoor, indoor, gateway,
+# doorbell, clock, block. The same test in HaReadings.kt, home-config.py and smarthome.js/widgets.js
+# (tests/fixtures/opens_house_ids.json holds the ids every copy is tested with).
+OPENS_HOUSE = re.compile(r"(cover|switch|script|scene)\.[a-z0-9_]*(garage|gate(?!way)|(?<![._]in)(?<![._]out)door(?!bell)|(?<![._]c)(?<![._]b)lock|alarm|disarm)[a-z0-9_]*")
 HOUSE_OPENERS = {"garage", "gate", "door"}
 REFUSED_WAIT = 60   # seconds a refused refresh token waits before it is tried again
+# a door, gate, garage door or lock as a reading: never listed (a doorbell is not one of these)
+OPENING_SENSORS = {"door", "garage_door", "lock", "opening", "window"}
+
+
+def slug(name):
+    return re.sub(r"[^a-z0-9]+", "_", str(name or "").lower()).strip("_")
+
+
+def opens_house(entity, attrs=None):
+    """By its id, or by the name Home Assistant gives it (a switch called "Garage Door"): the same test
+    on domain + "." + the name in lower case with _ between words. Names in other languages are not caught."""
+    entity = str(entity or "")
+    if OPENS_HOUSE.fullmatch(entity):
+        return True
+    n = slug((attrs or {}).get("friendly_name")) if isinstance(attrs, dict) else ""
+    return bool(n) and bool(OPENS_HOUSE.fullmatch(entity.split(".")[0] + "." + n))
 MODES = ["off", "heat", "cool", "heat_cool", "auto", "dry", "fan_only"]
 FAN = re.compile(r"[A-Za-z0-9 _-]{1,24}")
 UNIT = re.compile(r"[^\x00-\x1f<>]{1,12}")
@@ -101,7 +121,7 @@ def parse(o):
             if not isinstance(x, dict):
                 continue
             ent = str(x.get("entity") or "").strip()
-            if not ok.fullmatch(ent) or any(n["entity"] == ent for n in out):
+            if not ok.fullmatch(ent) or OPENS_HOUSE.fullmatch(ent) or any(n["entity"] == ent for n in out):
                 continue
             out.append({"entity": ent, "name": str(x.get("name") or "").strip()[:40]})
         return out
@@ -146,18 +166,18 @@ def control(n, st):
     o = _base(n, st)
     domain = n["entity"].split(".")[0]
     o["kind"] = domain
+    a = (st or {}).get("attributes") if isinstance((st or {}).get("attributes"), dict) else {}
+    if (domain == "cover" and a.get("device_class") in HOUSE_OPENERS) or (domain in ("cover", "switch") and opens_house(n["entity"], a)):
+        o["blocked"] = True   # a garage door, gate or door: never shown on the TV, never switched
     state = (st or {}).get("state")
     if st is None or _down(state):
         o["ok"] = False
         return o
-    a = st.get("attributes") or {}
     o.update(ok=True, state=state)
     if domain == "cover":
         o["on"] = state in ("open", "opening")
         if _num(a.get("current_position")) is not None:
             o["level"] = max(0, min(100, int(a["current_position"])))
-        if a.get("device_class") in HOUSE_OPENERS:
-            o["blocked"] = True
     elif domain == "light":
         o["on"] = state == "on"
         if state == "on" and _num(a.get("brightness")) is not None:
@@ -222,8 +242,39 @@ def speaker(n, st):
     return o
 
 
-def room(n, st, limits):
+def scene_members(attrs):
+    """What a scene sets (Home Assistant lists it in its "entity_id" attribute): the blinds and switches
+    among them are read too, to know what each one is."""
+    ids = attrs.get("entity_id") if isinstance(attrs, dict) else None
+    return [str(e) for e in ids] if isinstance(ids, list) else []
+
+
+def scene_opens_house(attrs, member):
+    """A scene that sets a lock, an alarm, a group (it may hold locks), or a garage door, gate or door (by
+    its id, its name, or a blind whose device class says so): never listed and never run from a TV.
+    member(entity) gives a blind's or switch's attributes, or None when they could not be read, and then
+    the scene counts as opening the house (HaReadings.sceneOpensHouse, the same)."""
+    for e in scene_members(attrs):
+        if e.startswith(("lock.", "alarm_control_panel.", "group.")) or OPENS_HOUSE.fullmatch(e):
+            return True
+        if e.startswith(("cover.", "switch.")):
+            a = member(e)
+            if a is None or opens_house(e, a) or (e.startswith("cover.") and a.get("device_class") in HOUSE_OPENERS):
+                return True
+    return False
+
+
+def ha_unit(cfg):
+    """Home Assistant's own temperature unit from /api/config ("°C" or "°F"), or None if it does not say."""
+    u = ((cfg or {}).get("unit_system") or {}).get("temperature") if isinstance(cfg, dict) else None
+    return u if u in ("°C", "°F") else None
+
+
+def room(n, st, limits, unit=None):
     o = {"entity": n["entity"], "name": n["name"] or pretty(n["entity"])}
+    if unit:
+        # every climate temperature Home Assistant sends is in its own unit system (the widget converts)
+        o["unit"] = unit
     state = (st or {}).get("state")
     if st is None or _down(state):
         o["ok"] = False
@@ -350,14 +401,25 @@ def series(a):
 
 def pickable(states):
     out = []
+    attrs = {str(st.get("entity_id")): (st.get("attributes") if isinstance(st.get("attributes"), dict) else {})
+             for st in (states if isinstance(states, list) else []) if isinstance(st, dict)}
     for st in states if isinstance(states, list) else []:
         if not isinstance(st, dict):
             continue
         ent = str(st.get("entity_id") or "")
-        if not PICKABLE.fullmatch(ent) or OPENS_HOUSE.fullmatch(ent):
+        a = st.get("attributes") if isinstance(st.get("attributes"), dict) else {}
+        if not PICKABLE.fullmatch(ent) or opens_house(ent, a):
             continue
-        a = st.get("attributes") or {}
         if ent.startswith("cover.") and a.get("device_class") in HOUSE_OPENERS:
+            continue
+        if ent.startswith("scene.") and scene_opens_house(a, lambda e: attrs.get(e)):
+            continue
+        # a door, gate or lock as a reading; a sensor with no unit named for one ("Front door lock")
+        if ent.startswith("binary_sensor.") and a.get("device_class") in OPENING_SENSORS:
+            continue
+        if ent.startswith("binary_sensor.") and not a.get("device_class") and opens_house("switch." + ent.split(".", 1)[1], a):
+            continue   # no class, but named for a door, gate or lock (a doorbell is not)
+        if ent.startswith("sensor.") and not a.get("unit_of_measurement") and opens_house("switch." + ent.split(".", 1)[1], a):
             continue
         o = {"entity": ent, "name": (str(a.get("friendly_name") or "").strip()[:40] or pretty(ent))}
         u = a.get("unit_of_measurement")
@@ -381,6 +443,8 @@ class Home:
         self.config_section = config_section
         self.env_token = env_token
         self.limits, self.read_controls, self.read_speakers = {}, {}, {}
+        self.refused_scenes = set()   # scenes and scripts a run found open the house: no longer drawn
+        self.unit = None   # Home Assistant's temperature unit, read once from /api/config
         self.pending = None
         self.call = self._call
         self.form = self._form   # a form POST to Home Assistant's /auth (signing in, refreshing): tests replace it
@@ -521,8 +585,8 @@ class Home:
         def names(lst):
             return [{"entity": n["entity"], "name": n["name"] or pretty(n["entity"])} for n in lst]
         if s:
-            o = {"climate": names(s["climate"]), "scenes": names(s["scenes"]), "doorbell": s["doorbell"] is not None,
-                 "controls": names(s["controls"]), "cameras": names(s["cameras"]), "sensors": names(s["sensors"]),
+            o = {"climate": names(s["climate"]), "scenes": names([n for n in s["scenes"] if n["entity"] not in self.refused_scenes]), "doorbell": s["doorbell"] is not None,
+                 "controls": names([n for n in s["controls"] if not self.read_controls.get(n["entity"])]), "cameras": names(s["cameras"]), "sensors": names(s["sensors"]),
                  "speakers": names(s["speakers"]), "energy": s["energy"] is not None,
                  "doorbell_camera": bool(s["doorbell"] and s["doorbell"]["camera"])}
         else:
@@ -584,7 +648,12 @@ class Home:
         now = now_ms or int(time.time() * 1000)
         climate = any(c["entity"] == entity for c in s["climate"])
         if action == "climate":
-            return {"ok": True, "rooms": [room(n, await self.state(s, n["entity"]), self.limits) for n in s["climate"]]}
+            if self.unit is None and s["climate"]:
+                cfg = await self._json(s, "/api/config", 64 * 1024)
+                # kept only when Home Assistant answered: a failed read is asked again next time
+                if cfg is not None:
+                    self.unit = ha_unit(cfg) or ""
+            return {"ok": True, "rooms": [room(n, await self.state(s, n["entity"]), self.limits, self.unit or "") for n in s["climate"]]}
         if action == "temp":
             lim, want = self.limits.get(entity), _num(value)
             if not climate or not lim or want is None:
@@ -607,14 +676,34 @@ class Home:
             return done(await self.service(s, "climate", "turn_on" if action == "on" else "turn_off", idd))
         if action == "scene":
             sc = next((x for x in s["scenes"] if x["entity"] == entity), None)
-            if not sc:
+            if not sc or OPENS_HOUSE.fullmatch(entity):
                 return refused
+            # read first: a script or scene Home Assistant names for a garage, gate, door, lock or alarm,
+            # or a scene that sets one, never runs from a TV (a failed read runs nothing)
+            st = await self.state(s, entity)
+            if not st:
+                return failed
+            a = st.get("attributes") if isinstance(st.get("attributes"), dict) else {}
+            if opens_house(entity, a):
+                self.refused_scenes.add(entity)
+                return refused
+            if entity.startswith("scene."):
+                members = {}
+                for e in scene_members(a):
+                    if e.startswith(("cover.", "switch.")) and e not in members:
+                        m = await self.state(s, e)
+                        if m is None:
+                            return failed
+                        members[e] = m.get("attributes") if isinstance(m.get("attributes"), dict) else {}
+                if scene_opens_house(a, lambda e: members.get(e)):
+                    self.refused_scenes.add(entity)
+                    return refused
             return done(await self.service(s, sc["entity"].split(".")[0], "turn_on", idd))
         if action == "controls":
             out = []
             for n in s["controls"]:
                 r = control(n, await self.state(s, n["entity"]))
-                if r.get("ok"):
+                if r.get("ok") or r.get("blocked"):
                     self.read_controls[n["entity"]] = bool(r.get("blocked"))
                 out.append(r)
             return {"ok": True, "controls": out}
@@ -793,7 +882,7 @@ class Home:
         if not o:
             return {"ok": False, "error": "picks"}
         self._write(o)
-        self.limits.clear(); self.read_controls.clear(); self.read_speakers.clear()
+        self.limits.clear(); self.read_controls.clear(); self.read_speakers.clear(); self.unit = None; self.refused_scenes.clear()
         return {"ok": True}
 
     # ---------------- signed in from a phone (bridge/haphone.py)
@@ -813,7 +902,7 @@ class Home:
         self.remember(r, tokens)
         self._write(o)
         self.pending = None
-        self.limits.clear(); self.read_controls.clear(); self.read_speakers.clear()
+        self.limits.clear(); self.read_controls.clear(); self.read_speakers.clear(); self.unit = None
         return True
 
     def keep_picks(self, picks):
@@ -830,7 +919,7 @@ class Home:
         if not o:
             return False
         self._write(o)
-        self.limits.clear(); self.read_controls.clear(); self.read_speakers.clear()
+        self.limits.clear(); self.read_controls.clear(); self.read_speakers.clear(); self.unit = None
         return True
 
     async def disconnect(self):
@@ -849,7 +938,7 @@ class Home:
             os.remove(self._path())
         except OSError:
             pass
-        self.limits.clear(); self.read_controls.clear(); self.read_speakers.clear()
+        self.limits.clear(); self.read_controls.clear(); self.read_speakers.clear(); self.unit = None; self.refused_scenes.clear()
         return {"ok": True}
 
 

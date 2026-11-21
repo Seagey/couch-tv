@@ -132,9 +132,11 @@ const PRE = {
   countdown: ["label", "day", "month", "year"], weather: ["place", "hilo", "town", "degrees"], bigtemp: ["place", "town", "degrees"],
   hourly: ["town", "hours", "degrees"], rain: ["town"], uv: ["town"], sun: ["town"], moon: ["hemi"], air: ["town", "scale"],
   surf: ["place", "units", "wind"], photo: ["photo", "image"], artframe: ["photo", "image"], upnext: ["sport"],
-  aircon: ["entity"], controls: ["switches"], camera: ["cam", "label"], sensor: ["reading", "label"],
-  doorbell: ["label"], energy: ["label"], list: ["list"], news: ["feed"], sports: ["league", "team"],
-  stocks: ["tickers"], commute: ["to", "arrive_h"], bins: ["thisweek"]
+  aircon: ["entity", "others"], controls: ["switches"], camera: ["cam", "label"], sensor: ["reading", "label"],
+  doorbell: ["label", "picture"], energy: ["label", "now"], list: ["list"], news: ["feed"], sports: ["league", "team"],
+  stocks: ["tickers"], commute: ["to", "arrive_h"], bins: ["weekday", "alt", "thisweek", "bin_a", "bin_b", "lid_a", "lid_b"],
+  // the smart home group (ws2): every setting wired and before launch
+  speakers: ["players"], scenes: ["scenes"], battery: ["low"], solar: ["town"]
 };
 Object.keys(PRE).forEach((kind) => {
   ok(!!CAPS.get(kind), kind + " has a caps record");
@@ -153,7 +155,12 @@ const WW = fs.readFileSync(path.join(web, "widget-web.js"), "utf8");
 CAPS.settings("news")[0].options.forEach((o) => { if (o[0] !== "auto") ok(WW.indexOf("\"" + o[0] + "\": {") >= 0 || WW.indexOf(" " + o[0] + ": {") >= 0, "news source " + o[0] + " is a feed the TV reads"); });
 CAPS.settings("sports")[0].options.forEach((o) => ok(new RegExp("\\b" + o[0] + ": \\{ name: \"" + o[1] + "\"").test(WW), "competition " + o[0] + " is " + o[1] + " on the TV"));
 // the later settings (L items) are there too, after the before launch ones
-const LATER = { commute: ["buffer", "weekdays", "from"], speakers: ["players"], agenda: ["calendars", "days"], sports: ["games"] };
+const LATER = { commute: ["buffer", "weekdays", "from"], agenda: ["calendars", "days"], sports: ["games"] };
+// the smart home group: nothing left for later (the owner, 20 Nov 2026: there is no "later")
+["aircon", "controls", "camera", "doorbell", "sensor", "energy", "solar", "battery", "speakers", "scenes", "bins"].forEach((kind) => {
+  ok(CAPS.settings(kind).length > 0, kind + " has something to set");
+  CAPS.settings(kind).forEach((s) => ok(s.pre === true, kind + "." + s.key + " is wired and before launch"));
+});
 Object.keys(LATER).forEach((kind) => {
   const list = CAPS.settings(kind), firstLater = list.findIndex((s) => !s.pre);
   ok(list.slice(firstLater).every((s) => !s.pre), kind + ": before launch settings come first");

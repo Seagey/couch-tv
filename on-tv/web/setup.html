@@ -679,20 +679,24 @@
         '<div class="places" data-wl="' + esc(w.key) + '" role="list"></div>' + back +
         '<p>Only the name you type goes to Open-Meteo, the free weather service the TV already uses. The TV keeps the place, never a street.</p>';
     }
-    if ((s.type === 'choice' || s.type === 'tvlist') && s.many) {
+    // a device (an aircon room, a camera, the switches) picks from what the TV already shows from Home
+    // Assistant, handed over with the setting; with nothing there yet, where to set it up
+    var pick = s.type === 'choice' || s.type === 'tvlist' || (s.type === 'device' && s.options && s.options.length);
+    if (s.type === 'device' && !pick) return '<p>' + esc(s.label) + ': <span class="now">' + esc(s.words) + '</span></p><p>Nothing to pick yet. Set up Smart home on this page first.</p>';
+    if (pick && s.many) {
       var picked = (Array.isArray(s.value) ? s.value : []).map(String);
       return '<fieldset style="border:0;padding:0;margin:12px 0 0"><legend class="now">' + esc(s.label) + '</legend>' + (s.options.length ? s.options.map(function (o, i) {
         return '<label class="check"><input type="checkbox" data-wmany="' + i + '"' + data + (picked.indexOf(String(o[0])) >= 0 ? ' checked' : '') + '> ' + esc(String(o[1])) + '</label>';
       }).join('') : '<p>Nothing to pick on this TV yet.</p>') + '</fieldset>' + help + back;
     }
-    if (s.type === 'choice' || s.type === 'tvlist') {
+    if (pick) {
       if (!s.options.length) return '<p>' + esc(s.label) + ': nothing to pick on this TV yet.</p>' + help;
       return '<label for="' + id + '">' + esc(s.label) + '</label><select id="' + id + '" data-wpick="1"' + data + '>' +
         (s.value === null || s.value === undefined ? '<option value="" selected disabled>Pick one</option>' : '') + s.options.map(function (o) { return optHtml(o, s.value); }).join('') + '</select>' + help + back;
     }
     if (s.type === 'toggle') return '<label class="check"><input type="checkbox" id="' + id + '" data-wtog="1"' + data + (s.value ? ' checked' : '') + '> ' + esc(s.label) + '</label>' + help + back;
-    if (s.type === 'device' || s.type === 'apps') {
-      return '<p>' + esc(s.label) + ': <span class="now">' + esc(s.words) + '</span></p><p>' + (s.type === 'apps' ? 'Change its apps under Apps on this design, or on the TV: hold OK on an app in it.' : 'Pick the devices this TV shows in Home settings, Smart home.') + '</p>';
+    if (s.type === 'apps') {
+      return '<p>' + esc(s.label) + ': <span class="now">' + esc(s.words) + '</span></p><p>Change its apps under Apps on this design, or on the TV: hold OK on an app in it.</p>';
     }
     // text, a number, a team, a calendar link and anything newer: a box and Save
     var val = s.value === true || s.value === null || s.value === undefined ? '' : Array.isArray(s.value) ? s.value.join(', ') : String(s.value);

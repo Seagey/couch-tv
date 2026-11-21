@@ -7716,6 +7716,8 @@
     SET.sub = { up: up, back: "sh-g:" + g[0], crumb: "Smart home", title: function () { return g[1]; }, rows: function () {
       var cur = SH.picks[g[0]] = SH.picks[g[0]] || [];
       var rows = [info("sh-g-most", "", "", g[3] === 1 ? "Pick one." : "Pick up to " + g[3] + ". They show in this order.")];
+      // nothing that opens the house is offered (bridge/smarthome.py and HomeAssistant.kt pickable): say so
+      if (g[0] === "controls" || g[0] === "scenes") rows.push(info("sh-g-house", "", "", "Locks, alarms, garage doors and gates are left out. So is anything Home Assistant names for a garage, gate, door, lock or alarm."));
       have.forEach(function (e) {
         rows.push({ kind: "check", key: "sh-e:" + e.entity, label: e.name, sub: e.unit || "", checked: cur.indexOf(e.entity) >= 0, act: function () {
           var i = cur.indexOf(e.entity);
@@ -8033,7 +8035,15 @@
     if (from === "calendars") return AH && AH.store.get().cal ? [["main", "Your calendar"]] : [];
     return [];
   }
-  function wsOptions(s) { return s.type === "tvlist" ? tvlistOptions(s.from) : s.options; }
+  function wsOptions(s) { return s.type === "tvlist" ? tvlistOptions(s.from) : s.type === "device" ? deviceOptions(s) : s.options; }
+  // a device setting (an aircon room, a camera, the switches): what this TV already shows from Home
+  // Assistant (Home settings, Smart home; smarthome.js devices). One device starts with "The first one",
+  // which clears it; a list picks none for every one
+  function deviceOptions(s) {
+    var l = window.smartHome && window.smartHome.devices ? window.smartHome.devices(s.domain) : [];
+    if (!Array.isArray(l) || !l.length) return [];
+    return s.many ? l : [["", "The first one in Smart home"]].concat(l);
+  }
   // "sets": bins, Which bin goes out this week, also sets the count the widget keeps from (anchor):
   // the coming bin night is week 0 for the first bin, week 1 for the second
   function wsSets(w, s, v) {
@@ -8122,12 +8132,13 @@
   // a setting's value now, in words (a private one never shows itself)
   function wsWords(s, v) {
     if (s.type === "place") { var p = cleanPlace(v); return p ? p.name : s.key === "to" ? "Not set" : townName() ? townName() + " (your home's town)" : "Not set"; }
+    if (s.type === "device" && (v === undefined || v === null || v === "" || (Array.isArray(v) && !v.length))) return s.many ? "Every one in Smart home" : "The first one in Smart home";
     if (v === undefined || v === null || v === "" || (Array.isArray(v) && !v.length)) return s.many ? "None picked" : "Not set";
-    if (s.private && s.type !== "tvlist" && s.type !== "choice") return "Set";
+    if (s.private && s.type !== "tvlist" && s.type !== "choice" && s.type !== "device") return "Set";
     if (s.type === "toggle") return v ? t("on") : t("off");
     var opts = wsOptions(s), name = function (x) { var o = opts.filter(function (y) { return String(y[0]) === String(x); })[0]; return o ? String(o[1]) : String(x); };
-    if (Array.isArray(v)) return v.map(s.type === "choice" || s.type === "tvlist" ? name : String).join(", ");
-    if (s.type === "choice" || s.type === "tvlist") return name(v);
+    if (Array.isArray(v)) return v.map(s.type === "choice" || s.type === "tvlist" || s.type === "device" ? name : String).join(", ");
+    if (s.type === "choice" || s.type === "tvlist" || s.type === "device") return name(v);
     if (s.type === "app") { var it = arrangeItems().items.filter(function (x) { return x.package === v || (window.CouchApps && window.CouchApps.idOf(x.package) === v); })[0]; return it ? it.name : String(v); }
     return String(v);
   }
@@ -8162,23 +8173,25 @@
     var rows = [], vals = wsOf(w.key), shown = w.settings.filter(function (s) { return wsShown(w, s); });
     shown.forEach(function (s) {
       var id = w.key + ":" + s.key, v = vals[s.key], cur = wsCur(w, s), set = function (x) { wsSave(w, s, x); };
-      var opts = wsOptions(s);
+      var opts = wsOptions(s), pick = s.type === "choice" || s.type === "tvlist" || (s.type === "device" && opts.length > 0);
       if (shown.length > 1 && (s.type === "place" || s.many)) rows.push(head(s.label));
       if (s.type === "place") { placeRows(w, s, rows); return; }
-      if ((s.type === "choice" || s.type === "tvlist") && s.many) {
+      if (pick && s.many) {
         // a list: one tick per choice (up to the setting's max, 4 when it says none)
         var picked = Array.isArray(cur) ? cur.map(String) : [], most = isFinite(s.max) ? +s.max : 4;
         if (!opts.length) rows.push(info(id, s.label, "Nothing to pick on this TV yet", s.help));
         opts.forEach(function (o, i) {
           var on = picked.indexOf(String(o[0])) >= 0;
           rows.push({ kind: "check", key: id + ":" + i, label: String(o[1]), checked: on, act: function () {
-            var now = (Array.isArray(wsCur(w, s)) ? wsCur(w, s) : []).filter(function (x) { return String(x) !== String(o[0]); });
+            // only what can still be picked here: one gone from the TV (a device taken out of Smart
+            // home) drops out, so it never counts toward the most and unticking all gives every one
+            var now = (Array.isArray(wsCur(w, s)) ? wsCur(w, s) : []).filter(function (x) { return String(x) !== String(o[0]) && opts.some(function (y) { return String(y[0]) === String(x); }); });
             if (!on) { if (now.length >= most) { SET.msg = "Up to " + most + ". Untick one first."; return; } now.push(o[0]); }
             set(now.length ? now : null);
           } });
         });
         if (s.help) rows.push(info(id + ":help", "", "", s.help));
-      } else if ((s.type === "choice" || s.type === "tvlist") && opts.length) {
+      } else if (pick && opts.length) {
         rows.push({ kind: "cycle", key: id, label: s.label, sub: s.help, value: wsWords(s, cur), act: function () {
           var i = opts.map(function (o) { return String(o[0]); }).indexOf(String(cur)), o = opts[(i + 1) % opts.length];
           set(o[0]);
@@ -8202,9 +8215,10 @@
       } else if (s.type === "apps") {
         rows.push(info(id, s.label, "", "On the home, hold OK on an app in it: Change app, Move, Remove or Add app. Or use Home settings on your phone."));
       } else if (s.type === "device") {
+        // nothing from Home Assistant on this TV yet: where to set it up
         var sh = window.smartHome && window.smartHome.setup && window.smartHome.setup.can();
-        rows.push(info(id, s.label, wsWords(s, cur), s.help || "Picked from what this TV shows from Home Assistant"));
-        if (sh) rows.push({ kind: "nav", key: id + ":smart", label: "Smart home", sub: "Pick the devices this TV shows", act: openSmartSetup });
+        rows.push(info(id, s.label, "Nothing to pick on this TV yet", sh ? "Set up Smart home first, then pick here." : "Needs Home Assistant set up for this TV in Home settings, Smart home."));
+        if (sh) rows.push({ kind: "nav", key: id + ":smart", label: "Smart home", sub: "Set up what this TV shows", act: openSmartSetup });
       } else if (s.type === "image") {
         return;   // a picture is put in the widget in couch-tv Studio
       } else {
@@ -8296,7 +8310,7 @@
           settings: w.settings.filter(function (s) { return s.where.indexOf("phone") >= 0 && s.type !== "image"; }).map(function (s) {
             var cur = wsCur(w, s), o = { key: s.key, label: s.label, type: s.type, help: s.help, many: s.many, coast: s.coast, store: s.store, min: s.min, max: s.max, step: s.step,
               options: wsOptions(s), shown: wsShown(w, s), own: vals[s.key] !== undefined, words: wsWords(s, cur) };
-            o.value = s.private && s.type !== "tvlist" && s.type !== "choice" ? (cur ? true : null) : cur === undefined ? null : cur;
+            o.value = s.private && s.type !== "tvlist" && s.type !== "choice" && s.type !== "device" ? (cur ? true : null) : cur === undefined ? null : cur;
             return o;
           }) };
       }),
@@ -8322,12 +8336,13 @@
         if (v === null) { wsSet(w.key, k, null); if (s.sets) wsSet(w.key, s.sets, null); return; }
         var opts = wsOptions(s), one = function (x) { var o = opts.filter(function (y) { return String(y[0]) === String(x); })[0]; return o ? o[0] : undefined; };
         if (s.type === "place") { v = cleanPlace(v); if (!v) { bad = "That place could not be used. Search for it again."; return; } }
-        else if ((s.type === "choice" || s.type === "tvlist") && s.many) {
+        else if (s.type === "device" && !opts.length) { bad = "Set up Smart home on the TV first."; return; }
+        else if ((s.type === "choice" || s.type === "tvlist" || s.type === "device") && s.many) {
           if (!Array.isArray(v)) { bad = "That choice is not one of the choices."; return; }
           v = v.map(one).filter(function (x, i, a) { return x !== undefined && a.indexOf(x) === i; }).slice(0, isFinite(s.max) ? +s.max : 4);
           if (!v.length) v = null;
         }
-        else if (s.type === "choice" || s.type === "tvlist") { v = one(v); if (v === undefined) { bad = "That choice is not one of the choices."; return; } }
+        else if (s.type === "choice" || s.type === "tvlist" || s.type === "device") { v = one(v); if (v === undefined) { bad = "That choice is not one of the choices."; return; } }
         else if (s.many) { v = (Array.isArray(v) ? v : String(v).split(",")).map(function (x) { return String(x).replace(/[\u0000-\u001f]/g, "").trim().slice(0, 30); }).filter(Boolean).slice(0, isFinite(s.max) ? +s.max : 6); if (!v.length) v = null; }
         else if (s.type === "toggle") { if (typeof v !== "boolean") { bad = "That needs on or off."; return; } }
         else if (s.type === "number") {
@@ -8339,7 +8354,7 @@
           if (isFinite(s.max) && v > +s.max) v -= st0;
         }
         else if (s.type === "calendar") { v = String(v).trim().slice(0, 600); v = window.CouchAtHome ? CouchAtHome.calUrl(v) : ""; if (!v) { bad = "That is not a calendar link. It starts with https://."; return; } }
-        else if (s.type === "apps" || s.type === "device") { bad = "Change that on the TV."; return; }
+        else if (s.type === "apps") { bad = "Change that on the TV."; return; }
         else if (s.type !== "choice" && s.type !== "tvlist") v = String(v).replace(/[\u0000-\u001f]/g, "").trim().slice(0, 80);
         wsSave(w, s, v);
       });

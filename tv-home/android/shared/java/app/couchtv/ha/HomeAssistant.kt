@@ -113,7 +113,7 @@ object HomeAssistant {
                 if (out.size >= most) break
                 val x = a.optJSONObject(k) ?: continue
                 val ent = x.optString("entity").trim()
-                if (!ok.matches(ent) || out.any { it.entity == ent }) continue
+                if (!ok.matches(ent) || HaReadings.OPENS_HOUSE.matches(ent) || out.any { it.entity == ent }) continue
                 out.add(Named(ent, x.optString("name").trim().take(40)))   // no name: Home Assistant's own
             }
             return out
@@ -251,6 +251,21 @@ object HomeAssistant {
         }
     }
 
+    // Home Assistant's own temperature unit ("°C" or "°F", from /api/config), read once per Home
+    // Assistant address: every climate temperature it sends is in that unit, and the aircon widget
+    // converts to the home's unit only when a room says which it is (widgets.js roomUnit)
+    @Volatile private var unitFor: String? = null
+    @Volatile private var unit: String = ""
+    private fun haUnit(s: Settings): String {
+        if (unitFor == s.base) return unit
+        val (code, bytes) = call(s, "GET", "/api/config", null, 64 * 1024)
+        if (code != 200 || bytes == null) return ""   // asked again next time
+        val u = try { JSONObject(String(bytes, Charsets.UTF_8)).optJSONObject("unit_system")?.optString("temperature") ?: "" } catch (e: Exception) { "" }
+        unit = if (u == "°C" || u == "°F") u else ""
+        unitFor = s.base
+        return unit
+    }
+
     /** The state of one entity, as Home Assistant sends it, or null when it did not answer. */
     fun state(s: Settings, entity: String): JSONObject? {
         val (code, bytes) = call(s, "GET", "/api/states/$entity", null, 256 * 1024)
@@ -289,8 +304,9 @@ object HomeAssistant {
     private val FAN = Regex("[A-Za-z0-9 _-]{1,24}")
     private val limits = ConcurrentHashMap<String, Limits>()
 
-    private fun room(n: Named, st: JSONObject?): JSONObject {
+    private fun room(n: Named, st: JSONObject?, unit: String = ""): JSONObject {
         val o = JSONObject().put("entity", n.entity).put("name", n.name.ifEmpty { pretty(n.entity) })
+        if (unit.isNotEmpty()) o.put("unit", unit)
         val state = st?.optString("state")
         if (st == null || state == null || state == "unavailable" || state == "unknown") return o.put("ok", false)
         val a = st.optJSONObject("attributes") ?: JSONObject()
@@ -322,7 +338,7 @@ object HomeAssistant {
         val done = { ok: Boolean -> JSONObject().put("ok", ok).apply { if (!ok) put("error", "failed") } }
         val id = JSONObject().put("entity_id", entity)
         return when (action) {
-            "climate" -> JSONObject().put("ok", true).put("rooms", JSONArray(s.climate.map { room(it, state(s, it.entity)) }))
+            "climate" -> { val u = if (s.climate.isEmpty()) "" else haUnit(s); JSONObject().put("ok", true).put("rooms", JSONArray(s.climate.map { room(it, state(s, it.entity), u) })) }
             "temp" -> {
                 climate ?: return refused
                 val lim = limits[entity] ?: return refused   // read the room first
@@ -348,6 +364,20 @@ object HomeAssistant {
             }
             "scene" -> {
                 val sc = s.scenes.firstOrNull { it.entity == entity } ?: return refused
+                // read first: a script or scene Home Assistant names for a garage, gate, door, lock or alarm,
+                // or a scene that sets one, never runs from a TV (a failed read runs nothing)
+                val failed = JSONObject().put("ok", false).put("error", "failed")
+                val st = state(s, sc.entity) ?: return failed
+                val a = st.optJSONObject("attributes") ?: JSONObject()
+                if (HaReadings.opensHouse(sc.entity, a)) { refusedScenes.add(sc.entity); return refused }
+                if (sc.entity.startsWith("scene.")) {
+                    val members = HashMap<String, JSONObject>()
+                    for (e in HaReadings.sceneMembers(a)) {
+                        if ((e.startsWith("cover.") || e.startsWith("switch.")) && e !in members)
+                            members[e] = state(s, e)?.let { it.optJSONObject("attributes") ?: JSONObject() } ?: return failed
+                    }
+                    if (HaReadings.sceneOpensHouse(a) { members[it] }) { refusedScenes.add(sc.entity); return refused }
+                }
                 done(service(s, sc.entity.substringBefore('.'), "turn_on", id))
             }
             else -> widgets(s, action, entity, value) ?: refused
@@ -359,6 +389,8 @@ object HomeAssistant {
     // What was last read for each control (is it a garage door?) and speaker (can its volume be
     // set?), to check a switch or a volume against: nothing is switched that was not read first.
     private val readControls = ConcurrentHashMap<String, Boolean>()
+    // scenes and scripts a run found open the house: info() leaves them out (bridge/smarthome.py refused_scenes)
+    internal val refusedScenes: MutableSet<String> = ConcurrentHashMap.newKeySet()
     private val readSpeakers = ConcurrentHashMap<String, JSONObject>()
     internal var clock: () -> Long = { System.currentTimeMillis() }
     private const val HOUR = 3_600_000L
@@ -381,7 +413,7 @@ object HomeAssistant {
         val id = JSONObject().put("entity_id", entity)
         return when (action) {
             "controls" -> JSONObject().put("ok", true).put("controls", JSONArray(hx(s.controls).map { n ->
-                HaReadings.control(n, state(s, n.entity)).also { r -> if (r.optBoolean("ok")) readControls[n.entity] = r.optBoolean("blocked") }
+                HaReadings.control(n, state(s, n.entity)).also { r -> if (r.optBoolean("ok") || r.optBoolean("blocked")) readControls[n.entity] = r.optBoolean("blocked") }
             }))
             "set" -> {
                 if (s.controls.none { it.entity == entity }) return refused
@@ -481,8 +513,8 @@ object HomeAssistant {
 
     private val PICKABLE = Regex("(climate|scene|script|light|switch|fan|cover|camera|sensor|media_player|event|binary_sensor|input_boolean)\\.[a-z0-9_]{1,64}")
     // nothing that opens the house: a cover, switch, script or scene named for a garage, gate, door,
-    // lock or alarm is never listed, kept or switched (bridge/smarthome.py OPENS_HOUSE, the same)
-    private val OPENS_HOUSE = Regex("(cover|switch|script|scene)\\.[a-z0-9_]*(garage|gate|door|lock|alarm)[a-z0-9_]*")
+    // lock or alarm is never listed, kept or switched (HaReadings.OPENS_HOUSE, the one test)
+    private val OPENS_HOUSE = HaReadings.OPENS_HOUSE
     private const val MOST_LISTED = 400
 
     /** Home Assistant's /api/states, cut to what couch-tv can show: entity, name, and for a sensor its unit. */
@@ -491,9 +523,14 @@ object HomeAssistant {
         for (k in 0 until states.length()) {
             val st = states.optJSONObject(k) ?: continue
             val ent = st.optString("entity_id")
-            if (!PICKABLE.matches(ent) || OPENS_HOUSE.matches(ent)) continue
             val a = st.optJSONObject("attributes") ?: JSONObject()
+            if (!PICKABLE.matches(ent) || HaReadings.opensHouse(ent, a)) continue
             if (ent.startsWith("cover.") && a.optString("device_class") in HaReadings.HOUSE_OPENERS) continue
+            if (ent.startsWith("scene.") && HaReadings.sceneOpensHouse(a) { HaReadings.attributes(states, it) }) continue
+            // a door, gate or lock as a reading; a sensor with no unit named for one ("Front door lock")
+            if (ent.startsWith("binary_sensor.") && a.optString("device_class") in HaReadings.OPENING_SENSORS) continue
+            if (ent.startsWith("binary_sensor.") && a.optString("device_class").isEmpty() && HaReadings.opensHouse("switch." + ent.substringAfter('.'), a)) continue
+            if (ent.startsWith("sensor.") && a.optString("unit_of_measurement").isEmpty() && HaReadings.opensHouse("switch." + ent.substringAfter('.'), a)) continue
             val o = JSONObject().put("entity", ent).put("name", a.optString("friendly_name").trim().take(40).ifEmpty { pretty(ent) })
             a.optString("unit_of_measurement").takeIf { it.length in 1..12 && !it.contains('<') }?.let { o.put("unit", it) }
             a.optString("device_class").takeIf { it.matches(Regex("[a-z_]{1,32}")) }?.let { o.put("cls", it) }
@@ -631,9 +668,9 @@ object HomeAssistant {
     fun info(ctx: Context): JSONObject {
         val s = settings(ctx) ?: return JSONObject()
         fun names(l: List<Named>) = JSONArray(l.map { JSONObject().put("entity", it.entity).put("name", it.name.ifEmpty { pretty(it.entity) }) })
-        return JSONObject().put("climate", names(s.climate)).put("scenes", names(s.scenes))
+        return JSONObject().put("climate", names(s.climate)).put("scenes", names(s.scenes.filter { it.entity !in refusedScenes }))
             .put("doorbell", s.doorbell != null)
-            .put("controls", names(s.controls)).put("cameras", names(s.cameras)).put("sensors", names(s.sensors))
+            .put("controls", names(s.controls.filter { readControls[it.entity] != true })).put("cameras", names(s.cameras)).put("sensors", names(s.sensors))
             .put("speakers", names(s.speakers)).put("energy", s.energy != null)
             .put("doorbell_camera", s.doorbell?.camera != null)
     }

@@ -440,7 +440,7 @@
     keep: "", keeprow: "label shows", upnext: "apps sport", picks: "label align",
     app: "apps", folder: "label apps cols", dock: "apps more", appgrid: "apps cols names", games: "label apps",
     nowplaying: "", soundscape: "sound", queue: "", speakers: "",
-    aircon: "entity", scenes: "label", controls: "label controls cols", camera: "label", doorbell: "", energy: "", sensor: "label", battery: "",
+    aircon: "entity others", scenes: "label", controls: "label controls cols", camera: "label", doorbell: "", energy: "", sensor: "label", battery: "low",
     bins: "label weekday alt anchor lid_a lid_b bin_a bin_b", people: "", agenda: "label align days", note: "align", list: "label icon align",
     card: "label text icon", quote: "text sub", word: "", news: "feed label align count", sports: "label league team align games", stocks: "label tickers align price", commute: "label arrive_h arrive_m buffer weekdays align",
     welcome: "kicker text sub align source times", quick: "quick align", wifi: "align", guide: "align", screentime: "align", ask: "label align", agent: "label align", stack: ""
@@ -457,9 +457,13 @@
   // calendar (Home settings, couch-tv Studio, At home, Guests); the design never carries a name, a
   // link or a time. times: false hides the check in and check out line.
   OPT.source = function (v) { return SAN.pick(v, ["typed", "calendar"]); };
+  // the smart home widgets' own settings Studio can set (widget-caps.js, store "design"): the aircon's
+  // other rooms, the doorbell's picture, the energy's power now (on or off), and the batteries' red line
+  OPT.others = SAN.b; OPT.picture = SAN.b; OPT.now = SAN.b;
+  OPT.low = function (v) { return SAN.n(v, 5, 50, true); };
   OPT.times = SAN.b;
   // align: centred unless the design says left or right (seagey, 18 Nov 2026)
-  WOPT.controls = "label controls cols switches align"; WOPT.camera = "label cam align"; WOPT.doorbell = "label align"; WOPT.energy = "label align";
+  WOPT.controls = "label controls cols switches align"; WOPT.camera = "label cam align"; WOPT.doorbell = "label align picture"; WOPT.energy = "label align now";
   WOPT.sensor = "label reading align"; WOPT.speakers = "label players align"; WOPT.queue = "label align";
   function sanWStyle(src) {
     src = obj(src);
