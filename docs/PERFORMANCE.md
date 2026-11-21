@@ -49,6 +49,10 @@ never measured, so it never got it. Since 0.13.9:
 - Slow means a median frame over 22 ms or over 1.3 times the screen's own frame time, measured at rest first, so a
   smooth 30, 25 or 24 Hz screen is not a slow TV. A stutter while moving is a strike; a second start within a week
   that stutters too turns Lighter home on, and that answer is kept for 30 days.
+- A median frame over 250 ms is not a slow TV but a screen that was not drawing: a 2021 Samsung Frame (Tizen 6,
+  2 GB) kept a 2849.7 ms reading taken in Art Mode, where the app stays loaded and believes it is visible, and ran
+  Lighter home for days on it. With its screen on it measured a 19.2 ms median (13.1 ms at rest). Such a reading,
+  kept or new, now decides nothing, is not kept, and is measured again a minute later.
 - The home then says once: "This TV is a bit slow, so Lighter home is on. Home settings, Look and scenes to change it."
 - A choice in Home settings or `home.lighter` always wins.
 

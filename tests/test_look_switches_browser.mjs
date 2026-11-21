@@ -274,6 +274,27 @@ const box = (page, sel) => page.evaluate((s) => { const e = document.querySelect
   await page.waitForFunction(() => document.getElementById("toast").classList.contains("on"), null, { timeout: 4000 });
   ok(true, "with the note");
   await page.close();
+  // a reading from a screen that was not drawing (a 2021 Samsung Frame, 21 Nov 2026: {"low":true,"ms":2849.7} kept
+  // from Art Mode, Lighter home on for days; 19.2 ms with the screen on): not trusted, measured again
+  const ART = JSON.stringify({ low: true, t: Date.now() - 2 * 86400000, ms: 2849.7 });
+  page = await home("&look=night", { memory: 2, storage: { "tvhome.lowend": ART } });
+  ok(!(await cls(page, "lighter")), "the Frame's kept Art Mode reading does not turn Lighter home on");
+  await page.waitForFunction(() => { const k = JSON.parse(localStorage.getItem("tvhome.lowend") || "{}"); return k.ms < 100; }, null, { timeout: 30000 });
+  const kf = await page.evaluate(() => JSON.parse(localStorage.getItem("tvhome.lowend")));
+  ok(!(await cls(page, "lighter")) && kf.low === false, "measured again with the screen drawing: off, and that is kept " + JSON.stringify(kf));
+  await page.close();
+  // a new reading while the screen is not drawing (3 s frames): nothing decided, nothing kept
+  page = await home("&look=night", { memory: 2, slowVeil: 3000 });
+  await until(page, 26000);
+  ok(!(await cls(page, "lighter")) && !(await page.evaluate(() => localStorage.getItem("tvhome.lowend"))), "a stalled reading decides nothing and is not kept");
+  await page.close();
+  // the note's words leave the page once it has faded (the Frame's page still said it long after)
+  page = await home("&look=night", { memory: 4, slowVeil: 30 });
+  await page.waitForFunction(() => document.getElementById("toast").classList.contains("on"), null, { timeout: 30000 });
+  ok(/bit slow/.test(await page.evaluate(() => document.getElementById("toast").textContent)), "the note shows");
+  await page.waitForFunction(() => !document.getElementById("toast").classList.contains("on") && document.getElementById("toast").textContent === "", null, { timeout: 15000 });
+  ok(true, "and once it has faded its words are gone from the page");
+  await page.close();
   // 8 GB, slow frames: never measured, never on
   page = await home("&look=night", { memory: 8, slowMs: 30 });
   await until(page, 23000);
