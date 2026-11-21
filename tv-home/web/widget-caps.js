@@ -105,7 +105,10 @@
   var SEND = "Tap Send to my TV, then on the TV: Home settings, Designs, Get a design, and type the code.";
   function inStudio(what) { return ["Open your design in couch-tv Studio on your phone.", "Tap the widget, then " + what + ".", SEND]; }
   var TOWN = [OPEN, "Go down to Location and press OK.", "Pick Search for a town or city, type your town, then press OK.", "Pick your town in the list. The weather shows within a minute."];
+  // a weather widget can also have a place of its own (its Place setting, Hold OK on the widget)
+  var TOWN_OWN = TOWN.concat(["Or for this widget only: hold OK on it, pick Edit on the TV, then Place."]);
   var BEACH = [OPEN, "Go down to Location and press OK.", "Pick Search for a town or city, type the beach town nearest you, then press OK.", "Pick it in the list. The swell shows within a minute (inland towns have no swell)."];
+  var BEACH_OWN = BEACH.concat(["Or for this widget only: hold OK on it, pick Edit on the TV, then Beach."]);
   var PHOTOS_ANDROID = [OPEN, "Go down to Look and scenes, then down to Your photos.", "Pick Add photos from a USB drive or this TV, and choose up to 50 photos.", "Or put one photo in the widget itself, in couch-tv Studio."];
   var PHOTOS_LINK = [OPEN, "Go down to Look and scenes, then down to Your photos.", "Pick Add a photo from a web address, type the photo's address, then press OK.", "Or put one photo in the widget itself, in couch-tv Studio."];
   var NOTHING = ["Nothing to set up."];
@@ -203,34 +206,34 @@
 
     // ---------- weather (free, straight from the TV, no account) ----------
     weather: { name: "Weather", status: "works", what: "Your town, the temperature, the sky, the high and low", needs: [TOWN_NEED],
-      setup: setup("tv", TOWN), until: "\"Set your town\", or \"Weather is off on this TV\"", build: "",
+      setup: setup("tv", TOWN_OWN), until: "\"Set your town\", or \"Weather is off on this TV\"", build: "",
       ok: "Opens the forecast: the next 24 hours and the week", platforms: plat("setup", "computer", "setup"), sizes: sz(["tile", "wtile", "small", "medium"], [2, 2]) },
     bigtemp: { name: "Big number", status: "works", what: "One huge temperature, coloured for the day", needs: [TOWN_NEED],
-      setup: setup("tv", TOWN), until: "\"Set your town\"", build: "",
+      setup: setup("tv", TOWN_OWN), until: "\"Set your town\"", build: "",
       ok: "Opens the forecast", platforms: plat("setup", "computer", "setup"), sizes: sz(["tile", "small", "medium", "large"], [2, 2]) },
     hourly: { name: "Hourly", status: "works", what: "The next few hours: time, sky and temperature", needs: [TOWN_NEED],
-      setup: setup("tv", TOWN), until: "\"Set your town\"", build: "",
+      setup: setup("tv", TOWN_OWN), until: "\"Set your town\"", build: "",
       ok: "Opens the forecast: 24 hours with the chance of rain", platforms: plat("setup", "computer", "setup"), sizes: sz(["wtile", "small", "medium", "wide"], [4, 2]) },
     week: { name: "This week", status: "works", what: "The next 7 days, with each day's high and low", needs: [TOWN_NEED],
       setup: setup("tv", TOWN), until: "\"Set your town\"", build: "",
       ok: "Opens the forecast: the 7 days in full", platforms: plat("setup", "computer", "setup"), sizes: sz(["wtile", "small", "tall", "medium", "large"], [4, 2]) },
     rain: { name: "Rain soon", status: "works", what: "Rain in the next three hours, as bars", needs: [TOWN_NEED],
-      setup: setup("tv", TOWN), until: "\"Set your town\"", build: "",
+      setup: setup("tv", TOWN_OWN), until: "\"Set your town\"", build: "",
       ok: "Opens the forecast: the chance of rain by the hour", platforms: plat("setup", "computer", "setup"), sizes: sz(["wtile", "small", "medium"], [4, 2]) },
     uv: { name: "UV index", status: "works", what: "Today's UV and how strong it is", needs: [TOWN_NEED],
-      setup: setup("tv", TOWN), until: "\"Set your town\"", build: "",
+      setup: setup("tv", TOWN_OWN), until: "\"Set your town\"", build: "",
       ok: "Opens the forecast: UV by the hour", platforms: plat("setup", "computer", "setup"), sizes: sz(["tile", "wtile", "small"], [2, 2]) },
     sun: { name: "Sunrise and sunset", status: "works", what: "Today's sunrise and sunset, and the sun's path", needs: [TOWN_NEED],
-      setup: setup("tv", TOWN), until: "\"Set your town for the sun\"", build: "",
+      setup: setup("tv", TOWN_OWN), until: "\"Set your town for the sun\"", build: "",
       ok: "Opens the forecast: sunrise and sunset for the week", platforms: plat("setup", "computer", "setup"), sizes: sz(["tile", "wtile", "small"], [2, 2]) },
-    moon: { name: "Moon", status: "works", what: "Tonight's moon and the next full moon", needs: ["Nothing: worked out on the TV"],
+    moon: { name: "Moon", status: "works", what: "Tonight's moon, the right way round for your half of the world, and the next full moon", needs: ["Nothing: worked out on the TV"],
       setup: setup("nothing", NOTHING), until: "Always shows the moon", build: "",
       ok: "Opens the moon: the next four weeks", platforms: EVERY(), sizes: sz(["tile", "wtile", "small"], [2, 2]) },
     air: { name: "Air quality", status: "works", what: "How clean the air is, as a number and a word", needs: [TOWN_NEED],
-      setup: setup("tv", TOWN), until: "\"Set your town\"", build: "",
+      setup: setup("tv", TOWN_OWN), until: "\"Set your town\"", build: "",
       ok: "Opens Air quality: the next 12 hours", platforms: plat("setup", "computer", "setup"), sizes: sz(["tile", "wtile", "small"], [2, 2]) },
-    surf: { name: "Surf", status: "works", what: "The swell (height, seconds apart, direction) and the wind at the coast nearest your town", needs: ["Your town, set on the TV: pick the beach town nearest you", "A town near the coast: inland there is no swell"],
-      setup: setup("tv", BEACH), until: "\"Set your town\", or \"No surf reading here\" inland", build: "",
+    surf: { name: "Surf", status: "works", what: "The swell (height, seconds apart, direction) and the wind at the beach picked for it, or your town", needs: ["Your town, set on the TV: pick the beach town nearest you", "A town near the coast: inland there is no swell"],
+      setup: setup("tv", BEACH_OWN), until: "\"Set your town\", or \"No surf reading here\" inland", build: "",
       ok: "Opens Surf: the swell by the hour today", platforms: plat("setup", "computer", "setup"), sizes: sz(["wtile", "small", "medium"], [4, 2]) },
 
     // ---------- photos ----------
@@ -544,6 +547,12 @@
   var HEADING_TV = function (help) { return st("label", "Heading", "text", "", help, "tv", ON_TV, true, { max: 40 }); };
   var HA = { ha: true };
 
+  // a weather widget's own place (kept on this TV: Hold OK, Home settings or the phone) and its own
+  // temperature unit (kept on this TV: Roku and Apple TV draw designs in the home's own unit)
+  var WX_TOWN = function (what, are) { return st("town", "Place", "place", "", "Where " + what + (are ? " are" : " is") + " for. Empty uses this home's town.", "tv", ON_TV, true, { "private": true }); };
+  var DEGREES = function () { return st("degrees", "Temperature in", "choice", "auto", "Follow this TV uses Home settings, Weather, Units.", "tv", ON_TV, true,
+    { options: [["auto", "Follow this TV"], ["c", "Celsius (°C)"], ["f", "Fahrenheit (°F)"]] }); };
+
   // before launch (WIDGET-SETTINGS-SPEC.md section 2, the P items)
   var SETTINGS = {
     clock: [CLOCK_FMT()], tallclock: [CLOCK_FMT()], glassclock: [CLOCK_FMT()], flipclock: [CLOCK_FMT()],
@@ -554,9 +563,25 @@
       st("year", "Year", "choice", "every", "Pick a year for a one off day, like a wedding. Every year counts to the same day each year.", "design", ALL, true, { options: YEARS }),
       st("unit", "Count in", "choice", "sleeps", "Sleeps suit children. Weeks suit a day far away.", "design", ALL, true, { options: [["sleeps", "Sleeps"], ["days", "Days"], ["weeks", "Weeks"]] })
     ],
-    weather: [st("place", "Show the town name", "toggle", true, "Turn off to show only the weather.", "design", ALL, true)],
-    bigtemp: [st("place", "Show the town name", "toggle", true, "Turn off to show only the temperature.", "design", ALL, true)],
-    surf: [st("place", "Beach", "place", "", "Where the swell is read. Empty uses this home's town.", "tv", ON_TV, true, { coast: true, "private": true })],
+    // the weather widgets (WIDGET-SETTINGS-SPEC.md section 2, Weather): each one's own place, read for
+    // that place alone (app.js airAndSurf), and its own units
+    weather: [WX_TOWN("the weather"), st("place", "Show the town name", "toggle", true, "Turn off to show only the weather. A tile names only a place picked for it.", "design", ALL, true),
+      st("hilo", "Show the high and low", "toggle", true, "Turn off to show only the temperature and the sky. A tile shows only those already.", "design", ALL, true), DEGREES()],
+    bigtemp: [WX_TOWN("the temperature"), st("place", "Show the town name", "toggle", true, "Turn off to show only the temperature. A tile names only a place picked for it.", "design", ALL, true), DEGREES()],
+    hourly: [WX_TOWN("the forecast"), st("hours", "How many hours", "choice", "auto", "A small widget shows only as many as fit.", "design", ALL, true,
+      { options: [["auto", "As many as fit"], [4, "4"], [6, "6"], [8, "8"]] }), DEGREES()],
+    rain: [WX_TOWN("the rain")],
+    uv: [WX_TOWN("the UV")],
+    sun: [WX_TOWN("sunrise and sunset", true)],
+    moon: [st("hemi", "Moon seen from", "choice", "auto", "The moon looks the other way round south of the equator.", "tv", ON_TV, true,
+      { options: [["auto", "This home's town"], ["south", "The south"], ["north", "The north"]] })],
+    air: [WX_TOWN("the air quality"), st("scale", "Scale", "choice", "auto", "Best for your country uses the American scale in the United States and the European one elsewhere.", "tv", ON_TV, true,
+      { options: [["auto", "Best for your country"], ["eu", "European"], ["us", "American"]] })],
+    surf: [st("place", "Beach", "place", "", "Where the swell is read. Empty uses this home's town.", "tv", ON_TV, true, { coast: true, "private": true }),
+      st("units", "Wave height in", "choice", "auto", "Best for your country uses feet in the United States and metres elsewhere.", "tv", ON_TV, true,
+        { options: [["auto", "Best for your country"], ["m", "Metres"], ["ft", "Feet"]] }),
+      st("wind", "Wind in", "choice", "auto", "Best for your country uses miles an hour in the United States and kilometres an hour elsewhere.", "tv", ON_TV, true,
+        { options: [["auto", "Best for your country"], ["kmh", "Kilometres an hour"], ["kn", "Knots"], ["mph", "Miles an hour"]] })],
     photo: [PHOTO(), IMAGE()],
     artframe: [PHOTO(), IMAGE()],
     upnext: [st("sport", "Game mode", "choice", "auto", "On shows the last game watched in a sport app on this TV. Automatic turns it on when the home also shows scores.", "design", ALL, true,
@@ -612,16 +637,7 @@
     ],
     timer: [st("minutes", "Quick start", "choice", 0, "OK on the widget starts a timer this long.", "design", ALL, false,
       { options: [[0, "Ask each time"], [5, "5 minutes"], [10, "10 minutes"], [15, "15 minutes"], [20, "20 minutes"], [30, "30 minutes"], [45, "45 minutes"], [60, "1 hour"]] })],
-    weather: [TOWN("the weather")], bigtemp: [TOWN("the temperature")], week: [TOWN("the forecast")],
-    hourly: [TOWN("the forecast"), st("hours", "How many hours", "choice", "auto", "", "design", ALL, false, { options: [["auto", "As many as fit"], [4, "4"], [6, "6"], [8, "8"]] })],
-    rain: [TOWN("the rain")], uv: [TOWN("the UV")], sun: [TOWN("sunrise and sunset")],
-    moon: [st("hemi", "Moon seen from", "choice", "auto", "The moon looks the other way up south of the equator.", "tv", ON_TV, false,
-      { options: [["auto", "This home's town"], ["south", "The south"], ["north", "The north"]] })],
-    air: [TOWN("the air quality"), st("scale", "Scale", "choice", "auto", "", "tv", ON_TV, false, { options: [["auto", "Best for your country"], ["eu", "European"], ["us", "American"]] })],
-    surf: [
-      st("units", "Wave height in", "choice", "auto", "", "tv", ON_TV, false, { options: [["auto", "Best for your country"], ["m", "Metres"], ["ft", "Feet"]] }),
-      st("wind", "Wind in", "choice", "auto", "", "tv", ON_TV, false, { options: [["auto", "Best for your country"], ["kmh", "Kilometres an hour"], ["kn", "Knots"]] })
-    ],
+    week: [TOWN("the forecast")],
     photo: [st("fit", "Fill or fit", "choice", "cover", "Fit shows the whole photo with a border.", "design", ALL, false, { options: [["cover", "Fill the box"], ["contain", "Fit the whole photo"]] })],
     slideshow: [st("shuffle", "Shuffle", "toggle", false, "", "design", ALL, false)],
     mosaic: [st("count", "How many photos", "choice", "auto", "", "design", ALL, false, { options: [["auto", "As many as fit"], [3, "3"], [4, "4"], [5, "5"]] })],
@@ -672,6 +688,9 @@
         note: need === "no" ? (c.status === "not-built" ? DEFAULT_NOTE.no : NOT_NATIVE) : NATIVE_PHOTO[k] ? NATIVE_PHOTO_NOTE : "Couch TV draws this on your " + NATIVE_NAME[p] + ", opened by the home computer." };
     });
   });
+
+  // a Roku draws the moon as a plain disc with its name and how much is lit, the same way round everywhere
+  C.moon.platforms["Roku OS"].note += " On a Roku the moon is a plain disc with its name and how much is lit, the same way round everywhere, and no next full moon.";
 
   // the setup card a TV shows for a widget that has nothing real to show yet: the first line says what
   // is missing, the second where to go. Built only from this file, never from a design.
