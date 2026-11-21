@@ -1,6 +1,6 @@
-## couch-tv 0.13.9: one button updates, Home settings on your phone, settings for each widget, and plain words
+## couch-tv 0.13.9: one button updates, Home settings on your phone, settings for every widget, Matter devices, and plain words
 
-Fewer presses with the TV remote. The on-TV app now updates itself with one button, Home settings can be changed from a phone or a computer, a phone pairs in one scan, and a couch-tv Studio design can be sent from the phone instead of typed on the TV. Each widget on a design now has its own settings, Home settings only shows what your design uses, and the words in settings and setup are plain English. The standard home (no design) looks exactly as it did in 0.13.8.
+Fewer presses with the TV remote. The on-TV app now updates itself with one button, Home settings can be changed from a phone or a computer, a phone pairs in one scan, and a couch-tv Studio design can be sent from the phone instead of typed on the TV. Every widget now has its own settings, Home settings only shows what your design uses, and the words in settings and setup are plain, in every language the home speaks. The smart devices you already have in Google Home, Apple Home, SmartThings or Alexa can join Couch TV by Matter, Home can be made to open Couch TV with one press, Home Assistant signs in with a QR code, and the problems people told us about on social media are fixed. The standard home (no design) looks as it did in 0.13.8, apart from the new switches you turn on yourself.
 
 ### Do this after updating
 
@@ -8,6 +8,7 @@ Fewer presses with the TV remote. The on-TV app now updates itself with one butt
 - **Every other Android TV:** Home settings, Updates, check now, or install `couch-tv-home.apk` over the old one. All four APKs are signed with the same key as every earlier release.
 - **Samsung:** download `couch-tv-samsung-setup.zip` below and run its installer again (step 4 in `START HERE.txt`). Your settings stay.
 - **Option B (a computer at home):** `git pull`, then install the bridge's one new part (Pillow, for photos sent from the phone). In the couch-tv folder run `.venv/bin/pip install -r bridge/requirements.txt` on a Mac or Linux, or `.venv\Scripts\pip install -r bridge\requirements.txt` on Windows, then restart the bridge. In Docker, build the image again: `docker compose -f examples/docker/compose.yaml up -d --build` ([docs/DOCKER.md](docs/DOCKER.md)).
+- **Option B and Matter devices (only if you want them):** the home computer needs Node.js 22.13 or newer. In the couch-tv folder run `scripts/matter-setup.sh` once, then restart the bridge ([docs/MATTER.md](docs/MATTER.md)). On a Mac, Matter needs the Local Network permission: start the bridge once from Terminal and press Allow. If the bridge runs as a background service (launchd), macOS never asks, so switch it on yourself in System Settings, Privacy and Security, Local Network, or adding a device fails and the phone page says so.
 - **Apple TV:** build Couch TV again with Xcode ([docs/APPLE-TV.md](docs/APPLE-TV.md)).
 - **Roku:** build the channel and put it on again the way you did before ([docs/ROKU.md](docs/ROKU.md)).
 
@@ -18,7 +19,8 @@ Fewer presses with the TV remote. The on-TV app now updates itself with one butt
 - **The Couch TV home app on its own (option A):** Get a design from your phone, settings for each widget, Home settings that follow your design, and the Couch Original design.
 - **Samsung, LG and the other TVs a computer at home runs:** Get a design from your phone, Send a design from the phone remote, settings for each widget (kept by the computer at home), Home settings that follow your design, and the Couch Original design. On a Samsung, Home settings, About also shows a QR code that opens the update steps on your phone.
 - **Apple TV and Roku:** designs show now, drawn by Couch TV itself, with the widgets it can't draw there left out and named ("Surf: not on this TV"). On an Apple TV, the Couch Original design shows its clock behind the mountains too. Get a design from your phone is in Couch TV's settings on an Apple TV. Send a design is not offered on an Apple TV or a Roku: the phone remote says to type the code on the TV instead.
-- **Every TV:** the plain words below.
+- **Matter devices:** the on-TV app and the Couch TV home app join them themselves; every other TV a computer at home runs gets them through the computer. Home Assistant by QR code: the on-TV app, the Couch TV home app, and the computer at home. Make Home open Couch TV: the on-TV app.
+- **Every TV:** settings for every widget, the plain words in every language, and the fixes below.
 
 ### Update to, with one button (on-TV app)
 
@@ -110,9 +112,60 @@ The words in settings and setup are written for someone who has never set up a T
 - A calendar link that does not work says where to find the right one (in Google Calendar: Secret address in iCal format).
 - Going back to the first settings, kids mode and quiet hours no longer mention config.json.
 
-Every language the home and the phone remote speak has the new words.
+Every language the home and the phone remote speak has the new words, and so do the phone's Home settings page, the Home Assistant phone page, the widget settings and the lines the widgets draw.
 
-Not in this release: putting a photo in a widget from couch-tv Studio. Studio does not offer that option.
+### Settings for every widget
+
+All 68 widgets now have something to set, each tried at every size it comes in: clocks (seconds, the date, 12 or 24 hour, the cities), weather (the town, the high and low, °F), sports (all seven competitions, live scores and your team), news, markets, commute, now playing and the app widgets, smart home devices picked from a list, agenda, notes, guest Wi-Fi, photos and the rest. A widget's settings show only while it is on your design, and with nothing set up a widget shows how to set it up, never made up readings.
+
+### A photo in a widget
+
+In couch-tv Studio, a Photo or Art frame widget can hold a photo of your own (Put a photo in). It travels with the design to the TV. Sharing the home leaves your photos out.
+
+### Matter devices, with no Home Assistant
+
+Lights, plugs, fans, blinds, air conditioners and sensors you already have in Google Home, Apple Home, SmartThings or Alexa can join Couch TV. In your home app, share the device with Matter's "share", and type the 11 digit code it gives on the phone's Home settings page, Matter devices (the page says where each app keeps it). The device stays in your own home app, which works as before. It then shows in the smart home widgets and the TV's Smart home screen, where you can rename or remove it.
+
+On the on-TV app and the Couch TV home app the TV itself joins the device (Android 7 or newer). On Samsung, LG, Roku, Apple TV and the other TVs a computer at home runs, the computer does (see Do this after updating). Locks, alarms and garage doors are never shown or switched: if one is shared by mistake, Couch TV leaves it again at once. A Thread device also needs a Thread hub at home (a Nest hub, an Apple TV or HomePod, a SmartThings hub). Tested with virtual Matter devices shared the same way; sharing from the real Google Home and Apple Home apps has not been tried yet.
+
+### Make Home open Couch TV, with one press (on-TV app)
+
+On Google TV and other TVs with Google's home, Home settings, About, the setup screen and the phone page have Make Home open Couch TV. With the app's own link to the TV (Let the phone press keys), one press puts on the Home button version, switches its watch on and makes Couch TV the home. No computer needed. On a Fire TV whose Fire OS blocks the link, the page shows the steps instead.
+
+### Home Assistant signs in with a QR code
+
+Home settings, Designs, Smart home shows a QR code. Scan it, sign in on Home Assistant's own page on your phone and tick what shows on the TV. No access key to copy, no config.json. It works on the Couch TV home app on its own, the on-TV app, and with a computer at home. If Home Assistant asks again later, the TV says Sign in again.
+
+### Can't connect?
+
+When the phone or the setup screen cannot get the TV to press keys, a Can't connect check says the one thing that is wrong (the TV on Ethernet, no Wireless debugging, the debugging question never answered, the port closed after a restart, and more) and the next step for it. Copy a report puts the TV's model, Android version and the last error in one block for a GitHub issue, with no addresses or keys. New Start here pages walk a beginner through Google TV, Android TV and Samsung, and the LG guide says what to do when LG says no.
+
+### Fixes for what people told us
+
+- **Lag on mid range TVs:** Lighter home now checks 4 GB TVs too, measures while the focus moves along a row, and judges slow by the screen's own speed. When it turns itself on, the home says so once and where to change it. The Night look's panels cost less to draw.
+- **Mac style dock and Moving tiles** say "Off while Lighter home is on" instead of doing nothing, and OK offers to turn Lighter home off.
+- **Show the clock** (Home settings, Look): switch the home clock off.
+- **Show seconds** (Home settings, Look): seconds next to the home clock.
+- **Sharp pictures on a 4K TV** (Home settings, Look): Auto, Off or Always.
+- **Icon style** (Home settings, Look): the home's own tiles in Standard, Line, Solid, Two tone, Colour tile, Glass or Playful icons.
+- **Keep watching tiles** that lost their picture show the app's banner, or the title.
+- **Photos from a web link** that cannot show now say why (not found, not a picture, blocked, too big).
+- **Fire TV:** the background comes back after a video link instead of staying black.
+- **A video background that shows green** on some TVs is noticed, and the home goes back to the photo, with Try the video again in Look.
+- **Air mouse:** moving an air mouse pointer now wakes the home.
+- **Quick buttons** you choose are kept after a restart.
+- **Samsung smart monitors:** the phone remote has More keys (Return, Exit and the rest).
+- **Phone remote:** added Next and Previous scene buttons on the phone remote.
+- **Home settings on a slow TV:** Up and Down move the focus in place, with no scroll animation or fade, so presses land on time (#301).
+- **Hisense Google TV:** back on Couch TV after a restart or wake, and Home goes straight to Couch TV with no flash of Google's home (#202, #297). After a cold start the home waits for its own page instead of showing an error page.
+
+### New on the Couch TV home app on its own (option A), thanks alisalehi02 (#299)
+
+Each is off until you turn it on in config.json:
+
+- **Bing Picture of the Day** as the Night background (`home.bing_daily_background`). It keeps the last picture when the TV is offline.
+- **A Spotify card** with Open Spotify, and previous, play or pause and next for the Spotify TV app (`home.spotify_player`, after you allow Spotify playback controls in Android's Notification access). It reads no notifications.
+- **Football scores** from FotMob (`home.football_scores`), with the competitions to show in Home settings, Football scores.
 
 ### From the community
 

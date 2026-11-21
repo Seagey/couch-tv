@@ -26,7 +26,12 @@ The newest release is **0.13.9**. The TV apps come from [the Releases page](http
 - **Apple TV and Roku show designs:** drawn by Couch TV itself, with a widget it can't draw there left out and named, like "Surf: not on this TV". Apple TV: build Couch TV again. Roku: put the channel on again.
 - **The app list scrolls:** Add app (the "+") and Change app keep the app you are on in view.
 - **Plain words:** the app is called Couch TV everywhere on screen; the Home settings section couch-tv Studio is now Designs (Back to the standard home); ADB on the TV is now Let the phone press keys, with Newer TVs and Older TVs steps and Android's own menu names kept exact; widgets say the Couch TV app on this TV or a home computer, never option B or C; the phone remote says the home computer, not the bridge; Home Assistant's token is the access key. Every language has the new words.
-- **Not in this release:** putting a photo in a widget from couch-tv Studio (Studio does not offer it).
+- **Matter devices, with no Home Assistant:** share a light, plug, fan, blind, air conditioner or sensor from Google Home, Apple Home, SmartThings or Alexa and type its code on the phone page. The on-TV app joins it itself; with a computer at home, run `scripts/matter-setup.sh` once ([MATTER.md](MATTER.md)). On a Mac whose bridge runs as a background service, allow Local Network for it in System Settings, Privacy and Security, Local Network.
+- **Make Home open Couch TV (on-TV app):** one press, no computer.
+- **Home Assistant by QR code:** Home settings, Designs, Smart home; sign in on your phone.
+- **Every widget has settings**, a photo can go in a Photo or Art frame widget from couch-tv Studio, and a Can't connect check with Copy a report is on the setup screen and phone page.
+- **Fixes from social media:** Lighter home checks 4 GB TVs, Show the clock, Show seconds, Sharp pictures on a 4K TV, Icon style, Keep watching banners, photo link reasons, the Fire TV black background, green video backgrounds, the air mouse, quick buttons kept, Samsung More keys, Next and Previous scene buttons on the phone remote, and smoother Home settings on a slow TV.
+- **Couch TV home app on its own (option A), off until turned on:** Bing Picture of the Day, a Spotify card and FotMob football scores (#299).
 
 ### 20 November 2026: Hisense Google TV comes back on couch-tv after a restart (option C, in 0.13.9)
 
