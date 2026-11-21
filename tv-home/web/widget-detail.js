@@ -294,6 +294,9 @@
   B.ask = function (o, env) {
     var A = window.CouchAsk, st = A ? A.status() : { ready: false, by: "" };
     var v = env.demo ? { q: "How far away is the moon?", a: "About 384,000 kilometres. Light from it takes just over a second to reach us." } : A && A.last();
+    // Show the last answer: No keeps the question private here too; For an hour hides an older one
+    var keep = kit().setting(o, env, "keep");
+    if (v && !env.demo && !v.pending && (keep === "never" || (keep === "hour" && v.at && Date.now() - v.at > 3600000))) v = null;
     S.body.appendChild(head("mic", "Ask AI", env.demo ? "Answered by your own AI" : st.ready ? "Answered by " + st.by : "Pick who answers first: OK on Set up", "#5e5ce6"));
     var go = function (view) { return function () { if (designerSays()) return; close(true); if (A) A.open(view); }; };
     var row = E("div", "cwd-row", "margin-top:30px", [F(btn("mic", st.ready || env.demo ? "Ask a question" : "Set it up now"), go(st.ready ? "ask" : "setup"), "Ask"), F(btn("settings", "Set up"), go("setup"), "Set up")]);
@@ -305,7 +308,10 @@
   // From your AI (ask.js): the last message in full, and how to connect an agent (docs/AI-AGENT.md)
   B.agent = function (o, env) {
     var A = window.CouchAsk, m = env.demo ? { from: "Claude", text: "Your new autumn design is on its way. Press OK on the TV when it asks." } : A && A.message();
-    S.body.appendChild(head("phone", "From your AI", m ? "From " + m.from : "Your own AI agent can write to this TV", "#5e5ce6"));
+    // Show each message and Show who sent it, as on the widget: an older message waits quietly here too
+    var keep = kit().setting(o, env, "keep"), who = kit().setting(o, env, "who");
+    if (m && !env.demo && ((keep === "hour" && m.at && Date.now() - m.at > 3600000) || (keep === "day" && m.at && Date.now() - m.at > 86400000))) m = null;
+    S.body.appendChild(head("phone", "From your AI", m ? (who === false ? "From your AI" : "From " + m.from) : "Your own AI agent can write to this TV", "#5e5ce6"));
     if (m) S.body.appendChild(E("div", "cwd-note", "margin-top:24px;font-size:" + px(clamp(Math.sqrt(1500 * 300 / Math.max(10, m.text.length) / 1.6), 36, 84)), [m.text]));
     var C = window.CouchWidgetCaps, steps = C ? C.steps("agent", "android") : [];
     S.body.appendChild(E("div", "cwd-col cwd-grow", "margin-top:24px", [label("Connect your AI agent"),
@@ -912,7 +918,11 @@
     var WW = window.CouchWidgetWeb, q = op(o), id = WW ? WW.leagueOf(kit().setting(o, env, "league")) : "nrl", rec = null, v;
     if (env.demo) v = wk().demoScores ? wk().demoScores() : { games: [] };
     else { rec = webRec(env, "sports", id); if (!rec || !rec.ok || !rec.v || !rec.v.games || !rec.v.games.length) return B.setup(o, env); v = rec.v; }
-    var games = v.games.slice().sort(function (a, b) { return a.at - b.at; }), shown = games.slice(0, 12), n = shown.length;
+    // Which games: only my team, or live games and my team, as the widget shows them (else the whole round)
+    var mode = kit().setting(o, env, "games"), team = kit().setting(o, env, "team");
+    var games = (WW && mode && mode !== "all" && team ? WW.scoreFilter(v.games, team, mode, Date.now()) : v.games).slice().sort(function (a, b) { return a.at - b.at; });
+    if (!games.length) games = v.games.slice().sort(function (a, b) { return a.at - b.at; });
+    var shown = games.slice(0, 12), n = shown.length;
     var cols = n <= 6 ? 2 : n <= 9 ? 3 : 4, w = Math.floor((1600 - (cols - 1) * 24) / cols), big = cols <= 2 ? 56 : cols === 3 ? 48 : 40, mid = cols <= 3 ? 34 : 29;
     var real = WW && WW.LEAGUES && WW.LEAGUES[id] ? WW.LEAGUES[id].name : v.league;
     S.body.appendChild(head("tv", kit().webName(q.label, real, WW && WW.LEAGUES) || real || "Scores", [v.round, rec ? updated(rec) : ""].filter(Boolean).join(". ") || "This round", "#0a6e8a"));

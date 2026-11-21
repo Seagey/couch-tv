@@ -48,7 +48,7 @@ const ANSWERS = {
 // per widget: the design's widget, what proves the real answer is drawn, its layer
 const CASES = [
   { kind: "news", opts: { feed: "bbc" }, box: [0, 0, 8, 4], says: () => WW.parseRss(fix("rss-bbc.xml"), 12)[0].title, layer: "news" },
-  { kind: "sports", opts: { league: "nba", team: "Knicks" }, box: [0, 0, 8, 4], routes: [["https://site.api.espn.com/**", "espn-nba.json"]], says: () => "Knicks", layer: "sports" },
+  { kind: "sports", opts: { league: "nba", team: "Knicks" }, box: [0, 0, 8, 4], routes: [["https://site.api.espn.com/**", "espn-nba.json"]], says: () => "Knicks", layer: "sports", maxAsks: 2 },
   { kind: "stocks", opts: { tickers: ["BHP.AX", "^AXJO"] }, box: [0, 0, 4, 6], says: () => "$54.34", layer: "stocks" },
   // the commute's places are the TV's own (Home settings), never the design's
   { kind: "commute", opts: { arrive_h: 8, arrive_m: 30 }, box: [0, 0, 8, 4], routes: [["https://router.project-osrm.org/**", "osrm-route.json"]], says: () => "27", layer: "commute",

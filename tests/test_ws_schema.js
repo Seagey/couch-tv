@@ -172,7 +172,7 @@ Object.keys(HOME).forEach((kind) => {
 });
 ok(!Object.keys(HOME).some((k) => ["surf", "commute", "weather", "speakers", "sports"].indexOf(k) >= 0), "no home kind in the later list");
 // the later settings (L items) are there too, after the before launch ones
-const LATER = { commute: ["buffer", "weekdays", "from"], sports: ["games"] };
+const LATER = {};
 // the smart home group: nothing left for later (the owner, 20 Nov 2026: there is no "later")
 ["aircon", "controls", "camera", "doorbell", "sensor", "energy", "solar", "battery", "speakers", "scenes", "bins"].forEach((kind) => {
   ok(CAPS.settings(kind).length > 0, kind + " has something to set");

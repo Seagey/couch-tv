@@ -423,7 +423,14 @@
     year: function (v) { return v === "every" ? "every" : SAN.n(v, 2026, 2040, true); }, minutes: function (v) { return SAN.n(v, 0, 240, true); },
     hours: function (v) { return v === "auto" ? "auto" : SAN.n(v, 1, 24, true); }, shuffle: SAN.b, price: SAN.b,
     days: function (v) { return SAN.pick(v, ["today", "two", "week"]); }, games: function (v) { return SAN.pick(v, ["all", "live", "mine"]); },
-    league: function (v) { return SAN.pick(v, WEB_LEAGUES); }, team: function (v) { return SAN.w(v, 24); },
+    league: function (v) { return SAN.pick(v, WEB_LEAGUES); },
+    // a team's name as ESPN writes it ("Philadelphia 76ers", "Brighton & Hove Albion"): letters, digits, spaces and & . ' -
+    team: function (v) { v = typeof v === "string" ? v.replace(/\s+/g, " ").trim().slice(0, 40) : ""; // never a secret: no word over 16 letters, and digits only in a short word ("76ers"), never a token
+      return /^[A-Za-z0-9\u00c0-\u024f][A-Za-z0-9\u00c0-\u024f &.'-]*$/.test(v) && !v.split(" ").some(secretish) && v.split(/[ &.'-]+/).every(function (w) { return w.length <= 16 && (!/[0-9]/.test(w) || w.length <= 5); }) ? v : undefined; },
+    // the quote's kind of line, the word's language and whether its meaning shows; how long Ask AI's last
+    // answer and From your AI's last message show, and whether the message names its sender
+    mood: function (v) { return SAN.pick(v, ["all", "calm", "go", "home"]); }, lang: function (v) { return SAN.pick(v, ["en", "es", "fr", "it", "de", "ja"]); }, meaning: SAN.b,
+    keep: function (v) { return SAN.pick(v, ["always", "hour", "day", "never"]); }, who: SAN.b,
     // share symbols as Yahoo writes them (BHP.AX, ^AXJO, AUDUSD=X, BTC-AUD): never a link or a word
     tickers: function (v) { return SAN.list(v, 6, function (s) { s = typeof s === "string" ? s.trim().toUpperCase() : ""; return /^\^?[A-Z0-9]{1,8}([.=-][A-Z0-9]{1,4})?$/.test(s) ? s : undefined; }); },
     // the commute: when to arrive and the minutes to spare; the places stay on the TV, never here
@@ -442,8 +449,8 @@
     nowplaying: "", soundscape: "sound", queue: "", speakers: "",
     aircon: "entity others", scenes: "label", controls: "label controls cols", camera: "label", doorbell: "", energy: "", sensor: "label", battery: "low",
     bins: "label weekday alt anchor lid_a lid_b bin_a bin_b", people: "names", agenda: "label align days", note: "align byline", list: "label icon align done",
-    card: "label text icon", quote: "text sub", word: "", news: "feed label align count", sports: "label league team align games", stocks: "label tickers align price", commute: "label arrive_h arrive_m buffer weekdays align",
-    welcome: "kicker text sub align source times", quick: "quick align", wifi: "align", guide: "align", screentime: "align appcount", ask: "label align", agent: "label align", stack: ""
+    card: "label text icon", quote: "text sub mood", word: "lang meaning", news: "feed label align count", sports: "label league team align games", stocks: "label tickers align price", commute: "label arrive_h arrive_m buffer weekdays align",
+    welcome: "kicker text sub align source times", quick: "quick align", wifi: "align", guide: "align", screentime: "align appcount", ask: "label align keep", agent: "label align keep who", stack: ""
   };
   // The smart home and music widgets: which of the TV's own Home Assistant things a widget shows,
   // named by entity id only (never a reading, a state or an address). A TV shows one only when it is

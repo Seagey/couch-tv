@@ -393,38 +393,38 @@
       until: "Always shows your words. A card for a live number with no computer: \"Needs a home computer\", and where", build: "",
       ok: "Opens every custom card big", platforms: EVERY(), sizes: sz(["tile", "wtile", "small"], [2, 2]) },
     quote: { name: "Quote", status: "works", what: "A short line for the day, or your own words", needs: ["Nothing: the lines come with Couch TV"],
-      setup: setup("nothing", ["Nothing to set up.", "For your own words: open your design in couch-tv Studio, tap the widget and type them.", SEND]), until: "Always shows a line", build: "",
+      setup: setup("nothing", ["Nothing to set up.", "On the TV: hold OK on the widget, then Edit on the TV (or Edit on your phone).", "Pick Kind of line, or type Your own words and Who said it."]), until: "Always shows a line", build: "",
       ok: "Nothing: it is to look at", platforms: EVERY(), sizes: sz(["wtile", "small", "medium", "wide"], [4, 2]) },
-    word: { name: "Word of the day", status: "works", what: "A word and what it means", needs: ["Nothing: the words come with Couch TV"],
-      setup: setup("nothing", NOTHING), until: "Always shows a word", build: "",
+    word: { name: "Word of the day", status: "works", what: "A word and what it means, in English or another language", needs: ["Nothing: the words come with Couch TV"],
+      setup: setup("nothing", ["Nothing to set up.", "On the TV: hold OK on the widget, then Edit on the TV (or Edit on your phone).", "Pick Words in: English, Spanish, French, Italian, German or Japanese."]), until: "Always shows a word", build: "",
       ok: "Nothing: it is to look at", platforms: EVERY(), sizes: sz(["wtile", "small", "medium"], [4, 2]) },
     // the feed is read through couch-tv itself (the launcher, the on-TV app or the home computer's
     // bridge: widget-web.js, /api/webdata), never a server of ours; ABC News unless the design picks another
     news: { name: "Headlines", status: "works", what: "One to four of the latest headlines from a news feed you pick (ABC News unless you choose another)",
       needs: ["Nothing on a Google TV, Android TV or Fire TV: Couch TV reads the feed itself", "On other TVs, the home computer, which reads the feed for the TV"],
       setup: setup("designer", {
-        android: ["Nothing to set up: the headlines come from ABC News.", "To pick another news source, open your design in couch-tv Studio on your phone.", "Tap the widget, then pick the news source: ABC News, SBS, The Guardian, BBC or RNZ.", SEND],
-        web: ["Keep the home computer on: it reads the news feed for this TV.", "To pick another news source, open your design in couch-tv Studio on your phone.", "Tap the widget, then pick the news source: ABC News, SBS, The Guardian, BBC or RNZ.", SEND],
-        vidaa: ["Needs a home computer that stays on, running Couch TV. The website home cannot read news feeds.", "To pick another news source, open your design in couch-tv Studio on your phone.", "Tap the widget, then pick the news source.", SEND] }),
+        android: ["Nothing to set up: the headlines come from the best source for your country (ABC News in Australia).", "On the TV: hold OK on the widget, then Edit on the TV (or Edit on your phone).", "Pick News source: ABC News, SBS, The Guardian, BBC or RNZ, and How many headlines.", "Or in couch-tv Studio on your phone: tap the widget and pick them there, then send the design."],
+        web: ["Keep the home computer on: it reads the news feed for this TV.", "On the TV: hold OK on the widget, then Edit on the TV (or Edit on your phone).", "Pick News source: ABC News, SBS, The Guardian, BBC or RNZ, and How many headlines.", "Or in couch-tv Studio on your phone: tap the widget and pick them there, then send the design."],
+        vidaa: ["Needs a home computer that stays on, running Couch TV. The website home cannot read news feeds.", "On the TV: hold OK on the widget, then Edit on the TV (or Edit on your phone).", "Pick News source and How many headlines."] }),
       until: "\"Getting the headlines\" for a moment. If the feed cannot be read, it says so and tries again in a few minutes", build: "",
       ok: "Opens the headlines: the latest six, with how long ago each came out", platforms: plat("works", "computer", "computer", { android: "Couch TV on the TV reads the feed: no computer needed.", vidaa: "Needs a home computer: the website home cannot read news feeds." }), sizes: sz(["wtile", "small", "tall", "medium"], [4, 2]) },
     // ESPN's public scoreboards, asked by the TV itself (free, no key; unofficial, so they may change)
     sports: { name: "Scores", status: "works", beta: "Unofficial source: a free feed that may change. Couch TV can pause it for every TV, and then the widget says the feed is paused.", what: "This round's games with their scores, live ones first: AFL, NRL, A-League, Premier League, NBA, Big Bash or cricket",
       needs: ["Nothing: the TV reads the scores itself (the NRL unless you pick another)"],
       setup: setup("designer", {
-        android: ["Nothing to set up: the widget shows the NRL.", "To pick another competition or your team, open your design in couch-tv Studio on your phone.", "Tap the widget, then pick AFL, NRL, A-League, Premier League, NBA, Big Bash or Cricket, and type your team if you like.", SEND],
-        web: ["Keep the home computer on: it runs Couch TV for this TV.", "To pick another competition or your team, open your design in couch-tv Studio on your phone.", "Tap the widget, then pick AFL, NRL, A-League, Premier League, NBA, Big Bash or Cricket, and type your team if you like.", SEND],
-        vidaa: ["Nothing to set up: the widget shows the NRL.", "To pick another competition or your team, open your design in couch-tv Studio on your phone.", "Tap the widget, then pick AFL, NRL, A-League, Premier League, NBA, Big Bash or Cricket, and type your team if you like.", SEND] }),
-      until: "\"Getting the scores\" for a moment; \"No NRL games this week\" between seasons", build: "",
+        android: ["Nothing to set up: the widget shows the NRL.", "On the TV: hold OK on the widget, then Edit on the TV (or Edit on your phone).", "Pick Competition: AFL, NRL, A-League, Premier League, NBA, Big Bash or Cricket. Then Your team, from that competition's teams.", "Which games: every game, live games and your team, or only your team."],
+        web: ["Keep the home computer on: it runs Couch TV for this TV.", "On the TV: hold OK on the widget, then Edit on the TV (or Edit on your phone).", "Pick Competition: AFL, NRL, A-League, Premier League, NBA, Big Bash or Cricket. Then Your team, from that competition's teams.", "Which games: every game, live games and your team, or only your team."],
+        vidaa: ["Nothing to set up: the widget shows the NRL.", "On the TV: hold OK on the widget, then Edit on the TV (or Edit on your phone).", "Pick Competition: AFL, NRL, A-League, Premier League, NBA, Big Bash or Cricket. Then Your team, from that competition's teams.", "Which games: every game, live games and your team, or only your team."] }),
+      until: "\"Getting the scores\" for a moment. Between seasons the last results or the first games, with \"Season over\" or \"Starts 17 Mar\"; \"No NRL games right now\" when there are none", build: "",
       ok: "Opens the round: every game with its score, live ones marked, and when the rest start", platforms: plat("works", "computer", "works", { web: "Works while the home computer is on (it runs Couch TV for this TV)." }), sizes: sz(["wtile", "small", "tall", "medium"], [4, 2]) },
     // Yahoo Finance's chart data (free, no key, unofficial), read through couch-tv itself (the launcher,
     // the on-TV app or the home computer's bridge: widget-web.js, /api/webdata), never a server of ours
     stocks: { name: "Markets", status: "works", beta: "Unofficial source: a free feed that may change. Couch TV can pause it for every TV, and then the widget says the feed is paused.", what: "Your watchlist: the ASX 200, the dollar and Bitcoin unless you pick others, each with today's move. ASX prices are about 20 minutes late",
       needs: ["Nothing on a Google TV, Android TV or Fire TV: Couch TV reads the prices itself", "On other TVs, the home computer, which reads the prices for the TV"],
       setup: setup("designer", {
-        android: ["Nothing to set up: it shows the ASX 200, the Australian dollar and Bitcoin.", "To pick your own, open your design in couch-tv Studio on your phone.", "Tap the widget, then type up to six share codes, like BHP.AX or CBA.AX for ASX shares.", SEND],
-        web: ["Keep the home computer on: it reads the prices for this TV.", "To pick your own, open your design in couch-tv Studio on your phone.", "Tap the widget, then type up to six share codes, like BHP.AX or CBA.AX for ASX shares.", SEND],
-        vidaa: ["Needs a home computer that stays on, running Couch TV. The website home cannot read share prices.", "To pick your own, open your design in couch-tv Studio on your phone.", "Tap the widget, then type up to six share codes, like BHP.AX.", SEND] }),
+        android: ["Nothing to set up: it shows the ASX 200, the Australian dollar and Bitcoin.", "On the TV: hold OK on the widget, then Edit on the TV (or Edit on your phone).", "Pick Shares and prices and type up to six codes with commas between, like BHP.AX, CBA.AX. Show the price turns the price on or off."],
+        web: ["Keep the home computer on: it reads the prices for this TV.", "On the TV: hold OK on the widget, then Edit on the TV (or Edit on your phone).", "Pick Shares and prices and type up to six codes with commas between, like BHP.AX, CBA.AX. Show the price turns the price on or off."],
+        vidaa: ["Needs a home computer that stays on, running Couch TV. The website home cannot read share prices.", "On the TV: hold OK on the widget, then Edit on the TV (or Edit on your phone).", "Pick Shares and prices and type up to six codes, like BHP.AX."] }),
       until: "\"Getting the prices\" for a moment. If they cannot be read, it says so and tries again in a few minutes", build: "",
       ok: "Opens the watchlist: each price, today's move and today's line", platforms: plat("works", "computer", "computer", { android: "Couch TV on the TV reads the prices: no computer needed.", vidaa: "Needs a home computer: the website home cannot read share prices." }), sizes: sz(["tile", "wtile", "small", "tall"], [2, 2]) },
     // OSRM's free route server with OpenStreetMap roads, asked by the TV itself: the usual drive, no live
@@ -432,7 +432,7 @@
     // couch-tv Studio's section of Home settings), never in a design
     commute: { name: "Commute", status: "setup", what: "The usual drive to work or school by road, and when to leave to arrive on time. No live traffic",
       needs: ["Your town, and where you drive to, set on the TV (never in the design)"],
-      setup: setup("tv", [OPEN, "Go down to Location and set your town, if it is not set yet.", "Go down to Designs, then Commute, Where to. Type the town or suburb you drive to and pick it.", "For when to leave: in couch-tv Studio on your phone, tap the widget and set the arrive by time, then send it again."]),
+      setup: setup("tv", [OPEN, "Go down to Location and set your town, if it is not set yet.", "On the TV: hold OK on the widget, then Edit on the TV (or Edit on your phone).", "Pick Where to: type the town or suburb you drive to and pick it. Leave from is your home's town unless you pick another.", "For when to leave: pick Arrive by and the minutes past the hour, then Minutes to spare and Weekdays only."]),
       until: "\"Set where you drive to\", and where", build: "",
       ok: "Opens the drive: how long, how far, and when to leave", platforms: plat("setup", "computer", "setup", { android: "The places are kept on the TV. Drive time without traffic.", web: "Works while the home computer is on. The places are kept on the TV." }), sizes: sz(["tile", "wtile", "small", "medium"], [2, 2]) },
 
@@ -607,17 +607,41 @@
       { domain: ["scene", "script"], many: true, max: 10, needs: HA, "private": true })],
     battery: [st("low", "Red below", "number", 20, "A charge under this shows in red, so you know to charge it.", "design", ALL, true, { min: 5, max: 50, step: 5 })],
     news: [st("feed", "News source", "choice", "auto", "Where the headlines come from. Best for your country picks ABC News in Australia, BBC World in the UK and RNZ in New Zealand.", "design", ALL, true,
-      { options: FEED_OPTS })],
+      { options: FEED_OPTS }),
+      st("count", "How many headlines", "choice", "auto", "As many as fit shows more on a bigger widget. 1 or 2 always show, their words sized to fit, except on a widget one row tall, which has room for one.", "design", ALL, true, { options: [["auto", "As many as fit"], [1, "1"], [2, "2"]] })],
     sports: [
       st("league", "Competition", "choice", "nrl", "Which games show here.", "design", ALL, true, { options: LEAGUE_OPTS }),
-      st("team", "Your team", "team", "", "Your team's game shows first. Pick from the teams in the competition.", "design", ALL, true, { league: "league" })
+      st("team", "Your team", "team", "", "Pick from the competition's teams. Cricket has no list: type the team's name and Couch TV checks it against the games it can see.", "design", ALL, true, { league: "league" }),
+      st("games", "Which games", "choice", "all", "Only my team needs your team picked above.", "design", ALL, true, { options: [["all", "Every game"], ["live", "Live games and my team"], ["mine", "Only my team"]] })
     ],
-    stocks: [st("tickers", "Shares and prices", "text", ["^AXJO", "AUDUSD=X", "BTC-AUD"], "Up to six. Pick one here, or type a share's code, like BHP.AX.", "design", ALL, true,
-      { many: true, max: 6, suggest: TICKER_OPTS })],
+    stocks: [st("tickers", "Shares and prices", "text", ["^AXJO", "AUDUSD=X", "BTC-AUD"], "Up to six, with commas between. A share's code like BHP.AX, ^AXJO for the ASX 200, AUDUSD=X for the dollar, BTC-AUD for Bitcoin.", "design", ALL, true,
+      { many: true, max: 6, suggest: TICKER_OPTS }),
+      st("price", "Show the price", "toggle", true, "Off shows only how much it moved today.", "design", ALL, true)],
     commute: [
       st("to", "Where to", "place", "", "The town or suburb you drive to. Kept in this TV's Home settings, never in a design.", "tv", ON_TV, true, { "private": true }),
       st("arrive_h", "Arrive by", "choice", "off", "Couch TV says when to leave to get there by then.", "design", ALL, true, { options: HOURS }),
-      st("arrive_m", "Minutes past the hour", "choice", 0, "For 8:30am, pick 8am above and 30 past the hour here.", "design", ALL, true, { options: MINUTES, when: { arrive_h: "set" } })
+      st("arrive_m", "Minutes past the hour", "choice", 0, "For 8:30am, pick 8am above and 30 past the hour here.", "design", ALL, true, { options: MINUTES, when: { arrive_h: "set" } }),
+      st("buffer", "Minutes to spare", "number", 10, "Added to the drive when Couch TV says when to leave.", "design", ALL, true, { min: 0, max: 60, step: 5, when: { arrive_h: "set" } }),
+      st("weekdays", "Weekdays only", "toggle", true, "Off works out when to leave on weekends too.", "design", ALL, true, { when: { arrive_h: "set" } }),
+      st("from", "Leave from", "place", "", "Empty leaves from this home's town. Kept in this TV's Home settings, never in a design.", "tv", ON_TV, true, { "private": true })
+    ],
+    quote: [
+      st("mood", "Kind of line", "choice", "all", "A new line each day, from the lines that come with Couch TV.", "design", ALL, true,
+        { options: [["all", "A mix"], ["calm", "Slow down"], ["go", "Get going"], ["home", "Home and family"]] }),
+      st("text", "Your own words", "text", "", "Shows instead of the line of the day. Empty goes back to the lines.", "design", ALL, true, { max: 120 }),
+      st("sub", "Who said it", "text", "", "Shows under your own words.", "design", ALL, true, { max: 80, when: { text: "set" } })
+    ],
+    word: [
+      st("lang", "Words in", "choice", "en", "Another language shows an everyday word, how to say it and what it means.", "design", ALL, true,
+        { options: [["en", "English"], ["es", "Spanish"], ["fr", "French"], ["it", "Italian"], ["de", "German"], ["ja", "Japanese"]] }),
+      st("meaning", "Show what it means", "toggle", true, "Off shows only the word and how to say it, or for English what kind of word it is.", "design", ALL, true)
+    ],
+    ask: [st("keep", "Show the last answer", "choice", "always", "No keeps your questions private: the widget always just invites the next one.", "design", ALL, true,
+      { options: [["always", "Until the next question"], ["hour", "For an hour"], ["never", "No"]] })],
+    agent: [
+      st("keep", "Show each message", "choice", "always", "After that the widget waits quietly for the next one.", "design", ALL, true,
+        { options: [["always", "Until the next one"], ["hour", "For an hour"], ["day", "For a day"]] }),
+      st("who", "Show who sent it", "toggle", true, "Off says From your AI instead of the agent's name.", "design", ALL, true)
     ],
     bins: [
       st("weekday", "Bin night", "choice", "none", "The night the bins go out.", "design", ALL, true, { options: [["none", "Not set yet"]].concat(DAYS) }),
@@ -652,14 +676,6 @@
     upnext: [st("apps", "Only from these apps", "apps", [], "None picked takes shows from any app.", "design", ALL, false)],
     dock: [st("more", "All apps at the end", "toggle", true, "", "design", ALL, false)],
     soundscape: [st("volume", "Volume", "number", 50, "", "tv", ON_TV, false, { min: 0, max: 100, step: 10 })],
-    news: [st("count", "How many headlines", "choice", "auto", "", "design", ALL, false, { options: [["auto", "As many as fit"], [1, "1"], [2, "2"], [3, "3"], [4, "4"]] })],
-    sports: [st("games", "Which games", "choice", "all", "", "design", ALL, false, { options: [["all", "Every game"], ["live", "Live games and my team"], ["mine", "Only my team"]] })],
-    stocks: [st("price", "Show the price", "toggle", true, "Off shows only how much it moved.", "design", ALL, false)],
-    commute: [
-      st("buffer", "Minutes to spare", "number", 10, "", "design", ALL, false, { min: 0, max: 60, step: 5 }),
-      st("weekdays", "Weekdays only", "toggle", true, "Off works out the drive for weekends too.", "design", ALL, false),
-      st("from", "Leave from", "place", "", "Empty leaves from this home's town. Kept in this TV's Home settings, never in a design.", "tv", ON_TV, false, { "private": true })
-    ]
   };
   Object.keys(LATER).forEach(function (k) { SETTINGS[k] = (SETTINGS[k] || []).concat(LATER[k]); });
   // the sun clock: its own town, before launch (widgets.js R.solar names it and works the sun out for it)

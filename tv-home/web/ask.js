@@ -382,6 +382,13 @@
   function labelRow(K, iconName, text) {
     return K.E("div", "cw-lab", "max-width:100%;flex:none", [K.ic(iconName, 30, "currentColor"), K.E("span", "cw-ell", "flex:0 1 auto;min-width:0;margin-right:0", [text])]);
   }
+  // the question over its answer: up to two lines, wrapping (a question longer than that is shortened
+  // at a word, never cut mid line); rows says how many lines it takes
+  function askRow(K, text, w) {
+    var f = fitWords(text, w - 40, 2 * 25 * 1.22, 25), per = Math.max(1, Math.floor((w - 40) / (f.fs * 0.58)));
+    return { rows: f.text.length > per * 0.82 ? 2 : 1, el: K.E("div", "cw-lab", "max-width:100%;flex:none;white-space:normal;overflow:visible;text-overflow:clip;align-items:flex-start", [K.ic("mic", 30, "currentColor"),
+      K.E("span", "", "flex:0 1 auto;min-width:0;margin-right:0;font-size:" + f.fs + "px;line-height:1.22;overflow-wrap:break-word", [f.text])]) };
+  }
   // the empty card, at the side the design picks (widgets.js empty() is always in the middle)
   function blank(K, root, o, b, iconName, line, sub) {
     var a = o && o.opts && o.opts.align;
@@ -390,15 +397,25 @@
     K.add(root, col(K, o, root, [K.ic(iconName, 40, "currentColor"), K.E("div", "cw-e1", "max-width:100%", [line]), sub && b.h >= 220 && b.w >= 300 ? K.E("div", "cw-e2", "max-width:100%", [sub]) : null]));
     return root;
   }
+  // this widget's own settings (widget-caps.js ask and agent): keep says how long the last answer or
+  // message shows ("always" until the next, "hour", "day", or "never": the question stays private)
+  function own(K, o, env, key, dflt) { var v = K.setting ? K.setting(o, env || {}, key) : undefined; return v === undefined || v === null || v === "" ? dflt : v; }
+  var KEEP_MS = { hour: 3600000, day: 86400000 };
+  function kept(K, o, env, at) {
+    var k = own(K, o, env, "keep", "always");
+    if (k === "never") return false;
+    return !KEEP_MS[k] || !at || Date.now() - at < KEEP_MS[k];
+  }
   function drawAsk(root, o, b, env) {
     var K = kit(); if (!K) return root;
     var v = env && env.demo ? DEMO_ASK : last, s = status(), tiny = b.w < 300 || b.h < 220;
+    if (v && !(env && env.demo) && !v.pending && !kept(K, o, env, v.at)) v = null;
     if (!(env && env.demo) && !s.ready) return blank(K, root, o, b, "mic", tiny ? "Set up Ask AI" : "Ask AI: pick who answers", "OK here sets it up, step by step");
     if (!v || !v.q) return blank(K, root, o, b, "mic", tiny ? "Ask AI" : "Ask anything", "Press OK, then type or say it. Or use Ask on the phone remote");
-    var a = v.pending ? "Thinking..." : v.err ? v.err : v.a, w = b.w - 48, by = b.h >= 300, h = b.h - 48 - 40 - 12 - (by ? 44 : 0);
+    var a = v.pending ? "Thinking..." : v.err ? v.err : v.a, w = b.w - 48, by = b.h >= 300, qr = askRow(K, v.q, w), h = b.h - 48 - 40 - (qr.rows - 1) * 31 - 12 - (by ? 44 : 0);
     if (b.w < 300) { var f0 = fitWords(a, w, b.h - 48, 34); K.add(root, col(K, o, root, [K.E("div", "", "font-size:" + f0.fs + "px;font-weight:650;line-height:1.2", [f0.text])])); return root; }
     var f = fitWords(a, w, h, 64);
-    K.add(root, col(K, o, root, [labelRow(K, "mic", v.q),
+    K.add(root, col(K, o, root, [qr.el,
       K.E("div", "", "max-width:100%;font-size:" + f.fs + "px;font-weight:680;line-height:1.2;margin-top:12px;letter-spacing:-.01em;overflow-wrap:break-word", [f.text]),
       by ? K.E("div", "cw-t23 cw-ell", "max-width:100%;margin-top:14px;color:var(--sub)", [v.pending ? "Asking " + (v.by || "your AI") : "Answered by " + (v.by || "your AI")]) : null]));
     return root;
@@ -406,6 +423,7 @@
   function drawAgent(root, o, b, env) {
     var K = kit(); if (!K) return root;
     var m = env && env.demo ? DEMO_MSG : message, tiny = b.w < 300 || b.h < 220;
+    if (m && !(env && env.demo) && !kept(K, o, env, m.at)) m = null;
     if (!m) {
       if (!home().on) return blank(K, root, o, b, "phone", tiny ? "Connect your AI" : "Connect your AI agent", "It needs the Couch TV app on this TV or a home computer. OK here shows how");
       return blank(K, root, o, b, "phone", tiny ? "No messages yet" : "Nothing from your AI yet", "OK here shows how to connect it");
@@ -413,7 +431,7 @@
     var w = b.w - 48;
     if (b.w < 300) { var f0 = fitWords(m.text, w, b.h - 48, 34); K.add(root, col(K, o, root, [K.E("div", "", "font-size:" + f0.fs + "px;font-weight:650;line-height:1.2", [f0.text])])); return root; }
     var f = fitWords(m.text, w, b.h - 48 - 40 - 10, 60);
-    K.add(root, col(K, o, root, [labelRow(K, "phone", "From " + m.from),
+    K.add(root, col(K, o, root, [labelRow(K, "phone", own(K, o, env, "who", true) === false ? "From your AI" : "From " + m.from),
       K.E("div", "", "max-width:100%;font-size:" + f.fs + "px;font-weight:680;line-height:1.2;margin-top:10px;overflow-wrap:break-word", [f.text])]));
     return root;
   }

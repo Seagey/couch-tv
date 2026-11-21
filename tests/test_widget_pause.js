@@ -20,6 +20,8 @@ ok(WW.pausedOf({ v: 1, paused: ["sports", "sports", "weather", "https://x", 3, n
 ok([null, undefined, "", "not json", 7, [], {}, { paused: "sports" }, { paused: {} }].every((x) => WW.pausedOf(x).length === 0), "no answer or a bad one: everything on");
 ok(WW.PAUSABLE.join() === "news,sports,stocks,commute", "every web source can be paused");
 
+// the requests for scores (each competition's team list is asked once besides, for the Your team picker)
+const sb = (t) => t.asked.filter((u) => !/\/standings$/.test(u));
 (async () => {
   // ---------------- 2. the loader ----------------
   const answer = () => K.json("espn-nba.json");
@@ -28,21 +30,21 @@ ok(WW.PAUSABLE.join() === "news,sports,stocks,commute", "every web source can be
   t.h.paused = () => paused;
   t.h.relay = () => Promise.resolve(K.fixture("rss-abc-top.xml"));
   await t.L.tick();
-  ok(t.asked.length === 0 && t.L.data().sports.nba.err === "paused", "a paused source is never asked; its widget is told");
+  ok(sb(t).length === 0 && t.L.data().sports.nba.err === "paused", "a paused source is never asked; its widget is told");
   ok(t.L.data().news.abc.ok, "the other sources carry on");
   const changes = t.changed;
   t.now += 10 * 60000; await t.L.tick();
-  ok(t.asked.length === 0 && t.changed === changes, "while paused: nothing asked, nothing drawn again");
+  ok(sb(t).length === 0 && t.changed === changes, "while paused: nothing asked, nothing drawn again");
   paused = [];
   t.now += 60000; await t.L.tick();
-  ok(t.asked.length === 1 && t.L.data().sports.nba.ok, "switched back on: asked straight away");
+  ok(t.asked.filter((u) => /scoreboard/.test(u)).length === 1 && t.L.data().sports.nba.ok, "switched back on: asked straight away");
   paused = ["sports"];
   t.now += 60000; await t.L.tick();
-  ok(t.asked.length === 1 && t.L.data().sports.nba.err === "paused", "paused again: the last scores make way for the paused state");
+  ok(sb(t).length === 1 && t.L.data().sports.nba.err === "paused", "paused again: the last scores make way for the paused state");
   const t2 = K.fakeTv(WW, { answer, now: NOW, widgets: [{ kind: "sports" }] });
   t2.h.paused = () => { throw new Error("broken"); };
   await t2.L.tick();
-  ok(t2.asked.length === 1, "a broken switch counts as everything on");
+  ok(sb(t2).length === 1, "a broken switch counts as everything on");
 
   // ---------------- 3. the widget, every size ----------------
   ["news", "sports", "stocks", "commute"].forEach((kind) => K.sizes(T.C, kind).forEach(([id, w, h]) => {

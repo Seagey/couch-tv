@@ -46,19 +46,23 @@ const live = JSON.parse(JSON.stringify(read("aleague").games)); live[1].state = 
 ok(WW.scoreOrder(live, "", NOW)[0].id === live[1].id, "a live game comes first");
 ok(WW.kickoff(Date.UTC(2026, 10, 18, 9, 40), NOW, false).length > 0 && /^Tomorrow /.test(WW.kickoff(NOW + 86400000, NOW)) && /^\d+ [A-Z][a-z]{2}$/.test(WW.kickoff(NOW + 30 * 86400000, NOW)), "start times in the TV's own time");
 
+// the requests for scores (each competition's team list is asked once besides, for the Your team picker)
+const sb = (t) => t.asked.filter((u) => !/\/standings$/.test(u));
 (async () => {
   // ---------------- 2. the loader: straight from the TV, no relay needed ----------------
   const answer = (src, url) => K.json(url.indexOf("rugby-league") >= 0 ? "espn-nrl.json" : url.indexOf("basketball") >= 0 ? "espn-nba.json" : "espn-afl.json");
   const t = K.fakeTv(WW, { answer, relay: false, now: NOW, widgets: [{ kind: "sports", opts: {} }, { kind: "sports", opts: { league: "nba", team: "Knicks" } }, { kind: "sports", opts: { league: "nrl" } }] });
   await t.L.tick();
-  ok(t.asked.length === 2 && t.asked.every((u) => /^https:\/\/site\.api\.espn\.com\//.test(u)), "one request per league, straight to ESPN, even with no relay (" + t.asked.length + ")");
+  const boards = t.asked.filter((u) => /scoreboard/.test(u)), lists = t.asked.filter((u) => /\/standings$/.test(u));
+  ok(boards.length === 2 && t.asked.every((u) => /^https:\/\/site\.api\.espn\.com\//.test(u)), "one scoreboard request per league, straight to ESPN, even with no relay (" + sb(t).length + ")");
+  ok(lists.length === 2 && boards.length + lists.length === t.asked.length, "and each competition's team list once, from its ladder, for the Your team picker (" + lists.join(", ") + ")");
   ok(t.L.data().sports.nrl.ok && t.L.data().sports.nba.v.games.length === 5, "the games are kept");
   t.now += 10 * 60000; await t.L.tick();
-  ok(t.asked.length === 2, "nothing live: not asked again within 15 minutes");
+  ok(sb(t).length === 2, "nothing live: not asked again within 15 minutes");
   // a game on now: every 2 minutes
   const rec = t.L.data().sports.nba; rec.v.games[0].state = "in";
   t.now += 3 * 60000; await t.L.tick();
-  ok(t.asked.filter((u) => /nba/.test(u)).length === 2 && t.asked.filter((u) => /rugby/.test(u)).length === 1, "a live game: that league is asked again after 2 minutes, the other is not");
+  ok(sb(t).filter((u) => /nba/.test(u)).length === 2 && sb(t).filter((u) => /rugby/.test(u)).length === 1, "a live game: that league is asked again after 2 minutes, the other is not");
 
   // ---------------- 3. the widget at every size ----------------
   const games = read("nba");
@@ -85,7 +89,7 @@ ok(WW.kickoff(Date.UTC(2026, 10, 18, 9, 40), NOW, false).length > 0 && /^Tomorro
   const pre = { ok: true, at: NOW, v: read("afl") };
   ok(!/AM EDT/.test(T.W.render({ kind: "sports", w: 360, h: 360, opts: { league: "afl" } }, { data: { web: { sports: { afl: pre } } } }).textContent), "a game not started says when in the TV's own time, not ESPN's");
   const none = T.W.render({ kind: "sports", w: 360, h: 360, opts: { league: "nba" } }, env({ ok: true, at: NOW, v: { league: "NBA", round: "", games: [] } }));
-  ok(none.getAttribute("data-empty") === "1" && /No NBA games this week/.test(none.textContent), "between seasons: says there are no games");
+  ok(none.getAttribute("data-empty") === "1" && /No NBA games right now/.test(none.textContent), "between seasons: says there are no games");
   [[undefined, "Getting the scores", "Getting scores"], [{ ok: false, err: "failed", at: 1 }, "could not be read", "Scores failed"]].forEach(([r, long, short]) => K.sizes(T.C, "sports").forEach(([id, w, h]) => {
     const el = T.W.render({ kind: "sports", w, h }, env(r)), says = w < 300 || h < 200 ? short : long;
     ok(el.getAttribute("data-empty") === "1" && el.textContent.indexOf(says) >= 0, "sports " + id + ": " + says);
