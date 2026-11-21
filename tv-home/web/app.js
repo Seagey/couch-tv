@@ -5828,6 +5828,7 @@
       renderSettings();
       return;
     }
+    var hadConfirm = SET.confirm;
     SET.confirm = null;
     if (SET.col === "secs") {
       if (dy) {
@@ -5844,13 +5845,36 @@
         SET.peek = dy;   // renderSettings scrolls, after it has rebuilt the list
         SET.peeks = (SET.peeks || 0) + 1;   // so the press does not also go round to the other end
       }
+      var from = SET.ri;
       SET.ri = to;
       SET.keyFocus = rows[SET.ri] ? rows[SET.ri].key : null;
+      if (to !== from && !hadConfirm && !SET.peek && moveFocusInPlace(rows, from, to)) return;
     } else if (dx && rows[SET.ri] && rows[SET.ri].adjust) {
       rows[SET.ri].adjust(document.documentElement.dir === "rtl" ? -dx : dx);
       SET.keyFocus = rows[SET.ri].key;
     } else if (dx < 0) leaveRows();
     renderSettings();
+  }
+  // Up or Down inside the same list only moves the focus: move the "focus" class from one row to
+  // the other and scroll, instead of rebuilding every row. A full rebuild cost 80 to 190 ms a press
+  // on an LG OLED65CX (webOS 5, 2020), with every app icon in the Apps list made again, so presses
+  // landed late and the labels jumped; the home's own rows take 20 to 40 ms there. Anything that
+  // changes a row's text (a confirm, a lifted row, another page) still goes through renderSettings.
+  function moveFocusInPlace(rows, from, to) {
+    var box = $("set-rows");
+    if (!box || SET.col !== "rows" || SET.lift || SET.typing || box.children.length !== rows.length) return false;
+    var a = box.children[from], b = box.children[to];
+    if (!b || !/\bsrow\b/.test(b.className) || !focusable(rows[to])) return false;
+    if (a) a.classList.remove("focus");
+    b.classList.add("focus");
+    SET.peeked = null;
+    var cur = rows[to];
+    $("set-hint").textContent = cur && cur.move ? t("hint_rows_move") : cur && cur.adjust ? t("hint_slider") : t("hint_rows");
+    // the same "a quarter of the list from either edge" rule as renderSettings
+    var top = b.offsetTop, bottom = top + b.offsetHeight, view = box.clientHeight, edge = view / 4;
+    if (top - edge < box.scrollTop) box.scrollTop = Math.max(0, top - edge);
+    else if (bottom + edge > box.scrollTop + view) box.scrollTop = bottom + edge - view;
+    return true;
   }
   function setActivate() {
     if (SET.lift) { dropRow(); return; }
