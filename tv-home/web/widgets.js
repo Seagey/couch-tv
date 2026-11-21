@@ -453,17 +453,22 @@
 
   // ---------------- time ----------------
   function now() { return new Date(); }
-  function clockParts(d, o, env) {
+  // secs: the seconds after the minutes (the digital clock's Show seconds)
+  function clockParts(d, o, env, secs) {
     var f = (o.opts || {}).format, h24 = f === "24h" ? true : f === "12h" ? false : !!env.clock24;
-    var hh = d.getHours(), mm = d.getMinutes(), m2 = (mm < 10 ? "0" : "") + mm;
-    return h24 ? { t: (hh < 10 ? "0" : "") + hh + ":" + m2, ap: "" } : { t: (hh % 12 || 12) + ":" + m2, ap: hh < 12 ? "am" : "pm" };
+    var hh = d.getHours(), mm = d.getMinutes(), m2 = (mm < 10 ? "0" : "") + mm, ss = d.getSeconds(), s2 = secs ? ":" + (ss < 10 ? "0" : "") + ss : "";
+    return h24 ? { t: (hh < 10 ? "0" : "") + hh + ":" + m2 + s2, ap: "" } : { t: (hh % 12 || 12) + ":" + m2 + s2, ap: hh < 12 ? "am" : "pm" };
   }
   function longDate(d) { return DAYS[d.getDay()] + " " + d.getDate() + " " + MONTHS[d.getMonth()]; }
   function shortDate(d) { return DAYS[d.getDay()].slice(0, 3) + " " + d.getDate() + " " + MONTHS[d.getMonth()].slice(0, 3); }
   function partOfDay(d) { var h = d.getHours(); return h < 5 ? "night" : h < 12 ? "morning" : h < 17 ? "afternoon" : h < 21 ? "evening" : "night"; }
   var NUMW = ["twelve", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten", "eleven", "twelve"];
-  function timeWords(d) {
-    var h = d.getHours(), m = Math.round(d.getMinutes() / 5) * 5;
+  // the minutes in words, 1 to 29 ("twenty two"), for the word clock to the minute
+  var ONES = ["", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten", "eleven", "twelve", "thirteen", "fourteen", "fifteen", "sixteen", "seventeen", "eighteen", "nineteen"];
+  function minWords(m) { return m < 20 ? ONES[m] : "twenty" + (m > 20 ? " " + ONES[m - 20] : ""); }
+  // precise: to the minute ("Twenty two past seven"); otherwise to the nearest five minutes
+  function timeWords(d, precise) {
+    var h = d.getHours(), m = precise ? d.getMinutes() : Math.round(d.getMinutes() / 5) * 5;
     if (m === 60) { m = 0; h++; }
     var hr = function (x) { return NUMW[x % 12 === 0 ? 12 : x % 12]; };
     var t;
@@ -471,8 +476,8 @@
     else if (m === 15) t = "quarter past\n" + hr(h);
     else if (m === 30) t = "half past\n" + hr(h);
     else if (m === 45) t = "quarter to\n" + hr(h + 1);
-    else if (m < 30) t = ({ 5: "five", 10: "ten", 20: "twenty", 25: "twenty five" })[m] + " past\n" + hr(h);
-    else t = ({ 35: "twenty five", 40: "twenty", 50: "ten", 55: "five" })[m] + " to\n" + hr(h + 1);
+    else if (m < 30) t = minWords(m) + (m === 1 ? " minute" : m % 5 ? " minutes" : "") + " past\n" + hr(h);
+    else t = minWords(60 - m) + (m === 59 ? " minute" : (60 - m) % 5 ? " minutes" : "") + " to\n" + hr(h + 1);
     return t.charAt(0).toUpperCase() + t.slice(1);
   }
   // the moon's age in days from a known new moon (6 Jan 2000 18:14 UTC), and its name
@@ -702,14 +707,15 @@
 
   // clocks
   R.clock = function (root, o, b, env) {
-    var p = clockParts(now(), o, env), sub = op(o).date !== false && b.h >= 200, shortD = b.w < 420;
-    var align = op(o).align || "center", showAp = op(o).ampm !== false && p.ap && b.w >= 300;
+    var secs = setting(o, env, "seconds") === true;
+    var p = clockParts(now(), o, env, secs), sub = setting(o, env, "date") !== false && b.h >= 200, shortD = b.w < 420;
+    var align = op(o).align || "center", showAp = setting(o, env, "ampm") !== false && p.ap && b.w >= 300;
     var fs = Math.min((b.h - (sub ? 60 : 0)) * 0.75, b.w / (p.t.length * 0.62 + (showAp ? 0.6 : 0)), 240);
     var tEl = E("span", "", "", [p.t]), aEl = showAp ? E("span", "", "font-size:" + px(Math.max(24, fs * 0.3)) + ";letter-spacing:0;margin-left:.12em;font-weight:600;opacity:.8", [p.ap]) : null;
     var big = E("div", "cw-big", "font-size:" + px(fs) + ";font-weight:640;text-align:" + align + (root.classList.contains("cw-bare") ? ";text-shadow:0 4px 30px rgba(0,0,0,.25)" : ""), [tEl, aEl]);
     var dEl = sub ? E("div", "cw-t29 cw-dim", "margin-top:" + px(Math.max(14, fs * 0.12)) + ";text-align:" + align + (root.classList.contains("cw-bare") ? ";text-shadow:0 2px 14px rgba(0,0,0,.3)" : ""), [shortD ? shortDate(now()) : longDate(now())]) : null;
     add(root, E("div", "cw-col cw-center", "height:100%;align-items:" + (align === "left" ? "flex-start" : align === "right" ? "flex-end" : "center"), [big, dEl]));
-    live(root, 1000, function () { var q = clockParts(now(), o, env); tEl.textContent = q.t; if (aEl) aEl.textContent = q.ap; if (dEl) dEl.textContent = shortD ? shortDate(now()) : longDate(now()); });
+    live(root, 1000, function () { var q = clockParts(now(), o, env, secs); tEl.textContent = q.t; if (aEl) aEl.textContent = q.ap; if (dEl) dEl.textContent = shortD ? shortDate(now()) : longDate(now()); });
   };
   // the tall digits (Antonio, line height .82): their ink runs from .05em to .93em of the line, so the
   // box grows .12em at the bottom (and a little at the top) to hold them whole, and the size comes from
@@ -720,13 +726,17 @@
   }
   var TALL = "font-family:Antonio,'Arial Narrow',sans-serif;font-weight:300;line-height:.82;padding:.03em 0 .13em;letter-spacing:-.02em;white-space:nowrap;flex:none;";
   R.tallclock = function (root, o, b, env) {
-    var p = clockParts(now(), o, env), fs = tallFs(root, b, p.t.length), al = op(o).align || "center";
+    var al = setting(o, env, "align"), p = clockParts(now(), o, env), fs = tallFs(root, b, p.t.length);
+    if (["left", "center", "right"].indexOf(al) < 0) al = "center";
     var tEl = E("div", "", TALL + "font-size:" + px(fs) + ";text-align:" + al + ";text-shadow:0 6px 40px rgba(0,0,0,.25)", [p.t]);
     add(root, E("div", "cw-col", "height:100%;justify-content:center;align-items:" + (al === "left" ? "flex-start" : al === "right" ? "flex-end" : "center"), [tEl]));
     live(root, 1000, function () { tEl.textContent = clockParts(now(), o, env).t; });
   };
+  var GLASS = ["night", "fog", "golden", "dawn", "water"];
   R.glassclock = function (root, o, b, env) {
-    var p = clockParts(now(), o, env), fs = tallFs(root, b, p.t.length), sc = op(o).scene || (dataOf(env).scene) || "night";
+    // Glass from: a scene picked for this widget, else the home's scene now
+    var pick = setting(o, env, "scene"), sc = GLASS.indexOf(pick) >= 0 ? pick : GLASS.indexOf(dataOf(env).scene) >= 0 ? dataOf(env).scene : "night";
+    var p = clockParts(now(), o, env), fs = tallFs(root, b, p.t.length);
     var tEl = E("div", "", TALL + "font-size:" + px(fs) + ";text-align:center;" +
       "color:rgba(255,255,255,.88);background-image:url(" + CW.base + "backgrounds/scene-" + sc + "-glass.jpg);background-size:1920px 1080px;-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;" +
       "filter:drop-shadow(0 8px 30px rgba(0,0,0,.25))", [p.t]);
@@ -740,10 +750,17 @@
     var hH = S("line", { x1: 50, y1: 50, x2: 50, y2: 25, stroke: ink, "stroke-width": 4.4, "stroke-linecap": "round" });
     var mH = S("line", { x1: 50, y1: 50, x2: 50, y2: 12, stroke: ink, "stroke-width": 3, "stroke-linecap": "round" });
     var sH = S("line", { x1: 50, y1: 58, x2: 50, y2: 10, stroke: hand, "stroke-width": 1.2, "stroke-linecap": "round" });
+    // the widget's own settings: the second hand (on unless turned off), the numbers 12, 3, 6 and 9
+    var secHand = setting(o, env, "seconds") !== false, nums = setting(o, env, "numbers") === true;
+    if (nums) [[12, 50, 22], [3, 80, 53.5], [6, 50, 85], [9, 20, 53.5]].forEach(function (n) {
+      var tx = S("text", { x: n[1], y: n[2], fill: ink, "font-size": 11, "font-weight": 650, "text-anchor": "middle", "font-family": "Inter, sans-serif" });
+      tx.textContent = String(n[0]); tx.setAttribute("data-num", String(n[0])); ticks.push(tx);
+    });
     var set = function () { var t = now(), h = t.getHours() % 12, m = t.getMinutes(), sec = t.getSeconds(); hH.setAttribute("transform", "rotate(" + (h * 30 + m / 2) + " 50 50)"); mH.setAttribute("transform", "rotate(" + m * 6 + " 50 50)"); sH.setAttribute("transform", "rotate(" + sec * 6 + " 50 50)"); };
     set();
-    add(root, E("div", "cw-grow cw-row cw-center", "", [svg("0 0 100 100", s, s, ticks.concat([hH, mH, sH, S("circle", { cx: 50, cy: 50, r: 2.6, fill: hand })]))]));
-    live(root, 1000, set);
+    sH.setAttribute("data-hand", "seconds");
+    add(root, E("div", "cw-grow cw-row cw-center", "", [svg("0 0 100 100", s, s, ticks.concat([hH, mH, secHand ? sH : null, S("circle", { cx: 50, cy: 50, r: 2.6, fill: hand })]))]));
+    live(root, secHand ? 1000 : 15000, set);
     void d;
   };
   R.flipclock = function (root, o, b, env) {
@@ -753,13 +770,16 @@
     var set = function () { var t = clockParts(now(), o, env).t.replace(":", ""); if (t.length === 3) t = "0" + t; for (var i = 0; i < 4; i++) cards[i].textContent = t.charAt(i); };
     set(); live(root, 1000, set);
   };
-  R.wordclock = function (root, o, b) {
-    var tw = timeWords(now()), tl = tw.split("\n"), longest = Math.max.apply(null, tl.map(function (l) { return l.length; }));
-    var fs = clamp(Math.min((b.w - 48) / (longest * 0.56), (b.h - 120) / (tl.length * 1.06)), 36, 130);
-    var w = E("div", "", "font-size:" + px(fs) + ";font-weight:780;line-height:1.02;letter-spacing:-.03em;white-space:pre-line", [timeWords(now())]);
-    var s = E("div", "cw-t29 cw-dim", "margin-top:18px", [DAYS[now().getDay()] + " " + partOfDay(now())]);
+  // the widget's own settings: To the minute (precise) and Show the day (dayline)
+  R.wordclock = function (root, o, b, env) {
+    var precise = setting(o, env, "precise") === true, dayline = setting(o, env, "dayline") !== false;
+    // the longest the words get, so the size holds as the minutes change
+    var tw = precise ? "Twenty seven minutes past\neleven" : timeWords(now()), tl = tw.split("\n"), longest = Math.max.apply(null, tl.map(function (l) { return l.length; }));
+    var fs = clamp(Math.min((b.w - 48) / (longest * 0.56), (b.h - (dayline ? 120 : 48)) / (tl.length * 1.06)), 36, 130);
+    var w = E("div", "", "font-size:" + px(fs) + ";font-weight:780;line-height:1.02;letter-spacing:-.03em;white-space:pre-line", [timeWords(now(), precise)]);
+    var s = dayline ? E("div", "cw-t29 cw-dim", "margin-top:18px", [DAYS[now().getDay()] + " " + partOfDay(now())]) : null;
     add(root, E("div", "cw-grow cw-col", "justify-content:center", [w, s]));
-    live(root, 15000, function () { w.textContent = timeWords(now()); s.textContent = DAYS[now().getDay()] + " " + partOfDay(now()); });
+    live(root, precise ? 5000 : 15000, function () { w.textContent = timeWords(now(), precise); if (s) s.textContent = DAYS[now().getDay()] + " " + partOfDay(now()); });
   };
   function arc(f) {
     f = clamp(f, 0, 1);
@@ -800,36 +820,54 @@
       return m ? { h: +m[1] % 12 + (/p/i.test(m[3]) ? 12 : 0), m: +m[2], t: m[1] + ":" + m[2] + m[3].toLowerCase() } : null;
     } catch (e) { return null; }
   }
+  // a city's time as the world clock shows it: 12 hour ("7:05pm") or 24 hour ("19:05")
+  function tzShow(t, h24) { return !t ? "" : h24 ? (t.h < 10 ? "0" : "") + t.h + ":" + (t.m < 10 ? "0" : "") + t.m : t.t; }
+  // the world clock's own settings: its cities (time zones that exist, else this TV's own town first,
+  // then London, New York and Tokyo), 12 or 24 hour, its heading
+  function worldOf(o, env, n) {
+    var here = ""; try { here = Intl.DateTimeFormat().resolvedOptions().timeZone; } catch (e) {}
+    var set = setting(o, env, "cities"), f = setting(o, env, "format");
+    var own = (Object.prototype.toString.call(set) === "[object Array]" ? set : []).filter(function (tz) { return typeof tz === "string" && /^[A-Za-z_]+(\/[A-Za-z_-]+){1,2}$/.test(tz) && !!tzTime(tz); }).slice(0, 4);
+    var town = (dataOf(env || {}).place || {}).name || "";
+    return { here: here, cities: own.length ? own : homeCities(here, n), h24: f === "24h" ? true : f === "12h" ? false : !!(env && env.clock24),
+      name: function (tz) { return tz === here && town ? town : CITY[tz] || tz.split("/").pop().replace(/_/g, " "); } };
+  }
   // the cities a world clock shows when its design picked none: here first, then London, New York, Tokyo
   function homeCities(here, n) {
     var l = here ? [here] : [];
     ["Europe/London", "America/New_York", "Asia/Tokyo", "Australia/Sydney"].forEach(function (z) { if (l.indexOf(z) < 0) l.push(z); });
     return l.slice(0, n);
   }
-  R.worldclock = function (root, o, b) {
+  R.worldclock = function (root, o, b, env) {
     // the TV's own time zone is called by its own town (the place set for the weather), not the zone's city
-    var here = ""; try { here = Intl.DateTimeFormat().resolvedOptions().timeZone; } catch (e) {}
-    var own = (Object.prototype.toString.call(op(o).cities) === "[object Array]" ? op(o).cities : []).filter(function (tz) { return typeof tz === "string" && !!tzTime(tz); });
-    var cities = (own.length ? own : homeCities(here, 4)).slice(0, b.w > b.h * 1.6 ? 4 : Math.max(2, Math.floor((b.h - 90) / 90)));
-    var town = (dataOf(arguments[3] || {}).place || {}).name || "";
-    var name = function (tz) { return tz === here && town ? town : CITY[tz] || tz.split("/").pop().replace(/_/g, " "); };
-    if (b.w > b.h * 1.6) {
-      var faces = cities.map(function (tz) {
-        var t = tzTime(tz) || { h: 0, m: 0 }, s = Math.min(b.h - 110, 170, (b.w - 48) / cities.length - 16), night = t.h >= 18 || t.h < 6, fg = night ? "#fff" : "#111";
-        return E("div", "cw-col", "align-items:center;min-width:0;flex:0 1 " + px((b.w - 48) / cities.length), [svg("0 0 100 100", s, s, [S("circle", { cx: 50, cy: 50, r: 48, fill: night ? "#1c1c1f" : "#f4f4f2" }),
-          S("line", { x1: 50, y1: 50, x2: 50, y2: 27, stroke: fg, "stroke-width": 5, "stroke-linecap": "round", transform: "rotate(" + ((t.h % 12) * 30 + t.m / 2) + " 50 50)" }),
-          S("line", { x1: 50, y1: 50, x2: 50, y2: 13, stroke: fg, "stroke-width": 3.4, "stroke-linecap": "round", transform: "rotate(" + t.m * 6 + " 50 50)" }),
-          S("circle", { cx: 50, cy: 50, r: 3.5, fill: "#ff9f0a" })]), E("div", "cw-t25 cw-ell", "color:var(--ink);font-weight:650;margin-top:10px;max-width:100%;text-align:center", [name(tz)])]);
-      });
-      add(root, E("div", "cw-row", "justify-content:space-around;height:100%", faces));
-      live(root, 30000, function () { while (root.lastChild && root.lastChild.className !== "cw-bg") root.removeChild(root.lastChild); R.worldclock(root, o, b); });
-      return;
-    }
-    // the cities spread from under the label to the bottom, so the whole sits in the middle
-    add(root, [lab("clock", op(o).label || "World clock"), E("div", "cw-col cw-grow", "justify-content:space-between;margin-top:18px", cities.map(function (tz) {
-      var t = tzTime(tz);
-      return E("div", "cw-row cw-sp", "", [E("div", "cw-t29 cw-ell", "min-width:0", [name(tz)]), E("div", "cw-t38", "flex:none;margin-left:12px", [t ? t.t : ""])]);
-    }))]);
+    var wc = worldOf(o, env, 4), name = wc.name, wide = b.w > b.h * 1.6;
+    var cities = wc.cities.slice(0, wide ? 4 : Math.max(2, Math.floor((b.h - 90) / 90)));
+    var heading = setting(o, env, "label"), ownHead = typeof heading === "string" && !!heading.trim();
+    heading = ownHead ? heading.trim().slice(0, 40) : "World clock";
+    var draw = function () {
+      while (root.lastChild && root.lastChild.className !== "cw-bg") root.removeChild(root.lastChild);
+      if (wide) {
+        // a face each, the city and its time under it (12 or 24 hour as set); a heading of its own above them
+        var hd = ownHead ? fitLab(root, "clock", heading, b.w - 48) : null, fw = (b.w - 48) / cities.length - 16;
+        var faces = cities.map(function (tz) {
+          var t = tzTime(tz) || { h: 0, m: 0 }, s = Math.min(b.h - (hd ? 200 : 150), 170, fw), night = t.h >= 18 || t.h < 6, fg = night ? "#fff" : "#111";
+          return E("div", "cw-col", "align-items:center;min-width:0;flex:0 1 " + px((b.w - 48) / cities.length), [svg("0 0 100 100", s, s, [S("circle", { cx: 50, cy: 50, r: 48, fill: night ? "#1c1c1f" : "#f4f4f2" }),
+            S("line", { x1: 50, y1: 50, x2: 50, y2: 27, stroke: fg, "stroke-width": 5, "stroke-linecap": "round", transform: "rotate(" + ((t.h % 12) * 30 + t.m / 2) + " 50 50)" }),
+            S("line", { x1: 50, y1: 50, x2: 50, y2: 13, stroke: fg, "stroke-width": 3.4, "stroke-linecap": "round", transform: "rotate(" + t.m * 6 + " 50 50)" }),
+            S("circle", { cx: 50, cy: 50, r: 3.5, fill: "#ff9f0a" })]), fitWords(root, name(tz), fw, 25, 1, 650, "color:var(--ink);margin-top:10px;text-align:center"),
+            E("div", "cw-t23", "max-width:100%;text-align:center;white-space:nowrap", [tzShow(tzTime(tz), wc.h24)])]);
+        });
+        add(root, hd ? [hd, E("div", "cw-row cw-grow", "justify-content:space-around;margin-top:10px", faces)] : E("div", "cw-row", "justify-content:space-around;height:100%", faces));
+        return;
+      }
+      // the cities spread from under the heading to the bottom, so the whole sits in the middle
+      add(root, [lab("clock", heading), E("div", "cw-col cw-grow", "justify-content:space-between;margin-top:18px", cities.map(function (tz) {
+        var t = tzTime(tz), tm = tzShow(t, wc.h24), room = b.w - 48 - 12 - tm.length * 38 * 0.6;
+        return E("div", "cw-row cw-sp", "", [fitWords(root, name(tz), room, 29, 1, 600) || fitWords(root, name(tz), room, 24, 2, 600) || E("div", "", "", []), E("div", "cw-t38", "flex:none;margin-left:12px;white-space:nowrap", [tm])]);
+      }))]);
+    };
+    draw();
+    live(root, 30000, draw);
   };
   function daysTo(month, day, year) {
     var t = now(), y = t.getFullYear(), today = new Date(y, t.getMonth(), t.getDate()), target = new Date(y, month - 1, day);
@@ -840,21 +878,47 @@
   var STARTER_DAYS = { christmas: "12/25", "christmas day": "12/25", "new year": "1/1", "new year's day": "1/1", "new years day": "1/1", "australia day": "1/26", halloween: "10/31", "valentine's day": "2/14" };
   R.countdown = function (root, o, b) {
     var q = op(o), month = +q.month || 12, day = +q.day || 25, yr = q.year === undefined || q.year === "every" ? NaN : +q.year, n = daysTo(month, day, yr), unit = q.unit || "sleeps";
-    var label = q.label || (month === 12 && day === 25 ? "Christmas" : "The big day");
+    // no name: Christmas on 25 December, else the date itself (25 January), which says what it counts to
+    var label = q.label || (month === 12 && day === 25 ? "Christmas" : day + " " + MONTHS[month - 1]);
     // a starter name kept after the date changed: the date itself, never "Christmas" over 3 March
     if ((tvSet(o, null, "day") !== undefined || tvSet(o, null, "month") !== undefined) && tvSet(o, null, "label") === undefined && STARTER_DAYS[String(label).toLowerCase()] && STARTER_DAYS[String(label).toLowerCase()] !== month + "/" + day) label = day + " " + MONTHS[month - 1];
     var num = unit === "weeks" ? Math.round(n / 7) : n;
     var gone = n < 0;
     if (gone) n = -n;
     var u = gone ? "It has been and gone" : n === 0 ? "It's today!" : unit === "weeks" ? (num === 1 ? "week to go" : "weeks to go") : unit === "days" ? (n === 1 ? "day to go" : "days to go") : (n === 1 ? "sleep to go" : "sleeps to go");
-    var tiny = b.h < 200, fs = clamp(Math.min((b.h - (tiny ? 84 : 110)) * 0.95, (b.w - 48) / (String(num).length * 0.62)), 44, 200);
-    add(root, [b.w < 300 ? E("div", "cw-t23 cw-ell", "font-weight:700;color:var(--sub)", [label]) : lab(q.icon || "calendar", label, "rgba(255,255,255,.9)"), E("div", "cw-grow"), n === 0 || gone ? null : E("div", "cw-big", "font-size:" + px(fs), [String(num)]), tiny && n && !gone ? null : E("div", "cw-t29 cw-ell", "font-weight:650", [u])]);
+    var tiny = b.h < 200, small = b.w < 300, inW = b.w - (small ? 28 : 48);
+    if (small) root.style.padding = "14px";
+    // the name whole: one line, else two, else left out (the number still says it all)
+    var one = fitPxText(label, small ? inW : inW - 40, 25, 1, 700, famOf(root)), nameH = 32, nm;
+    if (small) {
+      // one line, else two, else three; a name that still cannot fit gives way to the date (25 Dec)
+      nm = fitWords(root, label, inW, 25, 1, 700, "color:var(--sub)");
+      if (!nm) { nm = fitWords(root, label, inW, 24, 2, 700, "color:var(--sub)"); nameH = 60; }
+      if (!nm) { nm = fitWords(root, label, inW, 23, 3, 700, "color:var(--sub)"); nameH = 86; }
+      if (!nm) { nm = fitWords(root, day + " " + MONTHS[month - 1].slice(0, 3), inW, 25, 1, 700, "color:var(--sub)"); nameH = 32; }
+    } else { nm = fitLab(root, q.icon || "calendar", label, inW); nameH = one ? 32 : 60; }
+    if (!nm) nameH = 0;
+    var uH = tiny && n && !gone ? 0 : 36;
+    var fs = clamp(Math.min((b.h - (small ? 28 : 48) - nameH - uH - 8) * 0.95, inW / (String(num).length * 0.62)), 30, 200);
+    var uEl = tiny && n && !gone ? null : fitWords(root, u, inW, 29, 1, 650) || fitWords(root, u, inW, 23, 2, 650);
+    add(root, [nm, E("div", "cw-grow"), n === 0 || gone ? null : E("div", "cw-big", "font-size:" + px(fs), [String(num)]), uEl]);
     var lb = root.querySelector(".cw-lab"); if (lb && root.classList.contains("cw-tint")) lb.style.color = "var(--sub)";
   };
+  // the Date widget's Date style (dfmt): the home's language orders the numbers (20/11/2026 or 11/20/2026)
+  var DFMT = { short: null, numeric: { day: "numeric", month: "numeric", year: "numeric" }, weekday: { weekday: "long" }, day_month: { day: "numeric", month: "long" },
+    full: { weekday: "long", day: "numeric", month: "long", year: "numeric" } };
+  function dateWords(d, fmt, narrow) {
+    if (!DFMT.hasOwnProperty(fmt)) return narrow ? shortDate(d) : longDate(d);
+    if (fmt === "short") return shortDate(d);
+    var loc = "en-AU"; try { if (window.I18N && window.I18N.locale) loc = window.I18N.locale() || loc; } catch (e) {}
+    try { return d.toLocaleDateString(loc, DFMT[fmt]).replace(/,/g, ""); } catch (e) { return longDate(d); }
+  }
   R.date = function (root, o, b, env) {
-    var q = op(o), show = q.show || "date", d = now(), w = weather(env, o), short = b.w < 560 || q.dfmt === "short";
-    var dText = short ? shortDate(d) : longDate(d);
-    var wText = w ? w.temp + "°" + (show === "both" && b.h >= 120 ? (w.code !== undefined ? " and " + wxWords(w.code).toLowerCase() : "") : (b.w >= 600 && q.place !== false && w.place ? " " + w.place : "") + (b.w >= 760 && w.code !== undefined ? ", " + wxWords(w.code).toLowerCase() : "")) : "";
+    // the widget's own settings: what it shows, the date style, the town beside the weather
+    var q = op(o), show = setting(o, env, "show"), d = now(), w = weather(env, o), place = setting(o, env, "place") !== false;
+    if (["date", "weather", "both"].indexOf(show) < 0) show = "date";
+    var dText = dateWords(d, setting(o, env, "dfmt"), b.w < 560);
+    var wText = w ? w.temp + "°" + (show === "both" && b.h >= 120 ? (w.code !== undefined ? " and " + wxWords(w.code).toLowerCase() : "") : ((b.w >= 600 || b.h >= 300) && place && w.place ? " " + w.place : "") + ((b.w >= 760 || b.h >= 300) && w.code !== undefined ? ", " + wxWords(w.code).toLowerCase() : "")) : "";
     var big = b.h >= 160, fs = big ? clamp(b.h / 3.4, 34, 72) : clamp(b.h * 0.6, 26, 40), align = q.align || "center";
     var lines = [];
     if (show === "both" && w && b.h < 120) lines.push(dText + ". " + wText);
@@ -862,17 +926,22 @@
       if (show !== "weather") lines.push(dText);
       if (show !== "date" && w) lines.push(wText);
       if (show === "weather" && !w) lines.push("Set your town for the weather");
+      else if (show === "both" && !w && b.h >= 120) lines.push(b.w < 300 ? "Set your town" : "Set your town for the weather");
     }
     var bare = root.classList.contains("cw-bare");
     add(root, E("div", "cw-col", "height:100%;justify-content:center;text-align:" + align + (bare ? ";text-shadow:0 2px 18px rgba(0,0,0,.35)" : ""), lines.map(function (l, i) {
       // as big as the line fits across (Inter is about .56em a letter), else on two lines at 24 px
       var want = i ? Math.max(24, fs * 0.66) : fs, fit = (b.w - 48) / (l.length * 0.56), f = Math.max(24, Math.min(want, fit)), wrap = fit < 24 && b.h >= 120;
-      return E("div", i ? "cw-dim" : "", "font-size:" + px(f) + ";font-weight:" + (i ? 560 : 620) + ";letter-spacing:-.01em;line-height:1.15;" + (wrap ? "display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden" : "white-space:nowrap;overflow:hidden;text-overflow:ellipsis") + (i ? ";margin-top:6px" : ""), [l]);
+      var keep = Math.max(2, Math.floor((b.h - 48) / lines.length / (f * 1.15)));
+      return E("div", i ? "cw-dim" : "", "font-size:" + px(f) + ";font-weight:" + (i ? 560 : 620) + ";letter-spacing:-.01em;line-height:1.15;" + (wrap ? "display:-webkit-box;-webkit-line-clamp:" + keep + ";-webkit-box-orient:vertical;overflow:hidden" : "white-space:nowrap;overflow:hidden;text-overflow:ellipsis") + (i ? ";margin-top:6px" : ""), [l]);
     })));
   };
-  R.month = function (root, o, b) {
-    var d = now(), y = d.getFullYear(), m = d.getMonth(), first = (new Date(y, m, 1).getDay() + 6) % 7, days = new Date(y, m + 1, 0).getDate();
-    var cells = ["M", "T", "W", "T", "F", "S", "S"].map(function (x) { return E("span", "h", "", [x]); });
+  // Week starts on (wstart): Monday, or Sunday as in the US
+  function weekStart(o, env) { return setting(o, env, "wstart") === "sun" ? 0 : 1; }
+  function weekHead(ws) { return ws === 0 ? ["S", "M", "T", "W", "T", "F", "S"] : ["M", "T", "W", "T", "F", "S", "S"]; }
+  R.month = function (root, o, b, env) {
+    var ws = weekStart(o, env), d = now(), y = d.getFullYear(), m = d.getMonth(), first = (new Date(y, m, 1).getDay() + 7 - ws) % 7, days = new Date(y, m + 1, 0).getDate();
+    var cells = weekHead(ws).map(function (x) { return E("span", "h", "", [x]); });
     for (var i = 0; i < first; i++) cells.push(E("span", "", "", [""]));
     for (var k = 1; k <= days; k++) cells.push(E("span", k === d.getDate() ? "today" : "", "", [k === d.getDate() ? E("b", "", "", [String(k)]) : String(k)]));
     var rows = Math.ceil((first + days) / 7) + 1, ch = Math.min(56, (b.h - 110) / rows);
@@ -899,15 +968,30 @@
     return svg("0 0 100 100", s, s, [S("circle", { cx: 50, cy: 50, r: 44, fill: "none", stroke: done ? "rgba(255,69,58,.3)" : "rgba(255,159,10,.22)", "stroke-width": 7 }),
       frac > 0.004 ? S("circle", { cx: 50, cy: 50, r: 44, fill: "none", stroke: done ? "#ff453a" : colour || "#ff9f0a", "stroke-width": 7, "stroke-linecap": "round", "stroke-dasharray": 276, "stroke-dashoffset": 276 * (1 - clamp(frac, 0, 1)), transform: "rotate(-90 50 50)" }) : null]);
   }
+  // a Timer widget's own settings: its name (label, up to 24 letters) and Quick start (minutes, 0 asks)
+  function timerOwn(o, env) {
+    var l = setting(o, env, "label"), m = +setting(o, env, "minutes");
+    return { label: typeof l === "string" ? l.replace(/[\u0000-\u001f]/g, " ").trim().slice(0, 24) : "", minutes: isFinite(m) && m >= 1 && m <= 180 ? Math.round(m) : 0 };
+  }
+  function minWordsShort(m) { return m === 60 ? "1 hour" : m + (m === 1 ? " minute" : " minutes"); }
   R.timer = function (root, o, b, env) {
     var draw = function () {
       while (root.lastChild && root.lastChild.className !== "cw-bg") root.removeChild(root.lastChild);
       var t = Timer.live();
-      if (!t && env.demo) t = { end: Date.now() + 668000, total: 1080000, label: op(o).label || "Pizza", demo: 1 };
+      var own = timerOwn(o, env);
+      if (!t && env.demo) t = { end: Date.now() + 668000, total: 1080000, label: own.label || "Pizza", demo: 1 };
       var wide = b.w > b.h * 1.6, s = Math.min(wide ? b.h : b.w, b.h) - 48;
       if (!t) {
-        add(root, wide ? E("div", "cw-row", "height:100%", [ic("timer", 56, "currentColor"), E("div", "cw-col", "margin-left:20px;min-width:0", [E("div", "cw-t29 cw-ell", "font-weight:700", ["No timer"]), E("div", "cw-t23 cw-ell", "", ["OK to start one"])])])
-          : [ic("timer", b.h < 200 ? 44 : 64, "currentColor"), E("div", "cw-grow"), E("div", b.w < 300 ? "cw-t25" : "cw-t29", "font-weight:700;color:var(--ink)", ["No timer"]), E("div", "cw-t23 cw-ell", "", ["OK to start one"])]);
+        // the widget's own name and Quick start, so OK does what it says
+        var l1 = own.label ? own.label : "No timer", l2 = own.minutes ? "OK starts " + minWordsShort(own.minutes) : "OK to start one";
+        var small = b.w < 300, tw = wide ? b.w - 48 - 56 - 20 : b.w - (small ? 28 : 48);
+        if (small) root.style.padding = "14px";
+        var big1 = wide ? 29 : small ? 25 : 29, w1 = fitWords(root, l1, tw, big1, 1, 700, "color:var(--ink)") || fitWords(root, l1, tw, 24, 2, 700, "color:var(--ink)");
+        var w2 = fitWords(root, l2, tw, 23, 1, 500) || fitWords(root, l2, tw, 23, 2, 500);
+        var two = !fitPxText(l1, tw, big1, 1, 700, famOf(root)) || !fitPxText(l2, tw, 23, 1, 500, famOf(root));
+        add(root, wide ? E("div", "cw-row", "height:100%", [ic("timer", 56, "currentColor"), E("div", "cw-col", "margin-left:20px;min-width:0", [w1, w2])])
+          : small && two ? [w1, w2] : [ic("timer", b.h < 200 ? 44 : 64, "currentColor"), E("div", "cw-grow"), w1, w2]);
+        if (!wide && small && two) root.style.justifyContent = "center";   // the words alone, in the middle
         return;
       }
       var left = t.demo ? t.end - Date.now() : Timer.left(t), done = !t.demo && left <= 0, frac = done ? 1 : left / t.total;
@@ -1004,7 +1088,9 @@
     var rows = clamp(Math.floor((b.h - 170) / 62), 3, w.daily.length), ink = rgba(sh.ink, 1), lo = 99, hi = -99;
     w.daily.forEach(function (d) { lo = Math.min(lo, d[2]); hi = Math.max(hi, d[3]); });
     var span = Math.max(6, hi - lo);
-    add(root, [E("div", "cw-row cw-sp", "", [E("div", "", "min-width:0;flex:0 1 auto", [E("div", "cw-t29 cw-ell", "font-weight:640", [w.place || "Here"]), E("div", "cw-big", "font-size:76px;margin-top:4px", [w.temp + "°"])]), ic(wxIcon(w.code, w.is_day), 56, ink, "solid")]),
+    // Show the town name (place): off shows only the forecast
+    var named = setting(o, env, "place") !== false;
+    add(root, [E("div", "cw-row cw-sp", "", [E("div", "", "min-width:0;flex:0 1 auto", [named ? E("div", "cw-t29 cw-ell", "font-weight:640", [w.place || "Here"]) : null, E("div", "cw-big", "font-size:76px;margin-top:4px", [w.temp + "°"])]), ic(wxIcon(w.code, w.is_day), 56, ink, "solid")]),
       E("div", "cw-col cw-grow", "margin-top:18px;justify-content:space-around", w.daily.slice(0, rows).map(function (d) {
         var a = (d[2] - lo) / span * 100, z = (d[3] - lo) / span * 100;
         return E("div", "cw-row", "font-size:27px;font-weight:620", [E("span", "", "width:96px;flex:none", [d[0]]), E("span", "", "margin:0 14px;flex:none;display:flex", [ic(wxIcon(d[1], true), 34, ink, "solid")]),
@@ -2586,12 +2672,15 @@
   }
   // a kind couch-tv cannot fill yet: the setup card on a TV, the sample in couch-tv Studio
   function sample(kind, iconName, fn) { return function (root, o, b, env, sh) { if (!env.demo) return soon(root, b, iconName, kind); return fn(root, o, b, env, sh); }; }
-  CR.wordclock = function (root, o, b) {
-    var tl = timeWords(now()).split("\n"), longest = Math.max.apply(null, tl.map(function (l) { return l.length; }));
-    var fs = clamp(Math.min((b.w - 48) / (longest * 0.56), (b.h - 48) / (tl.length * 1.08)), 26, 70);
-    var w = E("div", "", "font-size:" + px(fs) + ";font-weight:780;line-height:1.04;letter-spacing:-.02em;white-space:pre-line", [timeWords(now())]);
-    add(root, E("div", "cw-col", "height:100%;justify-content:center", [w]));
-    live(root, 15000, function () { w.textContent = timeWords(now()); });
+  CR.wordclock = function (root, o, b, env) {
+    var precise = setting(o, env, "precise") === true;
+    var tl = (precise ? "Twenty seven minutes past\neleven" : timeWords(now())).split("\n"), longest = Math.max.apply(null, tl.map(function (l) { return l.length; }));
+    var dayline = setting(o, env, "dayline") !== false;
+    var fs = clamp(Math.min((b.w - 48) / (longest * 0.56), (b.h - 48 - (dayline ? 36 : 0)) / (tl.length * 1.08)), 26, 70);
+    var w = E("div", "", "font-size:" + px(fs) + ";font-weight:780;line-height:1.04;letter-spacing:-.02em;white-space:pre-line", [timeWords(now(), precise)]);
+    var s = dayline ? E("div", "cw-t23 cw-dim", "margin-top:6px;white-space:nowrap", [DAYS[now().getDay()] + " " + partOfDay(now())]) : null;
+    add(root, E("div", "cw-col", "height:100%;justify-content:center", [w, s]));
+    live(root, precise ? 5000 : 15000, function () { w.textContent = timeWords(now(), precise); if (s) s.textContent = DAYS[now().getDay()] + " " + partOfDay(now()); });
   };
   CR.solar = CR.sun = function (root, o, b, env) {
     var s = sunToday(env, o), own = o && o.kind === "solar" && !env.demo ? pickedPlace(o, env) : null;
@@ -2617,16 +2706,19 @@
     add(root, sn ? [E("div", "cw-row", "min-width:0", [E("div", "cw-t23 cw-ell", "font-weight:680;flex:0 1 auto", [sn]), s.tvClock ? E("div", "cw-t23", "flex:none;white-space:nowrap", [", TV clock"]) : null]), row] : row);
   };
   CR.worldclock = function (root, o, b, env) {
-    var here = ""; try { here = Intl.DateTimeFormat().resolvedOptions().timeZone; } catch (e) {}
-    var own = (Object.prototype.toString.call(op(o).cities) === "[object Array]" ? op(o).cities : []).filter(function (tz) { return typeof tz === "string" && !!tzTime(tz); });
-    var cities = own.length ? own : homeCities(here, 2), town = (dataOf(env || {}).place || {}).name || "";
-    var name = function (tz) { return tz === here && town ? town : CITY[tz] || tz.split("/").pop().replace(/_/g, " "); };
-    if (b.w < 300) { var t = tzTime(cities[0]); return mini(root, b, null, t ? t.t.replace(/[ap]m$/, "") : "", name(cities[0])); }
+    var wc = worldOf(o, env, 2), cities = wc.cities, name = wc.name;
+    if (b.w < 300) {
+      // a tile: the time, and the town's name whole on one or two lines (left out when even that cannot fit)
+      var t = tzTime(cities[0]), v = tzShow(t, wc.h24).replace(/[ap]m$/, "");
+      root.style.padding = "14px"; root.style.justifyContent = "center";
+      add(root, [fitNum(root, v, b.w - 28, 54), fitWords(root, name(cities[0]), b.w - 28, 25, 1, 650, "color:var(--ink);margin-top:2px;text-align:center") ||
+        fitWords(root, name(cities[0]), b.w - 28, 24, 2, 650, "color:var(--ink);margin-top:2px;text-align:center")]);
+      return;
+    }
     add(root, E("div", "cw-col", "height:100%;justify-content:space-around", cities.slice(0, 2).map(function (tz) {
-      var t = tzTime(tz);
-      return E("div", "cw-row cw-sp", "", [E("div", "cw-t29 cw-ell", "font-weight:650;min-width:0", [name(tz)]), E("div", "cw-t38", "margin-left:12px", [t ? t.t : ""])]);
+      var t = tzTime(tz), tm = tzShow(t, wc.h24), room = b.w - 48 - 12 - tm.length * 38 * 0.6;
+      return E("div", "cw-row cw-sp", "", [fitWords(root, name(tz), room, 29, 1, 650) || fitWords(root, name(tz), room, 24, 2, 650) || E("div", "", "", []), E("div", "cw-t38", "margin-left:12px;white-space:nowrap;flex:none", [tm])]);
     })));
-    void env;
   };
   CR.month = function (root, o, b) {
     var d = now();
@@ -2678,9 +2770,12 @@
     if (!w) return noWx(root, b, env, o);
     if (!w.daily) return empty(root, b, "calendar", "The week's forecast is on its way", "");
     var n = clamp(Math.floor((b.w - 48) / 96), 2, 4), ink = rgba(sh.ink, 1);
-    add(root, E("div", "cw-row cw-sp", "height:100%", w.daily.slice(0, n).map(function (d) {
-      return E("div", "cw-col", "align-items:center", [E("div", "cw-t23", "color:var(--ink);font-weight:650", [d[0]]), E("div", "", "margin:4px 0", [ic(wxIcon(d[1], true), 32, ink, "solid")]), E("div", "", "font-size:25px;font-weight:650", [d[3] + "°", E("span", "", "opacity:.6", [" " + d[2] + "°"])])]);
-    })));
+    // a place picked for this widget is named above the days (Show the town name); the home's town is not
+    var nm = w.picked && setting(o, env, "place") !== false ? fitWords(root, w.place, b.w - 48, 23, 1, 650, "color:var(--ink);text-align:center") : null;
+    var days = E("div", "cw-row cw-sp", nm ? "flex:1" : "height:100%", w.daily.slice(0, n).map(function (d) {
+      return E("div", "cw-col", "align-items:center", [E("div", "cw-t23", "color:var(--ink);font-weight:650", [d[0]]), E("div", "", "margin:4px 0", [ic(wxIcon(d[1], true), nm ? 26 : 32, ink, "solid")]), E("div", "", "font-size:25px;font-weight:650", [d[3] + "°", E("span", "", "opacity:.6", [" " + d[2] + "°"])])]);
+    }));
+    add(root, nm ? E("div", "cw-col", "height:100%", [nm, days]) : days);
   };
   CR.rain = function (root, o, b, env) {
     var w = weather(env, o);
@@ -3200,6 +3295,8 @@
       // this widget's own settings and honest headings (WIDGET-SETTINGS-CONTRACT.md)
       setting: setting, tvSet: tvSet, devName: devName, webName: webName, feedFor: feedFor, unitF: unitF, roomUnit: roomUnit, tconv: tconv, sensorConv: sensorConv, Timer: Timer, mmss: mmss, ring: ring, dial: dial, dayIndex: dayIndex, fmt12: fmt12,
       // things typed at home (athome.js through app.js)
+      // the time widgets' own settings, read again by their layers (Timers, World clocks, Calendar)
+      worldOf: worldOf, tzShow: tzShow, timerOwn: timerOwn, minWordsShort: minWordsShort, weekStart: weekStart, weekHead: weekHead,
       athome: athome, listOf: listOf, wifiOf: wifiOf, guideOf: guideOf, guidePart: guidePart, agendaEvents: agendaEvents, memoryList: memoryList, memoryWeek: memoryWeek, mixed: mixed, guideIcon: guideIcon, qrNode: qrNode, demoEvents: demoEvents, evDay: evDay, hhmm: hhmm, EV_COL: EV_COL, yearsAgo: yearsAgo }
   };
   // the smart home and music widgets' readers, for their detail layers (widget-detail.js)

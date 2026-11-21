@@ -114,10 +114,10 @@
 
   // timers: one at a time, kept on the TV (widgets.js Timer)
   var LABELS_ALL = ["Timer", "Oven", "Pizza", "Bath", "Homework", "Bedtime", "Tea"];
-  B.timers = function (o) {
+  B.timers = function (o, env) {
     var T = kit().Timer, now = kit().now();
-    // a Timer widget with a name in its design (opts.label): a timer started from it has that name
-    var own = o && o.kind === "timer" && op(o).label ? String(op(o).label).slice(0, 24) : "";
+    // a Timer widget's own settings (set on this TV or in its design): its name, and Quick start
+    var mine = o && o.kind === "timer" ? kit().timerOwn(o, env) : { label: "", minutes: 0 }, own = mine.label;
     var LABELS = own ? [own].concat(LABELS_ALL.filter(function (x) { return x !== own; })) : LABELS_ALL;
     S.body.appendChild(head("timer", "Timers", "It's " + kit().fmt12(now), "#ff9f0a"));
     var ringBox = E("div", "cwd-ringbox"), nameAt = 0;
@@ -143,6 +143,12 @@
       F(btn("close", "Stop"), function () { T.cancel(); drawRing(); msg("Timer stopped"); }, "Stop")]);
     S.body.appendChild(E("div", "cwd-row cwd-grow", "align-items:center;margin-top:20px", [ringBox, E("div", "cwd-col", "margin-left:90px", [label("Start a timer"), grid, row])]));
     S.start = T.live() ? 8 : 2;
+    // Quick start: OK on the widget starts that timer straight away (never over one already running, and
+    // never in couch-tv Studio, which switches nothing)
+    if (mine.minutes && !T.live() && !(env && env.demo)) {
+      T.start(mine.minutes, LABELS[0]); drawRing(); msg(LABELS[0] + ": " + kit().minWordsShort(mine.minutes) + ", counting down");
+      S.start = 8;
+    }
   };
 
   // the forecast: 24 hours and 7 days (Open-Meteo, the same answer the widgets read)
@@ -180,7 +186,8 @@
 
   // world clocks: every city big
   B.world = function (o, env) {
-    var cities = op(o).cities && op(o).cities.length ? op(o).cities.slice(0, 4) : ["Australia/Brisbane", "Europe/London", "America/New_York", "Asia/Tokyo"];
+    // the widget's own cities and 12 or 24 hour, the same as on the widget (widgets.js worldOf)
+    var wc = kit().worldOf(o, env, 4), cities = wc.cities;
     var here = new Date();
     S.body.appendChild(head("clock", "World clocks", "Here it is " + kit().fmt12(here), "#5e5ce6"));
     var draw = function () {
@@ -193,7 +200,7 @@
           S2("line", { x1: 50, y1: 50, x2: 50, y2: 27, stroke: fg, "stroke-width": 5, "stroke-linecap": "round", transform: "rotate(" + ((t.h % 12) * 30 + t.m / 2) + " 50 50)" }),
           S2("line", { x1: 50, y1: 50, x2: 50, y2: 13, stroke: fg, "stroke-width": 3.4, "stroke-linecap": "round", transform: "rotate(" + t.m * 6 + " 50 50)" }),
           S2("circle", { cx: 50, cy: 50, r: 3.5, fill: "#ff9f0a" })]),
-          E("div", "cwd-mid", "margin-top:24px", [kit().CITY[tz] || tz.split("/").pop().replace(/_/g, " ")]), E("div", "cwd-big", "", [t.t]),
+          E("div", "cwd-mid", "margin-top:24px", [wc.name(tz)]), E("div", "cwd-big", "", [kit().tzShow(t.t ? t : null, wc.h24)]),
           E("div", "cwd-small", "", [off === 0 ? "Same time as here" : Math.abs(off) + (Math.abs(off) === 1 ? " hour " : " hours ") + (off > 0 ? "ahead" : "behind")])]));
       });
       return row;
@@ -202,20 +209,21 @@
     S.body.appendChild(cur);
     S.tick = function () { var n = draw(); S.body.replaceChild(n, cur); cur = n; };
     S.every = 30000;
-    void env;
   };
 
-  // calendar: today, this month and next
-  function monthGrid(y, m, today) {
-    var first = (new Date(y, m, 1).getDay() + 6) % 7, days = new Date(y, m + 1, 0).getDate(), cells = [];
-    ["M", "T", "W", "T", "F", "S", "S"].forEach(function (x) { cells.push(E("span", "h", "", [x])); });
+  // calendar: today, this month and next. ws: the first day of the week (0 Sunday, 1 Monday): a Month
+  // widget's own Week starts on
+  function monthGrid(y, m, today, ws) {
+    ws = ws === 0 ? 0 : 1;
+    var first = (new Date(y, m, 1).getDay() + 7 - ws) % 7, days = new Date(y, m + 1, 0).getDate(), cells = [];
+    kit().weekHead(ws).forEach(function (x) { cells.push(E("span", "h", "", [x])); });
     for (var i = 0; i < first; i++) cells.push(E("span", "", "", [""]));
     for (var k = 1; k <= days; k++) cells.push(E("span", k === today ? "today" : "", "", [k === today ? E("b", "", "", [String(k)]) : String(k)]));
     return E("div", "cwd-month", "", [E("div", "cwd-mid", "margin-bottom:14px", [kit().MONTHS[m] + " " + y]), E("div", "cwd-mgrid", "", cells)]);
   }
   B.calendar = function (o, env) {
     var d = kit().now(), y = d.getFullYear(), m = d.getMonth(), doy = Math.floor((d - new Date(y, 0, 0)) / 86400000);
-    var jan = new Date(y, 0, 1), week = Math.ceil(((d - jan) / 86400000 + ((jan.getDay() + 6) % 7) + 1) / 7);
+    var jan = new Date(y, 0, 1), week = Math.ceil(((d - jan) / 86400000 + ((jan.getDay() + 6) % 7) + 1) / 7), wsd = o && o.kind === "month" ? kit().weekStart(o, env) : 1;
     S.body.appendChild(head("calendar", "Calendar", kit().longDate(d), "#ff453a"));
     var todayCol = E("div", "cwd-col", "width:430px", [E("div", "cwd-label", "color:#ff453a", [kit().DAYS[d.getDay()]]), E("div", "cwd-huge", "font-size:220px;line-height:.9", [String(d.getDate())]),
       E("div", "cwd-mid", "", [kit().MONTHS[m] + " " + y]), E("div", "cwd-small", "margin-top:10px", ["Day " + doy + " of the year, week " + week])]);
@@ -224,7 +232,7 @@
     var evs = o.kind === "agenda" ? (env.demo ? kit().demoEvents() : ae && ae.events) : null;
     if (o.kind === "agenda" && !evs) return B.setup(o, env);
     if (evs) return agendaDay(evs, env, todayCol);
-    S.body.appendChild(E("div", "cwd-row cwd-grow", "align-items:flex-start;margin-top:36px", [todayCol, E("div", "cwd-row", "margin-left:60px;align-items:flex-start", [monthGrid(y, m, d.getDate()), E("div", "", "width:56px"), monthGrid(m === 11 ? y + 1 : y, (m + 1) % 12, -1)])]));
+    S.body.appendChild(E("div", "cwd-row cwd-grow", "align-items:flex-start;margin-top:36px", [todayCol, E("div", "cwd-row", "margin-left:60px;align-items:flex-start", [monthGrid(y, m, d.getDate(), wsd), E("div", "", "width:56px"), monthGrid(m === 11 ? y + 1 : y, (m + 1) % 12, -1, wsd)])]));
   };
 
   // the Agenda: today's events on a timeline (6am to midnight, overlapping ones side by side), then
