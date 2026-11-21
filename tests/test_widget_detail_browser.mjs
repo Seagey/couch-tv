@@ -235,7 +235,9 @@ for (const [layer, w, q] of CASES) {
     ok(!page.errors.length, "no page errors: " + page.errors.join("; "));
     await page.close();
   }
-  ok(withSet > 5 && without > 5, "both kinds were tried: " + withSet + " with settings, " + without + " without");
+  // 0.13.9: with every widget group merged, every kind has a setting on the TV (the owner's goal: there is
+  // no "later"), so no kind is left without one; the "Nothing to set" branch above stays for any that comes
+  ok(withSet > 5 && without === 0, "every kind tried has settings: " + withSet + " with settings, " + without + " without");
   ok(wrong.length === 0, "Hold OK on every kind:\n  " + wrong.join("\n  "));
   console.log("  (not a stop beside other widgets, so not held: " + skippedLook.join(", ") + ")");
   // a widget inside a smart stack: the one showing now (headlines or markets, both with settings), by its place in the stack
