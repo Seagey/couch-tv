@@ -202,7 +202,7 @@ const ID = "AbCdEfGhIjKlMnOpQrStUv";
   eq(calls.length, 0);
 }
 const appjs = fs.readFileSync(path.join(root, "tv-home/web/app.js"), "utf8");
-ok(appjs.includes('label: "Get a design from your phone"'), "the row is in Home settings, couch-tv Studio");
+ok(appjs.includes('label: "Get a design from your phone"'), "the row is in Home settings, Designs");
 ok(/function lookInInbox[\s\S]{0,200}!inboxShown\(\)/.test(appjs), "it asks only while its screen is open");
 ok(/function closeSettings\(\) \{\s*stopInbox\(\);/.test(appjs), "closing Home settings stops it");
 ok(/takeInbox\(mine\.id\)[\s\S]{0,400}getDesignByCode\(code\)/.test(appjs), "a code from the inbox goes through Use this design? like a typed one");

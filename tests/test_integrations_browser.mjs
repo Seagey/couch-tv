@@ -2,7 +2,7 @@
 //  1. A Welcome widget whose design says the name comes from the calendar greets the guest booked now
 //     ("Welcome, Sarah") with their check out, from the bookings link kept on this TV; before any link
 //     it says where to add one. A name typed in At home wins.
-//  2. Home settings, couch-tv Studio, Smart home: the address and a pasted token are checked, what
+//  2. Home settings, Designs, Smart home: the address and a pasted token are checked, what
 //     Home Assistant has is listed, ticks are saved the way the launcher keeps them, the guide for a
 //     device we don't list is there, and the token is never kept in the page's storage or address.
 // Needs Playwright (Chromium). Without it the test says so and passes:

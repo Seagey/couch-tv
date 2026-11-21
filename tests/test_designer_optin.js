@@ -96,7 +96,7 @@ ok(code("?mock=1", {}, true).base() === "", "a browser preview never reaches the
 ok(code("", {}, false).base() === "", "without the gate loaded, nothing changes");
 ok(/^https:\/\/[a-z0-9.-]+$/.test(G.DEFAULT_STORE), "the default store is https with no path");
 // option C (the on-TV app, no computer, no config.json): its config.js (Store.publicConfig) names no
-// store, so Get a design and Share this home use couch-tv Studio's own; Home settings, couch-tv Studio,
+// store, so Get a design and Share this home use couch-tv Studio's own; Home settings, Designs,
 // Back to my classic home is the off switch there
 const onTv = { people: [], weather: { place: "Town" }, tvs: [{ id: "this-tv", name: "This TV" }], default_tv: "this-tv", mode: "on-tv" };
 ok(code("", onTv, true).base() === G.DEFAULT_STORE, "option C: the on-TV app's config gets couch-tv Studio's own store");

@@ -253,7 +253,7 @@ short code. It also has a gallery of designs other people made.
 - **couch-tv stays free and open source** (MIT). Studio is an optional hosted service, run
   separately, and its source is not open. You never need it to use couch-tv.
 - **Off until you turn it on.** Installing or updating couch-tv never switches it on. Until someone
-  at the TV turns it on (Home settings, couch-tv Studio) or types a code there, the TV asks Studio
+  at the TV turns it on (Home settings, Designs) or types a code there, the TV asks Studio
   for nothing. **Back to my classic home** switches it off again in one step.
 - **What the TV sends to Studio:** the code you typed, with no cookies and no referrer. While a
   design is on, the TV also fetches the fonts the design names from Studio, and the design's
@@ -263,7 +263,7 @@ short code. It also has a gallery of designs other people made.
   scores, markets or commute widget is on, it asks Studio once a day whether that source is paused.
   **Open this home in couch-tv Studio** (called Share this home on 0.13.0 to 0.13.2) sends the
   layout of the home you have now, without names, photos, places, keys or calendar links.
-- **Bring the home you have now into Studio.** On the TV: Home settings, couch-tv Studio, **Open this
+- **Bring the home you have now into Studio.** On the TV: Home settings, Designs, **Open this
   home in couch-tv Studio**. The TV shows a QR code and a 10 letter code; scan it, or type the code
   under "Already use couch-tv from GitHub?" on Studio's start screen. It opens as a design you can change, keep
   in My designs and send back. Only the look (scenes, clock, glass, the dock's style and size,

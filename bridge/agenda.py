@@ -3,7 +3,7 @@
 A Samsung, LG, Philips, TiVo OS or Panasonic TV (and a Hisense with a computer) shows the home as a web
 page, and a web page cannot read a Google, Apple or Outlook calendar by itself (those sites do not let
 other pages read them). So the TV hands this computer the calendar's private address it keeps
-(Home settings, couch-tv Studio, At home), and this reads it and hands the words straight back.
+(Home settings, Designs, At home), and this reads it and hands the words straight back.
 
 The address is a password (it opens the calendar), so it is never written down here: not in a file, not
 in the log, not in the action history. Only https, no name or password inside the address, nothing on

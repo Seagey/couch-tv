@@ -121,7 +121,7 @@
     web: ["Keep the home computer on: it runs Couch TV for this TV.", "Start a show from Couch TV's home (Netflix, YouTube and some others).", "Come back to the home: the show is waiting here."],
     vidaa: ["Needs a home computer that stays on, running Couch TV. The website home cannot do this.", "Start a show from Couch TV's home.", "Come back to the home: the show is waiting here."]
   };
-  // smart home is set up on the TV itself (Home settings, couch-tv Studio, Smart home): the launcher
+  // smart home is set up on the TV itself (Home settings, Designs, Smart home): the launcher
   // talks to Home Assistant on a Google TV, Android TV or Fire TV; on a TV whose home a computer runs,
   // that computer does (bridge/smarthome.py)
   var SH_CONNECT = "Go down to Designs, then Smart home. Type Home Assistant's address, then paste its access key with the phone remote's Type on the TV (the steps are on the screen).";
@@ -138,7 +138,7 @@
   var PICK_HERE = " Hold OK on the widget, then Edit on the TV, to pick which show here.";
   var APPS_ORDER = [OPEN, "Go down to Apps and press OK.", "OK moves an app between the home, More apps and hidden. Hold OK on an app to move it along."];
 
-  // things typed at home: Home settings, couch-tv Studio, At home (athome.js), kept on the TV only
+  // things typed at home: Home settings, Designs, At home (athome.js), kept on the TV only
   var AT_HOME = "Go down to Designs, then pick At home.";
   var TYPE_PHONE = "Typing is quicker with the phone remote: Type on the TV puts the words in the box.";
   var TYPE_TV = "Type with the TV remote's keyboard, then press OK.";
@@ -160,7 +160,7 @@
   var PHOTOS_NEED = "Your photos on the TV, or one photo put in the widget";
   var WATCH_NEED = "The Couch TV app on this TV or a home computer that stays on";
   var HA_NEED = "Home Assistant (a smart home app) running at home";
-  // the smart home widgets (group C): set up on the TV (Home settings, couch-tv Studio, Smart home)
+  // the smart home widgets (group C): set up on the TV (Home settings, Designs, Smart home)
   function haSteps(what) { return shSteps(what, [].slice.call(arguments, 1)); }
   var HA_PLAT = function () { return plat("setup", "computer", "computer", { android: "Set up on the TV: Home settings, Designs, Smart home. No computer needed.", web: "The home computer talks to Home Assistant for this TV.", vidaa: "Needs a home computer: the website home cannot reach Home Assistant." }); };
   // the Up next queue: Spotify's queue, read with the person's own Spotify sign in

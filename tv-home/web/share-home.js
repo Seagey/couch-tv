@@ -1,4 +1,4 @@
-// Share this home (Home settings, couch-tv Studio). Turns the home this TV shows now (made on the TV,
+// Share this home (Home settings, Designs). Turns the home this TV shows now (made on the TV,
 // from the phone, the scenes or config.json, or a couch-tv Studio design) into a couch-tv Studio design,
 // hands it to the design store, and shows a QR code and a short code. On a phone,
 // <store>/design/?from=<code> opens it in couch-tv Studio, to change it and share or sell it.
@@ -151,7 +151,9 @@
 
   // ---- on screen: the QR, the short code, and how to open it ----
   var box = null;
-  function show(res) {
+  // opts.back: this screen also has the TV's phone inbox open (app.js shareHome), so the phone's Send to my
+  // TV comes straight back while it stays open
+  function show(res, opts) {
     close();
     box = document.createElement("div");
     box.className = "share-home";
@@ -166,6 +168,7 @@
     line("Open this home in couch-tv Studio", "font-size:3rem;line-height:3.75rem;font-weight:700");
     line("Point your phone's camera at the code. Or go to " + res.page + " and type this code:", "margin-top:1.25rem;font-size:1.75rem;line-height:2.375rem;color:rgba(255,255,255,0.82)");
     line(res.code, "margin-top:1.5rem;font-size:4.5rem;font-weight:700;letter-spacing:0.08em;font-variant-numeric:tabular-nums");
+    if (opts && opts.back) line("Change it on your phone, then press Send to my TV there: it comes straight back to this TV, which asks you before it changes anything. Keep this screen open until then.", "margin-top:1.25rem;font-size:1.75rem;line-height:2.375rem;color:#fff;font-weight:600");
     line("The code works once, for 30 minutes. Only the look and your apps left this TV. People's names, photos, places, smart home keys, AI keys and calendar links stay here.", "margin-top:1.5rem;font-size:1.5rem;line-height:2.125rem;color:rgba(255,255,255,0.66)");
     line("Press Back or OK to close.", "margin-top:1.5rem;font-size:1.4375rem;color:rgba(255,255,255,0.6)");
     box.appendChild(qr);

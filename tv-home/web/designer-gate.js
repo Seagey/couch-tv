@@ -4,11 +4,11 @@
 // asked of any server. Updating couch-tv (the app or the bridge) never switches it on.
 //
 // It comes on in one of three ways, each a choice made at the TV:
-//   1. Home settings, couch-tv Studio, Turn on couch-tv Studio;
+//   1. Home settings, Designs, Turn on couch-tv Studio;
 //   2. getting a design by code there (typing the code is asking for it);
 //   3. "Use this design" on the question a design in config.json brings (Keep my home, or Back,
 //      leaves everything as it was, and the TV does not ask about that design again).
-// Home settings, couch-tv Studio, Back to my classic home switches it off in one step, and it stays
+// Home settings, Designs, Back to my classic home switches it off in one step, and it stays
 // off whatever design arrives later (a design in config.json included) until it is turned on again.
 // The design it had is kept, so turning it on again brings it back.
 //

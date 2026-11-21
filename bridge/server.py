@@ -3420,7 +3420,7 @@ def tv_or_paired(handler):
 
 @tv_or_paired
 async def h_direct(request):
-    """Set up Hue or AirTouch from the TV: Home settings, couch-tv Studio, Smart home."""
+    """Set up Hue or AirTouch from the TV: Home settings, Designs, Smart home."""
     data = await body(request)
     what, d = str(data.get("action") or ""), HA.direct
     if what == "status":

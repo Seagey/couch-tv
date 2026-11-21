@@ -5,7 +5,8 @@
 //  2. The TV's keyboard dropped a letter from a design code typed fast ("rstfd-5een"). The box shows
 //     the code as ABCDE-FGHJK and how many letters are in while typing, and OK shows a big Check page
 //     first: a short code says one letter is missing and goes back to the box with it in; a whole code,
-//     typed in any case with no dash, is sent as RSTFD-5EEDN only after "Yes, get this design".
+//     typed in any case with no dash, is sent as RSTFD-5EEDN at once: the TV's own "Use this design?"
+//     is the one question (a second Check page made two confirmations for one choice, launch audit 0.13.9).
 // Needs Playwright (Chromium). Without it the test says so and passes:
 //   COUCHTV_PLAYWRIGHT=<a folder whose node_modules has playwright> node tests/test_tcl_fixes_browser.mjs
 import { createRequire } from "node:module";
@@ -65,8 +66,8 @@ try {
   ok(/Designs are on/.test(await msg()), "it says designs are on");
   let rows = await rowsText();
   ok(await studioValue() !== "Off" && !/Turn on designs/.test(rows), "and the row no longer says Off or Turn on (" + rows.slice(0, 120) + ")");
-  ok(/Back to the standard home/.test(rows), "the way back is there at once");
-  ok(await toRow(/^Back to the standard home/), "Back to the standard home row");
+  ok(/No design on this TV yet/.test(rows), "the switch says there is no design yet, at once");
+  ok(await toRow(/^Designs/), "the Designs switch");
   await press("Enter", 300);
   rows = await rowsText();
   ok(await studioValue() === "Off" && /Turn on designs/.test(rows), "switched off: the row says Off again at once");
@@ -92,11 +93,9 @@ try {
   ok(await page.evaluate(() => document.getElementById("set-type").classList.contains("on") && document.getElementById("set-input").value === "rstfd-5een"), "back in the box, with what was typed in it");
   await page.fill("#set-input", "rstfd5eedn");
   ok(/^RSTFD-5EEDN\s+all 10 letters$/.test(await page.evaluate(() => document.getElementById("set-type-check").textContent)), "no dash, lower case: shown as RSTFD-5EEDN, all 10 letters");
-  await press("Enter", 400);
-  ok(/Check the code/.test(await head()) && asked.length === 0, "a whole code is checked first too, and not sent yet");
-  ok(/^Yes, get this design/.test(await focused()), "focus is on Yes, get this design");
   await press("Enter", 800);
-  ok(asked.length === 1 && JSON.parse(asked[0]).code === "RSTFD-5EEDN", "Yes sends the code as RSTFD-5EEDN (" + asked[0] + ")");
+  ok(!/Check the code/.test(await head()), "a whole code: no second Check page");
+  ok(asked.length === 1 && JSON.parse(asked[0]).code === "RSTFD-5EEDN", "OK sends the code as RSTFD-5EEDN (" + asked[0] + ")");
   ok(/That code did not work/.test(await msg()), "and the store's answer is said in plain words");
   ok(!/Check the code/.test(await head()), "and the Check page is gone");
   await press("Escape", 250);
