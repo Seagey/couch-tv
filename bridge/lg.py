@@ -158,6 +158,8 @@ class LGTV:
         self.leave_inputs = cfg.get("leave_inputs", False) is True
         # true: an app closing to LG's home reopens couch-tv. Home pressed from couch-tv is left alone.
         self.back_to_couch = cfg.get("back_to_couch", False) is True
+        # true (with back_to_couch): an app closing straight to an HDMI input reopens couch-tv too
+        self.back_to_couch_inputs = cfg.get("back_to_couch_inputs", False) is True
         self.ares_device = cfg.get("ares_device") or self.id
         self.ares_launch = cfg.get("ares_launch") or os.environ.get("ARES_LAUNCH") or None
         self.ports = [int(cfg["port"])] if cfg.get("port") else [3000, 3001]
@@ -589,10 +591,8 @@ class LGTV:
                             self._left_app = (prev, time.monotonic())
                         elif prev == "" and time.monotonic() - self._left_app[1] < 6:
                             came = self._left_app[0]
-                        if (self.back_to_couch and was_on and LG_HOME.match(self.visible)
-                                and came not in ("", self.app_id, DEVMODE_APP) and not NOTHING.match(came)
-                                and not self._extending and time.monotonic() >= self.quiet_until):
-                            asyncio.create_task(self._back_to_couch(came))
+                        if was_on and self._closed_to_couch_target(came, self.visible):
+                            asyncio.create_task(self._back_to_couch(came, self.visible))
                     if self.is_on:
                         await self.refresh_installed()
                         if ticks % 3 == 0:
@@ -651,16 +651,31 @@ class LGTV:
                 if now is not None and now != self.visible:
                     return
 
-    async def _back_to_couch(self, came_from):
-        """An app closed to LG's home: put couch-tv back, unless something else came up."""
+    def _closed_to_couch_target(self, came, now):
+        """back_to_couch: did an app (not couch-tv, not Developer Mode) just give way to LG's home, or,
+        with back_to_couch_inputs, straight to an HDMI or external input? Holding Back in an app on
+        an LG OLED65CX (webOS 5) closes it to the input last used (an Apple TV on HDMI 2) with no LG
+        home in between. An input picked from LG's input screen comes from that screen (homeconnect,
+        which NOTHING matches), so it is left alone, and so is anything just after a bridge command."""
+        if not self.back_to_couch or not now:
+            return False
+        if not (LG_HOME.match(now) or (self.back_to_couch_inputs and not self.leave_inputs and INPUT.match(now))):
+            return False
+        return (bool(came) and came not in (self.app_id, DEVMODE_APP) and not NOTHING.match(came)
+                and not self._extending and time.monotonic() >= self.quiet_until)
+
+    async def _back_to_couch(self, came_from, where=None):
+        """An app closed to LG's home (or an input): put couch-tv back, unless something else came up."""
         await asyncio.sleep(0.15)
-        if not LG_HOME.match(await self._read_visible() or ""):
+        now = await self._read_visible() or ""
+        if not (LG_HOME.match(now) or (where and now == where)):
             return
+        place = "LG home" if LG_HOME.match(now) else now
         try:
             await self._launch(self.app_id, quiet=False)
-            self._note(f"{came_from} closed to LG home, reopened couch-tv")
+            self._note(f"{came_from} closed to {place}, reopened couch-tv")
         except Exception as e:
-            self._note(f"{came_from} closed to LG home, could not reopen couch-tv: {e}")
+            self._note(f"{came_from} closed to {place}, could not reopen couch-tv: {e}")
 
     def _note(self, what):
         self.log.info("hook: %s", what)
