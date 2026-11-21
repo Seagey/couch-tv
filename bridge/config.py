@@ -497,6 +497,9 @@ def _home(h):
         out["ambient_music"] = h["ambient_music"]
     if isinstance(h.get("sun_sync"), bool):
         out["sun_sync"] = h["sun_sync"]
+    # the built-in scenes' slow depth zoom (off unless true)
+    if isinstance(h.get("scene_zoom"), bool):
+        out["scene_zoom"] = h["scene_zoom"]
     if isinstance(h.get("ambient_weather"), bool):
         out["ambient_weather"] = h["ambient_weather"]
     if isinstance(h.get("ambient_sun_grade"), bool):
