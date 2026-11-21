@@ -8,5 +8,6 @@ class App : Application() {
         super.onCreate()
         CrashGuard.install(this)
         TclPlaceholderInput.enableIfTcl(this)   // TCL only, issue #94
+        WatchRepair.schedule(this)   // puts the Home button watch back if the TV kills the app
     }
 }
