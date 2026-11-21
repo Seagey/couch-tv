@@ -65,6 +65,11 @@ and this server's `set_home_design` hands the code to the TV.
 | `show_message(text, sender, seconds)` | Up to 280 characters, plain words, shown 5 to 600 seconds |
 | `set_home_design(code)` | A couch-tv Studio code (`ABCDE-FGHJK` or `CTV1-...`); the TV asks first |
 | `tv_says()` | The last question and answer, message and design code |
+| `list_widgets()` | The widgets on the home's design, each with its settings and their values now |
+| `set_widget_setting(widget, setting, value)` | Changes one setting of one widget, as the phone's Home settings page does. Only settings a phone may change; the TV checks the value |
+
+For example, ask: "Set the weather widget's place to Byron Bay." The agent finds the widget with `list_widgets`
+and changes its `town`. The Couch TV home has to be open on the TV; if it is not, the answer says to open it.
 
 ## Plain HTTP (any program)
 

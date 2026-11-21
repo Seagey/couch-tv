@@ -1268,9 +1268,10 @@ function dlWelcomeLine(line as String) as String
     return line
 end function
 
-' the kinds drawn here; any other is the card that says it is not on this TV
+' the kinds drawn here; any other is the card that says it is not on this TV. Family note is not one:
+' the note is kept in the web home's own store, which a Roku does not have.
 function dlWNative(kind as String) as Boolean
-    for each k in ["clock", "tallclock", "glassclock", "analog", "flipclock", "wordclock", "countdown", "date", "month", "weather", "bigtemp", "moon", "photo", "artframe", "keep", "keeprow", "app", "folder", "dock", "appgrid", "games", "people", "card", "quote", "welcome", "note"]
+    for each k in ["clock", "tallclock", "glassclock", "analog", "flipclock", "wordclock", "countdown", "date", "month", "weather", "bigtemp", "moon", "photo", "artframe", "keep", "keeprow", "app", "folder", "dock", "appgrid", "games", "people", "card", "quote", "welcome"]
         if k = kind then return true
     end for
     return false
@@ -1354,8 +1355,14 @@ sub dlWidget(out as Object, o as Object, ctx as Object, look as Object)
     h = o.h
     alpha = dlOr(o.opacity, 1.0) * dlOr(st.opacity, 1.0)
     if kind = "stack"
+        ' a smart stack takes turns: the next widget each minute (the design is drawn again each minute,
+        ' dlHasTime), counted from midnight so every redraw agrees
+        n = o.items.count()
+        at = 0
+        nw = dlAA(ctx.now)
+        if n > 1 and nw.h <> invalid and nw.mi <> invalid then at = (nw.h * 60 + nw.mi) mod n
         first = {}
-        first.append(o.items[0])
+        first.append(o.items[at])
         first.x = x
         first.y = y
         first.w = w
@@ -1739,6 +1746,8 @@ function dlHasTime(design as Object) as Boolean
         if o.type = "clock" then return true
         if o.type = "widget"
             k = o.kind
+            ' a stack of two or more moves on each minute
+            if k = "stack" and o.items.count() > 1 then return true
             if k = "stack" then k = o.items[0].kind
             for each t in ["clock", "tallclock", "glassclock", "analog", "flipclock", "wordclock", "countdown", "date", "month", "moon"]
                 if t = k then return true

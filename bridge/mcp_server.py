@@ -24,6 +24,7 @@ mcp = FastMCP("tv", instructions=(
     "Controls the living room Google TV through the bridge. "
     "Use play to put a show or film on, find to see where it streams in this home's country, key/volume/"
     "launch for remote control, now to see what is on. Never power the TV off unless asked. "
+    "list_widgets and set_widget_setting read and change one widget on the TV home's design. "
     "There can be more than one TV (tvs); tools default to the TV the person asked from."))
 
 
@@ -305,6 +306,105 @@ def set_home_design(code: str, tv: str | None = None) -> dict:
     couch-tv Studio. The TV fetches the design itself and always asks "Use this design?" first, so tell
     the person to press OK on the TV. Nothing changes until they do."""
     return call("POST", "/api/say/design", {"code": code}, tv=tv)
+
+
+# ---- a design's widgets: read and change one setting, the way the phone's Home settings page does ----
+# The TV home hands the bridge its own view of the widgets on screen (app.js designView, through
+# /api/athome), and takes one widget's change the same way the phone's Widgets on this TV does
+# (widget_set). Only settings in widget-caps.js that a phone may change are sent
+# (bridge/widget_settings.json, made from it by scripts/widget-settings-json.mjs).
+TV_CLOSED = "The Couch TV home is not open on the TV. Open Couch TV on the TV, then try again."
+NO_DESIGN = "No couch-tv Studio design is on the TV home now, so it has no widgets to change."
+_SETTINGS = None
+
+
+def widget_settings():
+    """kind -> {"name", "settings": [{"key", "label", "type"}]}: what may be changed from a phone or an AI."""
+    global _SETTINGS
+    if _SETTINGS is None:
+        with open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "widget_settings.json"), encoding="utf-8") as f:
+            _SETTINGS = json.load(f)["kinds"]
+    return _SETTINGS
+
+
+def _design_widgets(tv):
+    """(widgets, error): the widgets on the TV home's design now, as the TV home itself lists them."""
+    r = call("GET", "/api/athome", tv=tv)
+    if r.get("ok") is False:
+        return None, r
+    if not r.get("live"):
+        return None, {"ok": False, "error": TV_CLOSED}
+    d = (r.get("athome") or {}).get("design") or {}
+    if not d.get("on"):
+        return None, {"ok": False, "error": NO_DESIGN}
+    return [w for w in d.get("widgets") or [] if isinstance(w, dict)], None
+
+
+def _setting_out(s):
+    o = {"key": s.get("key"), "label": s.get("label"), "type": s.get("type"), "value": s.get("value")}
+    if s.get("words"):
+        o["now"] = s["words"]
+    if s.get("help"):
+        o["help"] = s["help"]
+    if s.get("options"):
+        o["choices"] = [{"value": x[0], "words": x[1]} for x in s["options"] if isinstance(x, list) and len(x) >= 2]
+    for k in ("many", "min", "max", "step"):
+        if s.get(k) is not None:
+            o[k] = s[k]
+    return o
+
+
+@mcp.tool()
+def list_widgets(tv: str | None = None) -> dict:
+    """The widgets on the TV home's couch-tv Studio design that have settings, each with its key (pass it to
+    set_widget_setting), its kind, its name and where it sits ("Weather, top right"), and its settings: key,
+    label, type, the value now and the choices. A private value (a calendar link) only says it is set.
+    The Couch TV home must be open on the TV."""
+    widgets, err = _design_widgets(tv)
+    if err:
+        return err
+    caps = widget_settings()
+    out = []
+    for w in widgets:
+        allowed = {s["key"] for s in (caps.get(w.get("kind")) or {}).get("settings", [])}
+        sets = [_setting_out(s) for s in w.get("settings") or [] if isinstance(s, dict) and s.get("key") in allowed]
+        if sets:
+            out.append({"key": w.get("key"), "kind": w.get("kind"), "name": w.get("name"), "where": w.get("title"), "settings": sets})
+    return {"ok": True, "widgets": out}
+
+
+@mcp.tool()
+def set_widget_setting(widget: str, setting: str, value: str | int | float | bool | list | dict | None,
+                       tv: str | None = None) -> dict:
+    """Change one setting of one widget on the TV home's design, as the phone's Home settings page does.
+    widget is a key from list_widgets; setting is one of that widget's setting keys; value is one of its
+    choices' values, true or false for a toggle, a number, or words. A place setting takes
+    {"name": "Byron Bay", "area": "New South Wales, Australia", "lat": -28.64, "lon": 153.61} (look the
+    town's latitude and longitude up first). null puts the design's own value back. Example: the weather
+    widget's place (its town setting) to Byron Bay. The TV checks the value and says plainly when it cannot
+    use it. The Couch TV home must be open on the TV."""
+    widgets, err = _design_widgets(tv)
+    if err:
+        return err
+    w = next((x for x in widgets if x.get("key") == widget), None)
+    if w is None:
+        return {"ok": False, "error": "That widget is not on the TV home now. list_widgets shows the ones there are."}
+    kind = w.get("kind")
+    rec = widget_settings().get(kind)
+    names = [s["key"] for s in (rec or {}).get("settings", [])]
+    if setting not in names:
+        name = (rec or {}).get("name") or kind
+        return {"ok": False, "error": f"{name} has no setting called {setting}." + (f" Its settings: {', '.join(names)}." if names else " It has nothing to change.")}
+    r = call("POST", "/api/athome", {"edit": {"widget_set": {"key": widget, "values": {setting: value}}}}, tv=tv)
+    if r.get("ok") is False:
+        if r.get("error_key") == "err_tv_home_closed":
+            return {"ok": False, "error": TV_CLOSED}
+        return {"ok": False, "error": str(r.get("error") or "The TV did not take that change.")}
+    if not r.get("live"):
+        return {"ok": False, "error": TV_CLOSED}
+    after = next((x for x in (((r.get("athome") or {}).get("design") or {}).get("widgets") or []) if isinstance(x, dict) and x.get("key") == widget), None)
+    now = next((_setting_out(s) for s in (after or {}).get("settings") or [] if isinstance(s, dict) and s.get("key") == setting), None)
+    return {"ok": True, "widget": widget, "setting": now or {"key": setting}, "said": "Changed on the TV."}
 
 
 @mcp.tool()

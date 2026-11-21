@@ -276,6 +276,7 @@ The channel draws a couch-tv Studio design itself, natively, over the home. A de
 
 - **From the bridge.** `design` in `config.json` ([CONFIG.md](CONFIG.md), Design) reaches the Roku with the rest of `/api/config` and shows at once.
 - **By code.** Press **\*** on the remote, or OK on **Settings** at the end of the apps, then **Get a design by code**, and type the code from couch-tv Studio (it looks like ABCDE-FGHJK). The Roku asks the design store (`design_store` in `config.json`, else couch-tv Studio's own) and then asks **Use this design?** before anything changes. A yes is kept on the Roku, so the design is still there after a restart. The same menu has **Go back to the plain home** and, after that, **Show the design**.
+- **Changing a widget.** A Roku has no Hold OK menu, and the phone page cannot reach the design kept on it: change the widget in couch-tv Studio and send the design again (the phone page's Widgets section says so).
 
 Every design goes through the same check as on the other TVs: unknown parts are dropped, numbers are kept in range, colours are `#hex` only, words with a digit, an @ or a web address are not drawn, and the only pictures are a JPEG inside the design or one of couch-tv's own backgrounds.
 

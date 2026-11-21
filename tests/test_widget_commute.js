@@ -95,6 +95,6 @@ ok(fri.day === "Monday" && WW.leaveBy(27, 8, 30, 10, new Date(2026, 10, 20, 9, 0
     const sent = JSON.stringify(res && (res.design || res.body || res));
     ok(!/Parramatta|Riverside/.test(sent), "Share this home: the places are not in what is sent (" + sent.slice(0, 160) + ")");
   }
-  ok(T.C.get("commute").status === "setup" && T.C.need("commute", "Google TV") === "setup" && T.C.need("commute", "Tizen") === "computer" && T.C.need("commute", "Roku OS") === "no", "widget-caps: set up on the TV, honest platforms");
+  ok(T.C.get("commute").status === "setup" && T.C.need("commute", "Google TV") === "setup" && T.C.need("commute", "Tizen") === "setup" && T.C.need("commute", "Saphi") === "computer" && T.C.need("commute", "Roku OS") === "no", "widget-caps: set up on the TV, honest platforms");
   done();
 })().catch((e) => { console.error(e); process.exit(1); });

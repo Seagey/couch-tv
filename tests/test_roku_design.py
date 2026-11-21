@@ -405,7 +405,9 @@ class Layout(unittest.TestCase):
         self.assertIn("Headlines:", j)
         self.assertIn("Bedroom", t)                # the smart object
         self.assertIn("Smart home", t)             # the section
-        self.assertIn("Waxing gibbous", t)         # the stack shows its first widget
+        # the stack (moon, then weather) shows one widget at a time, the next each minute: at 21:05 (minute
+        # 1265 of the day) the weather, not the moon (tests/test_ws_native.py RokuStack)
+        self.assertNotIn("Waxing gibbous", t)
         self.assertNotIn("hologram", " ".join(t).lower())
         self.assertIn("Photo", t)                  # a photo whose picture was refused: its card
 
@@ -675,8 +677,9 @@ class SceneWidgetPhotos(unittest.TestCase):
         cls.stack_photo, cls.own_photo = big_jpeg(1), big_jpeg(2)
         answer = {"ok": True, "design": {"objects": [
             {"id": "st", "type": "widget", "kind": "stack", "x": 100, "y": 100, "w": 600, "h": 400, "items": [
-                {"kind": "photo", "opts": {"image": cls.stack_photo, "caption": "Beach"}},
-                {"kind": "clock"}]},
+                # one item: a stack of two takes turns each minute on a Roku, and this scene runs on the
+                # real clock, so the photo would show only on every other minute
+                {"kind": "photo", "opts": {"image": cls.stack_photo, "caption": "Beach"}}]},
             {"id": "ph", "type": "widget", "kind": "artframe", "x": 800, "y": 100, "w": 500, "h": 500,
              "opts": {"image": cls.own_photo}}]}}
         cls.r = run_scene(fixture("every-object.json"), answer)
