@@ -361,7 +361,7 @@ words together at most 60% (the rest are left out); the home's own parts have si
 people and quick buttons 3x, Keep watching 1.5x); and the remote never lands on a part the design
 hides or moves mostly off the screen. **Holding Back for about 5 seconds** (or pressing it 5 times
 quickly) switches designs off on that TV and shows the normal home. They stay off, whatever design
-arrives next, until **Home settings, Look, Your design** turns them back on. **Words with a phone
+arrives next, until the **Your design** switch (Home settings, Designs) turns them back on. **Words with a phone
 number or a web address are never drawn** (`CouchDesign.flags` finds them; couch-tv Studio warns
 before download). **A design is kept cheap to draw:** at most 40 objects, 6 frosted cards (and about
 a screen and a bit of frosted area), 8 turned objects, 10 glows, a 16 px background blur, and a
@@ -398,7 +398,7 @@ colour, `#000000` for a black screen) can stand in for `background.image`; a wid
 | `panel` | On `people`, `quick`, `keep_watching`, `dock`: `glass` (frosted, the default), `solid` (no blur, lighter for a slow TV) or `none`. |
 | `dock` | `icon_shape` `rounded`, `circle` or `square`; `icon_tone` `colour`, `mono` (black and white until focused) or `dim`. |
 | `apps` | `order`: the dock's apps, in order (only those, up to ten; the rest are behind More apps). `hidden`: apps taken off the dock. `tiles.<package>`: `x`, `y`, `scale` for one app's tile. Settings and More apps always stay. |
-| `background` | Your own picture over the scenes: `image` is a file in the app (`backgrounds/...`) or a JPEG, PNG or WebP data URL (couch-tv Studio makes these, 1920x1080); never a web address. A picture that does not load leaves the normal scenes. `darken` 0 to 0.9, `zoom` 1 to 4, `x` and `y` 0 to 100 (which part shows when zoomed), `blur` in pixels. The glass clock shows this picture through its digits. `video` (with `image`, which is then its still picture): a short muted loop played over the picture, either a file on the TV (`backgrounds/loop-rain.mp4`, `loop-fire`, `loop-ocean`, `loop-clouds`, or your own in `backgrounds/mine/`) or `store:<id>`, a video the design store keeps; never a web address. MP4 with H.264 or WebM with VP8 or VP9, at most 15 s, 1920x1080 and 8 MB (1280x720 and 4 MB for the store's 720p copy). An official couch-tv Studio gallery design's `store:` video may also have a long seamless loop, up to about 4 minutes and 24 MB at 1080p (16 MB at 720p); only a TV with 2 GB of memory or more asks for it, it falls back to the 15 s copy if the loop does not arrive within 3 minutes, and once a store video has played the TV keeps one copy (the current design's) and plays it from there. The picture shows first and stays with Lighter home, in power save, on a TV that drops frames (for a week), while an app is open, and whenever the video cannot play (Home settings, couch-tv Studio, Your design says why). `blur` is not used with a video. `loop-clouds.jpg` with `depth: true` puts the clock behind its hills. |
+| `background` | Your own picture over the scenes: `image` is a file in the app (`backgrounds/...`) or a JPEG, PNG or WebP data URL (couch-tv Studio makes these, 1920x1080); never a web address. A picture that does not load leaves the normal scenes. `darken` 0 to 0.9, `zoom` 1 to 4, `x` and `y` 0 to 100 (which part shows when zoomed), `blur` in pixels. The glass clock shows this picture through its digits. `video` (with `image`, which is then its still picture): a short muted loop played over the picture, either a file on the TV (`backgrounds/loop-rain.mp4`, `loop-fire`, `loop-ocean`, `loop-clouds`, or your own in `backgrounds/mine/`) or `store:<id>`, a video the design store keeps; never a web address. MP4 with H.264 or WebM with VP8 or VP9, at most 15 s, 1920x1080 and 8 MB (1280x720 and 4 MB for the store's 720p copy). An official couch-tv Studio gallery design's `store:` video may also have a long seamless loop, up to about 4 minutes and 24 MB at 1080p (16 MB at 720p); only a TV with 2 GB of memory or more asks for it, it falls back to the 15 s copy if the loop does not arrive within 3 minutes, and once a store video has played the TV keeps one copy (the current design's) and plays it from there. The picture shows first and stays with Lighter home, in power save, on a TV that drops frames (for a week), while an app is open, and whenever the video cannot play (Home settings, Designs, Your design says why). `blur` is not used with a video. `loop-clouds.jpg` with `depth: true` puts the clock behind its hills. |
 | `texts` | Up to eight lines of your own words: `text` (200 characters), `x`, `y` (the top left corner), `size` in pixels, and the text styles. Older designs; newer ones use `objects` of type `text`. |
 | `rotate`, `shade` | On parts (not the clock or the dock): `rotate` in degrees. On text parts and objects: `shade` `glow` (a wide dark glow) or `panel` (a dark panel behind the words; on the clock, a dark pool under the digits), to read them on a busy photo. |
 | dock layout | On `elements.dock`: `layout` `row` (the default), `column` or `grid` (with `columns`), `icon_size` and `icon_gap` in pixels (112 and 26), `labels` `focus` (the default), `always` or `off`, `label_pos` `below` or `right`, `icon_shape` also `squircle` or `none` (the app's symbol with no tile), `icon_style` `colour`, `mono`, `glass`, `outline` or `dark`. A row too long for the TV's safe area wraps onto more lines instead of running off the screen. The remote follows the shape: up and down move along a column (a side rail), left and right step off it to the shows, and More apps opens in its usual place. With `labels: "always"` a long name shows by its first word. |
@@ -418,7 +418,7 @@ each widget needs, where that is set up, which TVs can run it and the sizes it c
 OK on the card opens the whole record. It never shows pretend data. The air quality and surf widgets
 ask Open-Meteo's free air quality and marine services, only while one is on the home.
 
-**Things typed at home (Home settings, couch-tv Studio, At home).** The Family note, List, Guest
+**Things typed at home (Home settings, Designs, At home).** The Family note, List, Guest
 Wi-Fi, House guide, Agenda and Screen time widgets show what is typed on the TV itself, with the remote
 or the phone remote's Type on the TV: a note and who it is from, up to 3 lists of 40 items (OK on the
 List widget opens it, OK ticks an item), the guest network's name, password and security, up to 8 guide
@@ -466,7 +466,7 @@ link. The website home on a Hisense (no computer) has no relay, so Headlines and
 need a home computer there; Scores and Commute ask their services straight from the TV.
 
 The commute's places are never in a design: from the town in Home settings, Location, to the town or
-suburb picked in Home settings, couch-tv Studio, Commute (shown while a design has the widget). The
+suburb picked in Home settings, Designs, Commute (shown while a design has the widget). The
 second is kept on the TV only (`tvhome.commute`), not in the settings the bridge keeps, and Share
 this home stops if it would send it. A design's Commute widget carries only its label, the arrive by
 time (`arrive_h`, `arrive_m`), the minutes to spare (`buffer`, 10 unless set) and `weekdays`.
@@ -495,7 +495,7 @@ the design pointing at it. Not yet tried on a real TV.
 **Get a design**: type the code couch-tv Studio's Send to my TV shows (`ABCDE-FGHJK`, or the long
 `CTV1-...` one from its QR code). The TV asks that one server, with the code and nothing else (no
 cookies, no referrer), and keeps the design in its own storage (`couchtv.design.fetched`); it wins
-over a `design` in this file until **Remove the design I got**. The only picture it takes is a JPEG
+over a `design` in this file until **Delete this design** (Home settings, Designs). The only picture it takes is a JPEG
 inside the answer. A design got this way always shows "Use this design?" first: getting one clears
 the TV's record of any design it said yes to. Without `design_store` the rows do not show. The
 browser preview takes `?mock=1&designstore=http://127.0.0.1:5490`. English only for now.
@@ -673,7 +673,7 @@ computer on; the doorbell card that slides in over apps needs a Google TV, Andro
 
 With a computer at home, couch-tv talks to a Philips Hue bridge and an AirTouch 5 aircon console
 itself, the way Home Assistant would, on every TV it serves (Google TV and Android TV too, beside any
-Home Assistant things). Set both up on the TV: Home settings, couch-tv Studio, Smart home.
+Home Assistant things). Set both up on the TV: Home settings, Designs, Smart home.
 
 - **Philips Hue:** type the Hue bridge's address (Hue app, Settings, Bridges, the i button), press the
   round button on top of the Hue bridge, then Pair within 30 seconds. Tick up to 16 lights. They show
@@ -728,7 +728,7 @@ name from a calendar (Guest name from: Bookings calendar): "Welcome, Sarah" from
 until check out, with "Check in from 3pm" or "Check out Sunday at 10am" under it. Between stays it shows
 the design's own words. This is the way guest-tv, our sibling project for guest TVs, does it.
 
-On the TV: Home settings, couch-tv Studio, At home, **Guests**. Paste the calendar link Airbnb
+On the TV: Home settings, Designs, At home, **Guests**. Paste the calendar link Airbnb
 (Calendar, Availability, Connect calendars, Export calendar), Booking.com or VRBO gives you, and set
 **Check in from** and **Check out by** (calendars hold days, not times). Without a bookings link the
 Agenda's own calendar is read, and there only events titled like "Stay: Sarah" count. The link, the

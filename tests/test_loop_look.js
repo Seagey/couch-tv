@@ -753,7 +753,7 @@ const tick = () => new Promise((r) => setImmediate(r));
   // ---------------- a design in the Loop look: the preview opens in Night, a code switches to Night, the row says so ----------------
   assert(/if \(THEME === "loop" && GATE\.preview\) THEME = "night";/.test(source), 'Studio\'s preview opens in Night');
   assert(/if \(LOOP\) \{ ST\.look = "night"; keep\("tvhome\.look", "night"\); saveSettings\(\); \}/.test(source), 'a design got by code switches the home to Night');
-  assert(/if \(CFG\.design && LOOP\) rows\.push\(\{ kind: "action", key: "dz-loop"/.test(source) && /else if \(CFG\.design && typeof CouchDesign !== "undefined" && CouchDesign\.settingsRow\)/.test(source), 'in Loop the design row says where it shows, not On');
+  assert(/if \(on && has && !held && CFG\.design && LOOP\) rows\.push\(\{ kind: "action", key: "dz-loop"/.test(source), 'in Loop the design row says where it shows');
 
   // ---------------- the dock centred; the More apps panel keeps its full width; down finds the nearest tile ----------------
   assert(/html\.theme-loop \.apps \{ top: auto; bottom: 3\.5rem; left: 50%; right: auto; transform: translateX\(-50%\); \}/.test(sec), 'the dock is centred');

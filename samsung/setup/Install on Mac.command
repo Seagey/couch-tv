@@ -131,7 +131,7 @@ say "" "couch-tv is on your TV. If it is not on screen, open it from the TV's ro
 say "Next, on the TV:"
 say "  - Settings, General, Smart Features, Autorun Last App: On (couch-tv comes back when the TV does)."
 say "  - To open couch-tv: press Home on the Samsung remote, then pick Couch TV in the row of apps."
-say "  - couch-tv Studio: the gear tile, couch-tv Studio, Get a design, then type your code."
+say "  - couch-tv Studio: the gear tile, Designs, Get a design, then type your code."
 say "" "To update couch-tv later, run this again with the newest download. Your settings stay."
 say "" "Press Return to close this window."
 read -r _

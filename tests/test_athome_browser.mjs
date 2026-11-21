@@ -1,5 +1,5 @@
 // Things typed at home, in a real browser at 1920x1080 (the TV home in its ?mock preview):
-//  1. Home settings, couch-tv Studio, At home: a note, a list and its items, the guest Wi-Fi, a guide
+//  1. Home settings, Designs, At home: a note, a list and its items, the guest Wi-Fi, a guide
 //     entry and a calendar link typed with the remote land on the widgets straight away.
 //  2. The widgets show them at every size they come in, fitting and centred (2c): the note, the list (still to do first), a real
 //     Wi-Fi join code that reads back as the WIFI: words, the guide, today's events from the calendar,

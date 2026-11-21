@@ -280,7 +280,7 @@
     S.body.appendChild(E("div", "cwd-row cwd-grow", "align-items:flex-start;margin-top:36px", [todayCol, right]));
   }
 
-  // things typed at home (Home settings, couch-tv Studio, At home), kept on this TV
+  // things typed at home (Home settings, Designs, At home), kept on this TV
   // Batteries (Batteries.kt through TVOS.batteries): every paired device that reports its charge, and on
   // Android 12 and newer the one question Android asks first ("Nearby devices")
   B.batteries = function (o, env) {

@@ -76,7 +76,8 @@
       '<circle cx="' + Math.round(w * 0.22) + '" cy="' + Math.round(ht * 0.86) + '" r="' + Math.round(ht * 0.42) + '" fill="#000" opacity=".16"/></svg>';
     return "data:image/svg+xml," + encodeURIComponent(svg);
   };
-  var arg = function (name) { var m = q.match(new RegExp("[?&]" + name + "=([^&]*)")); return m ? decodeURIComponent(m[1]) : null; };
+  // a query string writes a space as "+" (URLSearchParams, couch-tv Studio's preview: "Your+town", launch audit 0.13.9)
+  var arg = function (name) { var m = q.match(new RegExp("[?&]" + name + "=([^&]*)")); if (!m) return null; try { return decodeURIComponent(m[1].replace(/\+/g, " ")); } catch (e) { return null; } };
   // the Home settings keys the bridge keeps (bridge/server.py clean_settings); keep the two lists alike
   var BRIDGE_KEYS = ["lang", "place", "wx_show", "wx_unit", "wx_every", "look", "idle_photo_seconds", "keep_photo", "keep_photo_pick", "glass", "glass_icons",
     "moving_tiles", "dock", "lighter", "glass_amount", "clock_style", "now_playing", "keep_watching", "ambient_music", "sun_sync", "ambient_weather",

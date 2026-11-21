@@ -29,7 +29,7 @@ Night, Classic and OLED are untouched by any of this.
 A couch-tv Studio design is not drawn in the Loop look: the home starts no design there (no design
 picture, layers, widgets or video behind the loop), so nothing decodes a picture that the loop would
 cover. The design shows again as soon as you pick another look. In the Loop look Home settings,
-couch-tv Studio says so in a "Your design" row that switches to Night, getting a design by its code
+Designs says so in a "Your design" row that switches to Night, getting a design by its code
 switches the home to Night so the design's question comes, and Studio's own preview (`?designer=1`)
 always opens in Night. In Home settings the Loop look also
 leaves out the Glass panels and Mac-style dock rows: it has its own glass and its own dock.

@@ -24,7 +24,8 @@ for (const f of files) {
 const app = fs.readFileSync(path.join(web, "app.js"), "utf8");
 ok(/id === "designer" \? "Designs"/.test(app), "Home settings names the section Designs (0.13.9; the website keeps the name couch-tv Studio)");
 ok(/label: "Turn on designs"/.test(app) && !/label: "Turn on couch-tv Studio"/.test(app), "Turn on designs");
-ok(/label: "Back to the standard home"/.test(app) && !/classic home/.test(app), "Back to the standard home, never the classic home");
+ok(/key: "dz-switch", label: "Your design", value: "On"/.test(app) && !/classic home/.test(app) && !/label: "Back to the standard home"/.test(app), "one Your design switch, never the classic home");
+ok(/label: "Delete this design"/.test(app) && !/label: "Remove the design I got"/.test(app), "Delete this design");
 ok(/sub: "Type the code from couch-tv Studio on your phone"/.test(app), "Get a design still names the couch-tv Studio website");
 ok(/Open this home in couch-tv Studio/.test(fs.readFileSync(path.join(web, "share-home.js"), "utf8")), "Share this home says couch-tv Studio");
 // the ids, keys and links do not change

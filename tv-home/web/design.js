@@ -464,7 +464,7 @@
   OPT.reading = haId(/^sensor\.[a-z0-9_]{1,64}$/);
   OPT.players = function (v) { return SAN.list(v, 6, haId(/^media_player\.[a-z0-9_]{1,64}$/)); };
   // the Welcome widget: where the guest's name comes from. "calendar" means this TV's own bookings
-  // calendar (Home settings, couch-tv Studio, At home, Guests); the design never carries a name, a
+  // calendar (Home settings, Designs, At home, Guests); the design never carries a name, a
   // link or a time. times: false hides the check in and check out line.
   OPT.source = function (v) { return SAN.pick(v, ["typed", "calendar"]); };
   // the smart home widgets' own settings Studio can set (widget-caps.js, store "design"): the aircon's
@@ -2194,6 +2194,10 @@
     card.appendChild(back);
     var layer = document.createElement("div");
     layer.setAttribute("style", "position:absolute;left:0;top:0;width:1920px;height:1080px;transform-origin:0 0;transform:scale(" + k + ");font-family:Inter, sans-serif;color:#fff");
+    // the home's own parts the design keeps (the clock, the date, Keep watching, the dock), sketched where
+    // it puts them: a design that only restyles them (Couch Original) showed just its photo here, so the
+    // card did not show what "Check it looks right" asks about (launch audit 0.13.9, 22 Nov 2026)
+    try { homeParts(clean).forEach(function (n) { layer.appendChild(n); }); } catch (e) { /* the objects still draw */ }
     IN_CARD = true;   // the "Use this design?" card: drawn before this TV's app list is read (widgets.js appsFor)
     try {
       list(clean.objects).forEach(function (o) {
@@ -2209,6 +2213,52 @@
     card.appendChild(tag);
     return card;
   }
+  // The sketch of the home's parts for the preview card, in 1920 x 1080 pixels, from the clean design:
+  // each part where the design moves it, at its size, in its font and colour, left out when it hides it.
+  // Shapes stand in for the apps and shows (this TV's own app list is not read before the answer).
+  function homeParts(clean) {
+    var E = obj(clean.elements), out = [], now = new Date();
+    var hid = function (k) { return obj(E[k]).hidden === true; };
+    var box = function (css, text) { var n = document.createElement("div"); n.setAttribute("style", "position:absolute;" + css); if (text) n.textContent = text; out.push(n); return n; };
+    var at = function (m, origin) { return moved(m) ? "transform:translate(" + m.x + "px," + m.y + "px) scale(" + m.s + ");transform-origin:" + origin + ";" : ""; };
+    var font = function (e) { var f = fontOf(obj(e).font); return f ? "font-family:" + f + ";" : ""; };
+    var ink = function (e, def) { return "color:" + (colour(obj(e).colour) || def) + ";"; };
+    if (!hid("clock")) {
+      var ce = obj(E.clock), cm = ce.at === "scene" ? { x: 0, y: 0, s: 1, r: 0 } : place(ce), hh = now.getHours();
+      var time = (ce.format === "24h" ? ("0" + hh).slice(-2) : String(hh % 12 || 12)) + ":" + ("0" + now.getMinutes()).slice(-2);
+      var cw = parseInt(ce.weight, 10);
+      box("left:0;right:0;top:" + (184 + cm.y) + "px;text-align:center;white-space:nowrap;font-size:" + Math.round(400 * cm.s) + "px;line-height:0.86;letter-spacing:-0.045em;" +
+        "font-weight:" + (cw >= 100 && cw <= 900 ? cw : 200) + ";" + font(ce) + ink(ce, "rgba(255,255,255,0.9)") + "text-shadow:0 0.5rem 2.5rem rgba(0,0,0,0.3);transform:translateX(" + cm.x + "px)", time);
+    }
+    if (!hid("date")) {
+      // in the TV's language and the design's date format, as the home writes it (app.js clock)
+      var de = obj(E.date), loc = window.I18N && window.I18N.locale ? window.I18N.locale() : "en-AU";
+      var day = now.toLocaleDateString(loc, DATE_FORMATS[de.format] || { weekday: "long", day: "numeric", month: "long" }).replace(/,/g, "");
+      day = day.charAt(0).toUpperCase() + day.slice(1);
+      box("left:0;right:0;top:96px;text-align:center;white-space:nowrap;font-size:36px;font-weight:600;" + font(de) + ink(de, "#fff") + at(place(de), "50% 0") + "text-shadow:0 0.125rem 1rem rgba(0,0,0,0.35)", day);
+    }
+    if (!hid("keep_watching")) {
+      var kw = place(E.keep_watching), shelf = box("left:80px;top:650px;width:1760px;height:200px;" + at(kw, "0 0"));
+      for (var i = 0; i < 3; i++) {
+        var c = document.createElement("div");
+        c.setAttribute("style", "position:absolute;top:44px;left:" + (i * 544) + "px;width:520px;height:146px;border-radius:24px;background:rgba(18,19,24,0.62);box-shadow:inset 0 0 0 2px rgba(255,255,255,0.1)");
+        shelf.appendChild(c);
+      }
+    }
+    if (!hid("dock")) {
+      var dk = obj(E.dock), dm = place(dk), size = num(dk.icon_size, 112, 40, 240), gap = num(dk.icon_gap, 26, 0, 120);
+      var n = Math.min(12, Math.max(4, Math.floor((1728 - 40 + gap) / (size + gap)))), w = n * size + (n - 1) * gap + 40;
+      var radius = SHAPES[dk.icon_shape] !== undefined ? SHAPES[dk.icon_shape] : "22.5%";
+      var bar = box("left:" + Math.round((1920 - w) / 2) + "px;top:" + (1080 - 48 - size - 40) + "px;width:" + w + "px;height:" + (size + 40) + "px;border-radius:" + Math.round((size + 40) * 0.32) + "px;" +
+        "background:rgba(255,255,255,0.1);box-shadow:inset 0 0 0 2px rgba(255,255,255,0.14);" + at({ x: dm.x, y: dm.y, s: dm.s, r: 0 }, "50% 100%"));
+      for (var j = 0; j < n; j++) {
+        var t = document.createElement("div");
+        t.setAttribute("style", "position:absolute;top:20px;left:" + (20 + j * (size + gap)) + "px;width:" + size + "px;height:" + size + "px;border-radius:" + (radius === "0" ? "8%" : radius) + ";background:rgba(255,255,255," + (j >= n - 2 ? "0.22" : "0.78") + ")");
+        bar.appendChild(t);
+      }
+    }
+    return out;
+  }
   function askFirst(d) {
     // the objects' own styles, for the preview card
     if (!document.getElementById("cd-ask-style")) { var s = document.createElement("style"); s.id = "cd-ask-style"; s.textContent = OBJ_CSS; document.head.appendChild(s); }
@@ -2219,7 +2269,7 @@
     var col = document.createElement("div"); col.setAttribute("style", "flex:1;min-width:0");
     var h1 = document.createElement("div"); h1.textContent = "A new home design arrived. Use this design?";
     h1.setAttribute("style", "font-size:3.25rem;line-height:4rem;font-weight:700;letter-spacing:-0.01em");
-    var p = document.createElement("div"); p.textContent = "Check it looks right first: its words and pictures are the ones whoever made it chose. Keep my home leaves your TV exactly as it is.";
+    var p = document.createElement("div"); p.textContent = "This design came from couch-tv Studio. Keep my home leaves your TV exactly as it is.";
     p.setAttribute("style", "margin-top:1.25rem;font-size:1.75rem;line-height:2.375rem;color:rgba(255,255,255,0.82);max-width:44rem");
     var row = document.createElement("div"); row.setAttribute("style", "margin-top:2.5rem;display:flex;flex-direction:column;align-items:flex-start;gap:1.25rem");
     var mk = function (label, big) { var b = document.createElement("div"); b.textContent = label; b.setAttribute("style", "padding:" + (big ? "1.375rem 3rem" : "1rem 2.25rem") + ";border-radius:3rem;font-size:" + (big ? "2rem" : "1.625rem") + ";font-weight:700;background:rgba(255,255,255,0.12)"); row.appendChild(b); return b; };
@@ -2240,6 +2290,9 @@
       box.remove(); ASK = null;
       if (use) {
         store("couchtv.design.ok", hashOf(d)); store("couchtv.design.no", null);
+        // the person is at the remote: the home that starts next shows where the focus is at once, so the
+        // next press moves from a tile they can see (focusAfterAnswer)
+        try { sessionStorage.setItem(KEYS_SHOWN, "1"); } catch (e) {}
         // its look settings are read when the home starts: start again with it
         setTimeout(function () { try { location.reload(); } catch (e) { apply(d); } }, 50);
       } else { store("couchtv.design.no", hashOf(d)); escaped = true; }
@@ -2254,6 +2307,30 @@
     };
     window.addEventListener("keydown", onKey, true);
     ASK = { box: box, done: done };
+  }
+
+  // ---------------- the focus on a design ----------------
+  // A design opens calm, with no focus drawn until a key is pressed (css(): html.cd:not(.cd-keys)). The
+  // first arrow press only shows where the focus is: it used to move it too, from a tile nobody could
+  // see, and Down from the dock opened More apps by surprise (launch audit 0.13.9, 22 Nov 2026). OK, Back
+  // and the rest act at once, as before. After Use this design the home that starts again shows the
+  // focus straight away: the person is holding the remote.
+  var KEYS_SHOWN = "couchtv.design.keys";
+  var ARROW = { ArrowUp: 1, ArrowDown: 1, ArrowLeft: 1, ArrowRight: 1, Up: 1, Down: 1, Left: 1, Right: 1 };
+  function isArrow(e) { return !!ARROW[e.key] || (e.keyCode >= 37 && e.keyCode <= 40) || (e.keyCode >= 19 && e.keyCode <= 22); }
+  function focusAfterAnswer() {
+    var said = null;
+    try { said = sessionStorage.getItem(KEYS_SHOWN); sessionStorage.removeItem(KEYS_SHOWN); } catch (e) {}
+    if (said && ON && !DESIGNER) ROOT.classList.add("cd-keys");
+  }
+  function firstKey(e) {
+    if (!ON || ROOT.classList.contains("cd-keys")) return;
+    ROOT.classList.add("cd-keys");
+    // only on the home itself: Home settings, a question or a sheet draw their own focus
+    // (nor a home asleep behind its idle photo, the ambient clock or Screen off: that press wakes it)
+    if (DESIGNER || ASK || !isArrow(e) || /\b(setting|idle-photo)\b/.test(document.documentElement.className) ||
+      document.querySelector(".share-home, .cw-sheet, #screen-off-overlay.active, #idle-ambient-overlay.active")) return;
+    e.preventDefault(); e.stopImmediatePropagation();
   }
 
   // ---------------- what app.js asks ----------------
@@ -2921,7 +2998,8 @@
         else if (needsConfirm(design)) askFirst(design);   // nothing of it is applied until Use this design
         else apply(design);
       }
-      document.addEventListener("keydown", function () { if (ON) ROOT.classList.add("cd-keys"); }, true);
+      focusAfterAnswer();
+      document.addEventListener("keydown", firstKey, true);
       if (DESIGNER) {
         ROOT.classList.add("cd-edit");   // editing: no focus shown until "Try it with the remote"
         // trying it with the remote: OK on an app flashes it and tells the designer what would open
@@ -2990,6 +3068,12 @@
     cost: function (design, raw) { return cost(raw ? obj(design) : sanitize(design)); },
     // Home settings, Look: the row that turns designs back on after Back switched them off
     off: function () { return offNow(); },
+    // Home settings, Designs (app.js designerRows): the design is held back on this TV, switched off with
+    // Back held or answered Keep my home; resume() brings it back (the same as Your design On did)
+    held: function () { return offNow() || !!(PENDING && store("couchtv.design.no") === hashOf(PENDING)); },
+    resume: function () { setOff(false); if (PENDING && store("couchtv.design.no") === hashOf(PENDING)) { store("couchtv.design.ok", hashOf(PENDING)); store("couchtv.design.no", null); } },
+    // an honest line when the design's video shows only its still picture, and why ("" when it plays)
+    videoNote: function () { var vs = VP ? VP.state() : null; return vs && vs.why && (vs.state === "still" || vs.state === "failed") ? ". Video background: its still picture shows, " + vs.why : ""; },
     settingsRow: function (restart) {
       var off = offNow() || (PENDING && store("couchtv.design.no") === hashOf(PENDING));
       // an honest line when the design's video shows only its still picture, and why

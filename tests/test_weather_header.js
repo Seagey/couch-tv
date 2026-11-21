@@ -77,18 +77,22 @@ function render(language) {
 const romanian = render('ro');
 assert(romanian.date.innerHTML.includes('Duminică, 15 noiembrie'), 'Romanian date keeps its localized comma');
 assert(
-  romanian.date.innerHTML.includes('Sâmburești, Olt · 5° · Înnorat'),
+  romanian.date.innerHTML.includes('Sâmburești, Olt\u00a0· 5°\u00a0· Înnorat'),
   'Romanian weather line shows the configured locality, live temperature, and localized condition'
 );
 assert(romanian.classes.has('weather-lines'), 'Romanian date and weather render on separate lines');
-assert.strictEqual(romanian.idleWx.textContent, 'Sâmburești, Olt · 5° · Înnorat');
+assert.strictEqual(romanian.idleWx.textContent, 'Sâmburești, Olt\u00a0· 5°\u00a0· Înnorat');
 assert(/^\d{2}:\d{2}$/.test(romanian.time.innerHTML), 'the time remains a separate live clock');
 
 const english = render('en');
 assert(english.date.innerHTML.includes('Sunday 15 November'), 'other locales keep their existing date punctuation');
 assert(english.date.innerHTML.includes('Sâmburești, Olt, Romania'), 'other locales keep the full configured place');
-assert(english.date.innerHTML.includes('Sunday 15 November<span class="wx"><span class="wx-place"> · Sâmburești, Olt, Romania · </span>'),
+assert(english.date.innerHTML.includes('Sunday 15 November<span class="wx"><span class="wx-place">\u00a0· Sâmburești, Olt, Romania\u00a0· </span>'),
   'the one-line header puts the same middle dot between the date and the place as between the other parts');
+// launch audit 0.13.9 (Couch Night): a line that wraps never starts with the dot. Every dot has a no-break
+// space before it (it stays with the word before) and a plain space after (the line may break there)
+assert(!/ ·/.test(english.date.innerHTML) && !/ ·/.test(romanian.date.innerHTML), 'no dot that a wrapped line could start with');
+assert((english.date.innerHTML.match(/\u00a0· /g) || []).length >= 3, 'each dot is kept with the word before it');
 assert(english.date.innerHTML.includes('<svg class="icon"></svg>'), 'other locales retain the existing weather icon');
 assert(!english.classes.has('weather-lines'), 'the Romanian stacked layout is not applied to other locales');
 

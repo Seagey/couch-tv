@@ -576,7 +576,7 @@
     CFG = window.COUCH_CONFIG || {};
     // couch-tv Studio is opt in (designer-gate.js): until the person at this TV turns it on, no design
     // reaches design.js at all and the home is exactly as it was. A design got by code at this TV
-    // (design-code.js, Home settings, couch-tv Studio, Get a design) wins over one in config.json; it is
+    // (design-code.js, Home settings, Designs, Get a design) wins over one in config.json; it is
     // always asked about first (CouchDesign.start with fromCode).
     var GOT = typeof CouchDesignCode !== "undefined" ? CouchDesignCode.kept() : null;
     GATE = typeof CouchDesigner !== "undefined" ? CouchDesigner.decide({ choice: CouchDesigner.readChoice(kept(CouchDesigner.KEY)),
@@ -1022,6 +1022,9 @@
     clock();
   }
   function clock() {
+    // the date line's separator: a no-break space before the dot keeps it with the word before it, so a
+    // line that wraps never starts with "·" (Couch Night, launch audit 0.13.9: a town and the temperature)
+    var DOT = "\u00a0· ";
     if (typeof clockShown === "function") clockShown();   // a design that has just come on or gone shows its own clock
     var d = new Date(), h = d.getHours(), m = d.getMinutes();
     clockMinute = h + ":" + m;
@@ -1044,15 +1047,15 @@
       var weatherParts = [place, w && tempText(w.temp), w && wxText(w)].filter(Boolean);
       date.classList.add("weather-lines");
       date.innerHTML = '<span class="dline"><span class="date-label">' + esc(day) +
-        '</span><span class="wx">' + weatherParts.map(esc).join(" · ") + "</span></span>";
+        '</span><span class="wx">' + weatherParts.map(esc).join(DOT) + "</span></span>";
     } else {
       date.classList.remove("weather-lines");
       var bar = DATE_BARS ? '<i class="vbar"></i>' : "";
       date.innerHTML = '<span class="dline">' + esc(day) + (w ? '<span class="wx">' + bar +
-        (place ? '<span class="wx-place">' + (DATE_BARS ? esc(place) + bar : " · " + esc(place) + " · ") + "</span>" : "") + wxIcon(w) + esc(tempText(w.temp)) +
-        '<span class="ww">' + (DATE_BARS ? " " : " · ") + esc(wxText(w)) + "</span></span>" : "") +
+        (place ? '<span class="wx-place">' + (DATE_BARS ? esc(place) + bar : DOT + esc(place) + DOT) + "</span>" : "") + wxIcon(w) + esc(tempText(w.temp)) +
+        '<span class="ww">' + (DATE_BARS ? " " : DOT) + esc(wxText(w)) + "</span></span>" : "") +
         // no town yet (never a made up one): say once, in the weather's place, where to pick it
-        (!w && NIGHT && WX_SHOW && !CD && !wxPlaceSet() ? '<span class="wx wx-ask">' + bar + (DATE_BARS ? "" : " · ") + esc(t("wx_ask", { home: t("gear_home"), loc: t("sec_location") })) + "</span>" : "") + "</span>";
+        (!w && NIGHT && WX_SHOW && !CD && !wxPlaceSet() ? '<span class="wx wx-ask">' + bar + (DATE_BARS ? "" : DOT) + esc(t("wx_ask", { home: t("gear_home"), loc: t("sec_location") })) + "</span>" : "") + "</span>";
     }
     var ic = $("idle-clock"), idate = $("idle-date"), iwx = $("idle-wx");
     if (ic) ic.innerHTML = clockText;
@@ -1060,7 +1063,7 @@
     if (iwx) {
       var wIdle = WX_SHOW && data.weather && data.weather.temp != null ? data.weather : null;
       var placeIdle = wIdle ? weatherPlace() : "";
-      iwx.textContent = wIdle ? ([placeIdle, tempText(wIdle.temp), wxText(wIdle)].filter(Boolean).join(" · ")) : "";
+      iwx.textContent = wIdle ? ([placeIdle, tempText(wIdle.temp), wxText(wIdle)].filter(Boolean).join(DOT)) : "";
     }
     var iov = $("idle-ambient-overlay");
     if (iov) iov.classList.toggle("quiet-hours", isQuietHours(SMART_IDLE.quiet_hours));
@@ -4524,14 +4527,10 @@
         g -= GRID_COLS;
       } else if (row < lastRow) {
         g = Math.min(g + GRID_COLS, gridEls.length - 1);
-      } else if (dy > 0 && !expanded && gridItems.some(function (x) { return x.kind === "more"; })) {
-        // Down from the bottom row of the dock opens the full apps view (#98), on the same app
-        dockBack = gridKey(gridItems[g]);
-        expanded = true; renderGrid();
-        var at = -1;
-        gridItems.forEach(function (x, i) { if (at < 0 && gridKey(x) === dockBack) at = i; });
-        g = at >= 0 ? at : Math.min(g, gridEls.length - 1);
       }
+      // Down from the bottom row of the dock does nothing: it used to open More apps (#98), which a
+      // beginner met by surprise, three times in one test (launch audit 0.13.9, 22 Nov 2026). More apps
+      // is the tile at the end of the dock.
     }
     paintFocus();
   }
@@ -4580,7 +4579,9 @@
       if (dx) {   // along the row: the first app and the last tile (More apps) meet
         var first = Math.floor(g / GRID_COLS) * GRID_COLS;
         g = dx > 0 ? first : Math.min(first + GRID_COLS, gridEls.length) - 1;
-      } else if (dy > 0) {   // down from the very bottom: back to the top of the home
+      } else if (dy > 0 && !expanded) {
+        return;   // Down on the dock does nothing (launch audit 0.13.9): it neither opens More apps nor jumps to the top
+      } else if (dy > 0) {   // down from the very bottom of More apps: back to the top of the home
         if (peopleOn()) toPeople();
         else if (hasQuick()) { zone = "quick"; qi = 0; }
         else if (shelfReach() && !(NIGHT && expanded)) { zone = "shelf"; s = 0; }
@@ -4692,7 +4693,7 @@
     if (zone === "inputs") { closeInputMenu(); paintFocus(); return; }
     if (expanded) {
       expanded = false; renderGrid();
-      if (dockBack) {   // opened with Down from the dock: Back lands on that app in the dock again
+      if (dockBack) {   // opened from the More apps tile: Back lands on that tile in the dock again
         var back = -1;
         gridItems.forEach(function (x, i) { if (back < 0 && gridKey(x) === dockBack) back = i; });
         dockBack = null;
@@ -4776,7 +4777,8 @@
     }
     var a = gridItems[g], el = gridEls[g];
     if (!a) return;
-    if (a.kind === "more") { dockBack = null; expanded = true; renderGrid(); paintFocus(); return; }
+    // Back from More apps lands on the More apps tile it was opened from, with the focus showing
+    if (a.kind === "more") { dockBack = gridKey(a); expanded = true; renderGrid(); paintFocus(); return; }
     if (a.kind === "gear") { openGear(); return; }
     if (a.kind === "inputs") { openInputs(); return; }
     if (a.kind === "smart") { openSmart(); return; }
@@ -5089,6 +5091,10 @@
   var ATHOME_USE = ["note", "list", "wifi", "guide", "agenda", "welcome", "screentime"];
   function designUse() {
     if (typeof CouchDesign === "undefined" || !CouchDesign.on || !CouchDesign.on() || !CouchDesign.uses) return null;
+    // switched off or deleted in Designs just now: the banner and the hidden rows go at once, not
+    // only after Home settings is closed (launch audit 0.13.9)
+    if (typeof CouchDesigner !== "undefined" && kept(CouchDesigner.KEY) === "off" && !GATE.preview) return null;
+    if (DESIGN_FROM_CODE && typeof CouchDesignCode !== "undefined" && !CouchDesignCode.kept()) return null;
     try { var u = CouchDesign.uses(); return u && u.on ? u : null; } catch (e) { return null; }
   }
   // what the design on screen uses; null: no design, so every setting shows
@@ -5369,8 +5375,14 @@
     // Right under Get a design, so the rows above stay where couch-tv Studio's pictured steps show them.
     if (CouchDesignCode.openInbox && window.TVQR) rows.push({ kind: "nav", key: "design-phone", label: "Get a design from your phone",
       sub: "Scan a code with your phone and choose a design there. No typing on the TV", act: openPhoneInbox });
-    if (DESIGN_FROM_CODE) rows.push({ kind: "action", key: "design-forget", label: "Remove the design I got", sub: "Back to the home as it was", act: function () {
-      CouchDesignCode.forget(); SET.dirty = true; SET.msg = "Removed. The home goes back to how it was when you close Home settings.";
+  }
+  // A design got by code is kept on this TV until it is deleted here, whether designs are on or off
+  // (it used to be hidden while they were off, so deleting it meant turning it back on first).
+  function deleteRow(rows) {
+    if (typeof CouchDesignCode === "undefined" || !CouchDesignCode.kept()) return;
+    rows.push({ kind: "action", key: "design-forget", label: "Delete this design", sub: "Back to the home as it was", danger: true, act: function () {
+      sameSection(function () { CouchDesignCode.forget(); }); SET.dirty = true; SET.keyFocus = "dz-switch";
+      SET.msg = "Removed. The home goes back to how it was when you close Home settings.";
     } });
   }
   // Get a design from your phone (design-code.js openInbox, takeInbox): a QR of couch-tv Studio with a
@@ -5378,7 +5390,24 @@
   // seconds whether the phone put a design code in it; nothing connects to the TV. A code that comes
   // is got exactly as a typed one (getDesignByCode), so "Use this design?" comes first, always.
   var INBOX = null;   // { state: "opening" | "waiting" | "gone" | "error", id, link, expires, every, timer, misses, msg }
-  function inboxShown() { return zone === "settings" && !!SET.sub && SET.sub.id === "phone-inbox"; }
+  // (an inbox opened with Open this home in couch-tv Studio is asked while that screen is open instead)
+  function inboxShown() {
+    if (INBOX && INBOX.share) return typeof CouchShare !== "undefined" && CouchShare.isOpen();
+    return zone === "settings" && !!SET.sub && SET.sub.id === "phone-inbox";
+  }
+  // the inbox's screen says it ran out or failed: the phone inbox page draws it; the Open this home screen
+  // keeps its QR and code (they work for 30 minutes), so it just stops asking
+  function inboxEnded(mine) {
+    if (mine.share) { stopInbox(); return; }
+    renderSettings();
+  }
+  // a code came: the screen that was waiting closes, and the focus goes back to the row that opened it
+  function inboxGot(mine) {
+    var shown = inboxShown();
+    if (INBOX === mine) stopInbox();
+    if (mine.share) { if (typeof CouchShare !== "undefined") CouchShare.close(); SET.keyFocus = "dz-share"; }
+    else if (shown) { SET.sub = null; SET.keyFocus = "design-phone"; }
+  }
   function stopInbox() { if (INBOX && INBOX.timer) clearTimeout(INBOX.timer); INBOX = null; }
   function openPhoneInbox() {
     stopInbox();
@@ -5401,13 +5430,12 @@
   function lookInInbox(mine) {
     // the screen was closed, or another inbox replaced this one: stop asking
     if (INBOX !== mine || !inboxShown()) { if (INBOX === mine) stopInbox(); return; }
-    if (Date.now() > mine.expires) { mine.state = "gone"; renderSettings(); return; }
+    if (Date.now() > mine.expires) { mine.state = "gone"; inboxEnded(mine); return; }
     CouchDesignCode.takeInbox(mine.id).then(function (code) {
       // a code is handed out once (the store deletes it as it answers): one that comes back after the
       // screen was closed is still got, so the phone's send is never lost. "Use this design?" still asks.
       if (code) {
-        if (INBOX === mine) stopInbox();
-        if (inboxShown()) { SET.sub = null; SET.keyFocus = "design-phone"; }
+        inboxGot(mine);
         getDesignByCode(code);
         return;
       }
@@ -5415,10 +5443,10 @@
       mine.misses = 0; nextInboxLook(mine);
     }, function (e) {
       if (INBOX !== mine || !inboxShown()) return;
-      if (e && e.kind === "gone") { mine.state = "gone"; renderSettings(); return; }
+      if (e && e.kind === "gone") { mine.state = "gone"; inboxEnded(mine); return; }
       // a Wi-Fi blip: keep asking a few more times before saying so
       if (++mine.misses < 5) { nextInboxLook(mine); return; }
-      mine.state = "error"; mine.msg = (e && e.message) || ""; renderSettings();
+      mine.state = "error"; mine.msg = (e && e.message) || ""; inboxEnded(mine);
     });
   }
   function inboxRows() {
@@ -5455,22 +5483,22 @@
     el.textContent = !c.count ? "" : c.ok ? c.shown + "   all 10 letters" : mark ? c.shown + "   take out the " + mark[0] :
       c.shown + "   " + Math.min(c.count, 99) + " of 10 letters";
   }
+  // A whole code is got at once: the TV's own "Use this design?" with its preview is the one question
+  // (a Check page with a second yes before it made two confirmations for one choice, launch
+  // audit 0.13.9). A code that is not whole still shows the Check page, big, with what is wrong.
   function checkDesignCode(typed) {
     var c = CouchDesignCode.checkCode ? CouchDesignCode.checkCode(typed) : { ok: true, code: typed, shown: typed };
+    if (c.ok) { SET.sub = null; SET.keyFocus = "design-get"; SET.col = "rows"; getDesignByCode(c.code); return; }
     SET.sub = { back: "design-get", crumb: "Designs", title: function () { return "Check the code"; },
       rows: function () { return codeCheckRows(c, typed); } };
-    SET.col = "rows"; SET.keyFocus = c.ok ? "code-get" : "code-again"; SET.ri = 0;
+    SET.col = "rows"; SET.keyFocus = "code-again"; SET.ri = 0;
     SET.msg = "";
   }
   function codeCheckRows(c, typed) {
-    var rows = [{ kind: "code", key: "code-shown", label: c.shown || " ", sub: c.ok ? "Is this the code on your phone? Check each letter." : c.msg }];
-    if (c.ok) rows.push({ kind: "action", key: "code-get", label: "Yes, get this design", sub: "The TV asks you about it before it changes anything", act: function () {
-      SET.sub = null; SET.keyFocus = "design-get"; getDesignByCode(c.code);
-    } });
-    rows.push({ kind: "action", key: "code-again", label: "Type it again", sub: c.ok ? "Fix a letter" : "What you typed stays in the box, so you can fix it", act: function () {
-      SET.sub = null; SET.keyFocus = "design-get"; typeDesignCode(c.ok ? c.shown : String(typed || "").trim());
-    } });
-    return rows;
+    return [{ kind: "code", key: "code-shown", label: c.shown || " ", sub: c.msg },
+      { kind: "action", key: "code-again", label: "Type it again", sub: "What you typed stays in the box, so you can fix it", act: function () {
+        SET.sub = null; SET.keyFocus = "design-get"; typeDesignCode(String(typed || "").trim());
+      } }];
   }
   function getDesignByCode(typed) {
     SET.msg = "Getting the design...";
@@ -5491,37 +5519,76 @@
   // ---- Designs (designer-gate.js, couch-tv Studio designs): opt in, and one step back to the standard home ----
   // English only for now, like the rows above (needs i18n). The section's name is the product's.
   function setDesigner(on) {
-    keep(CouchDesigner.KEY, on ? "on" : "off");
-    // on again: designs switched off with Back held (design.js) come back too
-    if (on) try { localStorage.removeItem("couchtv.design.off"); } catch (e) {}
+    sameSection(function () {
+      keep(CouchDesigner.KEY, on ? "on" : "off");
+      // on again: designs switched off with Back held (design.js) come back too
+      if (on) try { localStorage.removeItem("couchtv.design.off"); } catch (e) {}
+    });
     SET.dirty = true;
+  }
+  // The design aware rows and the banner follow a change in Designs at once, not after Home settings is
+  // closed; sections hidden for the design come back, so the one open is found again by its name.
+  function sameSection(change) {
+    var id = !SET.sub && secsNow()[SET.sec] ? secsNow()[SET.sec][0] : null;
+    change();
+    RULES.at = 0;
+    if (!id) return;
+    var i = secsNow().map(function (s) { return s[0]; }).indexOf(id);
+    if (i >= 0) SET.sec = i;
+  }
+  // Whether a design is kept on this TV: one got by code, or one in config.json (GATE.design is null
+  // while designs are off, so this asks what is stored, not what the home started with)
+  function designKept() {
+    var got = typeof CouchDesignCode !== "undefined" ? CouchDesignCode.kept() : null;
+    var cfg = (window.COUCH_CONFIG || {}).design;
+    return !!(got || (cfg && typeof cfg === "object" && !Array.isArray(cfg)));
+  }
+  // Designs (launch audit 0.13.9, 22 Nov 2026): one switch for the design and one way to delete it,
+  // then the ways to get one, then Smart home and At home under their own heading. It used to have
+  // three overlapping ways back (the standard home row, the old Your design On, and a remove row) and
+  // rows that only caught up after Home settings was closed. Every row here is worked out from what is
+  // stored now, so it changes the moment it is pressed.
+  function designsOn() {
+    return !!GATE.preview || CouchDesigner.shownOn(kept(CouchDesigner.KEY), GATE.on, typeof CouchDesign !== "undefined" && CouchDesign.on());
   }
   function designerRows() {
     if (typeof CouchDesigner === "undefined") return [info("dz-none", "Designs", "", "Not in this version of the home.")];
     // the choice kept just now wins over GATE, which is only worked out when the home starts
-    var rows = [], on = !!GATE.preview || CouchDesigner.shownOn(kept(CouchDesigner.KEY), GATE.on, typeof CouchDesign !== "undefined" && CouchDesign.on());
-    if (!on) {
-      rows.push(info("dz-off", "Designs", "Off", "Design your home on your phone, then send it to this TV. While it is off, your home stays exactly as it is."));
-      rows.push({ kind: "action", key: "dz-turn-on", label: "Turn on designs", sub: "Nothing changes until you choose a design", act: function () {
-        setDesigner(true); SET.msg = "Designs are on. Get a design below, or close Home settings.";
-      } });
-    } else {
-      rows.push({ kind: "action", key: "dz-classic", label: "Back to the standard home", sub: "Turns designs off in one step. Your design is kept for later.", act: function () {
+    var rows = [], on = designsOn(), has = designKept();
+    var cd = typeof CouchDesign !== "undefined" ? CouchDesign : null, held = !!(cd && cd.held && CFG.design && cd.held());
+    if (!on && !has) rows.push(info("dz-off", "Designs", "Off", "Design your home on your phone, then send it to this TV. While it is off, your home stays exactly as it is."));
+    if (has && on && !held) {
+      var note = cd && cd.videoNote ? cd.videoNote() : "";
+      rows.push({ kind: "toggle", key: "dz-switch", label: "Your design", value: "On", sub: "Turns designs off in one step. Your design is kept for later." + (note ? " " + note.replace(/^\. /, "") : ""), act: function () {
         setDesigner(false); SET.msg = "Designs are off. The standard home comes back when you close Home settings.";
       } });
-      // a design switched off with Back held, or not chosen yet: it comes back here
-      // in the Loop look no design runs (start()), so its row would say On for a design nobody sees
-      if (CFG.design && LOOP) rows.push({ kind: "action", key: "dz-loop", label: "Your design", sub: "Designs show in the Night, Classic and OLED looks. Switch to Night to see it",
-        act: function () { ST.look = "night"; keep("tvhome.look", "night"); saveSettings(); restart(); } });
-      else if (CFG.design && typeof CouchDesign !== "undefined" && CouchDesign.settingsRow) rows.push(CouchDesign.settingsRow(restart));
-      // (the Commute's Where to is its own page now, Widgets on this home; tvhome.commute stays the 0.13.8 fallback)
-      widgetRows(rows);   // each widget on the design with settings of its own
+    } else if (has) {
+      // a design kept here comes straight back when designs are on again, so the row says so
+      rows.push({ kind: "toggle", key: "dz-switch", label: "Your design", value: "Off", sub: "Brings back your last design", act: function () {
+        setDesigner(true); if (cd && cd.resume) cd.resume();
+        SET.msg = "Your design comes back when you close Home settings.";
+      } });
+    } else if (on) {
+      rows.push({ kind: "toggle", key: "dz-switch", label: "Designs", value: "On", sub: "No design on this TV yet. Get one below.", act: function () {
+        setDesigner(false); SET.msg = "Designs are off. The standard home comes back when you close Home settings.";
+      } });
+    } else {
+      rows.push({ kind: "action", key: "dz-switch", label: "Turn on designs", sub: "Nothing changes until you choose a design", act: function () {
+        setDesigner(true); SET.msg = "Designs are on. Get a design below, or close Home settings.";
+      } });
     }
+    deleteRow(rows);
+    // in the Loop look no design runs (start()), so the switch would say On for a design nobody sees
+    if (on && has && !held && CFG.design && LOOP) rows.push({ kind: "action", key: "dz-loop", label: "Your design", sub: "Designs show in the Night, Classic and OLED looks. Switch to Night to see it",
+      act: function () { ST.look = "night"; keep("tvhome.look", "night"); saveSettings(); restart(); } });
+    designCodeRows(rows);
+    rows.push({ kind: "action", key: "dz-share", label: "Open this home in couch-tv Studio", sub: "Change it on your phone or computer. Names, photos, places, keys and calendar links stay on this TV.", act: shareHome });
+    // (the Commute's Where to is its own page now, Widgets on this home; tvhome.commute stays the 0.13.8 fallback)
+    if (on && CFG.design) widgetRows(rows);   // each widget on the design with settings of its own
+    if ((window.smartHome && window.smartHome.setup && window.smartHome.setup.can()) || (on && AH)) rows.push(head("Smart home and At home"));
     if (window.smartHome && window.smartHome.setup && window.smartHome.setup.can()) rows.push({ kind: "nav", key: "dz-smart", label: "Smart home",
       sub: window.smartHome.setup.status().signin_again ? "Sign in again" : window.smartHome.setup.status().set ? "Connected" : window.smartHome.setup.canPhone && window.smartHome.setup.canPhone() ? "Connect Home Assistant from your phone" : "Connect Home Assistant: your aircon, lights, cameras, speakers and more", act: openSmartSetup });
     if (on && AH) rows.push({ kind: "nav", key: "dz-athome", label: "At home", sub: "A note, lists, guest Wi-Fi, a house guide, your calendar and screen time, for your widgets", act: openAtHome });
-    designCodeRows(rows);
-    rows.push({ kind: "action", key: "dz-share", label: "Open this home in couch-tv Studio", sub: "Change it on your phone or computer. Names, photos, places, keys and calendar links stay on this TV.", act: shareHome });
     return rows;
   }
   // The home as it is now, for Share this home (share-home.js keeps only what a design is made of)
@@ -5556,10 +5623,21 @@
     var base = typeof CouchDesignCode !== "undefined" ? CouchDesignCode.base() : "";
     SET.msg = "Getting a code for couch-tv Studio...";
     renderSettings();
+    // The way back (launch audit 0.13.9): the screen also opens this TV's phone inbox and its QR carries
+    // it (#inbox=), so Send to my TV on the phone comes straight back here, asked about with "Use this
+    // design?" as always. Without an inbox (an older store, a blip) the QR and code work as before.
+    stopInbox();
+    var inbox = CouchDesignCode.openInbox && window.TVQR ? CouchDesignCode.openInbox().catch(function () { return null; }) : Promise.resolve(null);
     CouchShare.send(base, r.design).then(function (res) {
-      SET.msg = "";
-      if (zone === "settings") renderSettings();
-      CouchShare.show(res);
+      return inbox.then(function (b) {
+        SET.msg = "";
+        if (zone === "settings") renderSettings();
+        if (b && b.id) res.link += "#inbox=" + b.id;
+        CouchShare.show(res, { back: !!(b && b.id) });
+        if (!b || !b.id) return;
+        var mine = INBOX = { share: true, state: "waiting", misses: 0, id: b.id, link: b.link, expires: b.expires, every: b.every };
+        nextInboxLook(mine);
+      });
     }, function (e) {
       SET.msg = (e && e.message) || "That did not work. Try again.";
       if (zone === "settings") renderSettings();
@@ -7208,7 +7286,7 @@
 
   // ---------------- at home: what couch-tv Studio's home widgets show (athome.js) ----------------
   // The family note, lists, guest Wi-Fi, house guide, calendar link and screen time goal, typed in Home
-  // settings, couch-tv Studio, At home. Kept on this TV only: the launcher's private store on the
+  // settings, Designs, At home. Kept on this TV only: the launcher's private store on the
   // Android home (TVOS.keepPrivate: left out of Android's backups), else this page's own storage. Never
   // in ST (the copy of Home settings the bridge keeps), never in a design or Share this home.
   var AH = (function () {
@@ -7509,7 +7587,7 @@
     return w;
   }
 
-  // Home settings, couch-tv Studio, At home: one page with the note, lists, Wi-Fi, guide, calendar and
+  // Home settings, Designs, At home: one page with the note, lists, Wi-Fi, guide, calendar and
   // screen time; a list and a guide entry each open their own page. English only for now, like the
   // rest of the couch-tv Studio section (needs i18n).
   var AH_INTRO = "Words for the widgets on your home. They stay on this TV and never go into a design or Share this home. Typing is quicker with Type on the TV in the phone remote.";
@@ -7768,7 +7846,7 @@
   }
   if (window.CouchMatter) window.CouchMatter.onChange(function () { if (zone === "settings") renderSettings(); });
 
-  // ---- Home settings, couch-tv Studio, Smart home: Home Assistant set up on the TV, no computer ----
+  // ---- Home settings, Designs, Smart home: Home Assistant set up on the TV, no computer ----
   // The launcher (HomeAssistant.kt) or, on a TV whose home a computer runs, that computer's bridge
   // checks the address and token and lists what Home Assistant has; the person ticks what shows. The
   // token is handed over once and never comes back to this page. English only, like the rest of the
@@ -8730,7 +8808,7 @@
           bridge: !OFFLINE,
           // the scenes the launcher's Home Assistant allows (names and entities only, never its address)
           scenes: window.smartHome && window.smartHome.scenes ? window.smartHome.scenes() : [],
-          // things typed at home (Home settings, couch-tv Studio, At home): kept on this TV only
+          // things typed at home (Home settings, Designs, At home): kept on this TV only
           home: homeView(),
           // the web widgets' answers (widget-web.js): headlines, scores, prices, the drive
           web: WEB ? WEB.data() : null,

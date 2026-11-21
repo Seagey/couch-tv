@@ -7,8 +7,8 @@ Your own AI app (Claude Desktop, Claude Code, Cursor, or any program that speaks
   home, or Ask AI set up on that TV. A home with neither asks the computer nothing;
 - **change the TV home**: design one with couch-tv Studio's own MCP tools and send it as a code; the TV
   fetches it and asks **Use this design?** first, so nothing changes until someone presses OK. This works
-  only on a TV where couch-tv Studio is turned on (Home settings, couch-tv Studio): an agent never turns it
-  on, and a TV switched back to its classic home stays classic;
+  only on a TV where designs are turned on (Home settings, Designs): an agent never turns them
+  on, and a TV with **Your design** turned off keeps the standard home;
 - **drive the TV**: play a show, open an app, press keys, change the volume (the tools that were already there);
 - **read what the TV shows** from Ask AI.
 

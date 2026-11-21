@@ -4,7 +4,7 @@
 // TVQR.matrix(text) gives rows of true (dark) and false; TVQR.svg(text, px) gives an <svg> element.
 // Checked by decoding with jsQR: tools/tv-designer/server/tests/qr.test.mjs. Made from couch-tv
 // Studio's app/qr.js (this copy also sets stroke="none"); here it draws the QR of
-// Home settings, couch-tv Studio, Share this home, and of the Guest Wi-Fi widget.
+// Home settings, Designs, Share this home, and of the Guest Wi-Fi widget.
 (function (root) {
   "use strict";
   var ECC_PER_BLOCK = [-1, 10, 16, 26, 18, 24, 16, 18, 22, 22, 26];

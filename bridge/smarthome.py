@@ -6,7 +6,7 @@ instead (tv-home/web/smarthome.js, useBridge): the same questions, the same allo
 answers, ported from HomeAssistant.kt and HaReadings.kt so both TVs behave alike.
 
 Where the set up comes from, in order:
-  1. bridge/data/home-assistant.json, made on the TV (Home settings, couch-tv Studio, Smart home):
+  1. bridge/data/home-assistant.json, made on the TV (Home settings, Designs, Smart home):
      the address, the token and the ticks. Kept on this computer only (mode 600), never logged,
      never sent to the page: the page gets names and readings, never the address or the token.
   2. config.json's "home_assistant" section with HOME_ASSISTANT_TOKEN in .env (docs/CONFIG.md).

@@ -75,7 +75,7 @@ ok(/var designOn = typeof CouchDesign !== "undefined" && !!\(GATE\.design \|\| G
 ok(/if \(designOn\) CouchDesign\.start\(CFG\.design,/.test(app), "design.js is started only when the gate hands it a design");
 ok(/if \(typeof CouchDesign !== "undefined" && CFG\.design\) HOME = CouchDesign\.home\(/.test(app), "a design's look settings are read only with a design");
 ok(!/CouchDesign\.start\(CFG\.design, \{/.test(app.replace(/if \(designOn\) CouchDesign\.start\(CFG\.design, \{/, "")), "no other way in to CouchDesign.start");
-ok(/keep\(CouchDesigner\.KEY, on \? "on" : "off"\)/.test(app), "Turn on and Back to my classic home keep the choice on this TV");
+ok(/keep\(CouchDesigner\.KEY, on \? "on" : "off"\)/.test(app), "Turn on and turning Your design off keep the choice on this TV");
 ok(/setDesigner\(true\);\s+\/\/ typing a code is asking for couch-tv Studio/.test(app), "getting a design by code turns couch-tv Studio on");
 ok(/\["designer", "designer"\], \["about", "info"\]/.test(app), "Home settings has a couch-tv Studio section");
 
@@ -96,8 +96,8 @@ ok(code("?mock=1", {}, true).base() === "", "a browser preview never reaches the
 ok(code("", {}, false).base() === "", "without the gate loaded, nothing changes");
 ok(/^https:\/\/[a-z0-9.-]+$/.test(G.DEFAULT_STORE), "the default store is https with no path");
 // option C (the on-TV app, no computer, no config.json): its config.js (Store.publicConfig) names no
-// store, so Get a design and Share this home use couch-tv Studio's own; Home settings, couch-tv Studio,
-// Back to my classic home is the off switch there
+// store, so Get a design and Share this home use couch-tv Studio's own; Home settings, Designs,
+// the Your design switch is the off switch there
 const onTv = { people: [], weather: { place: "Town" }, tvs: [{ id: "this-tv", name: "This TV" }], default_tv: "this-tv", mode: "on-tv" };
 ok(code("", onTv, true).base() === G.DEFAULT_STORE, "option C: the on-TV app's config gets couch-tv Studio's own store");
 const ontvStore = fs.readFileSync(path.join(__dirname, "../on-tv/android/app/src/main/java/dev/couchtv/ontv/Store.kt"), "utf8");
@@ -108,7 +108,7 @@ ok(/from\(tvHomeWeb\) \{ into\("tv"\); exclude\("mock\.js"\) \}/.test(fs.readFil
 // still said "Off" and the button "Turn on", because the row read the gate worked out at start. The
 // choice just made wins; with none made, the gate and a design on screen decide.
 ok(G.shownOn("on", false, false) === true, "just turned on: the row says on at once");
-ok(G.shownOn("off", true, true) === false, "Back to my classic home: the row says off at once");
+ok(G.shownOn("off", true, true) === false, "Your design off: the row says off at once");
 ok(G.shownOn(null, true, false) === true && G.shownOn(null, false, true) === true, "nothing chosen: the gate or a design on screen");
 ok(G.shownOn(null, false, false) === false && G.shownOn("maybe", false, false) === false, "nothing chosen and nothing on: off");
 const appJs = fs.readFileSync(path.join(web, "app.js"), "utf8");
