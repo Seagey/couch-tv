@@ -258,8 +258,8 @@ object Matter {
     private fun commissionLocked(parsed: MatterCode.Parsed, at: MatterCode.Address?): JSONObject {
         val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(COMMISSION_TIMEOUT_S)
         fun left() = maxOf(0L, TimeUnit.NANOSECONDS.toMillis(deadline - System.nanoTime()))
-        if (!start()) return JSONObject().put("ok", false).put("error", if (unsupported != null) "unsupported" else "unreachable")
-            .put("note", note).put("device_ids", JSONArray()).apply { reasonKey()?.let { put("reason", it) } }
+        if (!start()) return (if (unsupported != null) "unsupported" else "unreachable").let { k ->
+            JSONObject().put("ok", false).put("error", k).put("note", note).put("device_ids", JSONArray()).put("reason", reasonKey() ?: k) }
         val c = controller!!
         val text = when (parsed) { is MatterCode.Parsed.Manual -> parsed.digits; is MatterCode.Parsed.Qr -> parsed.text; else -> "" }
         val node = store.nextNodeId()
@@ -290,9 +290,9 @@ object Matter {
                 val ip = addr?.let { runCatching { InetAddress.getByName(it.substringBefore('%')) }.getOrNull() }
                 val thread = p.thread || (ip is Inet6Address && !ip.isLinkLocalAddress && ip.address[0].toInt() and 0xfe == 0xfc)
                 val route = ip?.let { a -> threadRouteCheck?.invoke(a) } ?: true
-                val key = MatterCode.failureKey(p.errorStage, p.error ?: MatterCode.ERR_TIMEOUT, thread, route)
-                Log.w(TAG, "commission node $node failed at ${p.errorStage}: 0x${(p.error ?: 0).toString(16)} -> $key")
-                return fail(key, MatterCode.NOTES[key]!!)
+                val (key, reason) = MatterCode.commissionFailure(MatterCode.failureKey(p.errorStage, p.error ?: MatterCode.ERR_TIMEOUT, thread, route), at != null)
+                Log.w(TAG, "commission node $node failed at ${p.errorStage}: 0x${(p.error ?: 0).toString(16)} -> $key ($reason)")
+                return MatterCode.failure(key, MatterCode.failureNote(key, reason), reason)
             }
             val loc = runCatching { c.getNetworkLocation(node) }.getOrNull()
             val saved = MatterStore.Saved(node, System.currentTimeMillis(), address = loc?.ipAddress?.takeIf { it.isNotEmpty() } ?: hint?.second?.first,
@@ -320,7 +320,8 @@ object Matter {
         } finally { pending = null; hint = null }
     }
 
-    private fun fail(key: String, note: String) = JSONObject().put("ok", false).put("error", key).put("note", note).put("device_ids", JSONArray())
+    // every refusal carries a reason (the key itself unless the caller puts a more specific one after)
+    private fun fail(key: String, note: String) = MatterCode.failure(key, note)
 
     // ---- subscriptions (live state)
 

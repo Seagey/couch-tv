@@ -37,4 +37,35 @@ class MatterAddressTest {
         assertEquals("not_answering", dev.couchtv.ontv.matter.Matter.Refused(504, "x").reason)
         assertEquals("Lounge lamp", MatterModel.cleanName("Lounge‮lamp".replace("‮", "‮ ")))
     }
+
+    // contract change 15: every refused commission carries a reason; the key itself unless a caller puts a more specific one
+    @Test fun everyCommissionFailureCarriesAReason() {
+        listOf("wrong_code", "expired", "unreachable", "thread", "already").forEach { k ->
+            val o = MatterCode.failure(k, MatterCode.NOTES.getValue(k))
+            assertEquals(false, o.getBoolean("ok")); assertEquals(k, o.getString("error")); assertEquals(k, o.getString("reason"))
+            assertEquals(0, o.getJSONArray("device_ids").length()); assertTrue(o.getString("note").isNotEmpty())
+        }
+        // a bad code from parse() keeps its own key as the reason
+        val bad = MatterCode.parse("12345") as MatterCode.Parsed.Bad
+        assertEquals(bad.key, MatterCode.failure(bad.key, bad.note).getString("reason"))
+        // a caller's more specific reason wins (busy, blocked, port)
+        assertEquals("blocked", MatterCode.failure("not_allowed", "x").put("reason", "blocked").getString("reason"))
+        assertEquals("port", MatterCode.failure("unreachable", "x", "port").getString("reason"))
+    }
+
+    // an address named in the request where nothing answered: unreachable, reason address (ports 1 to 65535 still allowed)
+    @Test fun nothingAnsweredAtTheAddressIsUnreachable() {
+        assertEquals("unreachable" to "address", MatterCode.commissionFailure("expired", viaAddress = true))
+        assertEquals("expired" to "expired", MatterCode.commissionFailure("expired", viaAddress = false))
+        listOf("wrong_code", "already", "thread", "unreachable").forEach {
+            assertEquals(it to it, MatterCode.commissionFailure(it, viaAddress = true))
+        }
+        val key = MatterCode.failureKey(null, MatterCode.ERR_TIMEOUT)   // the device never answered
+        val (k, r) = MatterCode.commissionFailure(key, viaAddress = true)
+        assertEquals("unreachable", k); assertEquals("address", r)
+        assertEquals(MatterCode.ADDRESS_SILENT, MatterCode.failureNote(k, r))
+        assertEquals(MatterCode.NOTES["expired"], MatterCode.failureNote("expired", "expired"))
+        assertNull(MatterCode.address("192.0.2.7:1").reason)
+        assertTrue(!MatterCode.ADDRESS_SILENT.contains('—') && !MatterCode.ADDRESS_SILENT.contains(" - "))
+    }
 }

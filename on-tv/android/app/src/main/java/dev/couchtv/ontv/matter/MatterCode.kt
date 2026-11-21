@@ -89,6 +89,25 @@ object MatterCode {
         }
     }
 
+    /**
+     * The key and reason for a failed commission (contract change 15: every refusal carries a reason).
+     * With an address named in the request, a device that never answered there is "unreachable" with
+     * reason "address" (not "expired": the TV tried only that address, any port 1 to 65535). Otherwise
+     * the reason is the key itself.
+     */
+    fun commissionFailure(key: String, viaAddress: Boolean): Pair<String, String> =
+        if (viaAddress && key == "expired") "unreachable" to "address" else key to key
+
+    /** The note for [key] and [reason]: an address that never answered gets its own line. */
+    fun failureNote(key: String, reason: String): String =
+        if (key == "unreachable" && reason == "address") ADDRESS_SILENT else NOTES[key] ?: NOTES.getValue("unreachable")
+
+    const val ADDRESS_SILENT = "Nothing answered at that address. Check the address and the port, or leave it empty and the TV finds the device itself."
+
+    /** A refused commission as the API answers it: ok false, error [key], a plain note, no ids, and always a reason. */
+    fun failure(key: String, note: String, reason: String = key): org.json.JSONObject =
+        org.json.JSONObject().put("ok", false).put("error", key).put("note", note).put("device_ids", org.json.JSONArray()).put("reason", reason)
+
     // ---------------------------------------------------------------- an address typed with the code
 
     /** A checked address: [host] and [port], or [reason] ("address", "port", "link_local") and a plain [note]. */
