@@ -1650,22 +1650,50 @@
   function pauseVideo() { stopSoundscape(); if (window.AmbientWeather) window.AmbientWeather.pause(); var v = $("bgvid"); if (v.getAttribute("src")) v.pause(); sceneVideos(false); if (LOOP) loopPause(); }
   document.addEventListener("visibilitychange", function () {
     if (document.hidden) { saveFocusNow(); pauseVideo(); }
-    else { setIdleAmbient(false); resetSmartIdle(); startVideo(); sceneVideos(true); mood(true); if (window.AmbientWeather) window.AmbientWeather.resume(); resetIdlePhoto(); }
+    else { setIdleAmbient(false); resetSmartIdle(); startVideo(); clipWake(); sceneVideos(true); mood(true); if (window.AmbientWeather) window.AmbientWeather.resume(); resetIdlePhoto(); }
   });
 
   // A scene's own clip (home.my_scenes[].video): only the scene on screen plays, and only while the
   // home is showing. The photo under it stays until the clip really plays; a clip that fails just
-  // leaves the photo. Lighter home, the whole-home video (home.video_url), the OLED and Classic
-  // looks, the ambient clock, screen off and the system's reduced motion setting leave clips off.
+  // leaves the photo. The whole-home video (home.video_url), the OLED and Classic looks, the ambient
+  // clock, screen off and the system's reduced motion setting leave clips off. Lighter home does
+  // too, unless home.scene_clips_lighter is true (a small clip the TV decodes in hardware).
+  // A playing <video> makes the WebView hold KEEP_SCREEN_ON, which stops Android's own screensaver
+  // from ever starting. So clips pause on their current frame after the Home settings "Home screen
+  // idle after" time (Smart Idle, the quiet hours one during quiet hours) without a key press, and
+  // play on with the next key. Set to Off, they pause after 15 minutes so the screensaver still can.
+  var clipsIdle = false, clipIdleTimer = null;
+  function clipWake() {
+    clearTimeout(clipIdleTimer);
+    var was = clipsIdle;
+    clipsIdle = false;
+    var qh = SMART_IDLE.quiet_hours;
+    var mins = qh && qh.enabled && isQuietHours(qh) ? qh.idle_minutes : SMART_IDLE.home_idle_minutes;
+    if (!mins) mins = 15;
+    // home.scene_clips_idle false: the clips never pause and nothing starts the TV's screensaver
+    if (HOME.scene_clips_idle === false) mins = 0;
+    // Letting go of KEEP_SCREEN_ON counts as user activity, so Android's own countdown would only
+    // start now. Where the screensaver button can work, start the TV's screensaver right away.
+    if (mins > 0) clipIdleTimer = setTimeout(function () {
+      clipsIdle = true;
+      sceneVideos(false);
+      if (document.hidden || screenOffActive || idleAmbientActive || sndPlaying) return;
+      try { if (TV && TV.canStartScreensaver && TV.canStartScreensaver()) TV.startScreensaver(); } catch (e) {}
+    }, mins * 60000);
+    if (was) sceneVideos(true);
+  }
   function sceneVideos(on) {
     var calm = false;
     try { calm = !!(window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches); } catch (e) {}
-    on = on && NIGHT && !calm && !idleAmbientActive && !screenOffActive;
+    on = on && NIGHT && !calm && !idleAmbientActive && !screenOffActive && !clipsIdle;
+    var lighterOff = LIGHTER && HOME.scene_clips_lighter !== true;
+    var curEl = sceneEls[scene];
+    var curClip = !!(on && curEl && curEl.querySelector(".svid") && !lighterOff && !VIDEO_ON && !document.hidden);
     sceneEls.forEach(function (el, k) {
       var v = el.querySelector(".svid");
       if (!v) return;
       var s = SCENES[k];
-      if (on && k === scene && !LIGHTER && !VIDEO_ON && !document.hidden) {
+      if (on && k === scene && !lighterOff && !VIDEO_ON && !document.hidden) {
         if (!v.getAttribute("src")) {
           v.onplaying = function () { v.classList.add("playing"); };
           v.onerror = function () { v.classList.remove("playing"); };
@@ -1675,7 +1703,10 @@
         if (p && p.catch) p.catch(function () {});
       } else if (v.getAttribute("src")) {
         v.pause();
-        if (k !== scene || !NIGHT || calm) {   // off screen: let go of the decoder and the memory
+        // Off screen, a clip keeps its place (a boat sailing across a minute-long loop carries on
+        // where it was when its scene comes back), unless the scene now showing has a clip of its own
+        // and needs the decoder, or clips are off altogether: then it lets go of the decoder and memory.
+        if (!NIGHT || calm || !on || (k !== scene && curClip)) {
           v.classList.remove("playing");
           v.removeAttribute("src");
           try { v.load(); } catch (e) {}
@@ -2885,6 +2916,7 @@
   var lastSmartActivityAt = Date.now();
   function resetSmartIdle() {
     lastSmartActivityAt = Date.now();
+    clipWake();   // a changed idle time takes effect at once
   }
   function isQuietHours(qh) {
     if (!qh || !qh.enabled) return false;
@@ -6540,6 +6572,7 @@
 
   document.addEventListener("keydown", function (e) {
     lastKeyAt = Date.now();
+    clipWake();
     resetSmartIdle();
     if (screenOffActive) {
       e.preventDefault();
@@ -7406,14 +7439,14 @@
   // the native side calls these
   // Home on the remote also re-reads the lists, so an order arranged on the phone shows straight away
   window.tv = { back: function () { if (typeof CouchShare !== "undefined" && CouchShare.close()) return; if (typeof CouchDesign !== "undefined" && CouchDesign.back && CouchDesign.back()) return; if (idleAmbientActive) { setIdleAmbient(false); resetSmartIdle(); return; } if (idlePhotoInput(null)) return; goHome(); resetIdlePhoto(); resetSmartIdle(); },
-    home: function () { forgetFocus(); if (idleAmbientActive) { setIdleAmbient(false); resetSmartIdle(); return; } if (idlePhotoInput(null)) return; if (zone === "settings") closeSettings(); else goHome(); refresh(); resetIdlePhoto(); resetSmartIdle(); },
+    home: function () { forgetFocus(); clipWake(); if (idleAmbientActive) { setIdleAmbient(false); resetSmartIdle(); return; } if (idlePhotoInput(null)) return; if (zone === "settings") closeSettings(); else goHome(); refresh(); resetIdlePhoto(); resetSmartIdle(); },
     screenOff: function () { toggleScreenOff(true); },
     wakeScreen: function () { toggleScreenOff(false); },
     isScreenOff: function () { return screenOffActive; },
     noDream: function () { note(t("no_dream")); },
     // the remote's Settings/gear key, caught by the launcher natively (MainActivity.dispatchKeyEvent)
     settingsKey: function () { blip(0, 0); settingsKey(); },
-    resume: function () { PAGE_PAUSED = false; clock(); designVideo("away", false); toggleScreenOff(false); setIdleAmbient(false); resetSmartIdle(); okReset(); refresh(); if (!OFFLINE) refreshQuick(); refreshWeather(); startVideo(); sceneVideos(true); refreshMusic(); refreshCards(true); if (window.AmbientWeather) window.AmbientWeather.resume(); resetIdlePhoto(); },
+    resume: function () { PAGE_PAUSED = false; clock(); designVideo("away", false); toggleScreenOff(false); setIdleAmbient(false); resetSmartIdle(); okReset(); refresh(); if (!OFFLINE) refreshQuick(); refreshWeather(); startVideo(); clipWake(); sceneVideos(true); refreshMusic(); refreshCards(true); if (window.AmbientWeather) window.AmbientWeather.resume(); resetIdlePhoto(); },
     // an app is in front: the video background stops until the home is back
     // (and a design's video background lets go of the TV's decoder, which the app may need)
     pause: function () { saveFocusNow(); PAGE_PAUSED = true; pauseVideo(); designVideo("away", true); },
@@ -7762,6 +7795,7 @@
     updateOledShift();
     setInterval(updateOledShift, 60000);
     setInterval(checkSmartIdle, 10000);
+    clipWake();
     // couch-tv Studio's home widgets: the calendar, photo dates, screen time and a new day
     if (AH) { setTimeout(ahTick, 2500); setInterval(ahTick, 60000); }
     setInterval(function () { if (!covered()) { if (!screenOffActive) renderQuick(); refreshBedtimeDim(); } }, 30000);

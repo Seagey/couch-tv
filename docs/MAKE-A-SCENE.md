@@ -256,7 +256,38 @@ scene on screen plays, and only while the home is showing; it stops the moment a
    `apply.sh` (step 5), since the clip goes inside the app.
 
 The photo shows until the clip really plays, and stays if it cannot, so a clip the TV refuses
-does no harm. Lighter home and the whole-home video (`home.video_url`) leave scene clips off.
+does no harm. The whole-home video (`home.video_url`) leaves scene clips off, and so does Lighter
+home unless `home.scene_clips_lighter` is `true`. When the scene goes off screen its clip pauses
+and keeps its place, so the next time the scene shows it carries on from there (a longer clip,
+such as a boat crossing the screen in a minute, gets all the way across over a few turns). After
+the home has sat untouched for a while the clip pauses so the TV's screensaver can start
+(`home.scene_clips_idle`).
+
+## 8. Optional: moving wave scenes, made here
+
+`tv-home/tools/make-waves.py` draws three ready-made moving scenes, nothing downloaded: layered
+colour waves (Dusk, Ocean and Dawn) as a seamless one-minute loop, a little sailboat crossing the
+screen with a stick figure in a frock waving from the stern, someone overboard waving both arms
+for help, and dolphins leaping out of the waves at random, now left to right, now right to left.
+
+```sh
+.venv/bin/pip install numpy Pillow imageio-ffmpeg
+.venv/bin/python tv-home/tools/make-waves.py --preview     # one frame of each, in build/scenes/
+.venv/bin/python tv-home/tools/make-waves.py               # the clips, their photos and glass fills
+```
+
+The two figures have cartoon faces. To use your household's faces instead, give a photo of each:
+`--captain-face me.jpg --swimmer-face them.jpg`, with `--captain-crop X,Y,SIZE` (the square
+around the face, in the photo's pixels) when the face is not in the middle. Ask before you use
+someone else's face. Leave out what you do not want: `--no-captain`, `--no-swimmer`,
+`--no-dolphins`, `--no-boat`. The files go to `tv-home/web/backgrounds/mine/`, which git
+ignores, and it prints the `home.my_scenes` entries to paste: `"video": true`, and a `when` so
+Follow the sun shows each at its time of day.
+
+Rendering is slow, about 1.5 s a frame, so each one-minute clip takes about 35 minutes; run the
+palettes in parallel (`--palettes dusk`, `--palettes ocean`, `--palettes dawn`) or make shorter
+loops with `--seconds 20`. Each one-minute clip is about 20 MB, and option A carries it inside
+the app.
 
 ## Credits
 

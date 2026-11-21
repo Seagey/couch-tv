@@ -278,6 +278,8 @@ def _my_scenes(items):
                 "text": "dark" if m.get("text") == "dark" else "light", "cutout": m.get("cutout") is True}
         if m.get("video") is True:   # backgrounds/mine/scene-<id>.mp4 loops over the photo
             item["video"] = True
+        if m.get("when") in ("dawn", "day", "dusk", "night"):   # Follow the sun shows it then (app.js)
+            item["when"] = m["when"]
         if isinstance(m.get("name"), str) and m["name"].strip():
             item["name"] = m["name"].strip()[:40]
         out.append(item)
@@ -510,6 +512,16 @@ def _home(h):
         ps = {k: v for k, v in ps.items() if isinstance(k, str) and v in ("gentle", "electric")}
         if ps:
             out["person_styles"] = ps
+    # with sun_sync: how long each scene of the time of day stays, 5 to 240 minutes (app.js)
+    srm = h.get("sun_rotate_minutes")
+    if isinstance(srm, int) and not isinstance(srm, bool) and 5 <= srm <= 240:
+        out["sun_rotate_minutes"] = srm
+    # your own scenes' clips keep playing with Lighter home on
+    if isinstance(h.get("scene_clips_lighter"), bool):
+        out["scene_clips_lighter"] = h["scene_clips_lighter"]
+    # false: the clips never pause when the home sits idle, and the home never starts the screensaver
+    if isinstance(h.get("scene_clips_idle"), bool):
+        out["scene_clips_idle"] = h["scene_clips_idle"]
     if isinstance(h.get("ambient_weather"), bool):
         out["ambient_weather"] = h["ambient_weather"]
     if isinstance(h.get("ambient_sun_grade"), bool):
