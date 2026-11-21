@@ -297,7 +297,10 @@ class HomeActivity : Activity() {
         val bmp = Bitmap.createBitmap(n, n, Bitmap.Config.ARGB_8888)
         // A non-square icon (a wide wordmark) keeps its shape: fit it inside the square, centred (#181).
         val iw = d.intrinsicWidth; val ih = d.intrinsicHeight
-        if (d !is android.graphics.drawable.AdaptiveIconDrawable && iw > 0 && ih > 0 && iw != ih) {
+        // Android 7.1 and older (Fire OS 6) have no AdaptiveIconDrawable class: an unguarded `is`
+        // check there throws NoClassDefFoundError and the home crashes while drawing the dock.
+        val adaptive = android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O && d is AdaptiveIconDrawable
+        if (!adaptive && iw > 0 && ih > 0 && iw != ih) {
             val w = if (iw > ih) n else (n * iw / ih).coerceAtLeast(1)
             val h = if (ih > iw) n else (n * ih / iw).coerceAtLeast(1)
             d.setBounds((n - w) / 2, (n - h) / 2, (n + w) / 2, (n + h) / 2)
