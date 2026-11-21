@@ -68,6 +68,7 @@
     else if (k === "svg" && p) { p.className = "face tool input-ic"; p.innerHTML = n.getAttribute("data-svg"); }
     else if (k === "word" && p) { p.className = "face word"; p.textContent = n.getAttribute("data-name"); }
     else if (k === "name" && p) p.textContent = n.getAttribute("data-n");
+    else if (k === "sletter" && p) { var s = document.createElement("span"); s.className = "sicon none"; s.textContent = n.getAttribute("data-n") || ""; p.replaceChild(s, n); }
     else if (k === "kwretry" && window.kwArtRetry) window.kwArtRetry(n);   // a Keep watching picture is asked for again (#274)
   }, true);
   // No place set yet (no config.json weather, nothing picked in Home settings, Location): no weather and
@@ -5828,6 +5829,7 @@
       renderSettings();
       return;
     }
+    var hadConfirm = SET.confirm;
     SET.confirm = null;
     if (SET.col === "secs") {
       if (dy) {
@@ -5844,13 +5846,36 @@
         SET.peek = dy;   // renderSettings scrolls, after it has rebuilt the list
         SET.peeks = (SET.peeks || 0) + 1;   // so the press does not also go round to the other end
       }
+      var from = SET.ri;
       SET.ri = to;
       SET.keyFocus = rows[SET.ri] ? rows[SET.ri].key : null;
+      if (to !== from && !hadConfirm && !SET.peek && moveFocusInPlace(rows, from, to)) return;
     } else if (dx && rows[SET.ri] && rows[SET.ri].adjust) {
       rows[SET.ri].adjust(document.documentElement.dir === "rtl" ? -dx : dx);
       SET.keyFocus = rows[SET.ri].key;
     } else if (dx < 0) leaveRows();
     renderSettings();
+  }
+  // Up or Down inside the same list only moves the focus: move the "focus" class from one row to
+  // the other and scroll, instead of rebuilding every row. A full rebuild cost 80 to 190 ms a press
+  // on an LG OLED65CX (webOS 5, 2020), with every app icon in the Apps list made again, so presses
+  // landed late and the labels jumped; the home's own rows take 20 to 40 ms there. Anything that
+  // changes a row's text (a confirm, a lifted row, another page) still goes through renderSettings.
+  function moveFocusInPlace(rows, from, to) {
+    var box = $("set-rows");
+    if (!box || SET.col !== "rows" || SET.lift || SET.typing || box.children.length !== rows.length) return false;
+    var a = box.children[from], b = box.children[to];
+    if (!b || !/\bsrow\b/.test(b.className) || !focusable(rows[to])) return false;
+    if (a) a.classList.remove("focus");
+    b.classList.add("focus");
+    SET.peeked = null;
+    var cur = rows[to];
+    $("set-hint").textContent = cur && cur.move ? t("hint_rows_move") : cur && cur.adjust ? t("hint_slider") : t("hint_rows");
+    // the same "a quarter of the list from either edge" rule as renderSettings
+    var top = b.offsetTop, bottom = top + b.offsetHeight, view = box.clientHeight, edge = view / 4;
+    if (top - edge < box.scrollTop) box.scrollTop = Math.max(0, top - edge);
+    else if (bottom + edge > box.scrollTop + view) box.scrollTop = bottom + edge - view;
+    return true;
   }
   function setActivate() {
     if (SET.lift) { dropRow(); return; }
@@ -5900,7 +5925,10 @@
     var cls = "srow k-" + r.kind + (f ? " focus" : "") + (lifted ? " lifted" : "") + (r.danger ? " danger" : "");
     var lead = "";
     if (r.avatar) lead = avatarHTML(r.avatar);
-    else if (r.icon && iconUrl(r.icon)) lead = '<img class="sicon" src="' + esc(iconUrl(r.icon)) + '" alt="" data-err="remove">';
+    // a logo that fails becomes the first letter in the same box, so the label never slides over (an
+    // LG OLED65CX answered no icon for Hulu or Fandango at Home, and those rows jumped on every redraw)
+    else if (r.icon && iconUrl(r.icon)) lead = '<img class="sicon" src="' + esc(iconUrl(r.icon)) + '" alt="" data-err="sletter" data-n="' +
+      esc((r.label || "?").charAt(0).toUpperCase()) + '">';
     else if (r.kind === "item") lead = '<span class="sicon none">' + (r.icon.indexOf("screen:") === 0 ? ICONS.screen : esc((r.label || "?").charAt(0).toUpperCase())) + "</span>";
     else if (r.thumb) lead = '<img class="sthumb" src="' + esc(r.thumb) + '" alt="" decoding="async" data-err="remove">';
     var label = SET.confirm === r.key ? r.confirmText || t("confirm_remove") : r.label;
