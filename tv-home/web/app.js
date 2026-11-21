@@ -68,6 +68,7 @@
     else if (k === "svg" && p) { p.className = "face tool input-ic"; p.innerHTML = n.getAttribute("data-svg"); }
     else if (k === "word" && p) { p.className = "face word"; p.textContent = n.getAttribute("data-name"); }
     else if (k === "name" && p) p.textContent = n.getAttribute("data-n");
+    else if (k === "sletter" && p) { var s = document.createElement("span"); s.className = "sicon none"; s.textContent = n.getAttribute("data-n") || ""; p.replaceChild(s, n); }
     else if (k === "kwretry" && window.kwArtRetry) window.kwArtRetry(n);   // a Keep watching picture is asked for again (#274)
   }, true);
   // No place set yet (no config.json weather, nothing picked in Home settings, Location): no weather and
@@ -5924,7 +5925,10 @@
     var cls = "srow k-" + r.kind + (f ? " focus" : "") + (lifted ? " lifted" : "") + (r.danger ? " danger" : "");
     var lead = "";
     if (r.avatar) lead = avatarHTML(r.avatar);
-    else if (r.icon && iconUrl(r.icon)) lead = '<img class="sicon" src="' + esc(iconUrl(r.icon)) + '" alt="" data-err="remove">';
+    // a logo that fails becomes the first letter in the same box, so the label never slides over (an
+    // LG OLED65CX answered no icon for Hulu or Fandango at Home, and those rows jumped on every redraw)
+    else if (r.icon && iconUrl(r.icon)) lead = '<img class="sicon" src="' + esc(iconUrl(r.icon)) + '" alt="" data-err="sletter" data-n="' +
+      esc((r.label || "?").charAt(0).toUpperCase()) + '">';
     else if (r.kind === "item") lead = '<span class="sicon none">' + (r.icon.indexOf("screen:") === 0 ? ICONS.screen : esc((r.label || "?").charAt(0).toUpperCase())) + "</span>";
     else if (r.thumb) lead = '<img class="sthumb" src="' + esc(r.thumb) + '" alt="" decoding="async" data-err="remove">';
     var label = SET.confirm === r.key ? r.confirmText || t("confirm_remove") : r.label;
