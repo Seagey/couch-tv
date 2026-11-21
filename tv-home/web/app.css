@@ -306,6 +306,22 @@ html.still .tile.focus .face, html.still .tile.focus .face::after { animation: n
 .scene.ready { display: block; will-change: opacity; }   /* painted while it waits at opacity 0, not on the first frame of the fade */
 .scene.on { opacity: 1; }
 .scene .sbg, .scene .fg { position: absolute; top: 0; right: 0; bottom: 0; left: 0; width: 100%; height: 100%; object-fit: cover; }
+/* Depth zoom (html.depth-zoom, app.js, home.scene_zoom): while a built-in scene is on screen its photo
+   pushes in slowly and its cut-out a little faster, so the scenery seems to move past the clock. It
+   keeps going while the scene fades out (.out) and starts again the next time the scene shows. Each
+   scene leans towards its own point, so no two move the same way. Own scenes are left still. */
+.depth-zoom .scene.on .sbg, .depth-zoom .scene.out .sbg { animation: sz-back var(--zoom-ms, 24s) cubic-bezier(0.33, 0.1, 0.4, 1) both; }
+.depth-zoom .scene.on .fg, .depth-zoom .scene.out .fg { animation: sz-front var(--zoom-ms, 24s) cubic-bezier(0.33, 0.1, 0.4, 1) both; }
+.depth-zoom .scene.s-mine .sbg, .depth-zoom .scene.s-mine .fg, .depth-zoom .scene.s-own .sbg { animation: none; }
+.depth-zoom .scene .sbg, .depth-zoom .scene .fg { will-change: transform; backface-visibility: hidden; }
+@keyframes sz-back { from { transform: scale(1.005); } to { transform: scale(1.075); } }
+@keyframes sz-front { from { transform: scale(1.005); } to { transform: scale(1.1); } }
+.s-night .sbg, .s-night .fg { transform-origin: 50% 85%; }
+.s-golden .sbg, .s-golden .fg { transform-origin: 62% 80%; }
+.s-water .sbg { transform-origin: 40% 50%; }
+.s-fog .sbg, .s-fog .fg { transform-origin: 70% 90%; }
+.s-dawn .sbg, .s-dawn .fg { transform-origin: 35% 85%; }
+@media (prefers-reduced-motion: reduce) { .depth-zoom .scene .sbg, .depth-zoom .scene .fg { animation: none !important; } }
 /* a scene's own clip (home.my_scenes[].video): over the photo, under the cut-out and the clock */
 .scene .svid { position: absolute; top: 0; right: 0; bottom: 0; left: 0; width: 100%; height: 100%; object-fit: cover; opacity: 0; transition: opacity 600ms ease-in-out; }
 .scene .svid.playing { opacity: 1; }

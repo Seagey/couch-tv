@@ -1717,12 +1717,17 @@
       date.classList.remove("swap");
       fitDate();
     }, 600);
+    sceneEls[i].classList.remove("out");
     sceneEls[i].classList.add("on");
-    if (prev !== i) sceneEls[prev].classList.remove("on");
+    // .out keeps the old scene's depth zoom going while it fades, instead of snapping back
+    if (prev !== i) { sceneEls[prev].classList.add("out"); sceneEls[prev].classList.remove("on"); }
+    // home.scene_zoom: the built-in scenes push in slowly (app.css, .depth-zoom); off unless true
+    document.documentElement.classList.toggle("depth-zoom", HOME.scene_zoom === true);
+    document.documentElement.style.setProperty("--zoom-ms", (SCENE_MS + 4000) + "ms");
     // after the fade, give the other scenes' pictures back; the next one is readied just before its turn
     var lead = SCENE_MS > 10000 ? SCENE_MS - PRE_READY_MS : 2000;
     setTimeout(function () {
-      sceneEls.forEach(function (el, k) { if (k !== scene && k !== pendingScene && (lead > 2000 || k !== nextFrom(scene))) unreadyScene(k); });
+      sceneEls.forEach(function (el, k) { if (k !== scene) el.classList.remove("out"); if (k !== scene && k !== pendingScene && (lead > 2000 || k !== nextFrom(scene))) unreadyScene(k); });
       sceneVideos(true);   // the old scene's clip stops now it has faded out; this one's starts
     }, 2000);
     clearTimeout(preReadyTimer);
