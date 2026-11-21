@@ -65,6 +65,7 @@ function render(language) {
     $: (id) => elements[id] || null,
     fitDate() {},
     glassClock() {},
+    mood() {},
     secondsMarkup() { return ''; },
     updateAmbientWeather() {},
     renderQuick() {},
