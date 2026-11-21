@@ -360,7 +360,11 @@ remote (step 6). `--apps tv` uses it.
 
 **Icons for apps with no bundled logo.** Some TVs give icon addresses like
 `https://<tv>:3001/resources/<hash>/Plex_80x80.png`. That is the TV's self-signed secure port, so the
-page cannot load them and the tile shows a letter instead. A workaround that worked on an LG OLED77GX
+page cannot load them and the tile shows a letter instead. With the bridge, the page asks the bridge
+for them instead (`/api/webos/icon/<app id>`): the bridge fetches the address the TV listed for that
+app, only on the TV's own address and under `/resources/`, with certificate checks off. The TV sends
+these icons with no `Content-Type` (an OLED B5 on webOS 11.2), so the bridge goes by the file's first
+bytes. With no bridge, a workaround that worked on an LG OLED77GX
 (ChrisFWCB, #56): from the computer, with certificate checks off, ask the TV for its launch points
 over `listLaunchPoints`, fetch each one's `largeIcon`, and save it as
 `remote/src/app-logos/<package>.png` before running `lg/build.py`. `lg/build.py --apps` now does
