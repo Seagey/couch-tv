@@ -237,7 +237,8 @@ ares tools) does anything, and Wake-on-LAN.
 |---|---|
 | couch-tv home as an app, apps in your order, the remote's arrows, OK and Back | Yes (seen on real LGs, see Test status above) |
 | Opens by itself when the TV is switched on | Yes, with the bridge running |
-| LG's own Home button | Still opens LG's menu. Press Back or open couch-tv from the app row. On a rooted LG it can open couch-tv (see "On a rooted LG") |
+| LG's own Home button | Still opens LG's menu, unless you install the opt-in Home button Helper (see "The Home button Helper"), which makes the Magic Remote's Home open couch-tv without root. On a rooted LG it can also open couch-tv (see "On a rooted LG") |
+| LG's store | The App Store tile in More apps opens it |
 | Phone remote: keys, volume, mute, open an app | Yes (the TV asks to accept the remote once) |
 | More than one TV on one phone remote | Yes: one bridge runs Google TVs, Samsungs and LGs together (several entries in `config.json`) |
 | "Put on Bluey" (find and play) | Netflix opens the title, YouTube opens the video. Other apps open on their home page and the reply says to pick the show there. Nothing presses Play for you yet |
@@ -439,6 +440,40 @@ press, so turning the TV on from the phone also lands on couch-tv. `"open_on_pow
 
 Netflix titles open with the title in the launch (`contentId`), YouTube videos with the video's
 address (`contentTarget`), as LG's own integrations do. Other apps just open.
+
+## The Home button Helper (opt-in)
+
+`lg/helper/` is a second Developer Mode app, `app.couchtv.helper`, that makes the Magic Remote's
+Home button open couch-tv. It needs no root. The trick comes from
+[Clean Your TV](https://github.com/Razdva122/clean-your-tv-lg-webos) (MIT, `lg/helper/LICENSE.cytv`):
+a small program takes the Magic Remote's input device (`LGE M-RCU - Builtin [0]`) for itself and
+writes every button on to its sibling device, except Home, which opens couch-tv instead. A Developer
+Mode app may do this because the input devices belong to the `compositor` group it runs in.
+
+Tried on one TV so far: an OLED77B5PUA (2025) on webOS 11.2.0, firmware 43.22.72, with the bridge in
+Docker. Clean Your TV reports the same trick on many LGs from webOS 4 to 26.
+
+Build and install it (needs [Zig](https://ziglang.org) 0.14 and LG's ares tools), then set
+`"home_helper": true` on the TV in `config.json` so the bridge starts it each time the TV comes on:
+
+```sh
+ZIG=/path/to/zig lg/helper/build.sh
+ares-install --device lounge build/lg/app.couchtv.helper_0.1.0_arm.ipk
+ares-launch --device lounge app.couchtv.helper     # or switch the TV off and on
+```
+
+- **Press Home three times within 2 seconds** to switch it off: it hands the remote back to webOS and
+  only watches for the next triple Home, which switches it on again. The TV shows which mode it is in.
+- **Hold Back for about a second** to reach LG's home once while it is on.
+- If the program that runs the relay stops, the relay gives the remote back within 2 seconds.
+- The plain IR remote ("LGE RCU") is not watched: its Home still opens LG's home.
+- If the TV's remote devices have other names, or the TV refuses access, the Helper stops before it
+  takes the remote, and Home opens LG's home as before.
+- **The risk:** while it is on, it holds the only remote. A bug can leave the arrows dead; Clean Your
+  TV has one report of that on a 2025 C5 after standby, for 2 to 3 minutes. The ways out are a triple
+  Home, the phone remote (it reaches the TV another way), and unplugging the TV.
+- Its log is `helper.log` in the app's folder on the TV.
+- Undo: `ares-install --device lounge --remove app.couchtv.helper` and take `home_helper` out.
 
 ## Keeping Developer Mode alive
 
