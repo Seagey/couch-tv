@@ -152,6 +152,30 @@ object FireHome {
         if (App.homeEnabled(App.instance) && cls in homeClasses) jump(force = true)
     }
 
+    /**
+     * Hisense Google TV (Android 11): after a cold start the Google home is already in
+     * front before the watch binds, so no window event ever reaches [onOtherHome] and it stays up.
+     * When the watch connects, look at the last screen that came forward (usage events) and act on it
+     * as if its window event had just arrived. An HDMI input or live TV is not a home and is left alone.
+     */
+    fun checkFrontAtConnect() {
+        later.postDelayed({
+            runCatching {
+                val usm = App.instance.getSystemService(UsageStatsManager::class.java)
+                val now = System.currentTimeMillis()
+                val events = usm.queryEvents(now - 10 * 60_000, now)
+                val e = UsageEvents.Event()
+                var pkg: String? = null; var cls: String? = null
+                while (events.getNextEvent(e)) {
+                    if (e.eventType != UsageEvents.Event.MOVE_TO_FOREGROUND || e.packageName in notScreens) continue
+                    pkg = e.packageName; cls = e.className
+                }
+                Log.i(TAG, "watch connected, in front: $pkg/$cls")
+                if (pkg != null && cls != null && cls in homeClasses) seen(pkg, cls).also { onOtherHome(pkg, cls) }
+            }.onFailure { Log.w(TAG, "front check at connect", it) }
+        }, 2_000)
+    }
+
     /** Cheap to call often: starts the watcher once, only while it is wanted. */
     fun poke() {
         if (!wanted) return

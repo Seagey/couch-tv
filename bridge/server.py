@@ -3131,6 +3131,11 @@ def clean_settings(s):
         out["glass_amount"] = s["glass_amount"]
     if s.get("clock_style") in ("frosted", "liquid"):
         out["clock_style"] = s["clock_style"]
+    if isinstance(s.get("clock_seconds"), bool):
+        out["clock_seconds"] = s["clock_seconds"]
+    if isinstance(s.get("football_leagues"), list):
+        allowed = {"47", "55", "42", "73", "77", "nations", "54", "87", "53", "523", "141", "138", "132", "209"}
+        out["football_leagues"] = list(dict.fromkeys(x for x in s["football_leagues"] if isinstance(x, str) and x in allowed))
     # Now playing on or off (#31), and the navigation sound: the TV's own, soft or off (#32)
     if isinstance(s.get("now_playing"), bool):
         out["now_playing"] = s["now_playing"]

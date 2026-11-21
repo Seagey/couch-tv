@@ -413,9 +413,10 @@ and its cover, with previous, play or pause and next (the remote's own media key
 look it is the first card of the Keep watching row; in Classic it sits under the quick buttons. A
 paused song stays for ten minutes.
 
-It needs option B or C: Android does not let an ordinary app see what other apps play, so option A
-has no card. Home settings, Look, Now playing switches it off. The cover comes from Apple's free
-music search. Thanks alonmustafa (#31).
+General media support uses option B or C. On Android TV with option A, `home.spotify_player` and
+Android's Notification access can show and control Spotify's active TV session. Home settings,
+Look, Now playing switches the card off. The bridge gets covers from Apple's free music search.
+Thanks alonmustafa (#31).
 
 Since 0.13: a full screen Now playing view with the album art, off to start (#84).
 

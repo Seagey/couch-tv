@@ -90,6 +90,39 @@ app.couchtv.launcher/.MainActivity`, start the app, `appops set app.couchtv.laun
 allow`, then write `enabled_accessibility_services` and `accessibility_enabled 1` again. On that TCL
 a real double press of Home also stays on Google TV; Back twice escapes.
 
+## Hisense Google TV: the Google home after every restart or wake
+
+On a Hisense Google TV ("SmartTV 4K", Android 11, board songshan) with the on-TV app (option C), the TV came
+back on the Google home after each restart and after standby, and Home from inside an app showed the Google
+home for a few seconds before couch-tv. Hisense's own framework hook (`com.vt.hisensehook`, inside the system's
+`services.jar`) causes it:
+
+- At standby it stops every app that did not come with the TV, couch-tv included.
+- From boot until the TV wakes, it refuses to start any such app in the background (`Failure starting process`
+  in the log). So couch-tv's start at boot and its Home button watch never run. Opening an app on the screen is
+  still allowed.
+- Its only exception is the list in `settings get global allowed_self_launch_3rd_packages` (package names with
+  `;` between them). The TV reads it once, early in each boot, and something on the TV empties it about 25
+  seconds later.
+
+Since this change the on-TV app writes itself back into that list whenever it runs: at start, a minute and
+three minutes later, and each time the screen goes on or off. So the name is there at the next boot. It
+needs the `WRITE_SECURE_SETTINGS` grant the setup already gives it, and falls back to its own ADB connection
+without it. Also on a Hisense:
+
+- When the Home button watch connects and finds the Google home already in front, it opens couch-tv.
+- The watch catches the remote's Home key, so Home goes straight to couch-tv with no flash of the Google home
+  (#202). `adb shell input keyevent` goes past the watch, so test this with the real remote.
+- When Android marks the watch crashed (Hisense stopped it at standby), the app switches it off and on again
+  so it binds.
+- The home waits for its own server before it loads, so a cold start no longer shows Chrome's
+  `ERR_CONNECTION_REFUSED` page for about 10 seconds.
+
+Checked on one real Hisense: three restarts in a row came back on couch-tv. `adb install -r` also empties the
+list, and the app writes it again the next time it runs. Other Hisense Android TVs (#186, #188, #202) may
+have the same hook: `adb shell settings get global allowed_self_launch_3rd_packages` answering anything other
+than `null` says yours does.
+
 ## Fire TV: Home still opens Amazon's home right after apply.sh
 
 Seen twice on a Fire TV Cube (3rd gen, Fire OS 7.7.1.7): `apply.sh` finished with "home screen now:

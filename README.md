@@ -350,6 +350,9 @@ gains a permission these tables do not explain.
   send window events to nothing else.
 - **Home gear button** (`KeyWatch`, Home): an accessibility service you switch on yourself in
   Accessibility. It catches only the remote's gear button.
+- **Spotify playback access** (`SpotifySessionAccess`, Home): a notification listener you switch on yourself
+  in Android settings, only when you turn on the Spotify card. It lets the home read the Spotify TV app's
+  song and send previous, play or pause and next. It reads no notifications.
 - **TCL placeholder input** (`TclPlaceholderInput`, Home): an empty TV input, switched on only on a
   TCL, so TCL's start manager lets Home start at power on. It shows nothing and receives nothing.
 - **Sync listener** (`Listener`, sync helper): a notification listener, granted over ADB, only so the
@@ -360,7 +363,7 @@ gains a permission these tables do not explain.
 
 **What the TV home talks to.** Your bridge or the on-TV app on your home network; Open-Meteo for
 the weather (and air quality, surf and place search when you use them); JustWatch for posters;
-YouTube's image host (`i.ytimg.com`) for the picture on a YouTube video card, named by that video's
+Bing for the daily picture and FotMob for football scores (both only when you turn those on, in the Android TV app); YouTube's image host (`i.ytimg.com`) for the picture on a YouTube video card, named by that video's
 id, once the bridge has found the video (option B); GitHub for the update check (only with updates on); Home Assistant on your home network, if you set
 it up; couch-tv Studio only once it is turned on (above); and, only while that widget is on the
 home, its own source (news feeds, ESPN for scores, Yahoo Finance for markets, OSRM for commute

@@ -16,7 +16,7 @@ import android.view.accessibility.AccessibilityEvent
  * Xiaomi with the switch off, no key passes through this app.
  */
 class WatchService : AccessibilityService() {
-    override fun onServiceConnected() { connected = true; instance = this; FireHome.readHomes(); applyKeyFilter() }
+    override fun onServiceConnected() { connected = true; instance = this; FireHome.readHomes(); applyKeyFilter(); FireHome.checkFrontAtConnect() }
     override fun onDestroy() { connected = false; if (instance === this) instance = null; super.onDestroy() }
     override fun onInterrupt() {}
 
@@ -39,14 +39,22 @@ class WatchService : AccessibilityService() {
      * about 2 to 4 ms per key press on that TV.
      */
     override fun onKeyEvent(e: KeyEvent): Boolean {
+        // Hisense Google TV (#202): Home from inside an app went app -> Google home -> couch-tv,
+        // a few seconds of the Google home. Catch the key and open couch-tv directly (one open, on release).
+        if (e.keyCode == KeyEvent.KEYCODE_HOME && catchesHome()) {
+            if (e.action == KeyEvent.ACTION_UP && !e.isCanceled) App.openHome()
+            return true
+        }
         if (e.keyCode != KeyEvent.KEYCODE_BUTTON_5 || !FireHome.replacePatchWall) return false
         if (e.action == KeyEvent.ACTION_UP && !e.isCanceled) App.openHome()
         return true
     }
 
+    private fun catchesHome() = isHisense && App.homeEnabled(App.instance)
+
     private fun applyKeyFilter() {
         val info = serviceInfo ?: return
-        val want = FireHome.replacePatchWall
+        val want = FireHome.replacePatchWall || isHisense
         val has = info.flags and AccessibilityServiceInfo.FLAG_REQUEST_FILTER_KEY_EVENTS != 0
         if (want == has) return
         info.flags = if (want) info.flags or AccessibilityServiceInfo.FLAG_REQUEST_FILTER_KEY_EVENTS
@@ -56,6 +64,7 @@ class WatchService : AccessibilityService() {
 
     companion object {
         @Volatile var connected = false
+        private val isHisense = android.os.Build.MANUFACTURER.equals("Hisense", ignoreCase = true)
         @Volatile private var instance: WatchService? = null
         /** After "patchwall_replace" changes: start or stop filtering keys straight away. */
         fun keyFilterChanged() {
