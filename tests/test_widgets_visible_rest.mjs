@@ -46,9 +46,11 @@ const SAME = {
   "battery tile low 50": "the remote at 12% is under 20 and under 50, so it is red either way",
   "battery wtile low 50": "the remote at 12% is under 20 and under 50, so it says Charge it soon either way",
   "speakers wtile players kitchen": "a wide tile shows the speaker that is playing, and the kitchen is the one playing",
-  "scenes tile scenes lights off": "a tile shows how many scenes are picked, one either way"
+  "scenes tile scenes lights off": "a tile shows how many scenes are picked, one either way",
+  "bins tile bin_a Paper": "a tile shows only the lid colours (its help says so)",
+  "bins tile bin_b Food": "a tile shows only the lid colours (its help says so)"
 };
-const NSAME = 12;   // how many cases SAME names (pinned, so a new one is a decision)
+const NSAME = 14;   // how many cases SAME names (pinned, so a new one is a decision)
 const KINDS = ["aircon", "controls", "camera", "doorbell", "sensor", "energy", "solar", "battery", "speakers", "scenes", "bins", "stack"];
 const TYPES = { ".html": "text/html", ".js": "text/javascript", ".css": "text/css", ".json": "application/json", ".svg": "image/svg+xml", ".woff2": "font/woff2", ".jpg": "image/jpeg", ".png": "image/png", ".webp": "image/webp" };
 const PAGE = '<!doctype html><html><head><meta charset="utf-8"><link rel="stylesheet" href="widgets.css"></head><body style="margin:0;width:1920px;height:1080px;background:#26303f">' +

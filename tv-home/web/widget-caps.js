@@ -595,9 +595,9 @@
     controls: [st("switches", "Lights and switches", "device", [], "Which ones show here. None picked shows every one picked in Smart home. Locks, alarms, garage doors and gates never show on Couch TV.", "tv", ON_TV, true,
       { domain: ["light", "switch", "fan", "cover"], many: true, max: 16, needs: HA, "private": true })],
     camera: [st("cam", "Camera", "device", "", "Which camera shows here. Empty shows the first one picked in Smart home.", "tv", ON_TV, true, { domain: "camera", needs: HA, "private": true }),
-      HEADING("Shows once the camera is picked on this TV. Empty shows the camera's own name.")],
+      HEADING("A heading for this widget. Empty shows the camera's own name.")],
     sensor: [st("reading", "Sensor", "device", "", "Which sensor shows here. Empty shows the first one picked in Smart home.", "tv", ON_TV, true, { domain: "sensor", needs: HA, "private": true }),
-      HEADING("Shows once the sensor is picked on this TV. Empty shows the sensor's own name.")],
+      HEADING("A heading for this widget. Empty shows the sensor's own name.")],
     doorbell: [HEADING_TV("Type a heading for this TV. Empty shows the doorbell's own name."),
       st("picture", "Show the door camera", "toggle", true, "Off shows only when the doorbell last rang.", "design", ALL, true)],
     energy: [HEADING_TV("Type a heading for this TV. Empty shows the name from your smart home."),
@@ -649,8 +649,8 @@
       st("alt", "Taking turns", "toggle", false, "On when the two bins go out on alternate weeks.", "design", ALL, true),
       st("thisweek", "Which bin goes out this week", "choice", "a", "Pick the one going out this week and Couch TV keeps count from there.", "design", ALL, true,
         { options: [["a", "First bin"], ["b", "Second bin"]], when: { alt: true }, sets: "anchor" }),
-      st("bin_a", "First bin", "text", "Recycling", "The name of the bin, like Recycling.", "design", ALL, true, { max: 20 }),
-      st("bin_b", "Second bin", "text", "Garden", "The name of the other bin, like Garden.", "design", ALL, true, { max: 20 }),
+      st("bin_a", "First bin", "text", "Recycling", "The name of the bin, like Recycling. A tile shows only the lid colours.", "design", ALL, true, { max: 20 }),
+      st("bin_b", "Second bin", "text", "Garden", "The name of the other bin, like Garden. A tile shows only the lid colours.", "design", ALL, true, { max: 20 }),
       st("lid_a", "First bin's lid", "choice", "#ffd60a", "The colour of the first bin's lid.", "design", ALL, true, { options: LIDS }),
       st("lid_b", "Second bin's lid", "choice", "#30d158", "The colour of the second bin's lid.", "design", ALL, true, { options: LIDS })
     ]
