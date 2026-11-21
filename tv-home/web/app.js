@@ -3881,6 +3881,31 @@
     return "";
   }
 
+  // Put the tiles for these HTML strings in the grid, in order, keeping every tile that is already
+  // there with the same HTML instead of making it again. Rebuilding them all made each icon go blank
+  // and draw again whenever More apps opened or closed (an LG OLED65CX decodes every new <img> anew).
+  // A kept tile gets back the classes it was made with (focus, pressed, off-window, end-row and the
+  // like are put on again after this) and loses the dock's magnify transform (magnify sets it again).
+  function placeTiles(grid, htmls) {
+    var pool = {}, tmp = document.createElement("div"), kids = grid.children, i, el;
+    for (i = 0; i < kids.length; i++) {
+      el = kids[i];
+      if (el._html !== undefined) (pool[el._html] = pool[el._html] || []).push(el);
+    }
+    var els = htmls.map(function (html) {
+      var old = pool[html] && pool[html].shift();
+      if (old) { old.className = old._cls; old.style.transform = ""; return old; }
+      tmp.innerHTML = html;
+      var made = tmp.firstChild;
+      made._html = html; made._cls = made.className;
+      return made;
+    });
+    // move only what is out of place, so tiles that stay put are not taken out of the page
+    els.forEach(function (want, at) { if (kids[at] !== want) grid.insertBefore(want, kids[at] || null); });
+    while (kids.length > els.length) grid.removeChild(kids[kids.length - 1]);
+    return els;
+  }
+
   function renderGrid() {
     document.documentElement.classList.toggle("expanded", expanded);
     document.documentElement.classList.toggle("lifting", !!lift);
@@ -3896,8 +3921,7 @@
       if (!expanded && typeof CouchDesign !== "undefined" && CouchDesign.on()) GRID_COLS = CouchDesign.cols(GRID_COLS, gridItems.length);
       $("grid").style.gridTemplateColumns = "repeat(" + GRID_COLS + ", " + dockTileRem() + "rem)";
     }
-    $("grid").innerHTML = gridItems.map(appHTML).join("");
-    gridEls = Array.prototype.slice.call($("grid").children);
+    gridEls = placeTiles($("grid"), gridItems.map(appHTML));
     if (OLD_ENGINE) {
       // no grid: app.css wraps the tiles in a flex box. The Night dock is exactly as wide as GRID_COLS
       // tiles and their gaps (its padding too); Classic and OLED fill the width the grid would, as the
