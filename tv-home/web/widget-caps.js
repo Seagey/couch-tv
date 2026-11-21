@@ -261,7 +261,7 @@
       sizes: sz(["tile", "wtile", "small", "medium"], [2, 2]) },
 
     // ---------- watching ----------
-    keep: { name: "Keep watching", status: "setup", what: "The show you were watching, ready to carry on", needs: [WATCH_NEED],
+    keep: { name: "Keep watching", status: "setup", what: "The show you were watching (or the person picked for it), ready to carry on", needs: [WATCH_NEED],
       setup: setup("computer", WATCH), until: "\"Nothing to keep watching yet\": shows you start on this TV appear here", build: "",
       ok: "Opens Keep watching: every show on the go, each with Resume", platforms: plat("setup", "computer:partial", "computer", { web: "Only shows started from Couch TV's home.", vidaa: "Only with a home computer: the website home cannot." }), sizes: sz(["tile", "wtile", "small", "medium"], [2, 2]) },
     keeprow: { name: "Keep watching row", status: "setup", what: "Two to five shows, with how far you got", needs: [WATCH_NEED],
@@ -286,12 +286,12 @@
         vidaa: ["Install the app from the TV's own app store.", "Needs a home computer to open it: the website home cannot open apps."] }),
       until: "\"This app is not on this TV\"", build: "",
       ok: "Opens the app", platforms: plat("works", "computer", "computer", { vidaa: "Needs a home computer: the website home cannot open apps." }), sizes: sz(["tile", "small"], [2, 2]) },
-    folder: { name: "App folder", status: "works", what: "A box of apps with a name", needs: ["The apps, picked in couch-tv Studio and installed on this TV"],
+    folder: { name: "App folder", status: "works", what: "A box of apps with a name", needs: ["The apps, picked in couch-tv Studio or on the TV, and installed on this TV"],
       setup: setup("designer", inStudio("pick the apps for it").concat(["Or on the TV: hold OK on an app to change, move or remove it, or on Add app to add one."])), until: "Apps this TV does not have are dimmed: \"Not on this TV\"", build: "",
       ok: "Opens the folder full screen, every app big", platforms: plat("works", "computer", "computer", { vidaa: "Needs a home computer: the website home cannot open apps." }), sizes: sz(["tile", "small", "tall", "medium", "large"], [2, 2]) },
     dock: { name: "Dock", status: "works", what: "A row of your apps", needs: ["Nothing: it shows this TV's apps"],
       setup: setup("nothing", ["Nothing to set up. Hold OK on an app to change, move or remove it."].concat(APPS_ORDER.slice(0))), until: "Always shows the TV's apps", build: "",
-      ok: "OK on an app opens it. The last one opens all your apps", platforms: plat("works", "computer", "computer", { vidaa: "Needs a home computer: the website home cannot open apps." }), sizes: sz([], [6, 2], [["row8", "Short row", 8, 2], ["row12", "Row", 12, 2], ["row18", "Full row", 18, 2]]) },
+      ok: "OK on an app opens it. The All apps tile at the end, when it is on, opens every app", platforms: plat("works", "computer", "computer", { vidaa: "Needs a home computer: the website home cannot open apps." }), sizes: sz([], [6, 2], [["row8", "Short row", 8, 2], ["row12", "Row", 12, 2], ["row18", "Full row", 18, 2]]) },
     appgrid: { name: "App grid", status: "works", what: "Rows of apps with their names", needs: ["Nothing: it shows this TV's apps"],
       setup: setup("nothing", ["Nothing to set up. Hold OK on an app to change, move or remove it."].concat(APPS_ORDER.slice(0))), until: "Always shows the TV's apps", build: "",
       ok: "OK on an app opens it", platforms: plat("works", "computer", "computer", { vidaa: "Needs a home computer: the website home cannot open apps." }), sizes: sz(["small", "medium", "large", "xl"], [4, 4]) },
@@ -541,7 +541,7 @@
     ["AUDEUR=X", "Australian dollar in euros"], ["AUDGBP=X", "Australian dollar in pounds"], ["AUDJPY=X", "Australian dollar in yen"], ["BTC-AUD", "Bitcoin"], ["ETH-AUD", "Ether"],
     ["^GSPC", "S&P 500"], ["^IXIC", "Nasdaq"], ["^DJI", "Dow Jones"], ["^FTSE", "FTSE 100"], ["^NZ50", "NZX 50"], ["^N225", "Nikkei"], ["GC=F", "Gold"], ["CL=F", "Oil"]];
   // the sport apps Up next's game mode looks in (widgets.js SPORT_APPS): any one of them will do
-  var SPORT_APP_PKGS = ["au.com.kayosports.tv", "au.com.foxtel.atv", "au.com.ninenow.ctv", "com.swm.live", "au.com.tenplay", "dazn"];
+  var SPORT_APP_PKGS = ["au.com.kayosports.tv", "au.com.foxtel.atv", "au.com.ninenow.ctv", "com.swm.live", "au.com.tenplay", "com.dazn", "dazn"];
 
   var CLOCK_FMT = function () { return st("format", "12 or 24 hour", "choice", "auto", "Follow this TV uses the clock set in Home settings, Look and scenes.", "design", ALL, true,
     { options: [["auto", "Follow this TV"], ["12h", "12 hour"], ["24h", "24 hour"]] }); };
@@ -587,8 +587,6 @@
         { options: [["auto", "Best for your country"], ["m", "Metres"], ["ft", "Feet"]] }),
       st("wind", "Wind in", "choice", "auto", "Best for your country uses miles an hour in the United States and kilometres an hour elsewhere.", "tv", ON_TV, true,
         { options: [["auto", "Best for your country"], ["kmh", "Kilometres an hour"], ["kn", "Knots"], ["mph", "Miles an hour"]] })],
-    upnext: [st("sport", "Game mode", "choice", "auto", "On shows the last game watched in a sport app on this TV. Automatic turns it on when the home also shows scores.", "design", ALL, true,
-      { options: [["auto", "Automatic"], [true, "On"], [false, "Off"]], needs: { apps: SPORT_APP_PKGS.slice() } })],
     aircon: [st("entity", "Room", "device", "", "Which aircon shows here. Empty shows the first one picked in Smart home.", "tv", ON_TV, true, { domain: "climate", needs: HA, "private": true }),
       st("others", "Show the other rooms", "toggle", true, "In a big widget, the other aircon rooms show beside this one.", "design", ALL, true)],
     controls: [st("switches", "Lights and switches", "device", [], "Which ones show here. None picked shows every one picked in Smart home. Locks, alarms, garage doors and gates never show on Couch TV.", "tv", ON_TV, true,
@@ -671,12 +669,51 @@
     timer: [st("minutes", "Quick start", "choice", 0, "OK on the widget starts a timer this long.", "design", ALL, false,
       { options: [[0, "Ask each time"], [5, "5 minutes"], [10, "10 minutes"], [15, "15 minutes"], [20, "20 minutes"], [30, "30 minutes"], [45, "45 minutes"], [60, "1 hour"]] })],
     week: [TOWN("the forecast")],
-    keep: [st("person", "Whose shows", "tvlist", "auto", "Whoever is watching follows the person picked on the home.", "tv", ON_TV, false, { from: "people", "private": true })],
-    keeprow: [st("shows", "How many shows", "choice", "auto", "", "design", ALL, false, { options: [["auto", "As many as fit"], [2, "2"], [3, "3"], [4, "4"], [5, "5"]] })],
-    upnext: [st("apps", "Only from these apps", "apps", [], "None picked takes shows from any app.", "design", ALL, false)],
-    dock: [st("more", "All apps at the end", "toggle", true, "", "design", ALL, false)],
-    soundscape: [st("volume", "Volume", "number", 50, "", "tv", ON_TV, false, { min: 0, max: 100, step: 10 })],
   };
+  // the watching, apps and music widgets (keep to stack): every setting here is read by its renderer
+  var WHOSE = function () { return st("person", "Whose shows", "tvlist", "auto", "Whoever is watching follows the person picked on the home. Add people in Home settings, People.", "tv", ON_TV, true,
+    { from: "people", options: [["auto", "Whoever is watching"]], "private": true }); };
+  // Hold OK on an app (Change app, Move, Remove, Add app) and the phone's Apps on this design change these
+  var APPS_IN = function (label, help) { return st("apps", label, "apps", [], help, "design", ALL, true); };
+  var ACROSS = function (more) { return st("cols", "Apps across", "choice", "auto", "How many apps in each row." + (more ? " " + more : ""), "design", ALL, true,
+    { options: [["auto", "As many as fit"], [1, "1"], [2, "2"], [3, "3"], [4, "4"], [5, "5"], [6, "6"]] }); };
+  // the streaming apps Up next can take its show from (catalogue ids, app-catalogue.js)
+  var SHOW_APPS = [["netflix", "Netflix"], ["youtube", "YouTube"], ["prime", "Prime Video"], ["disney", "Disney+"], ["stan", "Stan"], ["binge", "Binge"], ["iview", "ABC iview"],
+    ["sbs", "SBS On Demand"], ["7plus", "7plus"], ["9now", "9Now"], ["10play", "10 Play"], ["kayo", "Kayo"], ["foxtel", "Foxtel Go"], ["paramount", "Paramount+"],
+    ["appletv", "Apple TV"], ["max", "HBO Max"], ["dazn", "DAZN"], ["plex", "Plex"]];
+  var QUICK_OPTS = [["sleep", "Sleep timer"], ["picture", "Picture"], ["look", "Look"], ["soundscape", "Soundscape"], ["screen_off", "Screen off"], ["headphones", "Headphones"],
+    ["input", "Input"], ["bluetooth", "Bluetooth"], ["network", "Network"], ["tvsettings", "TV settings"], ["screensaver", "Screensaver"]];
+  var WATCHING = {
+    keep: [WHOSE()],
+    keeprow: [HEADING("Empty shows Keep watching."),
+      st("shows", "How many shows", "choice", "auto", "At most what fits in the widget.", "design", ALL, true, { options: [["auto", "As many as fit"], [2, "2"], [3, "3"], [4, "4"], [5, "5"]] }), WHOSE()],
+    upnext: [st("sport", "Game mode", "choice", "auto", "On shows the last game watched in a sport app on this TV. Automatic turns it on when the home also shows scores.", "design", ALL, true,
+      { options: [["auto", "Automatic"], [true, "On"], [false, "Off"]], needs: { apps: SPORT_APP_PKGS.slice() } }),
+      st("apps", "Only from these apps", "choice", [], "None picked takes shows from any app.", "design", ALL, true, { options: SHOW_APPS, many: true, max: 6 })],
+    picks: [HEADING("Empty shows Picks for you."),
+      st("mix", "Picks from", "choice", "all", "Your own shows are the ones you left part way.", "design", ALL, true,
+        { options: [["all", "Others at home and your own"], ["others", "Only what others are watching"], ["mine", "Only your own shows"]] })],
+    nowplaying: [st("buttons", "Show the buttons", "toggle", true, "Previous, play and next under the song. A tile or small widget has no room for them.", "design", ALL, true),
+      st("cover", "Show the cover", "toggle", true, "Off shows the song and artist only.", "design", ALL, true)],
+    soundscape: [st("sound", "Sound", "choice", "rain", "OK on the widget plays it, and OK again stops it.", "design", ALL, true,
+      { options: [["rain", "Rain"], ["fire", "Fire"], ["waves", "Waves"], ["brown", "Brown noise"]] }),
+      st("volume", "Volume", "number", 50, "How loud this widget plays its sound.", "tv", ON_TV, true, { min: 10, max: 100, step: 10 })],
+    queue: [HEADING("Empty shows Up next."),
+      st("count", "How many songs", "choice", "auto", "At most this many.", "design", ALL, true, { options: [["auto", "As many as fit"], [3, "3"], [5, "5"], [8, "8"]] })],
+    games: [APPS_IN("Games", "Hold OK on a game to change, move or remove it."), HEADING("Empty shows Play.")],
+    app: [APPS_IN("App", "Hold OK on it and pick Change app.")],
+    folder: [st("label", "Folder name", "text", "", "Shown above the apps. On a tile it shows when the folder is opened. Empty shows no name.", "design", ALL, true, { max: 40 }),
+      APPS_IN("Apps in the folder", "Hold OK on an app to change, move or remove it."), ACROSS("A tile always shows four small apps.")],
+    dock: [APPS_IN("Apps", "None picked shows this TV's own apps. Hold OK on an app to change, move or remove it."),
+      st("more", "All apps at the end", "toggle", true, "A tile at the end that opens every app.", "design", ALL, true)],
+    appgrid: [APPS_IN("Apps", "None picked shows this TV's own apps. Hold OK on an app to change, move or remove it."), ACROSS(),
+      st("names", "Show app names", "toggle", true, "Not shown on a small grid.", "design", ALL, true)],
+    quick: [st("quick", "Buttons", "choice", [], "Up to six. None picked shows the home's own quick buttons. Buttons this TV cannot do are left out.", "design", ALL, true,
+      { options: QUICK_OPTS, many: true, max: 6 })],
+    stack: [st("turn", "Next widget", "choice", 20, "When the stack moves on to its next widget.", "design", ALL, true,
+      { options: [[20, "Every 20 seconds"], [10, "Every 10 seconds"], [30, "Every 30 seconds"], [60, "Every minute"], [0, "By the time of day"]] })]
+  };
+  Object.keys(WATCHING).forEach(function (k) { SETTINGS[k] = WATCHING[k]; });
   Object.keys(LATER).forEach(function (k) { SETTINGS[k] = (SETTINGS[k] || []).concat(LATER[k]); });
   // the sun clock: its own town, before launch (widgets.js R.solar names it and works the sun out for it)
   SETTINGS.solar = [st("town", "Place", "place", "", "Where the sun is for. Empty uses this home's town.", "tv", ON_TV, true, { "private": true })];

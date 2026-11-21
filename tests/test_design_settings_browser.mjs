@@ -196,6 +196,7 @@ TV = tv;
   // round 2: the Welcome words, Guest Wi-Fi and House guide have settings of their own now (tests/test_ws2_home.mjs)
   ok(/Welcome words, /.test(studio) && /Guest Wi-Fi, /.test(studio) && /House guide, /.test(studio), "the Welcome words, Guest Wi-Fi and House guide are listed with their own settings");
   if (!(await tv.evaluate(() => window.CouchWidgetCaps.settings("appgrid").some((x) => x.pre && x.where.indexOf("tv") >= 0)))) ok(!/App grid,/.test(studio), "a widget with no settings of its own is not listed");
+  ok(/App grid, bottom middle/.test(studio) && /Apps: Netflix, Stan/.test(studio), "the app grid is listed with its apps (ws2-watching: its apps are its settings)");
   await closeSettings(tv);
 }
 // Hold OK on the surf widget: Edit on the TV, right after Settings, opens its page (a TV the computer runs: no phone item)
@@ -357,7 +358,7 @@ await phone.waitForFunction(() => document.getElementById("design-line").style.d
   ok(/Widgets on this TV/.test(await phone.textContent("#widgets .fold-btn")), "the phone's section is Widgets on this TV");
   const titles = await phone.evaluate(() => [...document.querySelectorAll("#w-list summary")].map((e) => e.textContent));
   // round 2: the Welcome words, Guest Wi-Fi and House guide have settings of their own too (tests/test_ws2_home.mjs)
-  ok(titles.join(" / ") === "Welcome words, top left / Surf, middle left / Guest Wi-Fi, in the middle / House guide, middle right / Headlines, top right",
+  ok(titles.join(" / ") === "Welcome words, top left / Surf, middle left / Guest Wi-Fi, in the middle / House guide, middle right / Headlines, top right / App grid, bottom middle",
     "one box per widget with settings, named like the TV names it: " + titles.join(" / "));
   await phone.click('#w-list details[data-key="s|surf"] summary');
   const words = await phone.textContent('#w-list details[data-key="s|surf"]');

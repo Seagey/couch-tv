@@ -411,6 +411,20 @@
         app: it.app && it.app.package, art: it.backdrop || it.poster || "", progress: +it.progress || 0 };
     });
   }
+  // the shows a Keep watching widget shows: its own "Whose shows" setting (a person on this TV, from
+  // everyone's Keep watching, data().household), else whoever is watching. Each keeps how OK plays it:
+  // "show" (its place in the shelf) for the person watching, "pshow" ("<person>|<place>") for another
+  function showsFor(o, env) {
+    var d = dataOf(env), want = o ? setting(o, env, "person") : "auto";
+    var mine = function () { return shows(env).map(function (x, i) { x.act = "show"; x.arg = String(i); return x; }); };
+    if (env.demo || !want || want === "auto" || want === d.who) return mine();
+    var p = (d.household || []).filter(function (h) { return h && h.id === want; })[0];
+    if (!p) return mine();   // that person is not on this TV now: whoever is watching
+    return (p.shows || []).map(function (it, i) {
+      return { title: String(it.title || ""), sub: it.season && it.episode ? "S" + it.season + " E" + it.episode : String(it.episode_title || (it.app && it.app.name) || ""),
+        app: it.app && it.app.package, art: it.backdrop || it.poster || "", progress: +it.progress || 0, act: "pshow", arg: p.id + "|" + i, owner: String(p.name || "") };
+    }).filter(function (x) { return x.title; });
+  }
   function music(env) {
     if (env.demo) return { title: "Riptide", artist: "Vance Joy", art: demoImg("album"), state: "playing", app: "com.spotify.tv.android", source: "Spotify", pos: 82, dur: 215 };
     var m = dataOf(env).music;
@@ -1197,10 +1211,10 @@
     var card = E("div", "cw-layer", "", [E("div", "cw-fill", "background:#2a2a30 center/cover;" + (s.art ? "background-image:" + cssImg(s.art) : "")),
       E("div", "cw-fill", "background:linear-gradient(180deg,rgba(0,0,0,.05) 35%,rgba(0,0,0,.8))"),
       E("div", "", "position:absolute;left:24px;right:24px;bottom:22px;color:#fff", [
-        b.h >= 300 ? E("div", "cw-row", "", [s.app ? appIcon(s.app, logoA, env) : null, E("span", "cw-t23", "color:rgba(255,255,255,.88);margin-left:10px", ["Keep watching"])]) : null,
-        E("div", b.h >= 300 ? "cw-t38 cw-ell" : "cw-t29 cw-ell", "margin-top:10px;font-weight:720", [s.title]), b.h >= 220 && s.sub ? E("div", "cw-t23 cw-ell", "color:rgba(255,255,255,.82)", [s.sub]) : null,
+        b.h >= 300 ? E("div", "cw-row", "", [s.app ? appIcon(s.app, logoA, env) : null, E("span", "cw-t23", "color:rgba(255,255,255,.88);margin-left:10px", [s.owner ? s.owner + " is watching" : "Keep watching"])]) : null,
+        b.h >= 300 ? E("div", "cw-t38 cw-ell", "margin-top:10px;font-weight:720", [s.title]) : fitT(E("div", "", WRAP + "font-size:25px;line-height:1.15;font-weight:720;margin-top:10px", [s.title])), b.h >= 220 && s.sub ? E("div", "cw-t23 cw-ell", "color:rgba(255,255,255,.82)", [s.sub]) : null,
         s.progress ? E("div", "cw-bar", "margin-top:14px", [E("b", "", "width:" + Math.round(s.progress * 100) + "%;background:#fff")]) : null])]);
-    stop(card, "show", i, s.title);
+    stop(card, s.act || "show", s.arg !== undefined ? s.arg : i, s.title);
     void n;
     return card;
   }
@@ -1209,7 +1223,7 @@
     return u ? E("span", "", "display:block;width:" + px(a) + ";height:" + px(a) + ";border-radius:" + px(a * 0.24) + ";background:#222 center/cover;flex:none;background-image:" + cssImg(u)) : null;
   }
   R.keep = function (root, o, b, env) {
-    var list = shows(env);
+    var list = showsFor(o, env);
     if (!list.length) return noShows(root, b, env);
     list = list.slice(0, 5);
     root.classList.add("cw-photo");
@@ -1220,6 +1234,7 @@
     if (list.length > 1) root.appendChild(dots);
     // OK opens Keep watching (widget-detail.js) on the show that is showing
     stop(root, "detail", "keep", list[at].title); root.setAttribute("data-at", String(at));
+    if (b.h < 300) fitLater(root);
     root.setAttribute("data-turns", "1");
     live(root, 1000, function () {
       if (root.classList.contains("cw-focus")) return;   // stops turning while focused
@@ -1231,19 +1246,25 @@
     });
   };
   R.keeprow = function (root, o, b, env) {
-    var list = shows(env);
+    var list = showsFor(o, env);
     if (!list.length) return noShows(root, b, env);
-    var q = op(o), labelH = q.label === "" || b.h < 220 ? 0 : 50, gap = 28, n = clamp(q.shows || Math.floor((b.w + gap) / 380), 1, Math.min(5, list.length)), cw = (b.w - (n - 1) * gap) / n;
-    add(root, [labelH ? E("div", "cw-lab", "color:var(--ink);margin-bottom:16px;text-shadow:0 2px 12px rgba(0,0,0,.3)", [q.label || "Keep watching"]) : null,
+    var q = op(o), labelH = q.label === "" || b.h < 220 ? 0 : 50, gap = 28, n = clamp(q.shows || Math.floor((b.w + gap) / 380), 1, Math.min(5, list.length, Math.max(1, Math.floor((b.w + gap) / 260)))), cw = Math.floor((b.w - 48 - (n - 1) * gap) / n);   // inside the padding
+    add(root, [labelH ? E("div", "cw-lab", "color:var(--ink);margin-bottom:16px;text-shadow:0 2px 12px rgba(0,0,0,.3)", [q.label || (list[0].owner ? list[0].owner + " is watching" : "Keep watching")]) : null,
       E("div", "cw-row", "flex:1;align-items:stretch;min-height:0", list.slice(0, n).map(function (s, i) {
         var p = E("div", "cw-poster", "width:" + px(cw) + ";flex:none;" + (i ? "margin-left:" + gap + "px;" : "") + (s.art ? "background-image:" + cssImg(s.art) : ""), [E("div", "cap", "", [
-          E("div", "cw-row", "", [s.app ? appIcon(s.app, 34, env) : null, E("span", "cw-t29 cw-ell", "color:#fff;font-weight:700;margin-left:10px", [s.title])]),
+          E("div", "cw-row", "", [s.app ? appIcon(s.app, 34, env) : null, E("div", "", "min-width:0;flex:1;margin-left:10px", [fitT(E("div", "", WRAP + "font-size:25px;line-height:1.2;color:#fff;font-weight:700", [s.title]))])]),
           s.progress ? E("div", "cw-bar", "margin-top:12px", [E("b", "", "width:" + Math.round(s.progress * 100) + "%;background:#fff")]) : null])]);
-        return stop(p, "show", i, s.title);
+        return stop(p, s.act || "show", s.arg !== undefined ? s.arg : i, s.title);
       }))]);
+    fitLater(root);
   };
   // the sport apps a game comes from (the Game Day hero): Kayo, Foxtel, 9Now, 7plus, 10, DAZN
-  var SPORT_APPS = ["au.com.kayosports.tv", "au.com.foxtel.atv", "au.com.ninenow.ctv", "com.swm.live", "au.com.tenplay", "dazn"];
+  var SPORT_APPS = ["au.com.kayosports.tv", "au.com.foxtel.atv", "au.com.ninenow.ctv", "com.swm.live", "au.com.tenplay", "com.dazn", "dazn"];
+  // a show's app is one of these: a package, or a catalogue id ("netflix") for any package it has
+  function appIn(want, pkg) {
+    var A = cat();
+    return want.some(function (k) { return k === pkg || (!!A && !!pkg && (A.idOf(pkg) === k || A.packagesOf(k).indexOf(pkg) >= 0)); });
+  }
   // an Up next is a game hero when it says so (opts.sport), or, when it does not say, when the design
   // also has a Scores widget (the Game Day preset); opts.apps narrows it to those apps
   // game mode: On, Off, or Automatic (on when the design also has a Scores widget)
@@ -1254,13 +1275,21 @@
     SPORT_APPS.forEach(function (p) { if (have.indexOf(p) >= 0 && names.length < 3) names.push(APPS[p] || p); });
     return names.length ? names.slice(0, -1).join(", ") + (names.length > 1 ? " or " : "") + names[names.length - 1] : "";
   }
+  // Only from these apps holds at most its setting's max (6), however it was saved
+  function upnextMost() {
+    var C = window.CouchWidgetCaps, s = C && C.settings ? C.settings("upnext").filter(function (x) { return x && x.key === "apps"; })[0] : null;
+    return s && isFinite(s.max) ? +s.max : 6;
+  }
   R.upnext = function (root, o, b, env) {
-    var q = op(o), sport = upnextSport(o, env), want = q.apps && q.apps.length ? q.apps : sport ? SPORT_APPS : null;
+    var only = setting(o, env, "apps"), sport = upnextSport(o, env);
+    only = Object.prototype.toString.call(only) === "[object Array]" ? only.filter(function (k) { return typeof k === "string"; }).slice(0, upnextMost()) : [];
+    var want = only.length ? only : sport ? SPORT_APPS : null;
     // each show keeps its place in Keep watching: Resume opens that one (app.js "show" is its index)
     var list = shows(env).map(function (x, i) { x.i = i; return x; });
-    if (want && !env.demo) list = list.filter(function (x) { return want.indexOf(x.app) >= 0; });
+    if (want && !env.demo) list = list.filter(function (x) { return appIn(want, x.app); });
     if (!list.length) {
       // on a TV, never a demo and never an unrelated show: say plainly there is no game to pick up
+      if (only.length && !(env && dataOf(env).bridge === false)) return empty(root, b, "tv", "Nothing to keep watching from " + only.map(function (k) { return appName(k, env); }).slice(0, 3).join(", ") + (only.length > 3 ? " or the others picked" : ""), "Start a show in one of them and it shows here");
       if (sport && !(env && dataOf(env).bridge === false)) { var sa = sportAppsHere(env); return empty(root, b, "tv", "No game to pick up", sa ? "Start a game in " + sa + " and it shows here" : "Start a game in a sport app and it shows here"); }
       return noShows(root, b, env);
     }
@@ -1273,7 +1302,7 @@
       E("div", "", "position:absolute;left:44px;bottom:40px;max-width:60%;color:#fff", [
         E("div", "cw-row", "", [s.app ? appIcon(s.app, 44, env) : null, E("span", "cw-t25", "color:rgba(255,255,255,.88);font-weight:650;margin-left:12px", ["Up next"])]),
         // a long title takes two lines at most and ends in "...", so it never climbs out of the box
-        E("div", "", "font-size:" + px(fs) + ";font-weight:780;letter-spacing:-.03em;line-height:1.08;margin-top:16px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;overflow-wrap:anywhere", [s.title]),
+        E("div", "", "font-size:" + px(fs) + ";font-weight:780;letter-spacing:-.03em;line-height:1.22;margin-top:16px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;overflow-wrap:anywhere", [s.title]),
         s.sub ? E("div", "cw-t29 cw-ell", "color:rgba(255,255,255,.86);margin-top:14px", [s.sub]) : null,
         b.h >= 420 ? E("div", "cw-row", "margin-top:26px", [resume, stop(E("div", "cw-chip", "height:64px;font-size:27px;padding:0 30px;margin-left:16px;background:rgba(255,255,255,.2)", ["Start over"]), "show", s.i, s.title)]) : null])]);
     if (b.h < 420) stop(root, "show", s.i, s.title);
@@ -1287,8 +1316,17 @@
     var d = dataOf(env), WW = window.CouchWidgetWeb;
     return WW ? WW.picks(d.household || [], d.who, (d.apps || []).map(function (a) { return a && a.package; }), 8) : [];
   }
+  // the picks this widget shows: its own "Picks from" (others at home, your own, or both). Each keeps
+  // its place in the whole list (at), which is what OK plays (app.js playPick)
+  function picksFor(o, env) {
+    var mix = setting(o, env, "mix"), who = dataOf(env).who;
+    return picksOf(env).map(function (p, i) { p.at = i; return p; }).filter(function (p) {
+      var mine = p.owner !== undefined ? p.owner === who : p.why === "Pick up again";
+      return mix === "others" ? !mine : mix === "mine" ? mine : true;
+    });
+  }
   R.picks = function (root, o, b, env) {
-    var a = alignOf(o), list = picksOf(env);
+    var a = alignOf(o), list = picksFor(o, env);
     if (!list.length) {
       // no Keep watching at all (no bridge, no on-TV app): its setup steps; otherwise nothing yet
       if (!env.demo && dataOf(env).bridge === false && !(dataOf(env).household || []).some(function (p) { return p.shows && p.shows.length; })) { soon(root, b, "favourite", "picks"); return; }
@@ -1299,7 +1337,7 @@
       var cap = E("div", "", "position:absolute;left:0;right:0;bottom:0;padding:14px 16px;background:linear-gradient(180deg,transparent,rgba(0,0,0,.82));text-align:" + a, [
         fitT(E("div", "", WRAP + "font-size:25px;line-height:1.2;color:#fff;font-weight:700", [p.title])), dropT(fitT(E("div", "", WRAP + "font-size:23px;line-height:1.2;color:rgba(255,255,255,.86);margin-top:2px", [p.why])), 3)]);
       var card = E("div", "", "position:relative;overflow:hidden;flex:none;border-radius:24px;background:#2a2a30 center/cover;width:" + px(pw) + ";" + (i ? "margin-left:" + gap + "px;" : "") + (p.art ? "background-image:" + cssImg(p.art) : ""), [cap]);
-      return stop(dropT(card, i ? 2 : 1), "pick", i, p.title);
+      return stop(dropT(card, i ? 2 : 1), "pick", p.at !== undefined ? p.at : i, p.title);
     }))]);
     // OK on the widget as a whole (the remote arrived before the posters were there) opens every pick
     stop(root, "detail", "picks", "Picks for you");
@@ -1307,10 +1345,16 @@
 
   // apps
   function noApps(root, b, named) { return empty(root, b, "apps", named ? "These apps are not on this TV" : "No apps yet", named ? "Install them, or pick others in couch-tv Studio" : ""); }
+  // exactly `cols` across (Apps across): a full width break after every `cols` apps in a wrapping row
+  function rowBreaks(nodes, cols) {
+    var out = [];
+    nodes.forEach(function (n, i) { if (i && i % cols === 0) out.push(E("div", "cw-rowbreak", "flex-basis:100%;width:0;height:0;margin:0")); out.push(n); });
+    return out;
+  }
   function appGrid(list, b, cols, env, top) {
     var rows = Math.ceil(list.length / cols), gap = clamp(Math.min(b.w, b.h) / 18, 14, 28);
     var a = Math.floor(Math.min((b.w - (cols - 1) * gap) / cols, (b.h - top - (rows - 1) * gap) / rows));
-    var g = E("div", "cw-grow", "display:flex;flex-wrap:wrap;align-content:center;justify-content:center;margin:" + px(-gap / 2), list.map(function (p) { var n = appNode(p, a, env); n.style.margin = px(gap / 2); return n; }));
+    var g = E("div", "cw-grow", "display:flex;flex-wrap:wrap;align-content:center;justify-content:center;margin:" + px(-gap / 2), rowBreaks(list.map(function (p) { var n = appNode(p, a, env); n.style.margin = px(gap / 2); return n; }), cols));
     return g;
   }
   R.app = function (root, o, b, env) {
@@ -1324,6 +1368,8 @@
     stop(root, act, arg === null ? undefined : arg, n.getAttribute("data-name"));
     root.setAttribute("data-slot", "0");
   };
+  // Apps across (a folder, an app grid): set on this TV, else the design's, else as many as fit (0)
+  function colsOf(o, env) { var c = +setting(o, env, "cols"); return isFinite(c) && c >= 1 && c <= 8 ? Math.round(c) : 0; }
   R.folder = function (root, o, b, env) {
     var q = op(o), list = appsFor(o, env, 12);
     if (canAdd(env) && list.length < 12 && !(b.w < 300 && b.h < 300)) list.push("add:");
@@ -1336,14 +1382,14 @@
       stop(root, "detail", "folder", q.label || "Apps");
       return;
     }
-    var cols = q.cols || clamp(Math.round(Math.sqrt(list.length * b.w / b.h)), 1, 6);
+    var cols = colsOf(o, env) || clamp(Math.round(Math.sqrt(list.length * b.w / b.h)), 1, 6);
     add(root, [label, appGrid(list, b.w > 0 ? { w: b.w - 48, h: b.h - 48 } : b, cols, env, label ? 50 : 0)]);
     root.setAttribute("data-detail", "folder");
   };
   R.dock = function (root, o, b, env) {
     var q = op(o), list = appsFor(o, env, 12);
     if (!list.length && !canAdd(env)) return noApps(root, b, (q.apps || []).length);
-    var a = Math.min(112, b.h - 40), gap = 30, cap = Math.max(1, Math.floor((b.w - 40 + gap) / (a + gap))), more = q.more !== false;
+    var a = Math.min(112, b.h - 40), gap = 30, cap = Math.max(1, Math.floor((b.w - 40 + gap) / (a + gap))), more = setting(o, env, "more") !== false;
     var shown = list.slice(0, Math.max(1, cap - (more ? 1 : 0)));
     if (canAdd(env) && list.length < 12 && shown.length < cap - (more ? 1 : 0)) shown.push("add:");
     root.style.padding = "20px";
@@ -1356,12 +1402,18 @@
     var small = b.w < 500 && b.h < 500, q = op(o), list = appsFor(o, env, small ? 4 : 16);
     if (canAdd(env) && list.length < (small ? 4 : 16)) list.push("add:");
     if (!list.length) return noApps(root, b, (q.apps || []).length);
-    var cols = small ? 2 : q.cols || clamp(Math.round(Math.sqrt(list.length * b.w / b.h)), 1, 8), rows = Math.ceil(list.length / cols), names = !small && q.names !== false;
-    var gx = 40, gy = 40, nameH = names ? 52 : 0, a = Math.floor(Math.min((b.w - cols * gx) / cols, (b.h - rows * gy - rows * nameH) / rows));
-    add(root, E("div", "", "display:flex;flex-wrap:wrap;justify-content:center;align-content:center;height:100%", list.map(function (p, i) {
+    // sized in the box inside the padding; Apps across, then as many rows as fit (at least 72 px an app),
+    // more across when the rows would not fit
+    var W0 = Math.max(1, b.w - 48), H0 = Math.max(1, b.h - 48), names = !small && setting(o, env, "names") !== false;
+    var cols = small ? colsOf(o, env) || 2 : colsOf(o, env) || clamp(Math.round(Math.sqrt(list.length * W0 / H0)), 1, 8);
+    var gx = 40, gy = H0 < 400 ? 16 : 40, nameH = names ? 52 : 0, maxRows = Math.max(1, Math.floor(H0 / (72 + gy + nameH)));
+    cols = Math.min(list.length, Math.max(cols, Math.ceil(list.length / maxRows)));
+    var rows = Math.ceil(list.length / cols), a = Math.floor(Math.min((W0 - cols * gx) / cols, (H0 - rows * gy - rows * nameH) / rows));
+    add(root, E("div", "", "display:flex;flex-wrap:wrap;justify-content:center;align-content:center;height:100%", rowBreaks(list.map(function (p, i) {
       var n = appNode(p, a, env);
-      return E("div", "cw-col", "align-items:center;width:" + px(a) + ";margin:" + px(gy / 2) + " " + px(gx / 2), [n, names ? E("span", "cw-t25 cw-ell", "color:var(--ink);margin-top:12px;max-width:" + px(a + 30) + ";text-align:center;font-weight:650" + (root.classList.contains("cw-bare") ? ";text-shadow:0 2px 10px rgba(0,0,0,.3)" : ""), [p === "add:" ? "Add app" : appName(String(p).replace(/^missing:/, ""), env)]) : null]);
-    })));
+      return E("div", "cw-col", "align-items:center;width:" + px(a) + ";margin:" + px(gy / 2) + " " + px(gx / 2), [n, names ? fitT(E("div", "", WRAP + "font-size:25px;line-height:1.2;color:var(--ink);margin-top:12px;max-width:" + px(a + gx) + ";text-align:center;font-weight:650" + (root.classList.contains("cw-bare") ? ";text-shadow:0 2px 10px rgba(0,0,0,.3)" : ""), [p === "add:" ? "Add app" : appName(String(p).replace(/^missing:/, ""), env)])) : null]);
+    }), cols)));
+    if (names) fitLater(root);
   };
   var GAMES = { "com.microsoft.xcloud": ["#107c10", "#0b4f0b", "Xbox Cloud", "cloud", "Last played: Forza"], "com.nvidia.geforcenow": ["#76b900", "#3f6400", "GeForce NOW", "bolt", "Fortnite, 2h ago"],
     "com.valvesoftware.steamlink": ["#2a475e", "#13202c", "Steam Link", "tv", "From the study PC"], "com.retroarch": ["#e60012", "#7a0009", "RetroArch", "games", "Mario Kart 64"] };
@@ -1372,19 +1424,21 @@
     add(root, [lab("games", op(o).label || "Play"), E("div", "cw-row cw-grow", "margin-top:16px;align-items:stretch", list.slice(0, n).map(function (p, i) {
       var miss = String(p).indexOf("missing:") === 0, key = miss ? p.slice(8) : p, gp = GAMES[key] || (cat() && cat().get(key) ? GAMES[cat().get(key).packages.android[0]] : null), g = gp || ["#3a3a46", "#1d1d24", appName(key, env), "games"];
       var t = E("div", "cw-col", "flex:1;position:relative;overflow:hidden;border-radius:28px;background:linear-gradient(165deg," + g[0] + "," + g[1] + ");padding:24px;justify-content:space-between;" + (i ? "margin-left:20px" : ""), [
-        ic(g[3], clamp(b.h / 5, 56, 96), "#fff", "solid"), E("div", "", "min-width:0", [E("div", "cw-t29 cw-ell", "color:#fff;font-weight:740", [g[2]]), env.demo && g[4] && b.h >= 400 ? E("div", "cw-t23 cw-ell", "color:rgba(255,255,255,.86)", [g[4]]) : null])]);
+        ic(g[3], clamp(b.h / 5, 56, 96), "#fff", "solid"), E("div", "", "min-width:0", [fitT(E("div", "", WRAP + "font-size:25px;line-height:1.15;color:#fff;font-weight:740", [g[2]])), env.demo && g[4] && b.h >= 400 ? E("div", "cw-t23 cw-ell", "color:rgba(255,255,255,.86)", [g[4]]) : null])]);
       if (miss) { t.style.opacity = "0.42"; t.appendChild(E("div", "cw-t23", "color:#fff", ["Not on this TV"])); } return stop(t, miss ? "missing" : "app", key, g[2]);
     }))]);
+    fitLater(root);
   };
 
   // music
   R.nowplaying = function (root, o, b, env) {
-    var m = music(env);
+    var m = music(env), buttons = setting(o, env, "buttons") !== false;
+    if (m && setting(o, env, "cover") === false) { m = JSON.parse(JSON.stringify(m)); m.art = ""; m.noCover = true; }
     if (!m) return dataOf(env).bridge === false ? soon(root, b, "music", "nowplaying") : empty(root, b, "music", "Nothing playing", "Songs playing on this TV show up here");
     if (b.w < 300 && b.h < 300) {
       // a tile: the cover, with play or pause on it; OK opens the player
       root.classList.add("cw-photo");
-      add(root, [E("div", "cw-fill", "background:#333 center/cover;" + (m.art ? "background-image:" + cssImg(m.art) : "")), E("div", "cw-fill", "background:linear-gradient(180deg,transparent 40%,rgba(0,0,0,.7))"),
+      add(root, [E("div", "cw-fill", "background:#333 center/cover;display:flex;align-items:center;justify-content:center;" + (m.art ? "background-image:" + cssImg(m.art) : ""), m.noCover ? [ic("music", 64, "rgba(255,255,255,.6)")] : null), E("div", "cw-fill", "background:linear-gradient(180deg,transparent 40%,rgba(0,0,0,.7))"),
         E("div", "cw-row", "position:absolute;left:16px;right:16px;bottom:14px;color:#fff", [ic(m.state === "playing" ? "pause" : "play", 30, "#fff", "solid"), E("span", "cw-t23 cw-ell", "color:#fff;font-weight:700;margin-left:8px", [m.title])])]);
       stop(root, "detail", "player", m.title);
       return;
@@ -1400,17 +1454,25 @@
       b.h >= 420 && env.demo ? E("div", "cw-row", "margin-top:18px", ["Living", "Kitchen"].map(function (r2, i) { return E("div", "cw-chip", "height:48px;font-size:23px;" + (i ? "margin-left:12px" : ""), [ic("speaker", 26), r2]); })) : null,
       b.h >= 240 ? E("div", "cw-bar", "margin-top:14px", [E("b", "", "width:" + Math.round(pct * 100) + "%")]) : null,
       b.h >= 300 && m.dur ? E("div", "cw-row cw-sp cw-t23", "margin-top:8px", [E("span", "", "", [Math.floor(m.pos / 60) + ":" + ("0" + Math.floor(m.pos % 60)).slice(-2)]), E("span", "", "", ["-" + Math.floor((m.dur - m.pos) / 60) + ":" + ("0" + Math.floor((m.dur - m.pos) % 60)).slice(-2)])]) : null,
-      b.h >= 300 ? E("div", "cw-row", "justify-content:center;margin-top:10px", [btn("previous", 40, "prev"), E("div", "", "width:40px"), btn(m.state === "playing" ? "pause" : "play", 52, "play"), E("div", "", "width:40px"), btn("next", 40, "next")]) : null]);
+      b.h >= 300 && buttons ? E("div", "cw-row cw-np-buttons", "justify-content:center;margin-top:10px", [btn("previous", 40, "prev"), E("div", "", "width:40px"), btn(m.state === "playing" ? "pause" : "play", 52, "play"), E("div", "", "width:40px"), btn("next", 40, "next")]) : null]);
     // the cover and its words as one group in the middle (the design's align does not apply here)
-    if (wide) add(root, E("div", "cw-row", "height:100%;align-items:stretch;justify-content:center", [art, info]));
-    else { art.style.alignSelf = "center"; add(root, [art, E("div", "cw-t29 cw-ell", "margin-top:16px;font-weight:680", [m.title]), E("div", "cw-t25 cw-ell", "", [m.artist]), E("div", "cw-grow"), E("div", "cw-bar", "", [E("b", "", "width:" + Math.round(pct * 100) + "%")])]); }
+    if (m.noCover) { info.style.marginLeft = "0"; info.style.width = "auto"; info.style.flex = "1"; }
+    if (wide) add(root, E("div", "cw-row", "height:100%;align-items:stretch;justify-content:center", m.noCover ? [info] : [art, info]));
+    else { art.style.alignSelf = "center"; add(root, [m.noCover ? null : art, E("div", "cw-t29 cw-ell", "margin-top:16px;font-weight:680", [m.title]), E("div", "cw-t25 cw-ell", "", [m.artist]), E("div", "cw-grow"), E("div", "cw-bar", "", [E("b", "", "width:" + Math.round(pct * 100) + "%")]),
+      // Previous, play and next under the song where there is room (a tall or large widget)
+      buttons && b.h >= 560 ? E("div", "cw-row cw-np-buttons", "justify-content:center;margin-top:12px", [btn("previous", 40), E("div", "", "width:40px"), btn(m.state === "playing" ? "pause" : "play", 52), E("div", "", "width:40px"), btn("next", 40)]) : null]); }
     // OK opens the player (widget-detail.js), which has every control
     stop(root, "detail", "player", m.title);
   };
-  R.soundscape = function (root, o, b) {
-    var snd = op(o).sound || "rain", names = { rain: "Rain", fire: "Fire", waves: "Waves", brown: "Brown noise" }, icons = { rain: "rain", fire: "bolt", waves: "wind", brown: "speaker" };
-    add(root, [ic(icons[snd], b.h < 200 ? 44 : 56, "currentColor"), E("div", "cw-grow"), E("div", b.w < 300 ? "cw-t25" : "cw-t29", "font-weight:680;color:var(--ink)", [names[snd]]), b.w >= 300 ? E("div", "cw-t23", "", ["Soundscape"]) : null]);
-    stop(root, "quick", "soundscape", "Soundscape");
+  R.soundscape = function (root, o, b, env) {
+    var snd = setting(o, env, "sound"), vol = +setting(o, env, "volume"), names = { rain: "Rain", fire: "Fire", waves: "Waves", brown: "Brown noise" }, icons = { rain: "rain", fire: "bolt", waves: "wind", brown: "speaker" };
+    if (!names[snd]) snd = "rain";
+    vol = isFinite(vol) ? clamp(Math.round(vol), 10, 100) : 50;
+    // OK plays this widget's own sound at its own volume (app.js widgetSound), and stops it when it plays
+    var on = !env.demo && !env.designer && !!window.Soundscape && window.Soundscape.current && window.Soundscape.current() === snd;
+    add(root, [ic(icons[snd], b.h < 200 ? 44 : 56, "currentColor"), E("div", "cw-grow"), E("div", b.w < 300 ? "cw-t25" : "cw-t29", "font-weight:680;color:var(--ink)", [names[snd]]), b.w >= 300 ? E("div", "cw-t23", "", [on ? "Playing. OK stops it" : b.h < 200 ? "Volume " + vol + "%" : "Soundscape, volume " + vol + "%"]) : null]);
+    root.setAttribute("data-sound", snd + "|" + vol);
+    stop(root, "sound", snd + "|" + vol, names[snd]);
   };
   // ---------------- fitting words (group C widgets) ----------------
   // seagey, 18 Nov 2026: "Make sure each widget fits in each container correctly things aren't cut off
@@ -1505,8 +1567,9 @@
     var items = (q.items || []).filter(function (s) { return s && s.title; });
     if (!items.length) return haWait(root, b, o, "music", title, "Nothing up next in Spotify");
     alignRoot(root, al);
-    var big = b.w >= 700, cs = big ? 96 : 76, gap = big ? 24 : 18, textW = W - cs - 20, left = b.h - 48 - 46, rows = [];
-    for (var i = 0; i < Math.min(10, items.length); i++) {
+    var big = b.w >= 700, cs = big ? 96 : 76, gap = big ? 24 : 18, textW = W - cs - 20, left = b.h - 48 - 46, rows = [], most = +setting(o, env, "count");
+    most = isFinite(most) && most >= 1 ? Math.min(10, Math.round(most)) : 10;
+    for (var i = 0; i < Math.min(most, items.length); i++) {
       var s = items[i], name = String(s.title).slice(0, 120), tl = 1, tpx = fitPxText(name, textW, big ? 38 : 29, 1, 650, famOf(root));
       if (!tpx) { tl = 2; tpx = fitPxText(name, textW, 25, 2, 650, famOf(root)); }
       if (!tpx) continue;   // a title too long for this box is left out, never cut
@@ -2489,7 +2552,12 @@
   var QNAMES = { sleep: ["sleep-timer", "Sleep timer"], picture: ["picture", "Picture"], look: ["picture", "Look"], soundscape: ["rain", "Soundscape"], screen_off: ["power", "Screen off"],
     headphones: ["headphones", "Headphones"], input: ["input", "Input"], bluetooth: ["bluetooth", "Bluetooth"], network: ["wifi", "Network"], tvsettings: ["settings", "TV settings"], screensaver: ["picture", "Screensaver"] };
   R.quick = function (root, o, b, env) {
-    var q = op(o), ids = q.quick && q.quick.length ? q.quick : (!env.demo && dataOf(env).quick && dataOf(env).quick.length ? dataOf(env).quick : ["sleep", "picture", "input"]);
+    var q = op(o), mine = setting(o, env, "quick");
+    mine = Object.prototype.toString.call(mine) === "[object Array]" ? mine.filter(function (x) { return !!QNAMES[x]; }).slice(0, 6) : [];
+    // on a TV, only the buttons this TV can do (app.js data().quickCan)
+    var can = !env.demo && !env.designer ? dataOf(env).quickCan : null;
+    if (Object.prototype.toString.call(can) === "[object Array]") mine = mine.filter(function (x) { return can.indexOf(x) >= 0; });
+    var ids = mine.length ? mine : (!env.demo && dataOf(env).quick && dataOf(env).quick.length ? dataOf(env).quick : ["sleep", "picture", "input"]);
     var s = clamp(b.h, 60, 96), gap = 24, n = Math.max(1, Math.min(ids.length, Math.floor((b.w + gap) / (s + gap))));
     add(root, E("div", "cw-row", "height:100%;justify-content:" + (q.align === "left" ? "flex-start" : q.align === "right" ? "flex-end" : "center"), ids.slice(0, n).map(function (id, i) {
       var nm = QNAMES[id] || ["settings", id];
@@ -3042,8 +3110,14 @@
   }
   // Smart stack: one place, up to 10 widgets taking turns; focused it stops, Left and Right flick it
   var SMART = { morning: ["weather", "bigtemp", "hourly", "week", "date", "agenda", "rain", "uv"], evening: ["keep", "upnext", "keeprow", "nowplaying"], night: ["clock", "tallclock", "analog", "wordclock", "moon"] };
-  function stackIndex(o, n) {
-    var t = o.turn === undefined ? 20 : o.turn;
+  // when a stack moves on: set on this TV, else the design's (its opts, or an older design's own turn), else 20 s
+  function stackTurn(o, env) {
+    var ws = wsetOf(o, env), v = ws && ws.turn !== undefined && ws.turn !== null && ws.turn !== "" ? ws.turn : op(o).turn !== undefined ? op(o).turn : o.turn;
+    v = +v;
+    return [0, 10, 20, 30, 60].indexOf(v) >= 0 ? v : 20;
+  }
+  function stackIndex(o, n, env) {
+    var t = stackTurn(o, env || {});
     if (t) return dayIndex(n, t);
     var h = now().getHours(), want = h >= 5 && h < 11 ? SMART.morning : h >= 18 && h < 22 ? SMART.evening : h >= 22 || h < 5 ? SMART.night : null;
     if (want) for (var i = 0; i < o.items.length; i++) if (want.indexOf(o.items[i].kind) >= 0) return i;
@@ -3051,12 +3125,12 @@
   }
   function stack(o, b, env) {
     var items = o.items || [], root = E("div", "cw cw-bare cw-stack", "width:" + px(b.w) + ";height:" + px(b.h) + ";position:relative");
-    root.setAttribute("data-kind", "stack"); root.setAttribute("data-stack", String(items.length));
+    root.setAttribute("data-kind", "stack"); root.setAttribute("data-stack", String(items.length)); root.setAttribute("data-turn", String(stackTurn(o, env)));
     // each item keeps an id of its own ("<stack id>/<index>"), so its settings on this TV are its own
     var slots = items.map(function (it, i) { var s = E("div", "cw-slot", "", [one({ id: o.id !== undefined ? o.id + "/" + i : undefined, kind: it.kind, opts: it.opts, style: it.style, w: b.w, h: b.h }, b, env)]); return s; });
     // the designer can hold a stack on the item being edited (CW.stackAt[id]); on the TV it turns by time
     var held = env.designer && CW.stackAt && CW.stackAt[o.id] != null ? CW.stackAt[o.id] : null;
-    var at = held != null ? held % Math.max(1, items.length) : stackIndex(o, items.length), manual = held != null ? 1e15 : 0;
+    var at = held != null ? held % Math.max(1, items.length) : stackIndex(o, items.length, env), manual = held != null ? 1e15 : 0;
     var dots = E("div", "cw-dots", "color:#fff", items.map(function () { return E("i"); }));
     var show = function (i) {
       at = (i + items.length) % items.length;
@@ -3070,7 +3144,7 @@
     root.__show = function (i) { if (env.designer) manual = 1e15; show(i); }; root.__at = function () { return at; };
     live(root, 1000, function () {
       if (root.classList.contains("cw-focus") || Date.now() - manual < 60000) return;
-      var j = stackIndex(o, items.length);
+      var j = stackIndex(o, items.length, env);
       if (j !== at) show(j);
     });
     return root;
@@ -3118,7 +3192,7 @@
     timer: Timer,
     // the building blocks and data readers the detail layers share (widget-detail.js)
     kit: { E: E, S: S, svg: svg, ic: ic, add: add, empty: empty, px: px, clamp: clamp, rgba: rgba, avatar: avatar, cssImg: cssImg, now: now, dataOf: dataOf,
-      weather: weather, wxIcon: wxIcon, wxWords: wxWords, shows: shows, music: music, photos: photos, people: people,
+      weather: weather, wxIcon: wxIcon, wxWords: wxWords, shows: shows, showsFor: showsFor, music: music, photos: photos, people: people,
       appNode: appNode, appsFor: appsFor, appName: appName, appIcon: appIcon, demoImg: demoImg, bgImg: bgImg,
       sunToday: sunToday, sunTimes: sunTimes, moon: moon, tzTime: tzTime, CITY: CITY, DAYS: DAYS, MONTHS: MONTHS, longDate: longDate, clockParts: clockParts,
       roomsOf: roomsOf, roomOn: roomOn, roomMode: roomMode, MODE_WORD: MODE_WORD, MODE_COL: MODE_COL, tdeg: tdeg, scenesOf: scenesOf,
@@ -3131,5 +3205,5 @@
   // the smart home and music widgets' readers, for their detail layers (widget-detail.js)
   window.CouchWidgets.kit.ha = { haOf: haOf, controlsOf: controlsOf, ctlIcon: ctlIcon, ctlWord: ctlWord, speakersOf: speakersOf, pickedOf: pickedOf, houseSafe: houseSafe, opensHouse: opensHouse, spkWord: spkWord, spkSong: spkSong, sensorPick: sensorPick, sensorText: sensorText, spark: spark, hourBars: hourBars, kwh: kwh, ringWords: ringWords, queueOf: queueOf, coverOk: coverOk, stillWidth: stillWidth, SENSOR_ICON: SENSOR_ICON };
   // what the web widgets' detail layers share with them (widget-detail.js)
-  window.CouchWidgets.webKit = { webOf: webOf, agoOf: agoOf, DEMO_NEWS: DEMO_NEWS, demoScores: demoScores, gameStatus: gameStatus, shortScore: shortScore, demoQuote: demoQuote, upDown: upDown, commuteOf: commuteOf, picksOf: picksOf };
+  window.CouchWidgets.webKit = { webOf: webOf, agoOf: agoOf, DEMO_NEWS: DEMO_NEWS, demoScores: demoScores, gameStatus: gameStatus, shortScore: shortScore, demoQuote: demoQuote, upDown: upDown, commuteOf: commuteOf, picksOf: picksOf, picksFor: picksFor };
 })();

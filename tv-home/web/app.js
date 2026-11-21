@@ -180,6 +180,16 @@
     renderQuick();
     note(t("soundscape") + ": " + (next === "off" ? t("timer_off") : t("sound_" + next)));
   }
+  // OK on a Soundscape widget: its own sound at its own volume ("rain|50"), or stops it when that sound
+  // is already playing
+  function widgetSound(arg) {
+    var S = window.Soundscape, parts = String(arg || "").split("|"), type = parts[0], vol = Math.max(10, Math.min(100, +parts[1] || 50)) / 100;
+    if (!S || !S.TYPES || S.TYPES.indexOf(type) < 0) return;
+    if (S.current() === type) { S.stop(); note(t("soundscape") + ": " + t("timer_off")); }
+    else { S.play(type, vol); note(t("soundscape") + ": " + (t("sound_" + type) || type)); }
+    try { renderQuick(); } catch (e) {}
+    if (typeof CouchDesign !== "undefined" && CouchDesign.dataChanged) CouchDesign.dataChanged("sound", S.current());
+  }
   // glass app icons: the focused app in its own colours, or staying glass (#32)
   var GLASS_FOCUS = "colour";
   // The focused tile's slow sway and glint: Home settings, Look, Moving tiles, else home.moving_tiles,
@@ -2620,8 +2630,11 @@
   // behind another app still says document.hidden === false there), so the note is read on both.
   document.addEventListener("visibilitychange", function () { if (!document.hidden) devResume(); });
   document.addEventListener("webOSRelaunch", devResume);
-  function quickVisible() {
-    return QUICK.filter(function (q) {
+  // the home's own quick buttons this TV can do; quickCan: one button this TV can do (the Quick buttons
+  // widget leaves out the rest)
+  function quickVisible() { return QUICK.filter(quickCan); }
+  function quickCan(q) {
+    {
       if (q === "sleep") return !OFFLINE || nativeSleep();
       if (q === "picture") return !OFFLINE && picShown;
       if (q === "look") return true;
@@ -2634,7 +2647,7 @@
       if (q === "tvsettings") return !!(TV && (TV.launch || TV.openSettings)) || !OFFLINE;
       if (q === "extend") return devOn();
       return false;
-    });
+    }
   }
   function hasQuick() { return quickVisible().length > 0 && !designHides("quick"); }
   // a part a design hides is out of the remote's way too: focus never lands on something you cannot see
@@ -2983,8 +2996,8 @@
     try { ok = !!(TV && TV.openAmbientSettings && TV.openAmbientSettings()); } catch (e) {}
     if (!ok) { SET.msg = t("no_screensaver"); renderSettings(); }
   }
-  function quickAction() {
-    var q = quickVisible()[qi];
+  function quickAction(one) {
+    var q = one || quickVisible()[qi];
     if (q === "sleep") openMenu();
     else if (q === "picture") togglePicture();
     else if (q === "look") toggleLook();
@@ -7931,7 +7944,12 @@
   // OK on a pick: the show, in its own app, the way Keep watching opens it (as its owner's)
   function playPick(i) {
     var d = typeof CouchWidgetWeb !== "undefined" ? CouchWidgetWeb.picks(householdData(), who, arrangeItems().items.map(function (it) { return it.package; }), 8) : [], p = d[i];
-    var it = p && (data.showsBy[p.owner] || [])[p.i];
+    if (p) playOwned(p.owner, p.i);
+  }
+  // one of a person's own Keep watching shows (Picks for you, or a Keep watching widget set to that
+  // person): in its own app, the way Keep watching opens it, as its owner's
+  function playOwned(owner, i) {
+    var p = { owner: owner }, it = (data.showsBy[owner] || [])[i];
     if (!it) return;
     status(it.app ? t("opening_in", { title: it.title, app: it.app.name }) : t("opening", { title: it.title }), true);
     if (it.wn && TV && TV.openWatchNext) {
@@ -7994,6 +8012,12 @@
         var wk = Math.floor((binNight(w).getTime() / 86400000 - an) / 7);
         return ((wk % 2) + 2) % 2 === 0 ? "a" : "b";
       }
+    }
+    // the apps in a dock, row, folder, app tile or games: what it holds now (Hold OK's changes on this
+    // TV, or the design's), the same list the phone's Apps on this design changes
+    if (s.type === "apps" && typeof CouchDesign !== "undefined" && CouchDesign.appWidgets) {
+      var aw = CouchDesign.appWidgets().filter(function (x) { return x.key === w.key; })[0];
+      if (aw) return aw.apps.map(function (x) { return x.key; });
     }
     if (v !== undefined && v !== null && v !== "") return v;
     // the Commute's Where to set with 0.13.8's Commute rows (kept on this TV, tvhome.commute) still counts
@@ -8068,7 +8092,8 @@
     if (from === "cards") return CARDS.length ? [["turns", "Each in turn"]].concat(CARDS.slice(0, 8).map(function (c) { return [String(c.title || ""), String(c.title || "")]; }).filter(function (c) { return c[0]; })) : [];
     return [];
   }
-  function wsOptions(s, w) { return s.type === "tvlist" ? tvlistOptions(s.from) : s.type === "team" ? teamOptions(w).map(function (t) { return [t.name, t.name]; }) : s.type === "device" ? deviceOptions(s) : s.options; }
+  // a TV list's own fixed choices first (Keep watching's "Whoever is watching"), then what this TV has
+  function wsOptions(s, w) { return s.type === "tvlist" ? (s.options || []).concat(tvlistOptions(s.from)) : s.type === "team" ? teamOptions(w).map(function (t) { return [t.name, t.name]; }) : s.type === "device" ? deviceOptions(s) : s.options; }
   // Scores, Your team: the competition this widget shows now (its Competition setting), and ESPN's own
   // team list for it, read with the scores (widget-web.js; cricket has none: [] means typed)
   function teamLeague(w) {
@@ -8190,6 +8215,7 @@
     if (v === undefined || v === null || v === "" || (Array.isArray(v) && !v.length)) return s.many ? "None picked" : "Not set";
     if (s.private && s.type !== "tvlist" && s.type !== "choice" && s.type !== "device") return "Set";
     if (s.type === "toggle") return v ? t("on") : t("off");
+    if (s.type === "apps" && Array.isArray(v)) return v.map(function (k) { var c = window.CouchApps && window.CouchApps.get(k), it = c ? null : arrangeItems().items.filter(function (x) { return x.package === k; })[0]; return c ? c.name : it ? String(it.name || k) : String(k); }).join(", ");
     var opts = wsOptions(s), name = function (x) { var o = opts.filter(function (y) { return String(y[0]) === String(x); })[0]; return o ? String(o[1]) : String(x); };
     if (Array.isArray(v)) return v.map(s.type === "choice" || s.type === "tvlist" || s.type === "device" ? name : String).join(", ");
     if (s.type === "choice" || s.type === "tvlist" || s.type === "device") return name(v);
@@ -8267,7 +8293,7 @@
           if (keys.length) set(keys[(i + 1) % keys.length]);
         } });
       } else if (s.type === "apps") {
-        rows.push(info(id, s.label, "", "On the home, hold OK on an app in it: Change app, Move, Remove or Add app. Or use Home settings on your phone."));
+        rows.push(info(id, s.label, wsWords(s, cur), "On the home, hold OK on an app in it: Change app, Move, Remove or Add app. Or use Home settings on your phone."));
       } else if (s.type === "device") {
         // nothing from Home Assistant on this TV yet: where to set it up
         var sh = window.smartHome && window.smartHome.setup && window.smartHome.setup.can();
@@ -8477,7 +8503,7 @@
         return { weather: WX_SHOW ? data.weather : null, wxOff: !WX_SHOW, place: { name: String((WXCFG && WXCFG.place) || "").split(",")[0], lat: WXCFG && WXCFG.lat, lon: WXCFG && WXCFG.lon },
           shows: data.shows || [], music: music, apps: (function () { try { return arrangeItems().items.map(function (it) { return { package: it.package, name: it.name }; }); } catch (e) { return []; } })(),
           photos: (Array.isArray(ST.photos) ? ST.photos : []).filter(function (p) { return p && (p.file || p.url); }).map(photoSrc),
-          people: NOBODY ? [] : PEOPLE.map(function (p) { return { id: p.id, name: p.name }; }), who: who, quick: quickVisible(), cards: CARDS.slice(0, 8), iconUrl: iconUrl,
+          people: NOBODY ? [] : PEOPLE.map(function (p) { return { id: p.id, name: p.name }; }), who: who, quick: quickVisible(), quickCan: QUICK_ALL.filter(quickCan), cards: CARDS.slice(0, 8), iconUrl: iconUrl,
           // no bridge at all (option A, or the standalone home): widgets that need one say so
           bridge: !OFFLINE,
           // the scenes the launcher's Home Assistant allows (names and entities only, never its address)
@@ -8513,11 +8539,13 @@
           api("POST", "/api/launch", { app: (it && it.id) || arg }).catch(function (e) { status(tBridge(e.key, e.vars, e.message)); });
         } else if (what === "show") { zone = "shelf"; s = Math.max(0, parseInt(arg, 10) || 0); activate(); zone = "grid"; }
         else if (what === "pick") playPick(parseInt(arg, 10) || 0);
+        else if (what === "pshow") { var ps = String(arg).split("|"); if (ps[0] === who) { zone = "shelf"; s = Math.max(0, parseInt(ps[1], 10) || 0); activate(); zone = "grid"; } else playOwned(ps[0], parseInt(ps[1], 10) || 0); }
+        else if (what === "sound") widgetSound(arg);
         else if (what === "more") { dockBack = null; expanded = true; zone = "grid"; g = 0; renderGrid(); paintFocus(); }
         else if (what === "gear") openGear();
         else if (what === "place" || what === "wset") openWidgetPage(arg);
         else if (what === "smart") openSmart();
-        else if (what === "quick") { var qv = quickVisible(), qn = qv.indexOf(arg); if (qn >= 0) { qi = qn; quickAction(); } else if (arg === "soundscape") cycleSoundscape(); }
+        else if (what === "quick") { var qv = quickVisible(), qn = qv.indexOf(arg); if (qn >= 0) { qi = qn; quickAction(); } else if (arg === "soundscape") cycleSoundscape(); else if (QUICK_ALL.indexOf(arg) >= 0 && quickCan(arg)) quickAction(arg); }
         else if (what === "person") { pickWho(arg); renderPeople(); }
         else if (what === "scene") { if (window.smartHome && window.smartHome.request && window.smartHome.available()) { var scn = (window.smartHome.scenes() || []).filter(function (x) { return x.entity === arg; })[0], snm = scn ? scn.name : arg; window.smartHome.request("scene", arg).then(function (r) { note(r && r.ok ? t("sh_started", { name: snm }) : t("sh_failed")); }); } }
         else if (what === "media") {
