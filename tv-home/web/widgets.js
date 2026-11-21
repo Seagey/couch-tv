@@ -1794,22 +1794,27 @@
     var dot = E("i", "", "display:block;width:18px;height:18px;border-radius:9px;flex:none;background:" + col + ";box-shadow:0 0 0 4px rgba(255,255,255,.12)");
     if (b.w < 300 && b.h < 300) {
       // a tile: the room, its temperature now, and whether it is on
-      add(root, [E("div", "cw-row cw-sp", "", [E("div", "cw-t23 cw-ell", "font-weight:700;color:var(--ink);min-width:0", [r.name || "Aircon"]), dot]), E("div", "cw-grow"),
-        E("div", "cw-big", "font-size:" + px(clamp(b.w * 0.36, 44, 64)), [r.current != null ? Math.round(tconv(r.current, r, env)) + "°" : tdeg(r.target, r, env)]), E("div", "cw-t23 cw-ell", "", [on ? roomMode(r) + " " + tdeg(r.target, r, env) : "Off"])]);
+      // the room's name whole: one line, else two (then the number is smaller so all of it fits)
+      var nm1 = fitWords(root, r.name || "Aircon", b.w - 48 - 30, 23, 1, 700, "color:var(--ink);min-width:0"), nmA = nm1 || fitWords(root, r.name || "Aircon", b.w - 48 - 30, 23, 2, 700, "color:var(--ink);min-width:0");
+      add(root, [E("div", "cw-row cw-sp", "align-items:flex-start", [nmA, dot]), E("div", "cw-grow"),
+        E("div", "cw-big", "font-size:" + px(nm1 ? clamp(b.w * 0.36, 44, 64) : 40), [r.current != null ? Math.round(tconv(r.current, r, env)) + "°" : tdeg(r.target, r, env)]), E("div", "cw-t23 cw-ell", "", [on ? roomMode(r) + " " + tdeg(r.target, r, env) : "Off"])]);
     } else if (b.h < 200) {
       // a wide tile: the room and its mode beside the set temperature
-      add(root, E("div", "cw-row", "height:100%", [E("div", "cw-col", "flex:1;min-width:0", [lab("aircon", r.name || "Aircon"), E("div", "cw-row", "margin-top:8px", [dot, E("span", "cw-t25 cw-ell", "margin-left:12px;color:var(--ink);font-weight:650", [on ? roomMode(r) : "Off"])]),
+      add(root, E("div", "cw-row", "height:100%", [E("div", "cw-col", "flex:1;min-width:0", [fitLab(root, "aircon", r.name || "Aircon", b.w - 48 - 140), E("div", "cw-row", "margin-top:8px", [dot, E("span", "cw-t25 cw-ell", "margin-left:12px;color:var(--ink);font-weight:650", [on ? roomMode(r) : "Off"])]),
         E("div", "cw-t23 cw-ell", "margin-top:2px", ["Now " + tdeg(r.current, r, env)])]),
         E("div", "cw-big", "font-size:84px;margin-left:16px;opacity:" + (on ? 1 : 0.55), [tdeg(r.target, r, env)])]));
     } else {
       // the room, its mode and the dial as one group in the middle (a tall box: not the dial alone)
-      var wideA = b.w > b.h * 1.3, s = Math.min(b.h - 130, wideA ? b.w * 0.5 : b.w - 48), others = rooms.filter(function (x) { return x !== r; }).slice(0, 4);
+      var wideA = b.w > b.h * 1.3, others = rooms.filter(function (x) { return x !== r; }).slice(0, 4);
+      // a large square widget: the other rooms in a row under the dial (a wide one has them beside it)
+      var under = !wideA && b.h >= 700 && b.w >= 700 && others.length && setting(o, env, "others") !== false;
+      var s = Math.min(b.h - 130 - (under ? 90 : 0), wideA ? b.w * 0.5 : b.w - 48);
+      var chip = function (z, css) { var zo = roomOn(z); return E("div", "cw-chip" + (zo ? " on" : ""), css + (zo ? "background:" + (MODE_COL[z.state] || "#64d2ff") : ""), [z.name + (zo ? " " + tdeg(z.target, z, env) : " off")]); };
       if (!wideA) root.style.justifyContent = "center";
       add(root, [E("div", "cw-row cw-sp", "", [lab("aircon", r.name || "Aircon"), E("div", "cw-chip on", "height:44px;font-size:23px;background:" + col + ";color:#1a1406", [on ? roomMode(r) : "Off"])]),
         E("div", (wideA ? "cw-grow " : "") + "cw-row cw-center", wideA ? "" : "margin-top:20px", [dial(s, r.target != null ? r.target : (roomUnit(r) === "f" ? 72 : 22), r.current != null ? Math.round(r.current * 10) / 10 : null, r, env), wideA && b.w >= 700 && others.length && setting(o, env, "others") !== false ? E("div", "cw-col", "margin-left:30px", others.map(function (z) {
-          var zo = roomOn(z);
-          return E("div", "cw-chip" + (zo ? " on" : ""), "margin:7px 0;" + (zo ? "background:" + (MODE_COL[z.state] || "#64d2ff") : ""), [z.name + (zo ? " " + tdeg(z.target, z, env) : " off")]);
-        })) : null])]);
+          return chip(z, "margin:7px 0;");
+        })) : null]), under ? E("div", "cw-row cw-center", "margin-top:24px;flex-wrap:wrap", others.map(function (z) { return chip(z, "margin:0 7px;"); })) : null]);
     }
     stop(root, "detail", "aircon", r.name || "Aircon");
   };
@@ -1832,7 +1837,11 @@
     var strip = b.h < 200, cols = strip ? Math.max(1, Math.min(list.length, Math.floor((b.w - 28) / 160))) : b.w > 500 ? 3 : 2, rows = strip ? 1 : Math.max(1, Math.floor((b.h - 70) / 150)), n = Math.min(list.length, cols * rows);
     var mw = (b.w - 48 - 20 * (cols - 1)) / cols, mh = strip ? b.h - 48 : (b.h - 48 - 60 - 20 * (rows - 1)) / rows;
     add(root, [strip ? null : lab("favourite", op(o).label || "Scenes"), E("div", "cw-mods", strip ? "" : "margin-top:8px", list.slice(0, n).map(function (x) {
-      var m = E("div", "cw-mod", "width:" + px(mw) + ";height:" + px(mh) + ";padding:" + (strip ? "12px 16px" : "16px 20px"), [E("div", "cw-ic", strip ? "width:46px;height:46px" : "", [ic(x[0], strip ? 26 : 32, "#fff", "solid")]), E("div", "cw-t25 cw-ell", "font-weight:700;color:inherit", [x[1]])]);
+      var inner = mw - (strip ? 32 : 40), room = mh - (strip ? 24 : 32), icS = strip ? 46 : 58;
+      var one = fitWords(root, x[1], inner, 25, 1, 700, "color:inherit"), nm = one || fitWords(root, x[1], inner, 25, 2, 700, "color:inherit");
+      var withIc = !nm || icS + 8 + (one ? 30 : 60) <= room;
+      if (nm && withIc) nm.style.marginTop = "8px";
+      var m = E("div", "cw-mod", "width:" + px(mw) + ";height:" + px(mh) + ";padding:" + (strip ? "12px 16px" : "16px 20px"), [withIc ? E("div", "cw-ic", strip ? "width:46px;height:46px" : "", [ic(x[0], strip ? 26 : 32, "#fff", "solid")]) : null, nm]);
       return stop(m, "scene", x[2], x[1]);
     }))]);
     root.setAttribute("data-detail", "scenes");
@@ -1973,8 +1982,9 @@
     var src = env.demo ? bgImg("grose-valley") : ring ? ring.src : (ha.stills || {}).doorbell, cam = (env.demo || info.doorbell_camera) && setting(o, env, "picture") !== false;
     var hot = bell && bell.ringing ? "color:#ff453a;" : "";
     alignRoot(root, al);
+    var own = String(setting(o, env, "label") || op(o).label || "").trim();
     if (b.w < 300 && b.h < 300) {
-      add(root, [ic("doorbell", 32, "currentColor"), E("div", "cw-grow"), fitNum(root, words[0], W, 48, hot), fitWords(root, words[2], W, 24, 1, 560, "margin-top:6px;color:var(--sub)")]);
+      add(root, [ic("doorbell", 32, "currentColor"), E("div", "cw-grow"), fitNum(root, words[0], W, 48, hot), (own && fitWords(root, own, W, 24, 1, 620, "margin-top:6px;color:var(--ink)")) || fitWords(root, words[2], W, 24, 1, 560, "margin-top:6px;color:var(--sub)")]);
     } else {
       var strip = b.h < 200, side = strip || b.w > b.h * 1.4, picW = side ? (strip ? H * 1.3 : W * 0.46) : W, colW = side && cam ? W - picW - 20 : W;
       var picH = side ? H : Math.min(H * 0.5, W * 0.5625), colH = side || !cam ? H : H - picH - 16;
@@ -1982,7 +1992,7 @@
         "width:" + px(picW) + ";height:" + px(picH), [!strip ? E("div", "cw-t23", "position:absolute;left:0;right:0;bottom:10px;text-align:center;color:#fff;text-shadow:0 1px 6px rgba(0,0,0,.7)", [env.demo || ring ? "At the ring" : "Door now"]) : null]) : null;
       var big = strip ? 40 : b.w >= 700 ? 72 : 52;
       var timeEl = fitNum(root, words[0], colW, big, hot + "font-weight:700"), lineEl = fitWords(root, strip ? words[2] : words[1], colW, 25, 1, 560, "margin-top:6px;color:var(--sub)");
-      var labEl = colH >= (strip ? 96 : 150) ? fitLab(root, "doorbell", name, colW) : null;
+      var labEl = colH >= (strip || (cam && !side) ? 96 : 150) ? fitLab(root, "doorbell", name, colW) : null;
       var text = E("div", "cw-col", "flex:1;min-width:0;justify-content:center;align-items:" + (al === "left" ? "flex-start" : al === "right" ? "flex-end" : "center") + ";" + (side && cam ? "margin-left:20px" : cam ? "margin-top:16px" : ""), [labEl, labEl ? E("div", "", "height:8px;flex:none") : null, timeEl, lineEl]);
       if (side && cam) { text.style.flex = "0 1 auto"; text.style.maxWidth = px(W - picW - 20); }
       add(root, E("div", side ? "cw-row" : "cw-col", "width:100%;height:100%;align-items:" + (side ? "stretch" : "center") + ";min-height:0" + (side ? ";" + justify(al) : ""), [pic, text]));
@@ -2010,7 +2020,9 @@
     alignRoot(root, al);
     var hours = Array.isArray(e.hours) ? e.hours.slice(0, 24) : [];
     if (b.w < 300 && b.h < 300) {
-      add(root, [ic("bolt", 32, "currentColor"), E("div", "cw-grow"), fitNum(root, kwh(e.total), W, 60), fitWords(root, "kWh today", W, 25, 1, 560, "color:var(--sub)") || fitWords(root, "kWh", W, 25, 1, 560, "color:var(--sub)")]);
+      var ownE = String(setting(o, env, "label") || op(o).label || "").trim();
+      add(root, [ic("bolt", 32, "currentColor"), E("div", "cw-grow"), fitNum(root, kwh(e.total), W, 60),
+        (ownE && fitWords(root, ownE + " kWh", W, 25, 1, 620, "color:var(--ink)")) || (ownE && fitWords(root, ownE, W, 25, 1, 620, "color:var(--ink)")) || fitWords(root, "kWh today", W, 25, 1, 560, "color:var(--sub)") || fitWords(root, "kWh", W, 25, 1, 560, "color:var(--sub)")]);
     } else if (b.h < 200) {
       var leftW = Math.min(W * 0.5, 200);
       add(root, E("div", "cw-row", "width:100%;height:100%;align-items:stretch", [E("div", "cw-col", "flex:none;width:" + px(leftW) + ";justify-content:center;align-items:" + (al === "right" ? "flex-end" : al === "left" ? "flex-start" : "center"), [fitLab(root, "bolt", name, leftW),
@@ -2667,7 +2679,8 @@
         label ? E("div", "cw-t23 cw-ell", "font-weight:650;color:var(--ink);margin-top:2px", [label]) : null]);
       return;
     }
-    add(root, E("div", "cw-row", "height:100%", [E("div", "cw-col", "flex:0 1 auto;min-width:0", [label ? lab(iconName, label) : null, sub ? E("div", "cw-t25 cw-ell", "color:var(--ink);font-weight:620;margin-top:8px", [sub]) : null]),
+    var subEl = sub ? fitWords(root, sub, (b.w - 48) * 0.6 - 16, 25, 1, 620, "color:var(--ink);margin-top:8px") || fitWords(root, sub, (b.w - 48) * 0.6 - 16, 25, 2, 620, "color:var(--ink);margin-top:8px") : null;
+    add(root, E("div", "cw-row", "height:100%", [E("div", "cw-col", "flex:0 1 auto;min-width:0", [label ? lab(iconName, label) : null, subEl]),
       E("div", "cw-big", "white-space:nowrap;margin-left:16px;font-size:" + px(fitPx(value, (b.w - 48) * 0.4, 72)) + (vcol ? ";color:" + vcol : ""), [value])]));
   }
   // a kind couch-tv cannot fill yet: the setup card on a TV, the sample in couch-tv Studio
@@ -2824,7 +2837,10 @@
     var A = lid("lid_a", "#ffd60a"), B = lid("lid_b", "#30d158"), lids = q.alt ? ["#ff453a", week % 2 === 0 ? A : B] : [A, B];
     var bin = function (c) { return svg("0 0 62 72", 40, 46, [S("rect", { x: 6, y: 14, width: 50, height: 56, rx: 8, fill: "#3a3a40" }), S("rect", { x: 2, y: 6, width: 58, height: 12, rx: 5, fill: c })], "margin-left:8px"); };
     if (b.w < 300) { root.style.padding = "18px"; add(root, [E("div", "cw-t23", "font-weight:700;color:var(--sub)", [op(o).label || "Bins"]), E("div", "cw-grow"), E("div", "cw-row", "margin-left:-8px", lids.map(bin)), E("div", "cw-t25 cw-ell", "font-weight:720;color:var(--ink);margin-top:6px", [when])]); return; }
-    add(root, E("div", "cw-row cw-sp", "height:100%", [E("div", "cw-col", "min-width:0", [lab("calendar", op(o).label || "Bin night"), E("div", "cw-t29", "font-weight:720;margin-top:6px", [when])]), E("div", "cw-row", "", lids.map(bin))]));
+    // a wide tile: the night on top, then each bin with its name (a tile has room only for the lids)
+    var names = q.alt ? ["Rubbish", week % 2 === 0 ? (q.bin_a || "Recycling") : (q.bin_b || "Garden")] : [q.bin_a || "Recycling", q.bin_b || "Garden"], half = (b.w - 48) / 2;
+    add(root, E("div", "cw-col", "height:100%;justify-content:space-between;align-items:center", [E("div", "cw-row", "min-width:0;max-width:100%", [ic("calendar", 30, "currentColor"), fitWords(root, (op(o).label ? op(o).label + ", " : "") + when, b.w - 48 - 40, 29, 1, 720, "margin-left:10px") || fitWords(root, when, b.w - 48 - 40, 29, 1, 720, "margin-left:10px")]),
+      E("div", "cw-row", "justify-content:center;max-width:100%", lids.map(function (c, i) { return E("div", "cw-row", "flex:none;max-width:" + px(half) + ";" + (i ? "margin-left:16px" : "margin-left:-8px"), [bin(c), fitWords(root, names[i], half - 60, 25, 1, 620, "margin-left:8px;color:var(--ink)")]); }))]));
   };
   CR.word = function (root, o, b, env) {
     var x = wordOf(o, env || {}), w = x.w;
