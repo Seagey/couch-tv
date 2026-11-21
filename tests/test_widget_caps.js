@@ -95,6 +95,10 @@ ok(/once a minute/.test(CAPS.get("stack").platforms["Roku OS"].note), "a stack o
 ["news", "stocks", "aircon", "agenda", "keep", "queue", "agent"].forEach((k) => ["Tizen", "webOS"].forEach((p) => ok(CAPS.need(k, p) === "computer", k + " on " + p + ": still needs the home computer")));
 ["Saphi", "TiVo OS", "My Home Screen"].forEach((p) => ok(CAPS.need("clock", p) === "computer", "the clock on " + p + ": the computer opens the home there"));
 ok(CAPS.need("agent", "Google TV") === "setup" && CAPS.need("agent", "Fire OS") === "setup" && CAPS.get("agent").setup.where === "tv", "From your AI on an Android TV: set up, no computer needed");
+// Keep watching and the rest on an Android TV: Couch TV's home reads Android's own Continue watching list,
+// the on-TV app or a computer adds each person's: set up on the TV, never "Needs a computer at home" there
+["keep", "keeprow", "upnext", "picks", "nowplaying"].forEach((k) => ok(CAPS.get(k).setup.where === "tv" && CAPS.need(k, "Google TV") === "setup" && CAPS.need(k, "Fire OS") === "setup" && !/^Needs /.test(CAPS.steps(k, "Google TV")[0]), k + ": set up on an Android TV, no computer badge"));
+ok(/Continue watching/.test(CAPS.steps("keep", "Android TV")[0]) && CAPS.need("keep", "Tizen") === "computer", "Keep watching: Android's own list on the home, the computer on a Samsung");
 ok(CAPS.need("battery", "Tizen") === "no" && CAPS.need("nowplaying", "webOS") === "no" && CAPS.need("screentime", "Tizen") === "no", "Batteries, Now playing and Screen time stay off a Samsung and LG");
 ["Roku OS", "tvOS"].forEach((p) => ["clock", "weather", "welcome"].forEach((k) => { const s = CAPS.steps(k, p); ok(/couch-tv Studio and send the design again/.test(s[s.length - 1]), k + " on " + p + ": says where to change it"); }));
 ok(CAPS.need("clock", "Vega OS") === "no" && /not possible/i.test(CAPS.steps("clock", "Vega OS")[0]), "a Fire TV on Vega OS: not possible, and says so");

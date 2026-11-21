@@ -119,7 +119,10 @@
   var CLOCK_STEPS = ["Nothing to set up.", EDIT_TV];
   var NOT_YET = ["Nothing to set up: Couch TV cannot show this."];
   var WATCH = {
-    android: ["Needs the Couch TV app on this TV, or a home computer that stays on. Ask whoever set up Couch TV.", "Start a show from Couch TV's home.", "Come back to the home: the show is waiting here."],
+    // the Couch TV home app alone reads Android's own Continue watching list (MainActivity.kt readWatchNext,
+    // app.js refreshNow when there is no computer), the same for everyone; the on-TV app or a home computer
+    // keeps each person's own
+    android: ["Nothing more to set up: Couch TV's home shows the shows Android keeps under Continue watching. If the TV asks, allow it once.", "For each person's own list, add the Couch TV app on this TV or a home computer that stays on.", "Start a show, then come back to the home: the show is waiting here."],
     web: ["Keep the home computer on: it runs Couch TV for this TV.", "Start a show from Couch TV's home (Netflix, YouTube and some others).", "Come back to the home: the show is waiting here."],
     vidaa: ["Needs a home computer that stays on, running Couch TV. The website home cannot do this.", "Start a show from Couch TV's home.", "Come back to the home: the show is waiting here."]
   };
@@ -267,18 +270,18 @@
 
     // ---------- watching ----------
     keep: { name: "Keep watching", status: "setup", what: "The show you were watching (or the person picked for it), ready to carry on", needs: [WATCH_NEED],
-      setup: setup("computer", WATCH), until: "\"Nothing to keep watching yet\": shows you start on this TV appear here", build: "",
+      setup: setup("tv", WATCH), until: "\"Nothing to keep watching yet\": shows you start on this TV appear here", build: "",
       ok: "Opens Keep watching: every show on the go, each with Resume", platforms: plat("setup", "computer:partial", "computer", { web: "Only shows started from Couch TV's home.", vidaa: "Only with a home computer: the website home cannot." }), sizes: sz(["tile", "wtile", "small", "medium"], [2, 2]) },
     keeprow: { name: "Keep watching row", status: "setup", what: "Two to five shows, with how far you got", needs: [WATCH_NEED],
-      setup: setup("computer", WATCH), until: "\"Nothing to keep watching yet\"", build: "",
+      setup: setup("tv", WATCH), until: "\"Nothing to keep watching yet\"", build: "",
       ok: "OK on a poster plays it. Hold OK, then Open, for the whole list", platforms: plat("setup", "computer:partial", "computer", { web: "Only shows started from Couch TV's home.", vidaa: "Only with a home computer: the website home cannot." }), sizes: sz(["medium", "wide", "hero"], [6, 2]) },
     upnext: { name: "Up next", status: "setup", what: "One show filling the space, with Resume and Start over. Beside Scores it shows your last game", needs: [WATCH_NEED],
-      setup: setup("computer", WATCH), until: "\"Nothing to keep watching yet\", or \"No game to pick up\"", build: "",
+      setup: setup("tv", WATCH), until: "\"Nothing to keep watching yet\", or \"No game to pick up\"", build: "",
       ok: "Resume plays it. Hold OK, then Open, for the whole list", platforms: plat("setup", "computer:partial", "computer", { web: "Only shows started from Couch TV's home.", vidaa: "Only with a home computer: the website home cannot." }), sizes: sz(["medium", "wide", "xl", "hero", "full"], [8, 4]) },
     // made on the TV from its own Keep watching (widget-web.js picks): no outside service, nothing leaves
     picks: { name: "Picks for you", status: "setup", what: "Shows the others at home are watching, and your own shows left part way, each ready to play",
       needs: [WATCH_NEED],
-      setup: setup("computer", { android: WATCH.android.concat(["Picks come from what everyone at home has on the go: add people in Home settings, People."]),
+      setup: setup("tv", { android: WATCH.android.concat(["Picks come from what everyone at home has on the go: add people in Home settings, People."]),
         web: WATCH.web.concat(["Picks come from what everyone at home has on the go: add people in Home settings, People."]),
         vidaa: WATCH.vidaa.concat(["Picks come from what everyone at home has on the go: add people in Home settings, People."]) }),
       until: "\"No picks yet\" until shows are on the go on this TV", build: "",
@@ -306,7 +309,9 @@
 
     // ---------- music ----------
     nowplaying: { name: "Now playing", status: "setup", what: "The song playing on this TV: cover, song and artist", needs: [WATCH_NEED],
-      setup: setup("computer", { android: ["Needs the Couch TV app on this TV, or a home computer that stays on. Ask whoever set up Couch TV.", OPEN, "Go down to Look and scenes, then Now playing card, and make it On.", "Play music in Spotify or any music app."],
+      // any music app through the on-TV app or a home computer; Couch TV's home alone reads only Spotify's
+      // media session (SpotifyPlayer.kt, home.spotify_player), so the computer is not the one way
+      setup: setup("tv", { android: ["Any music app shows with the Couch TV app on this TV or a home computer. With neither, only Spotify shows, if it was switched on when Couch TV was set up.", OPEN, "Go down to Look and scenes, then Now playing card, and make it On.", "Play music in Spotify or any music app."],
         web: ["Not possible on this TV: it does not say what is playing."], vidaa: ["Not possible on this TV: it does not say what is playing."] }),
       until: "\"Nothing playing\" while nothing plays", build: "",
       ok: "Opens the player: back, play or pause, next, volume", platforms: plat("setup", "no", "no", { web: "This TV does not say what is playing.", vidaa: "This TV does not say what is playing." }), sizes: sz(["tile", "wtile", "small", "medium", "large"], [2, 2]) },
