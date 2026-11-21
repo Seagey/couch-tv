@@ -112,6 +112,9 @@
   var PHOTOS_ANDROID = [OPEN, "Go down to Look and scenes, then down to Your photos.", "Pick Add photos from a USB drive or this TV, and choose up to 50 photos.", "Or put one photo in the widget itself, in couch-tv Studio."];
   var PHOTOS_LINK = [OPEN, "Go down to Look and scenes, then down to Your photos.", "Pick Add a photo from a web address, type the photo's address, then press OK.", "Or put one photo in the widget itself, in couch-tv Studio."];
   var NOTHING = ["Nothing to set up."];
+  // the time widgets: nothing to set up, and their own settings are on the TV too (Hold OK, Edit on the TV)
+  var EDIT_TV = "To change how it looks: hold OK on the widget, then pick Edit on the TV. Or change it in couch-tv Studio.";
+  var CLOCK_STEPS = ["Nothing to set up.", EDIT_TV];
   var NOT_YET = ["Nothing to set up: Couch TV cannot show this."];
   var WATCH = {
     android: ["Needs the Couch TV app on this TV, or a home computer that stays on. Ask whoever set up Couch TV.", "Start a show from Couch TV's home.", "Come back to the home: the show is waiting here."],
@@ -167,44 +170,44 @@
   var C = {
     // ---------- time ----------
     clock: { name: "Digital clock", status: "works", what: "The time, with the date if you like", needs: ["Nothing: it uses the TV's own clock"],
-      setup: setup("nothing", ["Nothing to set up.", "For 12 or 24 hour: " + OPEN.charAt(0).toLowerCase() + OPEN.slice(1), "Go down to Look and scenes, then press OK on Clock."]),
+      setup: setup("nothing", ["Nothing to set up.", EDIT_TV, "With Follow this TV, set 12 or 24 hour in Home settings, Look and scenes, Clock."]),
       until: "Always shows the time", build: "",
       ok: "Opens Timers: start a kitchen timer from the remote", platforms: EVERY(), sizes: sz(["tile", "wtile", "small", "medium", "wide", "xl", "hero", "full"], [2, 2]) },
     tallclock: { name: "Tall clock", status: "works", what: "Tall thin digits that fill the space", needs: ["Nothing: it uses the TV's own clock"],
-      setup: setup("nothing", NOTHING), until: "Always shows the time", build: "",
+      setup: setup("nothing", CLOCK_STEPS), until: "Always shows the time", build: "",
       ok: "Opens Timers", platforms: EVERY(), sizes: sz(["tile", "wtile", "small", "medium", "wide", "xl", "hero", "full"], [2, 2]) },
     glassclock: { name: "Glass clock", status: "works", what: "Big digits filled with the scene's photo", needs: ["Nothing: the scenes come with Couch TV"],
-      setup: setup("nothing", NOTHING), until: "Always shows the time", build: "",
+      setup: setup("nothing", CLOCK_STEPS), until: "Always shows the time", build: "",
       ok: "Opens Timers", platforms: EVERY(), sizes: sz(["wtile", "small", "medium", "wide", "xl", "hero"], [4, 2]) },
     analog: { name: "Analogue clock", status: "works", what: "A clock face with hands", needs: ["Nothing: it uses the TV's own clock"],
-      setup: setup("nothing", NOTHING), until: "Always shows the time", build: "",
+      setup: setup("nothing", CLOCK_STEPS), until: "Always shows the time", build: "",
       ok: "Opens Timers", platforms: EVERY(), sizes: sz(["tile", "small", "large"], [2, 2]) },
     flipclock: { name: "Flip clock", status: "works", what: "Digits on flip cards", needs: ["Nothing: it uses the TV's own clock"],
-      setup: setup("nothing", NOTHING), until: "Always shows the time", build: "",
+      setup: setup("nothing", CLOCK_STEPS), until: "Always shows the time", build: "",
       ok: "Opens Timers", platforms: EVERY(), sizes: sz(["wtile", "medium", "wide"], [4, 2]) },
     wordclock: { name: "Time in words", status: "works", what: "\"Twenty to eight, Wednesday morning\"", needs: ["Nothing: it uses the TV's own clock"],
-      setup: setup("nothing", NOTHING), until: "Always shows the time", build: "",
+      setup: setup("nothing", CLOCK_STEPS), until: "Always shows the time", build: "",
       ok: "Opens Timers", platforms: EVERY(), sizes: sz(["wtile", "small", "medium", "large"], [4, 2]) },
     solar: { name: "Sun clock", status: "works", what: "The sun's path today, with sunrise and sunset", needs: [TOWN_NEED],
       setup: setup("tv", TOWN.concat(["Or a place for this widget alone: hold OK on it, then Edit on the TV, Place."])), until: "\"Set your town for the sun\", and where", build: "",
       ok: "Opens the forecast: sunrise and sunset for the week", platforms: plat("setup", "computer", "setup"), sizes: sz(["wtile", "small", "medium"], [4, 2]) },
-    worldclock: { name: "World clocks", status: "works", what: "The time in two to four cities", needs: ["The cities, picked in couch-tv Studio"],
-      setup: setup("designer", inStudio("pick the cities")), until: "Always shows the times", build: "",
+    worldclock: { name: "World clocks", status: "works", what: "The time in two to four cities", needs: ["Nothing: it uses the TV's own clock. Pick the cities on the TV or in couch-tv Studio"],
+      setup: setup("nothing", ["Nothing to set up: with no cities picked it shows this TV's own town, London, New York and Tokyo.", "To pick the cities: hold OK on the widget, then pick Edit on the TV. Or pick them in couch-tv Studio."]), until: "Always shows the times", build: "",
       ok: "Opens World clocks: every city big, day or night", platforms: EVERY(), sizes: sz(["tile", "wtile", "small", "medium", "wide"], [2, 2]) },
-    countdown: { name: "Countdown", status: "works", what: "Sleeps, days or weeks to a date", needs: ["The date and its name, picked in couch-tv Studio"],
-      setup: setup("designer", inStudio("pick the date and type its name")), until: "Always shows the count", build: "",
+    countdown: { name: "Countdown", status: "works", what: "Sleeps, days or weeks to a date", needs: ["The date and its name, picked on the TV or in couch-tv Studio"],
+      setup: setup("designer", inStudio("pick the date, and a year for a one off day, and type its name").concat(["Or on the TV: hold OK on the widget, then pick Edit on the TV."])), until: "Always shows the count", build: "",
       ok: "Nothing: it is to look at", platforms: EVERY(), sizes: sz(["tile", "wtile", "small"], [2, 2]) },
     date: { name: "Date", status: "works", what: "Today's date, with the weather if you like", needs: ["Nothing for the date. The weather line needs your town"],
-      setup: setup("nothing", ["Nothing to set up for the date.", "For the weather, " + OPEN.charAt(0).toLowerCase() + OPEN.slice(1), "Go down to Location, pick Search for a town or city, type your town, then press OK."]),
+      setup: setup("nothing", ["Nothing to set up for the date.", "For the weather, " + OPEN.charAt(0).toLowerCase() + OPEN.slice(1), "Go down to Location, pick Search for a town or city, type your town, then press OK.", "To show the weather or change the date style: hold OK on the widget, then pick Edit on the TV."]),
       until: "Always shows the date", build: "",
       ok: "Opens Calendar: this month and today", platforms: EVERY(), sizes: sz(["line", "wline", "tile", "small"], [2, 1]) },
     month: { name: "Month", status: "works", what: "This month's calendar, with today marked", needs: ["Nothing: it uses the TV's own clock"],
-      setup: setup("nothing", NOTHING), until: "Always shows the month", build: "",
+      setup: setup("nothing", CLOCK_STEPS), until: "Always shows the month", build: "",
       ok: "Opens Calendar: this month and next", platforms: EVERY(), sizes: sz(["tile", "small", "large"], [2, 2]) },
     timer: { name: "Timer", status: "works", what: "A ring counting down a timer you start with the remote", needs: ["Nothing: timers are kept on the TV"],
-      setup: setup("nothing", ["Nothing to set up.", "To start one: move to the widget and press OK.", "Pick the minutes. It counts down here."]),
+      setup: setup("nothing", ["Nothing to set up.", "To start one: move to the widget and press OK.", "Pick the minutes. It counts down here.", "For one press: hold OK on the widget, pick Edit on the TV, then set Quick start."]),
       until: "\"No timer. OK to start one\"", build: "",
-      ok: "Opens Timers: 1 to 60 minutes, add a minute, cancel", platforms: EVERY(), sizes: sz(["tile", "wtile", "small"], [2, 2]) },
+      ok: "Opens Timers: 1 to 60 minutes, add a minute, cancel. With Quick start set, starts that timer straight away", platforms: EVERY(), sizes: sz(["tile", "wtile", "small"], [2, 2]) },
 
     // ---------- weather (free, straight from the TV, no account) ----------
     weather: { name: "Weather", status: "works", what: "Your town, the temperature, the sky, the high and low", needs: [TOWN_NEED],
@@ -217,7 +220,7 @@
       setup: setup("tv", TOWN_OWN), until: "\"Set your town\"", build: "",
       ok: "Opens the forecast: 24 hours with the chance of rain", platforms: plat("setup", "computer", "setup"), sizes: sz(["wtile", "small", "medium", "wide"], [4, 2]) },
     week: { name: "This week", status: "works", what: "The next 7 days, with each day's high and low", needs: [TOWN_NEED],
-      setup: setup("tv", TOWN), until: "\"Set your town\"", build: "",
+      setup: setup("tv", TOWN.concat(["Or a place for this widget only: hold OK on it, pick Edit on the TV, then Place."])), until: "\"Set your town\"", build: "",
       ok: "Opens the forecast: the 7 days in full", platforms: plat("setup", "computer", "setup"), sizes: sz(["wtile", "small", "tall", "medium", "large"], [4, 2]) },
     rain: { name: "Rain soon", status: "works", what: "Rain in the next three hours, as bars", needs: [TOWN_NEED],
       setup: setup("tv", TOWN_OWN), until: "\"Set your town\"", build: "",
@@ -566,7 +569,7 @@
       st("day", "Day", "number", 25, "The day of the month.", "design", ALL, true, { min: 1, max: 31, step: 1 }),
       st("month", "Month", "choice", 12, "The month of the day you are counting to.", "design", ALL, true, { options: MONTHS }),
       st("year", "Year", "choice", "every", "Pick a year for a one off day, like a wedding. Every year counts to the same day each year.", "design", ALL, true, { options: YEARS }),
-      st("unit", "Count in", "choice", "sleeps", "Sleeps suit children. Weeks suit a day far away.", "design", ALL, true, { options: [["sleeps", "Sleeps"], ["days", "Days"], ["weeks", "Weeks"]] })
+      st("unit", "Count in", "choice", "sleeps", "Sleeps suit children. Weeks suit a day far away. The two smallest sizes show only the number.", "design", ALL, true, { options: [["sleeps", "Sleeps"], ["days", "Days"], ["weeks", "Weeks"]] })
     ],
     // the weather widgets (WIDGET-SETTINGS-SPEC.md section 2, Weather): each one's own place, read for
     // that place alone (app.js airAndSurf), and its own units
@@ -658,17 +661,46 @@
   var CITY_OPTS = [["Australia/Brisbane", "Brisbane"], ["Australia/Sydney", "Sydney"], ["Australia/Perth", "Perth"], ["Pacific/Auckland", "Auckland"], ["Asia/Tokyo", "Tokyo"],
     ["Asia/Singapore", "Singapore"], ["Europe/London", "London"], ["Europe/Paris", "Paris"], ["America/New_York", "New York"], ["America/Los_Angeles", "Los Angeles"]];
   var LATER = {
-    clock: [st("seconds", "Show seconds", "toggle", false, "", "design", ALL, false)],
-    analog: [st("seconds", "Second hand", "toggle", true, "", "design", ALL, false)],
-    worldclock: [st("cities", "Cities", "choice", [], "Up to four. None picked shows this TV's own town and London.", "design", ALL, false, { options: CITY_OPTS, many: true, max: 4 })],
-    date: [
-      st("dfmt", "Date style", "choice", "auto", "", "design", ALL, false,
-        { options: [["auto", "Day and date"], ["short", "Short"], ["numeric", "Numbers only"], ["weekday", "Day of the week"], ["day_month", "Day and month"], ["full", "Day and date in full"]] }),
-      st("place", "Show the town name", "toggle", true, "", "design", ALL, false)
+    // the clocks, the date, the month, the countdown, the timer and the week's forecast: every one is
+    // read by its renderer in widgets.js (and the Timers, World clocks and Calendar layers), so all are pre
+    clock: [
+      st("seconds", "Show seconds", "toggle", false, "Adds the seconds after the minutes.", "design", ALL, true),
+      st("date", "Show the date", "toggle", true, "The date under the time, when the widget is tall enough.", "design", ALL, true),
+      st("ampm", "Show am and pm", "toggle", true, "Only with the 12 hour clock, when the widget is wide enough.", "design", ALL, true)
     ],
-    timer: [st("minutes", "Quick start", "choice", 0, "OK on the widget starts a timer this long.", "design", ALL, false,
-      { options: [[0, "Ask each time"], [5, "5 minutes"], [10, "10 minutes"], [15, "15 minutes"], [20, "20 minutes"], [30, "30 minutes"], [45, "45 minutes"], [60, "1 hour"]] })],
-    week: [TOWN("the forecast")],
+    tallclock: [st("align", "Line up", "choice", "center", "Where the digits sit in the widget.", "design", ALL, true, { options: [["left", "Left"], ["center", "Middle"], ["right", "Right"]] })],
+    glassclock: [st("scene", "Glass from", "choice", "auto", "The photo inside the digits.", "design", ALL, true,
+      { options: [["auto", "This home's scene"], ["night", "Night"], ["fog", "Fog"], ["golden", "Golden hour"], ["dawn", "Dawn"], ["water", "Water"]] })],
+    analog: [
+      st("seconds", "Second hand", "toggle", true, "", "design", ALL, true),
+      st("numbers", "Show the numbers", "toggle", false, "12, 3, 6 and 9 on the face.", "design", ALL, true)
+    ],
+    wordclock: [
+      st("precise", "To the minute", "toggle", false, "Off says the time to the nearest five minutes, like ten past seven.", "design", ALL, true),
+      st("dayline", "Show the day", "toggle", true, "Like Friday evening, under the time.", "design", ALL, true)
+    ],
+    worldclock: [
+      st("cities", "Cities", "choice", [], "Up to four. None picked shows this TV's own town first, then London, New York and Tokyo.", "design", ALL, true, { options: CITY_OPTS, many: true, max: 4 }),
+      CLOCK_FMT(),
+      HEADING("Shows over the cities on the bigger sizes. Empty says World clock.")
+    ],
+    date: [
+      st("show", "Shows", "choice", "date", "The weather needs your town, set in Home settings, Location.", "design", ALL, true,
+        { options: [["date", "The date"], ["weather", "The weather"], ["both", "The date and the weather"]] }),
+      st("dfmt", "Date style", "choice", "auto", "Day and date gets shorter when the widget is narrow.", "design", ALL, true,
+        { options: [["auto", "Day and date"], ["short", "Short"], ["numeric", "Numbers only"], ["weekday", "Day of the week"], ["day_month", "Day and month"], ["full", "Day and date in full"]] }),
+      st("place", "Show the town name", "toggle", true, "Beside the weather. Not on the two smallest sizes.", "design", ALL, true, { when: { show: "weather" } })
+    ],
+    month: [st("wstart", "Week starts on", "choice", "mon", "The smallest size shows only today.", "design", ALL, true, { options: [["mon", "Monday"], ["sun", "Sunday"]] })],
+    timer: [
+      st("minutes", "Quick start", "choice", 0, "OK on the widget starts a timer this long.", "design", ALL, true,
+        { options: [[0, "Ask each time"], [5, "5 minutes"], [10, "10 minutes"], [15, "15 minutes"], [20, "20 minutes"], [30, "30 minutes"], [45, "45 minutes"], [60, "1 hour"]] }),
+      st("label", "Timer name", "text", "", "A timer started from this widget has this name, like Pizza.", "design", ALL, true, { max: 24 })
+    ],
+    week: [
+      st("town", "Place", "place", "", "Where the forecast is for. Empty uses this home's town.", "tv", ON_TV, true, { "private": true }),
+      st("place", "Show the town name", "toggle", true, "Turn off to show only the forecast. The wide tile names only a place picked for it.", "design", ALL, true)
+    ],
   };
   // the watching, apps and music widgets (keep to stack): every setting here is read by its renderer
   var WHOSE = function () { return st("person", "Whose shows", "tvlist", "auto", "Whoever is watching follows the person picked on the home. Add people in Home settings, People.", "tv", ON_TV, true,
