@@ -18,6 +18,7 @@ import logging
 import os
 import re
 import socket
+import time
 
 from adb_shell.adb_device_async import AdbDeviceTcpAsync
 from adb_shell.auth.sign_pythonrsa import PythonRSASigner
@@ -189,8 +190,22 @@ class TV:
         self._dev = None
         self._signer = None
         self._task = None
+        self._adb_lost_at = None   # monotonic time of the last failed adb connect, None after a good one
 
     # ---------- state ----------
+    # How long a failed adb connect counts as "adb is down" (the bridge retries every few seconds
+    # while it is down, so a real outage keeps this fresh; an old failure is tried again).
+    ADB_LOST_FOR = 300.0
+
+    @property
+    def adb_known_down(self):
+        """True when the last adb connect failed recently and none has worked since (a Google TV
+        closes port 5555 after a restart or deep sleep). Never probes the network. Not for adb_only
+        TVs, where adb is the only link and the run loop reconnects."""
+        if self.adb_only or self.adb_ok or self._adb_lost_at is None:
+            return False
+        return (time.monotonic() - self._adb_lost_at) < self.ADB_LOST_FOR
+
     @property
     def is_on(self):
         if self.adb_only:
@@ -516,10 +531,12 @@ class TV:
             ok = await asyncio.wait_for(dev.connect(rsa_keys=[self._signer], auth_timeout_s=10), 25)
             self._dev = dev if ok else None
             self.adb_ok = bool(ok)
+            self._adb_lost_at = None if ok else time.monotonic()
         except Exception as e:
             self.log.info("adb not available: %s %s", type(e).__name__, e)
             await self._adb_close()
             self.adb_ok = False
+            self._adb_lost_at = time.monotonic()
         self._changed()
         return self.adb_ok
 

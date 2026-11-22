@@ -4769,8 +4769,9 @@
       api("POST", "/api/continue/open", { id: it.id, who: NOBODY ? "both" : who }, 60000)
         .then(function (res) { status(res.note ? tBridge(res.note_key, res.note_vars, res.note) : ""); })
         .catch(function (e) {
-          // the bridge can't help: at least open the app it was in
-          if (TV && it.app && TV.launch(it.app.package)) { status(""); return; }
+          // the bridge can't help: at least open the app it was in (and when the bridge has lost its
+          // link to this TV, say how to fix it)
+          if (TV && it.app && TV.launch(it.app.package)) { status(linkLost(e)); return; }
           status(tBridge(e.key, e.vars, e.message));
         });
       return;
@@ -8250,7 +8251,12 @@
     }
     api("POST", "/api/continue/open", { id: it.id, who: p.owner }, 60000)
       .then(function (res) { status(res.note ? tBridge(res.note_key, res.note_vars, res.note) : ""); })
-      .catch(function (e) { if (TV && it.app && TV.launch(it.app.package)) { status(""); return; } status(tBridge(e.key, e.vars, e.message)); });
+      .catch(function (e) { if (TV && it.app && TV.launch(it.app.package)) { status(linkLost(e)); return; } status(tBridge(e.key, e.vars, e.message)); });
+  }
+  // after a Keep watching card opened only its app: the bridge's words when it has lost its link to
+  // the TV (err_tv_link_lost: adb is down and so is the remote protocol), else nothing
+  function linkLost(e) {
+    return e && e.key === "err_tv_link_lost" ? tBridge(e.key, e.vars, e.message) : "";
   }
   // each Commute widget with its own Where to (or From): the same shape as commuteData, by the widget's id
   function commuteByData() {

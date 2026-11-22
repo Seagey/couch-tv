@@ -1053,11 +1053,37 @@ def resume_link(app_id, link, title):
     return link
 
 
+LINK_LOST = "Couch TV lost its link to this TV. On the TV, switch Network debugging off and on in Developer options."
+
+
+def _adb_lost():
+    """The TV's adb is known to be down right now (tv.py adb_known_down; never a network probe)."""
+    return bool(getattr(tv, "adb_known_down", False))
+
+
+def _link_lost():
+    return ApiError(503, LINK_LOST, key="err_tv_link_lost")
+
+
+async def _open_link_by_remote(link):
+    """adb is down: hand the show's link to the TV over the remote protocol (port 6466), which
+    answers at once. If that link is down too, err_tv_link_lost."""
+    try:
+        await tv.open_link(intent_to_link(str(link).replace("'", "")))
+    except Exception as e:
+        log.warning("remote protocol could not open the link either: %s %s", type(e).__name__, e)
+        raise _link_lost()
+
+
 async def play(title, season=None, episode=None, service=None, who=None, resume=False, exact=False,
                same=None):
     """`exact`: only a result with this title will do (finder.same_title, or `same` when given); the
-    search's best guess for a name it does not know is a 404 instead of another show."""
-    await installed_packages()
+    search's best guess for a name it does not know is a 404 instead of another show.
+
+    When the TV's adb is known to be down (adb_lost), nothing waits on adb: the show's link goes over
+    the remote protocol at once, without checking that it plays, or err_tv_link_lost comes back."""
+    adb_lost = _adb_lost()
+    await installed_packages(wait=not adb_lost)
     best, _ = await finder.find(title)
     if not best or (exact and not (same or finder.same_title)(best["title"], title)):
         raise ApiError(404, f"could not find {title}", key="err_title_not_found", vars={"title": title})
@@ -1082,6 +1108,8 @@ async def play(title, season=None, episode=None, service=None, who=None, resume=
             if not app:
                 raise ApiError(400, f"unknown service: {service}", key="err_unknown_service", vars={"service": service})
             # Not listed by JustWatch on that service: open it and search.
+            if adb_lost:
+                raise _link_lost()
             method, note = await search_in_app(app, best["title"], best)
             note_key, note_vars = _search_note_fields(method, app, best["title"])
             return finish_play(best, app, method, note, season, episode, who, ep_info,
@@ -1120,6 +1148,15 @@ async def play(title, season=None, episode=None, service=None, who=None, resume=
         note_key, note_vars = "note_opened_show_season_picked", {"season": season}
     elif resume and best["type"] == "tv":
         link = resume_link(app["id"], link, best["title"])
+
+    if adb_lost:
+        if not (app["deeplink"] == "jw" and link and tv.can_deeplink(app)):
+            raise _link_lost()
+        await _open_link_by_remote(link)
+        log.info("play %s in %s: opened over the remote protocol (adb is down), not checked", best["title"], app["name"])
+        return finish_play(best, app, "deeplink", f"Opened the {best['title']} page in {app['name']}.",
+                           season, episode, who, note_key="note_opened_title_page",
+                           note_vars={"title": best["title"], "app": app["name"]})
 
     method, started = None, None
     pkg = pkg_of(app)
