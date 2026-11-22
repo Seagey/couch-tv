@@ -500,6 +500,9 @@ def _home(h):
     # false hides the whole Keep watching row and stops the home asking for it. Home settings win over it.
     if isinstance(h.get("keep_watching"), bool):
         out["keep_watching"] = h["keep_watching"]
+    # "poster" shows the Night look's Keep watching as Classic poster tiles, more to a row (#192)
+    if h.get("keep_watching_style") in ("card", "poster"):
+        out["keep_watching_style"] = h["keep_watching_style"]
     # true puts an Inputs tile first in the dock (#154). Home settings win over it.
     if isinstance(h.get("input_tile"), bool):
         out["input_tile"] = h["input_tile"]

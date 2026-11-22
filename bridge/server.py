@@ -3209,6 +3209,8 @@ def clean_settings(s):
         out["now_playing"] = s["now_playing"]
     if isinstance(s.get("keep_watching"), bool):
         out["keep_watching"] = s["keep_watching"]
+    if s.get("keep_watching_style") in ("card", "poster"):   # Night: wide cards or poster tiles (#192)
+        out["keep_watching_style"] = s["keep_watching_style"]
     if isinstance(s.get("ambient_music"), bool):
         out["ambient_music"] = s["ambient_music"]
     if isinstance(s.get("sun_sync"), bool):
