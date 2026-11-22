@@ -58,8 +58,10 @@ object SetupWords {
      *  asking: Android's request is on its way. declined: Android's list was closed without Couch TV.
      */
     fun homeNote(useAsHome: Boolean, held: Boolean, googleTv: Boolean, watchApk: Boolean = false, googleHome: Boolean = googleTv,
-                 asking: Boolean = false, declined: Boolean = false, opensUs: Boolean = held): String = when {
+                 asking: Boolean = false, declined: Boolean = false, opensUs: Boolean = held, noAsk: String? = null): String = when {
         asking -> "Asking the TV to make Couch TV its home. If the screen goes black, press Back once and the question comes up."
+        // this TV cannot be asked from here (HomeAsk.plan EXPLAIN): say so instead of promising "No computer needed"
+        noAsk != null && !useAsHome -> noAskNote(noAsk)
         // the watch only acts while Use as home screen is on (FireHome.onOtherHome), so it is always one of the steps
         googleTv && watchApk && !useAsHome -> "On Google TV the Home button opens Google TV first. To bring your Couch TV home straight back on top: " +
             "press Use as home screen, then switch on Couch TV home watch in the TV's Settings, Accessibility (on some TVs inside System or Device Preferences)."
@@ -76,6 +78,26 @@ object SetupWords {
             "with the version you put on from your phone. That is normal: see More, Home button from a computer, or press Make Home open Couch TV. Until then, open your Couch TV home from Couch TV in the apps row."
         !opensUs -> "Android lists Couch TV as the home app, but Home still opens the TV's own home. Open your Couch TV home from Couch TV in the apps row."
         else -> "Couch TV is your home screen. Press Home on the remote to see it."
+    }
+
+    /**
+     * Use as home screen on a TV that cannot be asked from here (HomeAsk.noAskReason): the setup screen stays
+     * in front and says what this TV allows. "google": Google's Android TV Home (a TCL on Android TV 11 put it
+     * in front and kept the Home button, 19 and 23 Nov 2026). LEFT: asking sent the person to the TV's own home
+     * once already. NO_QUESTION: Android had no question to show.
+     */
+    fun noAskNote(reason: String): String {
+        val stays = "Couch TV stays one press away: open it from the apps row."
+        return when (reason) {
+            "google" -> "This TV keeps Google's home on the Home button, and it does not let Couch TV ask for it from here. $stays " +
+                "To make Home open Couch TV, first let Couch TV press keys on this TV (More, Let the phone press keys), then press Make Home open Couch TV. " +
+                "Or do it once from a computer: More, Home button from a computer."
+            HomeAsk.NO_QUESTION -> "This TV has no question for choosing a home screen, so the Home button keeps opening the TV's own home. $stays " +
+                "To change the Home button, do it once from a computer: More, Home button from a computer."
+            else -> "This TV went to its own home instead of asking, so the Home button still opens the TV's own home. $stays " +
+                "To try again, first let Couch TV press keys on this TV (More, Let the phone press keys), then press Use as home screen. " +
+                "Or do it once from a computer: More, Home button from a computer."
+        }
     }
 
     /**

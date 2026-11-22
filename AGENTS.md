@@ -24,7 +24,12 @@ and the Android SDK.
 **No computer or a failed home step (issue #98).** If couch-tv installed as an app but is not the
 home (the person came without a computer, or `apply.sh` could not run), on a plain Android TV 10 or
 newer the app asks Android itself: it offers "Make couch-tv your home screen?" the first time it
-opens, and Home settings, About repeats it. The on-TV app does the same from **Use as home screen**.
+opens, and Home settings, About repeats it. The on-TV app does the same from **Use as home screen**,
+except on a TV with Google's Android TV Home (`com.google.android.tvlauncher`) where Couch TV cannot yet press
+keys: there, switching the home on put Google's home in front and the setup screen could not come back (a TCL on
+Android TV 11, 23 Nov 2026), and Home kept opening Google's home by name anyway, so the setup screen stays put and
+says to let Couch TV press keys, then press **Make Home open Couch TV** (on-tv/README.md). A TV that had no
+question to show, or sent the person to its own home once, gets the same kind of note instead of a second try.
 On Google TV that does not hold the Home key: run `apply.sh` from a computer for the Home button
 watch, or, with the on-TV app (0.13.9 or newer) once its own link to the TV is connected, press **Make Home
 open Couch TV** on its setup screen (on-tv/README.md, "Use it as the home screen"): it puts the watch version

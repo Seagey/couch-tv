@@ -135,7 +135,8 @@ the TV, or on the setup page, signs every phone out.
 
 ## Use it as the home screen (optional)
 
-Switch on **Use as home screen** in Couch TV. On a plain Android TV that is enough. On Google TV the
+Switch on **Use as home screen** in Couch TV. On a plain Android TV with the maker's own home that is enough
+(Android asks "make Couch TV your home screen?"); with Google's Android TV Home see "When it does not ask" below. On Google TV the
 system launcher still wins the Home button, and **do not switch it off**: on some Google TVs (a
 Sony Bravia among them) the TV then loops at every restart
 ([docs/TROUBLESHOOTING.md](../docs/TROUBLESHOOTING.md#if-your-tv-loops-after-a-restart)). The Couch TV tile in the app row opens
@@ -175,6 +176,17 @@ and nothing is installed.
 
 **Use as home screen** waits a moment after switching the home on before asking Android (a first press
 showed a black screen on that TCL), and if the question is cancelled it switches the home off again.
+**When it does not ask (the release after 0.13.9).** On a TV with Google's Android TV Home (`com.google.android.tvlauncher`,
+plain Android TV, not Google TV) the press changes nothing until Couch TV can press keys on the TV. On a TCL on
+Android TV 11 installed from Downloader with no computer (23 Nov 2026), switching the home on put Google's home in
+front, and Android only lets the app bring its setup screen back from behind with "draw over apps", which it gets
+over its own key link; so the person was left on Google's home with no question. Now the setup screen stays in front
+and says: Couch TV stays one press away in the apps row; let Couch TV press keys (More, Let the phone press keys),
+then press **Make Home open Couch TV**; or More, Home button from a computer. Once Couch TV can press keys, Use as
+home screen asks Android again. The same note (HomeAsk.kt, SetupWords.noAskNote) comes up on any TV where Android
+answered at once with no question, had no request or Home settings screen at all, or where the setup screen was
+covered by the TV's own home and the person only came back later; that TV is remembered and not asked the same way
+again. The old fallback of a Home intent in a chooser is gone: it never set a default and opened Google's home at once.
 If an older guide had you switch it off, switch it back on before the next restart:
 
 ```

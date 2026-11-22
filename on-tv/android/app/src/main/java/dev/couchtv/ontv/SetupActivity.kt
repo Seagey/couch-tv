@@ -55,6 +55,9 @@ class SetupActivity : Activity() {
     private var declined = false
     private var inFront = false
     private var broughtBack = false
+    // when this screen last went behind something while asking (HomeAsk.askAfterAway), and when Android's request went out (HomeAsk.answer)
+    private var pausedAt = 0L
+    private var askedAt = 0L
     private val ask = object : Runnable {
         override fun run() {
             if (askSince == 0L) return
@@ -63,11 +66,38 @@ class SetupActivity : Activity() {
                 if (inFront) main.postDelayed(this, 250)   // not in front: onResume or the window coming back asks
                 return
             }
-            askSince = 0L
-            if (!HomeRole.held(this@SetupActivity)) awaitingRole = HomeRole.request(this@SetupActivity) == HomeRole.Asked.ROLE
+            askSince = 0L; Store.putStr(HomeAsk.PENDING_KEY, null)
+            if (!HomeRole.held(this@SetupActivity)) {
+                askedAt = System.currentTimeMillis()
+                val asked = HomeRole.request(this@SetupActivity)
+                android.util.Log.i("couchtv.homeask", "asked Android: $asked after ${since} ms")
+                when (asked) {
+                    HomeRole.Asked.ROLE -> awaitingRole = true
+                    HomeRole.Asked.SCREEN -> {}
+                    // no question on this TV: the home goes off again and the note says what to do
+                    HomeRole.Asked.NONE -> giveUp(HomeAsk.NO_QUESTION)
+                }
+            }
             refresh()
         }
     }
+
+    /**
+     * Asking cannot work here (HomeAsk.LEFT or NO_QUESTION): the home goes off again unless Android made Couch TV
+     * the home after all, this TV is remembered, and the note says what to do instead. The person stays here.
+     */
+    private fun giveUp(reason: String) {
+        askSince = 0L; awaitingRole = false
+        main.removeCallbacks(ask); main.removeCallbacks(bringBack)
+        Store.putStr(HomeAsk.PENDING_KEY, null)
+        if (!HomeRole.held(this)) { App.setHomeEnabled(this, false); FireHome.poke(); Store.putStr(HomeAsk.BLOCKED_KEY, reason) }
+        android.util.Log.w("couchtv.homeask", "use as home screen: gave up asking ($reason)")
+        updateOpenHome(); refresh()
+    }
+
+    /** What a press of Use as home screen does on this TV now (HomeAsk.plan). */
+    private fun plan() = HomeAsk.plan(HomeRole.googleTv(this), HomeRole.googleHome(this), BuildConfig.BUILD_TYPE == "watch",
+        HomeRole.canComeBack(this), Store.str(HomeAsk.BLOCKED_KEY))
     // Something came on top while waiting (Google's home put an empty black screen there on a TCL): bring
     // this screen back once, so the question is not left behind it. If Android does not allow that, the
     // note says to press Back, and the question goes out when this screen is back.
@@ -133,10 +163,21 @@ class SetupActivity : Activity() {
             // default asks again instead of switching off
             val on = !homeIsOn()
             declined = false
+            // A TV that cannot be asked from here (Google's Android TV Home without "draw over apps", or a TV that had
+            // no question before): change nothing and stay here, the note says what to do (TCL, 23 Nov 2026: switching
+            // the home on put Google's home in front and this screen never came back).
+            val plan = if (on) plan() else null
+            if (plan != null) android.util.Log.i("couchtv.homeask", "use as home screen pressed: $plan")
+            if (plan == HomeAsk.Plan.EXPLAIN) { if (App.homeEnabled(this)) App.setHomeEnabled(this, false); refresh(); updateOpenHome(); return@button }
             App.setHomeEnabled(this, on); FireHome.poke()
-            // No computer: Android's own "default home app" request (plain Android TV 10+), else its Home chooser.
+            // No computer: Android's own "default home app" request (plain Android TV 10+), else its Home settings.
             // Not at once: Android needs a moment to take in the alias just switched on (HomeAsk.kt).
-            if (on && !HomeRole.googleTv(this) && !HomeRole.held(this)) { askSince = System.currentTimeMillis(); broughtBack = false; main.post(ask) }
+            if (plan == HomeAsk.Plan.ASK && !HomeRole.held(this)) {
+                askSince = System.currentTimeMillis(); broughtBack = false; pausedAt = 0L
+                // kept, so a setup screen Android closes while it is behind another home is noticed when Couch TV opens again
+                Store.putStr(HomeAsk.PENDING_KEY, askSince.toString())
+                main.post(ask)
+            }
             refresh(); updateOpenHome()
         }
         main1.addView(homeBtn)
@@ -184,12 +225,20 @@ class SetupActivity : Activity() {
     override fun onResume() {
         super.onResume(); inFront = true
         Auth.onPin(pinListener); main.post(tick); updateOpenHome()
-        if (askSince > 0) { main.removeCallbacks(ask); main.post(ask) }
+        if (askSince > 0) {
+            // back in front: brought back (or Back on a black screen) soon enough asks; much later, the person found
+            // their own way back from the TV's home, so asking again would only send them there again
+            val away = if (pausedAt > 0) System.currentTimeMillis() - pausedAt else 0L
+            if (HomeAsk.askAfterAway(away)) { main.removeCallbacks(ask); main.post(ask) } else giveUp(HomeAsk.LEFT)
+        } else if (Store.str(HomeAsk.PENDING_KEY) != null) {
+            // a setup screen that was waiting to ask is gone (Android closed it while it was behind the TV's home)
+            giveUp(HomeAsk.LEFT)
+        }
     }
     override fun onPause() {
         super.onPause(); inFront = false
         Auth.offPin(pinListener); main.removeCallbacks(tick)
-        if (askSince > 0) main.postDelayed(bringBack, 1500)
+        if (askSince > 0) { pausedAt = System.currentTimeMillis(); main.postDelayed(bringBack, 1500) }
     }
     override fun onDestroy() {
         // nothing left to ask or to bring back once this screen is gone (bringBack would reopen it)
@@ -206,8 +255,16 @@ class SetupActivity : Activity() {
         if (requestCode == HomeRole.REQUEST && awaitingRole) {
             awaitingRole = false
             // Android's answer decides, not the button press: Cancel (or Back) leaves the TV's home as it was,
-            // so the alias goes off again and the button says Use as home screen.
-            if (!HomeAsk.keepAliasOn(HomeRole.held(this))) { App.setHomeEnabled(this, false); FireHome.poke(); declined = true }
+            // so the alias goes off again and the button says Use as home screen. An answer quicker than anyone
+            // could read means Android showed nothing: then the note says what this TV allows instead.
+            val held = HomeRole.held(this)
+            val answer = HomeAsk.answer(held, System.currentTimeMillis() - askedAt)
+            android.util.Log.i("couchtv.homeask", "Android answered $resultCode: $answer after ${System.currentTimeMillis() - askedAt} ms")
+            when (answer) {
+                HomeAsk.Answer.HOME -> Store.putStr(HomeAsk.BLOCKED_KEY, null)
+                HomeAsk.Answer.NO_QUESTION -> giveUp(HomeAsk.NO_QUESTION)
+                HomeAsk.Answer.DECLINED -> if (!HomeAsk.keepAliasOn(held)) { App.setHomeEnabled(this, false); FireHome.poke(); declined = true }
+            }
             updateOpenHome()
         }
         refresh()
@@ -269,8 +326,11 @@ class SetupActivity : Activity() {
         val opensUs = homeOpensUs()
         homeBtn.text = HomeAsk.buttonLabel(HomeAsk.isOn(App.homeEnabled(this), held, opensUs, google), asking)
         homeBtn.visibility = if (HomeAsk.showButton(google, watchApk, App.homeEnabled(this))) View.VISIBLE else View.GONE
+        val googleHome = HomeRole.googleHome(this)
+        val blocked = Store.str(HomeAsk.BLOCKED_KEY)
         homeNote.text = SetupWords.homeNote(App.homeEnabled(this), held, google, watchApk = watchApk,
-            googleHome = HomeRole.googleHome(this), asking = asking, declined = declined && !App.homeEnabled(this), opensUs = opensUs)
+            googleHome = googleHome, asking = asking, declined = declined && !App.homeEnabled(this), opensUs = opensUs,
+            noAsk = HomeAsk.noAskReason(plan(), googleHome, blocked))
         if (!watchApk) watchNote.text = SetupWords.watchSteps(ip)
         showHomeKey()
     }

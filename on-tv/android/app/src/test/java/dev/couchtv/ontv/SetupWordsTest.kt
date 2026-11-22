@@ -123,6 +123,26 @@ class SetupWordsTest {
         assertTrue(SetupWords.homeNote(true, false, true, watchApk = false).contains("then press Use as home screen"))
     }
 
+    @Test fun aTvThatCannotBeAskedSaysWhatToDo() {
+        // TCL, Android TV 11, Google's Android TV Home, 23 Nov 2026: no false "No computer needed" promise
+        val tcl = SetupWords.homeNote(false, false, false, googleHome = true, noAsk = "google")
+        assertEquals(SetupWords.noAskNote("google"), tcl)
+        assertFalse(tcl.contains("No computer needed"))
+        assertTrue(tcl.contains("Couch TV stays one press away: open it from the apps row."))
+        assertTrue(tcl.contains("Let the phone press keys") && tcl.contains("Make Home open Couch TV"))
+        assertTrue(tcl.contains("More, Home button from a computer"))
+        assertTrue(SetupWords.noAskNote(HomeAsk.NO_QUESTION).contains("no question for choosing a home screen"))
+        assertTrue(SetupWords.noAskNote(HomeAsk.LEFT).contains("then press Use as home screen"))
+        // the note only takes over while the home is off; asking wins while Android is being asked
+        assertEquals(SetupWords.homeNote(false, false, false), SetupWords.homeNote(false, false, false, noAsk = null))
+        assertTrue(SetupWords.homeNote(false, false, false, asking = true, noAsk = "google").contains("press Back once"))
+        listOf("google", HomeAsk.LEFT, HomeAsk.NO_QUESTION).map { SetupWords.noAskNote(it) }.forEach {
+            assertFalse(it, Regex("[–—]|\\s-\\s|\\bBeta\\b|coming soon", RegexOption.IGNORE_CASE).containsMatchIn(it))
+            assertFalse(it, Regex("couch-tv(?![-./])").containsMatchIn(it))
+            assertTrue(it.contains("Couch TV"))
+        }
+    }
+
     @Test fun askingAndCancelSayWhatHappened() {
         assertTrue(SetupWords.homeNote(true, false, false, asking = true).contains("press Back once"))
         assertTrue(SetupWords.homeNote(false, false, false, declined = true).startsWith("Couch TV is not your home screen"))
