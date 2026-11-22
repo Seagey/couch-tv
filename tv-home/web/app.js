@@ -1857,7 +1857,8 @@
     if (mins > 0) clipIdleTimer = setTimeout(function () {
       clipsIdle = true;
       sceneVideos(false);
-      if (document.hidden || screenOffActive || idleAmbientActive || sndPlaying) return;
+      // Smart Idle on: its own action (ambient clock, screen off, TV off) runs, not the TV's screensaver
+      if (SMART_IDLE.enabled || document.hidden || screenOffActive || idleAmbientActive || soundscapePlaying()) return;
       try { if (TV && TV.canStartScreensaver && TV.canStartScreensaver()) TV.startScreensaver(); } catch (e) {}
     }, mins * 60000);
     if (was) sceneVideos(true);
@@ -3239,6 +3240,9 @@
   }
   // a design's video background (design.js, bg-video.js) stops while the home is not on screen
   function designVideo(why, held) { if (typeof CouchDesign !== "undefined" && CouchDesign.hold) CouchDesign.hold(why, held); }
+  function soundscapePlaying() {
+    try { return !!(window.Soundscape && window.Soundscape.current && window.Soundscape.current() !== "off"); } catch (e) { return false; }
+  }
   function checkSmartIdle() {
     if (!SMART_IDLE.enabled || covered() || screenOffActive || idleAmbientActive) return;
     var mins = isQuietHours(SMART_IDLE.quiet_hours) ? SMART_IDLE.quiet_hours.idle_minutes : SMART_IDLE.home_idle_minutes;
@@ -3249,8 +3253,7 @@
     if (act === "screen_off") {
       toggleScreenOff(true);
     } else if (act === "tv_off") {
-      var sndPlaying = window.Soundscape && window.Soundscape.current && window.Soundscape.current() !== "off";
-      if (sndPlaying && !sleepEnds) { setIdleAmbient(true); return; }
+      if (soundscapePlaying() && !sleepEnds) { setIdleAmbient(true); return; }
       if (sleepEnds && !OFFLINE) api("POST", "/api/sleep", { minutes: 0 }).catch(function () {});
       if (TV && TV.powerOff) { try { TV.powerOff(); return; } catch (e) {} }
       if (!OFFLINE) api("POST", "/api/key", { key: "power" }).catch(function () {});
