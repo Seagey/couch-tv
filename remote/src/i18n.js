@@ -261,6 +261,7 @@ S.en = {
   ask_still_working: "Still working on it. Give it a minute and watch the TV.",
   ask_still_working_doing: "Still working on it, {doing}. Give it a minute and watch the TV.",
   err_adb_not_on: "On the TV, switch on USB debugging in Developer options, then press Allow.",
+  err_tv_link_lost: "Couch TV lost its link to this TV. On the TV, switch Network debugging off and on in Developer options.",
   err_after_must_be_number: "after must be a number",
   err_already_kids_profile: "That is a kids profile already.",
   err_app_did_not_come_up: "asked the TV to open {app} but it did not come up",
@@ -878,6 +879,7 @@ S['zh-CN'] = {
   ask_still_working: "还在处理，请稍等一分钟并看下电视。",
   ask_still_working_doing: "还在处理（{doing}），请稍等一分钟并看下电视。",
   err_adb_not_on: "在电视上的“开发者选项”里打开“USB 调试”，然后按“允许”。",
+  err_tv_link_lost: "Couch TV 与这台电视的连接断了。请在电视的开发者选项里把 Network debugging（网络调试）关掉再打开。",
   err_after_must_be_number: "after 必须是数字",
   err_already_kids_profile: "那已经是儿童资料了。",
   err_app_did_not_come_up: "让电视打开 {app}，但它没起来",
@@ -1259,6 +1261,7 @@ S['zh-CN'] = {
 S.es = {
   err_pairing_locked: "Demasiados códigos incorrectos. Espera {minutes} min y vuelve a intentarlo.",
   err_adb_not_on: "En la TV, activa Depuración por USB en Opciones para desarrolladores y luego pulsa Permitir.",
+  err_tv_link_lost: "Couch TV perdió la conexión con este televisor. En el televisor, desactiva y vuelve a activar Network debugging (depuración por red) en Opciones para desarrolladores.",
   ds_askLater: "Ahora no",
   ds_askSend: "Enviar",
   ds_ask: "¿Enviar este diseño al televisor?",
@@ -1559,6 +1562,7 @@ S['es-MX'] = {
 S.it = {
   err_pairing_locked: "Troppi codici sbagliati. Aspetta {minutes} min, poi riprova.",
   err_adb_not_on: "Sulla TV, attiva Debug USB in Opzioni sviluppatore, poi premi Consenti.",
+  err_tv_link_lost: "Couch TV ha perso il collegamento con questa TV. Sulla TV, disattiva e riattiva Network debugging (debug di rete) in Opzioni sviluppatore.",
   ds_askLater: "Non ora",
   ds_askSend: "Invia",
   ds_ask: "Inviare questo design alla TV?",
@@ -1772,6 +1776,7 @@ S.it = {
 S.de = {
   err_pairing_locked: "Zu viele falsche Codes. Warte {minutes} Min. und versuche es dann noch einmal.",
   err_adb_not_on: "Schalte am Fernseher in den Entwickleroptionen USB-Debugging ein und drücke dann Zulassen.",
+  err_tv_link_lost: "Couch TV hat die Verbindung zu diesem Fernseher verloren. Schalte am Fernseher in den Entwickleroptionen Network debugging (Netzwerk-Debugging) aus und wieder ein.",
   ds_askLater: "Nicht jetzt",
   ds_askSend: "Senden",
   ds_ask: "Dieses Design an den Fernseher senden?",
@@ -1990,6 +1995,7 @@ S.de = {
 S.tr = {
   err_pairing_locked: "Çok fazla yanlış kod. {minutes} dk bekle, sonra yeniden dene.",
   err_adb_not_on: "Televizyonda Geliştirici seçenekleri içinde USB hata ayıklamayı aç, sonra İzin ver'e bas.",
+  err_tv_link_lost: "Couch TV bu televizyonla bağlantısını kaybetti. Televizyonda Geliştirici seçenekleri içinde Network debugging (ağ üzerinden hata ayıklama) seçeneğini kapatıp yeniden aç.",
   ds_askLater: "Şimdi değil",
   ds_askSend: "Gönder",
   ds_ask: "Bu tasarım TV'ye gönderilsin mi?",
@@ -2207,6 +2213,7 @@ S.tr = {
 S['sr-Latn-RS'] = {
   err_pairing_locked: "Previše pogrešnih kodova. Sačekajte {minutes} min, pa pokušajte ponovo.",
   err_adb_not_on: "Na televizoru uključite Otklanjanje grešaka sa USB-a u Opcijama za programere, pa pritisnite Dozvoli.",
+  err_tv_link_lost: "Couch TV je izgubio vezu sa ovim televizorom. Na televizoru, u Opcijama za programere isključite pa ponovo uključite Network debugging (otklanjanje grešaka preko mreže).",
   ds_askLater: "Ne sada",
   ds_askSend: "Pošalji",
   ds_ask: "Poslati ovaj dizajn na TV?",
@@ -2424,6 +2431,7 @@ S['sr-Latn-RS'] = {
 S.cs = {
   err_pairing_locked: "Příliš mnoho špatných kódů. Počkejte {minutes} min a zkuste to znovu.",
   err_adb_not_on: "Na televizi zapněte Ladění přes USB v Možnostech pro vývojáře a pak stiskněte Povolit.",
+  err_tv_link_lost: "Couch TV ztratil spojení s touto televizí. Na televizi v Možnostech pro vývojáře vypněte a znovu zapněte Network debugging (ladění přes síť).",
   ds_askLater: "Teď ne",
   ds_askSend: "Poslat",
   ds_ask: "Poslat tento návrh do televize?",
@@ -2882,6 +2890,7 @@ S.pl = {
   ask_still_working: "Nadal nad tym pracuję. Poczekaj chwilę i spójrz na telewizor.",
   ask_still_working_doing: "Nadal nad tym pracuję ({doing}). Poczekaj chwilę i spójrz na telewizor.",
   err_adb_not_on: "Na telewizorze włącz Debugowanie USB w Opcjach programistycznych, a potem naciśnij Zezwól.",
+  err_tv_link_lost: "Couch TV stracił połączenie z tym telewizorem. Na telewizorze wyłącz i włącz ponownie Network debugging (debugowanie przez sieć) w Opcjach programistycznych.",
   err_after_must_be_number: "Parametr after musi być liczbą",
   err_already_kids_profile: "To jest już profil dziecięcy.",
   err_app_did_not_come_up: "Poproszono telewizor o otwarcie {app}, ale aplikacja się nie uruchomiła",
@@ -3264,6 +3273,7 @@ S.pl = {
 S.pt = {
   err_pairing_locked: "Muitos códigos errados. Espere {minutes} min e tente de novo.",
   err_adb_not_on: "Na TV, ative a Depuração USB nas Opções do desenvolvedor e depois aperte Permitir.",
+  err_tv_link_lost: "A Couch TV perdeu a conexão com esta TV. Na TV, desative e ative de novo o Network debugging (depuração pela rede) nas Opções do desenvolvedor.",
   ds_askLater: "Agora não",
   ds_askSend: "Enviar",
   ds_ask: "Enviar este design para a TV?",
