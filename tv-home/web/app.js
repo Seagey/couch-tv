@@ -1959,18 +1959,40 @@
     }, lead);
   }
 
-  // Night: the date line sits centred above the clock, between the people switch and the quick
-  // buttons. Longer words (Spanish, a running sleep timer, four buttons) can reach them, so it makes
-  // room: first it centres in the space left, then drops the weather's words, then the weather.
+  // Night: the date line sits just above the scene's clock and lines up with it (centred over a
+  // centred clock, on the clock's own edge for a clock at the side). Longer words (the weather place,
+  // Spanish, a running sleep timer, four quick buttons) can reach the people switch or the buttons in
+  // the top bar. It never slides sideways for them, which took it off the clock: the date and the
+  // scene's clock move down together, under the top bar. Only a line wider than the screen then drops
+  // the weather's words, then the weather. The Loop look (no scene clock) still makes room sideways.
   function fitDate() {
     var d = $("date"), line = d.firstChild;
     if (!NIGHT || !line || !line.getBoundingClientRect) return;
-    d.style.left = ""; d.style.right = "";
+    d.style.left = ""; d.style.right = ""; d.style.top = "";
     d.classList.remove("tight", "tighter");
     var b = line.getBoundingClientRect(), rem = innerWidth / 120;
     var near = function (r) { return r && r.width > 0 && r.bottom > b.top && r.top < b.bottom; };
     var q = $("quick").classList.contains("none") ? null : $("qbtns").getBoundingClientRect();
     var p = $("people").getBoundingClientRect();
+    if (!LOOP) {
+      var hits = function (r) { return near(r) && b.left < r.right + rem && b.right > r.left - rem; };
+      var drop = 0;
+      if (hits(p) || hits(q)) {
+        var under = Math.max(p.width > 0 ? p.bottom : 0, q && q.width > 0 ? q.bottom : 0) + rem;
+        drop = Math.max(0, Math.round(under - b.top));
+        d.style.top = (d.offsetTop + drop) + "px";
+      }
+      if (drop !== dateDrop) {
+        dateDrop = drop;
+        document.documentElement.style.setProperty("--date-drop", drop + "px");
+        // the glass digits show the photo behind them, lined up from where they sit: line them up again
+        sceneEls.forEach(function (el, i) { if (el.classList.contains("ready") && el.dataset.hm) drawClocks(el, SCENES[i], el.dataset.hm); });
+        placeMood();
+      }
+      if (d.scrollWidth > d.clientWidth + 1) d.classList.add("tight");
+      if (d.scrollWidth > d.clientWidth + 1) d.classList.add("tighter");
+      return;
+    }
     var rtl = document.documentElement.dir === "rtl";
     // the Loop look puts Now playing in the people's column, at the date line's height with one person
     // or under a tall head icon: of the two, the one that reaches further in is the one to clear
@@ -1988,6 +2010,7 @@
     if (d.scrollWidth > d.clientWidth + 1) d.classList.add("tight");
     if (d.scrollWidth > d.clientWidth + 1) d.classList.add("tighter");
   }
+  var dateDrop = 0;   // how far fitDate() moved the date and the scene clock down (px)
 
   // ---------------- Night: a greeting and a short line under the clock ----------------
   // A warm greeting for whoever is watching, picked at random for the time of day, and a short
