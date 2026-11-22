@@ -165,6 +165,10 @@ class TV:
         # "adb_only": true (Fire TV on Fire OS): no Android TV Remote protocol on this TV, so the
         # ADB link is the connection and there is no certificate pairing to do.
         self.adb_only = bool(cfg.get("adb_only"))
+        # "phone_keyboard": false asks the TV not to offer a phone keyboard, so the TV's own
+        # on screen keyboard shows instead of "Use the keyboard on your mobile device". Default true
+        # (the library's default). Off, the TV does not report the app in front over this link.
+        self.phone_keyboard = cfg.get("phone_keyboard") is not False
         if self.adb_only:
             self.paired = True
         self._adb_on = None     # adb_only: awake or not, read from dumpsys power
@@ -331,7 +335,7 @@ class TV:
 
     async def _connect_once(self, ip, timeout=10):
         """One connect attempt to a known address. Raises on failure."""
-        remote = AndroidTVRemote(CLIENT_NAME, CERT, KEY, ip)
+        remote = AndroidTVRemote(CLIENT_NAME, CERT, KEY, ip, enable_ime=self.phone_keyboard)
         remote.add_is_on_updated_callback(self._changed)
         remote.add_is_on_updated_callback(lambda on: self.log.info("TV reports %s", "on" if on else "standby"))
         remote.add_current_app_updated_callback(self._changed)
