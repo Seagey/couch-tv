@@ -134,10 +134,15 @@
   if (arg("scenes")) cfg.home.scenes = arg("scenes").split(",");
   if (arg("secs")) cfg.home.scene_seconds = parseInt(arg("secs"), 10);
   if (arg("sunsync")) cfg.home.sun_sync = arg("sunsync") === "1" || arg("sunsync") === "true";
+  // zoom=1   home.scene_zoom
+  if (arg("zoom")) cfg.home.scene_zoom = arg("zoom") === "1" || arg("zoom") === "true";
   if (arg("sunrotate")) cfg.home.sun_rotate_minutes = parseInt(arg("sunrotate"), 10);   // home.sun_rotate_minutes
   if (arg("datebars")) cfg.home.date_bars = arg("datebars") !== "off";   // home.date_bars
   if (arg("myscenes")) try { cfg.home.my_scenes = JSON.parse(arg("myscenes")); } catch (e) {}
   if (arg("iconset")) cfg.home.icon_set = arg("iconset");   // g24
+  // greeting=1   home.greeting; styles=person1:gentle,person2:electric   home.person_styles
+  if (arg("greeting")) cfg.home.greeting = true;
+  if (arg("styles")) cfg.home.person_styles = arg("styles").split(",").reduce(function (o, kv) { var p = kv.split(":"); if (p[1]) o[p[0]] = p[1]; return o; }, {});
   if (arg("glass")) cfg.home.glass = arg("glass");
   if (arg("moving")) cfg.home.moving_tiles = arg("moving") !== "off";
   if (arg("dock")) cfg.home.dock = arg("dock");

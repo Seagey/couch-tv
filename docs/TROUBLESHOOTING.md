@@ -139,6 +139,24 @@ Fire TV is still on Amazon's home after `apply.sh`, run from the repo root:
 TV_IP=<tv address> .venv/bin/python tv-home/tools/tvadb.py shell "settings put secure enabled_accessibility_services app.couchtv.launcher/.FireWatch; settings put secure accessibility_enabled 1"
 ```
 
+## Home stays on Google TV days later, with the Home button watch "crashed"
+
+Seen on a Hisense Google TV (Android 11): a few hours after the TV went into standby, something on
+the TV killed couch-tv's process by signal (`dumpsys activity exit-info app.couchtv.launcher` said
+`SIGNALED`, not a crash and not a low memory kill). The Home button watch lives in that process, so
+Android listed it under "Crashed services" in `dumpsys accessibility`, set `accessibility_enabled`
+to 0 and never bound it again, and the Home key stayed on Google TV's home until `apply.sh` ran.
+
+Since then the app checks about every 15 minutes, with a job Android runs even when couch-tv is
+not running (`WatchRepair.kt`): where a computer granted secure settings and the watch is still
+listed as on but not running, it switches accessibility back on and takes the watch out of the
+list and back in, so Android binds it afresh. A watch switched off in Settings stays off. So at
+worst Home goes to the TV's own home for up to about 15 minutes. To run the check now:
+
+```sh
+TV_IP=<tv address> .venv/bin/python tv-home/tools/tvadb.py shell "cmd jobscheduler run -f app.couchtv.launcher 43017"
+```
+
 ## If Disney+ (or another app) signs you out after the TV turns off
 
 This is not couch-tv, and changing your password does not fix it. Seen on an Android TV with Disney+

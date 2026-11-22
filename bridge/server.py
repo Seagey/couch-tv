@@ -22,7 +22,7 @@ from collections.abc import MutableMapping
 from datetime import datetime, timezone
 from zoneinfo import ZoneInfo
 
-from aiohttp import web
+from aiohttp import ClientError, web
 
 import apps
 import config
@@ -1241,6 +1241,17 @@ async def h_webos_apps(request):
     if tv.kind != "lg":
         raise ApiError(400, "only for LG TVs", key="err_only_lg")
     return ok(apps=await tv.apps_on_tv())
+
+
+async def h_webos_icon(request):
+    """An LG app's icon: the TV serves it only on its self-signed port, which the couch-tv page refuses."""
+    if tv.kind != "lg":
+        raise ApiError(400, "only for LG TVs", key="err_only_lg")
+    try:
+        data, kind = await tv.icon(request.match_info["id"])
+    except (ValueError, TVUnavailable, ClientError, asyncio.TimeoutError) as e:
+        raise ApiError(404, str(e))
+    return web.Response(body=data, content_type=kind.split(";")[0], headers={"Cache-Control": "max-age=86400"})
 
 
 async def h_roku_apps(request):
@@ -5845,6 +5856,7 @@ def make_app():
     r.add_get("/api/tizen/next", h_tizen_next)
     r.add_post("/api/tizen/answer", h_tizen_answer)
     r.add_get("/api/webos/apps", h_webos_apps)
+    r.add_get("/api/webos/icon/{id}", h_webos_icon)
     r.add_get("/api/roku/apps", h_roku_apps)
     r.add_get("/api/roku/icon/{id}", h_roku_icon)
     r.add_get("/api/vega/keys", h_vega_keys)

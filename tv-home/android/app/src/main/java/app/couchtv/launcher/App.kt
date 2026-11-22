@@ -12,5 +12,6 @@ class App : Application() {
         runCatching { dev.couchtv.ontv.matter.DiscoveryChipResolver.install(this) }
         // Matter devices added before: start their live state (nothing loads if there are none)
         runCatching { dev.couchtv.ontv.matter.Matter.init(this) }
+        WatchRepair.schedule(this)   // puts the Home button watch back if the TV kills the app
     }
 }

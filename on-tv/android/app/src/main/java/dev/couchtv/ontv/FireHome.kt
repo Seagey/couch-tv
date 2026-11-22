@@ -234,18 +234,24 @@ object FireHome {
         val usm = App.instance.getSystemService(UsageStatsManager::class.java)
         val power = App.instance.getSystemService(PowerManager::class.java)
         var since = System.currentTimeMillis()
+        var lastStamp = since   // newest event already handled
         while (wanted && usageAllowed && !WatchService.connected) {
             Thread.sleep(if (power.isInteractive) 500 else 3_000)
             val now = System.currentTimeMillis()
-            // A second of overlap, so an event on the boundary is never missed; the order check
-            // below keeps a twice-seen event from causing a second jump.
-            val events = runCatching { usm.queryEvents(since - 1_000, now) }.getOrNull() ?: continue
+            // Look back well past the last poll: on Fire OS 6 (Android 7.1) Amazon's home took 3 to 9 s to
+            // come up after Netflix or Prime Video, and its MOVE_TO_FOREGROUND arrived in the usage log that
+            // late, stamped with the earlier time, so a 1 s overlap missed it and Home stayed on Amazon's.
+            // Events at or before lastStamp were handled already, so none causes a second jump.
+            val events = runCatching { usm.queryEvents(since - USAGE_LOOKBACK_MS, now) }.getOrNull() ?: continue
             since = now
             val e = UsageEvents.Event()
             var amazonInFront = false
             while (events.getNextEvent(e)) {
                 if (e.eventType != UsageEvents.Event.MOVE_TO_FOREGROUND) continue
+                if (e.timeStamp <= lastStamp) continue
+                lastStamp = e.timeStamp
                 Log.i(TAG, "front: ${e.packageName}")
+                seen(e.packageName, e.className)   // keeps amazonHomeInFront true to the screen without the accessibility watch
                 when {
                     isAmazonHome(e.packageName, e.className) -> amazonInFront = true
                     e.packageName == BuildConfig.APPLICATION_ID || e.packageName == AMAZON_HOME -> amazonInFront = false
@@ -294,6 +300,8 @@ object FireHome {
     }
     private const val JUMP_GAP_MS = 1200L
     private const val FRONT_CHECK_MS = 800L   // Android 10: how long to wait before checking the move worked
+    private const val APP_SWITCH_MS = 5_500L  // Android 9 and older: just past the 5 s app-switch delay
+    private const val USAGE_LOOKBACK_MS = 20_000L   // how far back each usage poll looks for late events
     private val recheck = android.os.Handler(android.os.Looper.getMainLooper())
     private val again = Runnable { if (amazonHomeInFront) { Log.i(TAG, "Amazon's home still in front after the gap"); jump() } }
 
@@ -326,6 +334,15 @@ object FireHome {
                     App.openHome()
                 }
             }, FRONT_CHECK_MS)
+            // Fire OS 6 (Android 7.1): the move is dropped silently inside the app-switch delay after a
+            // Home press, and the usage watch sees no later event to react to, so Amazon's home stayed.
+            // Look once the delay is over and start the home if Amazon's is still the one in front.
+            if (sdk < 29) recheck.postDelayed({
+                if (amazonHomeInFront && !HomeActivity.isInFront()) {
+                    Log.i(TAG, "the move to front was dropped (app-switch delay): starting the home")
+                    App.openHome()
+                }
+            }, APP_SWITCH_MS)
         } else {
             Log.i(TAG, "Amazon's home came forward: starting the home")
             App.openHome()

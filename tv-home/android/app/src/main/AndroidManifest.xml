@@ -116,6 +116,10 @@
             <action android:name="android.settings.APPLICATION_DETAILS_SETTINGS" />
             <data android:scheme="package" />
         </intent>
+        <!-- Reminders: Android's speech screen (Google's "Speak now"), for the remote's mic. -->
+        <intent>
+            <action android:name="android.speech.action.RECOGNIZE_SPEECH" />
+        </intent>
     </queries>
 
     <application
@@ -207,6 +211,12 @@
             </intent-filter>
             <meta-data android:name="android.media.tv.input" android:resource="@xml/tcl_placeholder_input" />
         </service>
+        <!-- About every 15 minutes, even after the TV killed the app: switches the Home button
+             watch back on if it is listed as on but not running (WatchRepair.kt). -->
+        <service
+            android:name=".WatchRepair"
+            android:exported="false"
+            android:permission="android.permission.BIND_JOB_SERVICE" />
         <receiver android:name=".FireWatch$Restore" android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.BOOT_COMPLETED" />

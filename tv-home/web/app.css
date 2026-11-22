@@ -314,6 +314,22 @@ html.still .tile.focus .face, html.still .tile.focus .face::after { animation: n
 .scene.ready { display: block; will-change: opacity; }   /* painted while it waits at opacity 0, not on the first frame of the fade */
 .scene.on { opacity: 1; }
 .scene .sbg, .scene .fg { position: absolute; top: 0; right: 0; bottom: 0; left: 0; width: 100%; height: 100%; object-fit: cover; }
+/* Depth zoom (html.depth-zoom, app.js, home.scene_zoom): while a built-in scene is on screen its photo
+   pushes in slowly and its cut-out a little faster, so the scenery seems to move past the clock. It
+   keeps going while the scene fades out (.out) and starts again the next time the scene shows. Each
+   scene leans towards its own point, so no two move the same way. Own scenes are left still. */
+.depth-zoom .scene.on .sbg, .depth-zoom .scene.out .sbg { animation: sz-back var(--zoom-ms, 24s) cubic-bezier(0.33, 0.1, 0.4, 1) both; }
+.depth-zoom .scene.on .fg, .depth-zoom .scene.out .fg { animation: sz-front var(--zoom-ms, 24s) cubic-bezier(0.33, 0.1, 0.4, 1) both; }
+.depth-zoom .scene.s-mine .sbg, .depth-zoom .scene.s-mine .fg, .depth-zoom .scene.s-own .sbg { animation: none; }
+.depth-zoom .scene .sbg, .depth-zoom .scene .fg { will-change: transform; backface-visibility: hidden; }
+@keyframes sz-back { from { transform: scale(1.005); } to { transform: scale(1.075); } }
+@keyframes sz-front { from { transform: scale(1.005); } to { transform: scale(1.1); } }
+.s-night .sbg, .s-night .fg { transform-origin: 50% 85%; }
+.s-golden .sbg, .s-golden .fg { transform-origin: 62% 80%; }
+.s-water .sbg { transform-origin: 40% 50%; }
+.s-fog .sbg, .s-fog .fg { transform-origin: 70% 90%; }
+.s-dawn .sbg, .s-dawn .fg { transform-origin: 35% 85%; }
+@media (prefers-reduced-motion: reduce) { .depth-zoom .scene .sbg, .depth-zoom .scene .fg { animation: none !important; } }
 /* a scene's own clip (home.my_scenes[].video): over the photo, under the cut-out and the clock */
 .scene .svid { position: absolute; top: 0; right: 0; bottom: 0; left: 0; width: 100%; height: 100%; object-fit: cover; opacity: 0; transition: opacity 600ms ease-in-out; }
 .scene .svid.playing { opacity: 1; }
@@ -359,6 +375,139 @@ html.still .tile.focus .face, html.still .tile.focus .face::after { animation: n
 /* 5 Rainforest dawn: warm light at the top, the clock low enough for the ridges to cross it */
 .s-dawn .shade { background: linear-gradient(180deg, rgba(50, 28, 12, 0.42) 0%, rgba(50, 28, 12, 0) 55%); }
 .s-dawn .gclock { top: 14.375rem; filter: drop-shadow(0 0.5rem 2.125rem rgba(60, 30, 10, 0.3)); }
+
+/* a greeting and a short line under the clock (app.js mood, placeMood) */
+.mood { display: none; }
+.theme-night .mood {
+  display: block; position: fixed; left: 0; right: 0; text-align: center; pointer-events: none;
+  opacity: 0; transform: translateY(0.5rem); transition: opacity 600ms var(--ease), transform 600ms var(--ease);
+  color: #fff; text-shadow: 0 0.125rem 1.25rem rgba(0, 0, 0, 0.35);
+}
+.theme-night .mood.on { opacity: 1; transform: none; }
+.theme-night .mood.left { text-align: left; }
+.theme-night .mood.right { text-align: right; }
+.mood-hi { font-size: 2.75rem; line-height: 3.375rem; font-weight: 650; letter-spacing: -0.01em; }
+.mood-q { margin-top: 0.25rem; font-size: 1.625rem; line-height: 2.125rem; font-weight: 450; font-style: italic; color: rgba(255, 255, 255, 0.82); }
+.theme-night .mood.noq .mood-q { display: none; }
+.theme-night .mood.dark { color: #1d2420; text-shadow: none; }
+.theme-night .mood.dark .mood-q { color: rgba(29, 36, 32, 0.78); }
+.expanded .mood, .lifting .mood, .hinting .mood { opacity: 0 !important; }
+
+/* each person's own style (app.js applyStyle, home.person_styles) */
+/* gentle: soft blush pink, a rounded glow and a little heart that floats */
+html.who-gentle .mood:not(.dark) .mood-hi { color: #ffe4ef; text-shadow: 0 0 1.5rem rgba(255, 150, 196, 0.6), 0 0.125rem 1rem rgba(60, 10, 40, 0.3); }
+html.who-gentle .mood:not(.dark) .mood-q { color: rgba(255, 228, 240, 0.92); }
+html.who-gentle .mood.dark .mood-hi { color: #8a2f5c; }
+html.who-gentle .mood.dark .mood-q { color: rgba(120, 44, 84, 0.8); }
+html.who-gentle .mood-hi::after {
+  content: ""; display: inline-block; width: 1.75rem; height: 1.75rem; margin-left: 0.75rem; vertical-align: 0.1em;
+  background: no-repeat center / contain url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='%23ffb3d1' d='M12 21s-7.5-4.6-9.5-9.2C1.1 8.6 3.2 5 6.6 5c2 0 3.4 1.1 4.4 2.6C12 6.1 13.4 5 15.4 5c3.4 0 5.5 3.6 4.1 6.8C19.5 16.4 12 21 12 21z'/%3E%3C/svg%3E");
+  filter: drop-shadow(0 0 0.5rem rgba(255, 140, 190, 0.7)); animation: who-float 3.6s ease-in-out infinite;
+}
+@keyframes who-float { 0%, 100% { transform: translateY(0) rotate(-6deg); } 50% { transform: translateY(-0.4rem) rotate(6deg); } }
+html.who-gentle .gclock .rim { -webkit-text-stroke-color: rgba(255, 210, 230, 0.72); }
+html.who-gentle.theme-night:not(.scene-fog):not(.mine-dark) .date { color: #ffeaf3; text-shadow: 0 0 1rem rgba(255, 150, 196, 0.45); }
+
+/* electric: wide spaced capitals in a cyan to violet current that runs through them, now and then a flicker */
+html.who-electric .mood-hi {
+  font-family: "Antonio", "Inter", sans-serif; font-weight: 300; text-transform: uppercase; letter-spacing: 0.16em; font-size: 2.625rem;
+  color: transparent; -webkit-background-clip: text; background-clip: text; background-size: 200% 100%;
+  background-image: linear-gradient(90deg, #6ff0ff 0%, #b98cff 30%, #ffffff 50%, #b98cff 70%, #6ff0ff 100%);
+  filter: drop-shadow(0 0 0.625rem rgba(90, 210, 255, 0.6));
+  animation: who-current 7s linear infinite, who-flicker 9s steps(1, end) infinite;
+}
+html.who-electric .mood.dark .mood-hi {
+  background-image: linear-gradient(90deg, #12207a 0%, #5a1aa8 30%, #1a6a9a 50%, #5a1aa8 70%, #12207a 100%);
+  filter: drop-shadow(0 0 0.5rem rgba(90, 60, 200, 0.35));
+}
+html.who-electric .mood-q { font-style: normal; font-weight: 400; letter-spacing: 0.06em; font-size: 1.5rem; }
+html.who-electric .mood:not(.dark) .mood-q { color: rgba(196, 220, 255, 0.85); text-shadow: 0 0 0.875rem rgba(80, 140, 255, 0.45); }
+html.who-electric .mood.dark .mood-q { color: rgba(30, 30, 90, 0.8); }
+html.who-electric .mood-hi::after {
+  content: ""; display: inline-block; width: 1.5rem; height: 1.875rem; margin-left: 0.625rem; vertical-align: -0.05em;
+  background: no-repeat center / contain url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 26'%3E%3Cpath fill='%2380f0ff' d='M12 0L1 15h7l-2 11L19 9h-7z'/%3E%3C/svg%3E");
+}
+@keyframes who-current { from { background-position: 0% 0; } to { background-position: 200% 0; } }
+@keyframes who-flicker { 0% { opacity: 1; } 91% { opacity: 0.45; } 92% { opacity: 1; } 94% { opacity: 0.7; } 95% { opacity: 1; } }
+html.who-electric .gclock .rim { -webkit-text-stroke-color: rgba(130, 230, 255, 0.75); }
+html.who-electric.theme-night:not(.scene-fog):not(.mine-dark) .date { color: #dcf6ff; text-shadow: 0 0 1rem rgba(80, 200, 255, 0.5); }
+/* the fog scene is bright: a darker halo keeps both styles readable over the misty trees */
+html.who-electric.scene-fog .mood:not(.dark) .mood-hi { filter: drop-shadow(0 0 0.375rem rgba(0, 10, 30, 0.85)) drop-shadow(0 0 0.75rem rgba(90, 210, 255, 0.45)); }
+html.scene-fog .mood:not(.dark) .mood-q { text-shadow: 0 0 0.5rem rgba(0, 10, 20, 0.85), 0 0.125rem 1rem rgba(0, 0, 0, 0.5); }
+html.who-gentle.scene-fog .mood:not(.dark) .mood-hi { text-shadow: 0 0 0.5rem rgba(60, 10, 40, 0.8), 0 0 1.5rem rgba(255, 150, 196, 0.5); }
+@media (prefers-reduced-motion: reduce) {
+  html.who-gentle .mood-hi::after, html.who-electric .mood-hi { animation: none; }
+}
+
+/* ---------------- reminders (reminders.js) ---------------- */
+/* the next few, top right under the quick buttons */
+.rem-chips { display: none; }
+.theme-night .rem-chips.on {
+  display: flex; flex-direction: column; align-items: flex-end; gap: 0.625rem; position: fixed; top: 11rem; right: var(--safe-x);
+  max-width: 30rem; pointer-events: none; transition: opacity 400ms var(--ease);
+}
+.expanded .rem-chips, .lifting .rem-chips, .settings-open .rem-chips { opacity: 0; }
+.rem-chip {
+  display: flex; align-items: center; gap: 0.875rem; max-width: 100%; padding: 0.625rem 1.25rem 0.625rem 1rem; border-radius: 1.5rem;
+  background: rgba(30, 20, 28, 0.36); -webkit-backdrop-filter: blur(1.5rem) saturate(160%); backdrop-filter: blur(1.5rem) saturate(160%);
+  box-shadow: inset 0 0 0 0.0625rem rgba(255, 210, 220, 0.16), 0 1rem 2.5rem rgba(0, 0, 0, 0.25); color: #fff;
+}
+.rem-chip .rem-t, .rem-row > span:last-child, .rem-val { display: flex; flex-direction: column; min-width: 0; }
+.rem-chip b { font-size: 1.375rem; line-height: 1.75rem; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.rem-chip i { font-style: normal; font-size: 1.125rem; line-height: 1.5rem; color: rgba(255, 255, 255, 0.72); white-space: nowrap; }
+.rem-dot { flex: none; width: 0.75rem; height: 0.75rem; border-radius: 50%; background: #8ec5ff; box-shadow: 0 0 0.75rem rgba(142, 197, 255, 0.8); }
+.rem-chip.due .rem-dot, .rem-row.due .rem-dot { background: #ffb340; box-shadow: 0 0 1rem rgba(255, 179, 64, 0.95); animation: rem-pulse 1.4s ease-in-out infinite alternate; }
+.rem-chip.due { box-shadow: inset 0 0 0 0.125rem rgba(255, 179, 64, 0.7), 0 1rem 2.5rem rgba(0, 0, 0, 0.3); }
+@keyframes rem-pulse { from { opacity: 0.45; } to { opacity: 1; } }
+
+/* the panel: the list, the calendar card, a due one */
+.rem-panel { display: none; }
+.rem-panel.on {
+  display: block; position: fixed; z-index: 40; left: 50%; top: 50%; transform: translate(-50%, -50%); width: 58rem; max-height: 60rem; overflow: hidden;
+  padding: 2.25rem 2.5rem 1.75rem; border-radius: 2.5rem; color: #fff;
+  background: rgba(24, 18, 30, 0.78); -webkit-backdrop-filter: blur(2.5rem) saturate(170%); backdrop-filter: blur(2.5rem) saturate(170%);
+  box-shadow: inset 0 0 0 0.0625rem rgba(255, 220, 230, 0.18), 0 2.5rem 6rem rgba(0, 0, 0, 0.55);
+}
+.rem-h { font-size: 2.5rem; line-height: 3rem; font-weight: 700; margin-bottom: 1.25rem; }
+.rem-row, .rem-erow {
+  display: flex; align-items: center; gap: 1.125rem; padding: 0.875rem 1.25rem; margin: 0.25rem 0; border-radius: 1.25rem;
+  transition: background 160ms var(--ease), color 160ms var(--ease), transform 160ms var(--ease);
+}
+.rem-row b, .rem-val b { font-size: 1.75rem; line-height: 2.25rem; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.rem-row i, .rem-val i { font-style: normal; font-size: 1.3125rem; line-height: 1.75rem; color: rgba(255, 255, 255, 0.7); }
+.rem-row.focus, .rem-erow.focus { background: #fff; color: #15121a; transform: scale(1.015); }
+.rem-row.focus i, .rem-erow.focus i, .rem-erow.focus .rem-lbl { color: rgba(21, 18, 26, 0.65); }
+.rem-mic { display: flex; align-items: center; justify-content: center; flex: none; width: 3.25rem; height: 3.25rem; border-radius: 50%; background: rgba(255, 255, 255, 0.14); }
+.rem-row.focus .rem-mic { background: #0a84ff; color: #fff; }
+.rem-mic svg, .rem-bell svg { width: 1.75rem; height: 1.75rem; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.rem-empty, .rem-heard, .rem-msg, .rem-hint, .rem-when { font-size: 1.3125rem; line-height: 1.875rem; color: rgba(255, 255, 255, 0.68); margin: 0.75rem 1.25rem 0; }
+.rem-msg { color: #ffcf8a; }
+.rem-hint { margin-top: 1.25rem; font-size: 1.125rem; color: rgba(255, 255, 255, 0.5); }
+.rem-acts { display: flex; gap: 0.75rem; margin: 0.375rem 1.25rem 0.75rem; }
+.rem-save { justify-content: flex-end; margin-top: 1rem; }
+.rem-btn { padding: 0.75rem 1.75rem; border-radius: 1.5rem; font-size: 1.5rem; line-height: 2rem; font-weight: 700; background: rgba(255, 255, 255, 0.12); }
+.rem-btn.focus { background: #fff; color: #15121a; transform: scale(1.04); }
+.rem-btn.primary.focus { background: #0a84ff; color: #fff; }
+.rem-erow { align-items: flex-start; }
+.rem-lbl { flex: none; width: 8.5rem; padding-top: 0.25rem; font-size: 1.25rem; line-height: 1.75rem; font-weight: 600; color: rgba(255, 255, 255, 0.6); text-transform: uppercase; letter-spacing: 0.06em; }
+.rem-val { flex: 1; font-size: 1.75rem; line-height: 2.25rem; font-weight: 600; }
+.rem-arrows { flex-direction: row; align-items: center; flex-wrap: wrap; gap: 1rem; }
+.rem-arrows i { flex-basis: 100%; }
+.rem-a { font-size: 2.25rem; line-height: 2rem; opacity: 0.55; }
+.rem-erow.focus .rem-a { opacity: 1; }
+.rem-dayrow { flex-wrap: wrap; }
+.rem-cal { display: grid; grid-template-columns: repeat(7, 3.25rem); gap: 0.375rem; margin: 0.5rem 0 0.25rem 9.625rem; }
+.rem-cal span { display: flex; align-items: center; justify-content: center; height: 2.5rem; border-radius: 0.875rem; font-size: 1.25rem; font-weight: 600; }
+.rem-cal .rem-dow { font-size: 1.0625rem; opacity: 0.55; }
+.rem-cal .rem-d.past { opacity: 0.3; }
+.rem-cal .rem-d.today { box-shadow: inset 0 0 0 0.125rem currentColor; }
+.rem-cal .rem-d.sel { background: #0a84ff; color: #fff; }
+.rem-due { text-align: center; }
+.rem-due .rem-save { justify-content: center; }
+.rem-bell { display: inline-flex; align-items: center; justify-content: center; width: 5rem; height: 5rem; margin-bottom: 0.75rem; border-radius: 50%; background: rgba(255, 179, 64, 0.22); color: #ffb340; }
+.rem-bell svg { width: 2.75rem; height: 2.75rem; }
+.rem-due .rem-h { margin-bottom: 0.25rem; }
+.rem-due .rem-when { margin: 0 0 0.5rem; font-size: 1.625rem; }
 
 /* glass, as on the lock screen */
 .theme-night .people, .theme-night .qbtn, .theme-night .grid, .theme-night .ncard {

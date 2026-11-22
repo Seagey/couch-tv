@@ -289,7 +289,9 @@ class RokuTV:
         except (RokuError, TVUnavailable):
             return None
         app = root.find("app")
-        return (app.get("id") or "") if app is not None else ""
+        if app is None or (app.get("type") or "").lower() == "home":
+            return ""   # Roku's own home (Roku OS 16 names it, e.g. id 562859, type "home")
+        return app.get("id") or ""
 
     async def _read_media(self):
         """What query/media-player says about the app in front: playing, paused or nothing. No title."""

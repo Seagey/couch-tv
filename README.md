@@ -352,6 +352,10 @@ gains a permission these tables do not explain.
   screen name, and put couch-tv's home back when the TV opens its own. They read no screen content.
   The Home one declares the screen reading capability only because some TVs (a TCL on Android 12)
   send window events to nothing else.
+- **Home button watch check** (`WatchRepair`, Home): a job Android runs about every 15 minutes, even
+  when the app is not open. Where a computer granted secure settings and the Home button watch is
+  listed as on but not running, it switches the watch back on. A watch you switched off stays off.
+  It reads nothing from the screen.
 - **Home gear button** (`KeyWatch`, Home): an accessibility service you switch on yourself in
   Accessibility. It catches only the remote's gear button.
 - **Spotify playback access** (`SpotifySessionAccess`, Home): a notification listener you switch on yourself
