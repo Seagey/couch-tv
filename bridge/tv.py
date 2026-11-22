@@ -175,6 +175,7 @@ class TV:
         self.picture_cfg = config.picture_cfg(cfg.get("picture"))
         # Wake-on-LAN is tried when a mac is set, unless "wake_on_lan": false.
         self.wake_on_lan = cfg.get("wake_on_lan", True) is not False
+        self.phone_keyboard = cfg.get("phone_keyboard", True) is not False  # false: TV keeps its own on-screen keyboard
         # Per-TV state the server keeps (what is playing, sleep timer, picture mode, ...).
         self.state = {"playing": {"item": None}, "media_now": {}, "seen_playing": {},
                       "sleep": {"ends": None, "handle": None}, "waking": {"on": False},
@@ -331,7 +332,7 @@ class TV:
 
     async def _connect_once(self, ip, timeout=10):
         """One connect attempt to a known address. Raises on failure."""
-        remote = AndroidTVRemote(CLIENT_NAME, CERT, KEY, ip)
+        remote = AndroidTVRemote(CLIENT_NAME, CERT, KEY, ip, enable_ime=self.phone_keyboard)
         remote.add_is_on_updated_callback(self._changed)
         remote.add_is_on_updated_callback(lambda on: self.log.info("TV reports %s", "on" if on else "standby"))
         remote.add_current_app_updated_callback(self._changed)
