@@ -1822,7 +1822,9 @@
     if (wxEl.getAttribute("data-k") !== key) {
       wxEl.setAttribute("data-k", key);
       while (wxEl.firstChild) wxEl.removeChild(wxEl.firstChild);
-      if (w) { var span = document.createElement("span"); [].slice.call(w.childNodes).forEach(function (c) { span.appendChild(c.cloneNode(true)); }); wxEl.appendChild(span); }
+      if (w) { var span = document.createElement("span"); [].slice.call(w.childNodes).forEach(function (c) { span.appendChild(c.cloneNode(true)); }); var lead = span.querySelector(".wx-place");
+        if (lead && lead.firstChild && lead.firstChild.nodeType === 3) lead.firstChild.nodeValue = lead.firstChild.nodeValue.replace(/^\s*\u00b7\s*/, "");
+        wxEl.appendChild(span); }
     }
     if (D && list(D.objects).some(function (o) { o = obj(o); return o.type === "weather" || (o.type === "smart" && o.instead === "bigtemp"); })) objects(D);
   }
