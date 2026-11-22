@@ -151,7 +151,7 @@ When the phone or the setup screen cannot get the TV to press keys, a Can't conn
 - **Sharp pictures on a 4K TV** (Home settings, Look): Auto, Off or Always.
 - **Icon style** (Home settings, Look): the home's own tiles in Standard, Line, Solid, Two tone, Colour tile, Glass or Playful icons.
 - **Keep watching tiles** that lost their picture show the app's banner, or the title.
-- **Keep watching with a computer at home:** Keep watching no longer waits a minute when the computer has lost its link to the TV; it opens the show straight away or says how to fix the link.
+- **Keep watching and Play with a computer at home:** Keep watching and Play no longer wait a minute when the computer has lost its link to the TV. The show opens straight away, or the TV says how to fix the link. Once the link is back, the next show plays the usual way.
 - **Photos from a web link** that cannot show now say why (not found, not a picture, blocked, too big).
 - **Fire TV:** the background comes back after a video link instead of staying black.
 - **A video background that shows green** on some TVs is noticed, and the home goes back to the photo, with Try the video again in Look.
