@@ -40,6 +40,13 @@ class WidgetSettingsBridgeTests(unittest.TestCase):
         one = {"a|news": {"k%d" % i: i for i in range(30)}}
         self.assertEqual(len(server.clean_settings({"widgets": one})["widgets"]["a|news"]), 16)
 
+    def test_base_kept(self):
+        # what the design said for each design-kept setting (app.js wsNewDesign): kept, so a resend that
+        # changes one choice drops only that override
+        b = {"k|clock": {"format": "v1a2b3c"}, "n|news": {"feed": "vzz9"}}
+        self.assertEqual(server.clean_settings({"widgets_base": b})["widgets_base"], b)
+        self.assertNotIn("widgets_base", server.clean_settings({}))
+
 
 if __name__ == "__main__":
     unittest.main()

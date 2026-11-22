@@ -8767,26 +8767,77 @@
   // news source, a clock format) is dropped everywhere; a value kept on the TV (store "tv": a beach, where
   // you drive to) stays, keyed by widget id and kind, so it only ever applies to that same widget again.
   // The same design starting again changes nothing.
+  // The same widgets sent again with a design choice changed (a clock made 24 hour in Studio): the new
+  // choice wins over this TV's override of that one setting; overrides of settings the design left alone
+  // stay (ST.widgets_base keeps what the design said for every design-kept setting, as canon() text).
   // the widgets a design has (their ids and kinds, sorted): moving or restyling a widget is the same design
   var WS_NEW_WAIT = false;
   function wsAfterSync() { if (WS_NEW_WAIT) { WS_NEW_WAIT = false; wsNewDesign(); } }
+  // a value as short text that is the same whatever order its keys came in (unset is ""): a hash of its
+  // sorted JSON, so the copy kept by a computer at home (bridge clean_widget_settings) stays small
+  function wsCanon(v) {
+    if (v === undefined || v === null || v === "") return "";
+    var sort = function (x) {
+      if (Array.isArray(x)) return x.map(sort);
+      if (x && typeof x === "object") { var o = {}; Object.keys(x).sort().forEach(function (k) { o[k] = sort(x[k]); }); return o; }
+      return x;
+    };
+    var s = JSON.stringify(sort(v)), h = 0;
+    for (var i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0;
+    return "v" + (h >>> 0).toString(36);
+  }
+  // { "<id|kind>": { <key>: canon(the design's value) } } for every setting a design keeps (not "tv")
+  // that the design sets; a widget whose design keeps nothing set is left out
+  function wsBase(list) {
+    var C = window.CouchWidgetCaps, out = {};
+    list.forEach(function (w) {
+      var recs = C && C.settings ? C.settings(w.kind) : [], b = {}, any = false;
+      (Array.isArray(recs) ? recs : []).forEach(function (r) {
+        if (!r || !r.key || r.store === "tv") return;
+        var c = wsCanon((w.opts || {})[r.key]);
+        if (c) { b[r.key] = c; any = true; }
+      });
+      if (any) out[w.key] = b;
+    });
+    return out;
+  }
+  function wsSameBase(a, b) {
+    var ka = Object.keys(a).sort(), kb = Object.keys(b).sort();
+    if (ka.join(",") !== kb.join(",")) return false;
+    return ka.every(function (k) {
+      var x = a[k] || {}, y = b[k] || {}, n = Object.keys(x).sort(), m = Object.keys(y).sort();
+      return n.join(",") === m.join(",") && n.every(function (s) { return x[s] === y[s]; });
+    });
+  }
   function wsNewDesign() {
     if (typeof CouchDesign === "undefined" || !CouchDesign.on || !CouchDesign.on() || !CFG.design || !CouchDesign.widgetList) return;
-    var s = CouchDesign.widgetList().map(function (w) { return w.key; }).sort().join(","), h = 0;
+    var wl = CouchDesign.widgetList();
+    var s = wl.map(function (w) { return w.key; }).sort().join(","), h = 0;
     for (var i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0;
-    var mark = String(h), was = ST.widgets_design;
-    if (was === mark) return;
+    var mark = String(h), was = ST.widgets_design, base = wsBase(wl);
+    var oldBase = ST.widgets_base && typeof ST.widgets_base === "object" && !Array.isArray(ST.widgets_base) ? ST.widgets_base : null;
+    if (was === mark && oldBase && wsSameBase(oldBase, base)) return;
     var C = window.CouchWidgetCaps, all = wsAll(), changed = false;
-    if (was !== undefined) Object.keys(all).forEach(function (key) {
+    // which overrides go: a new set of widgets drops every design-kept one (today's rule); the same widgets
+    // with a design choice changed drop only the overrides of that choice; an older TV with no base yet
+    // only learns it and drops nothing
+    var drop = was === undefined ? null : was !== mark ? "all" : oldBase ? "base" : null;
+    if (drop) Object.keys(all).forEach(function (key) {
       var kind = key.split("|")[1] || "", recs = C && C.settings ? C.settings(kind) : [];
       Object.keys(all[key]).forEach(function (k) {
         var r = recs.filter(function (x) { return x && (x.key === k || x.sets === k); })[0];
-        if (!r || r.store !== "tv") { delete all[key][k]; changed = true; }
+        if (r && r.store === "tv") return;
+        if (drop === "base") {
+          var bk = r ? r.key : k, ob = oldBase[key] || {}, nb = base[key] || {};
+          if ((ob[bk] || "") === (nb[bk] || "")) return;
+        }
+        delete all[key][k]; changed = true;
       });
       if (!Object.keys(all[key]).length) delete all[key];
     });
     ST.widgets = all;
     ST.widgets_design = mark;
+    ST.widgets_base = base;
     keepSettings(true);
     if (!OFFLINE && data.bridge !== false) { clearTimeout(pushTimer); pushTimer = setTimeout(function () { pushSettings(kept(ST_KEY)); }, 400); }
     if (changed && CouchDesign.dataChanged) CouchDesign.dataChanged("wset", JSON.stringify(all));

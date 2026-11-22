@@ -3265,6 +3265,11 @@ def clean_settings(s):
     w = clean_widget_settings(s.get("widgets"))
     if w is not None:
         out["widgets"] = w
+    # what the design said for each design-kept widget setting (short hashes), so a resend that changes
+    # only one choice drops only that override
+    b = clean_widget_settings(s.get("widgets_base"))
+    if b is not None:
+        out["widgets_base"] = b
     return out
 
 
