@@ -1065,11 +1065,24 @@ def _link_lost():
     return ApiError(503, LINK_LOST, key="err_tv_link_lost")
 
 
+def _retry_adb_soon():
+    """One background adb reconnect, never waited on (tv.py retry_adb_soon)."""
+    retry = getattr(tv, "retry_adb_soon", None)
+    if retry:
+        try:
+            retry()
+        except Exception as e:
+            log.info("adb reconnect not started: %s %s", type(e).__name__, e)
+
+
 async def _open_link_by_remote(link):
     """adb is down: hand the show's link to the TV over the remote protocol (port 6466), which
-    answers at once. If that link is down too, err_tv_link_lost."""
+    answers at once. A TV that is off or out of reach says so (TVUnavailable, err_tv_not_connected,
+    unchanged); any other failure of that link is err_tv_link_lost."""
     try:
         await tv.open_link(intent_to_link(str(link).replace("'", "")))
+    except TVUnavailable:
+        raise
     except Exception as e:
         log.warning("remote protocol could not open the link either: %s %s", type(e).__name__, e)
         raise _link_lost()
@@ -1081,8 +1094,12 @@ async def play(title, season=None, episode=None, service=None, who=None, resume=
     search's best guess for a name it does not know is a 404 instead of another show.
 
     When the TV's adb is known to be down (adb_lost), nothing waits on adb: the show's link goes over
-    the remote protocol at once, without checking that it plays, or err_tv_link_lost comes back."""
+    the remote protocol at once, without checking that it plays, or err_tv_link_lost comes back
+    (err_tv_not_connected when the TV is off or out of reach). One adb reconnect starts in the
+    background, so the next play uses adb again once the link is back."""
     adb_lost = _adb_lost()
+    if adb_lost:
+        _retry_adb_soon()   # so the next play uses adb again once the link is back
     await installed_packages(wait=not adb_lost)
     best, _ = await finder.find(title)
     if not best or (exact and not (same or finder.same_title)(best["title"], title)):
@@ -1109,6 +1126,7 @@ async def play(title, season=None, episode=None, service=None, who=None, resume=
                 raise ApiError(400, f"unknown service: {service}", key="err_unknown_service", vars={"service": service})
             # Not listed by JustWatch on that service: open it and search.
             if adb_lost:
+                tv.require()   # a TV that is off or out of reach says so, not "lost its link"
                 raise _link_lost()
             method, note = await search_in_app(app, best["title"], best)
             note_key, note_vars = _search_note_fields(method, app, best["title"])
@@ -1151,6 +1169,7 @@ async def play(title, season=None, episode=None, service=None, who=None, resume=
 
     if adb_lost:
         if not (app["deeplink"] == "jw" and link and tv.can_deeplink(app)):
+            tv.require()   # a TV that is off or out of reach says so, not "lost its link"
             raise _link_lost()
         await _open_link_by_remote(link)
         log.info("play %s in %s: opened over the remote protocol (adb is down), not checked", best["title"], app["name"])

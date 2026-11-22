@@ -22,6 +22,8 @@ LINK = "intent://www.netflix.com/title/80117552#Intent;scheme=https;package=com.
 BEST = {"title": "Ozark", "year": 2017, "type": "tv", "jw_id": "ts1", "poster": None, "backdrop": None,
         "providers": [{"service": "netflix", "name": "Netflix", "playable": True, "kind": "flatrate",
                        "deeplink": LINK, "web": "https://www.netflix.com/title/80117552"}]}
+# on that app, but with no link to hand over (only adb could search in the app)
+NO_LINK = dict(BEST, providers=[dict(BEST["providers"][0], deeplink=None, web=None)])
 LINE = {"id": "h-ozark", "title": "Ozark", "type": "tv", "service": "netflix", "season": 2, "episode": 3,
         "who": "person1"}
 
@@ -64,6 +66,33 @@ class AdbKnownDown(unittest.TestCase):
         self.t.adb_ok, self.t.adb_only = False, True
         self.assertFalse(self.t.adb_known_down)
 
+    def test_one_background_reconnect_at_a_time_and_its_error_is_kept_quiet(self):
+        t = self.t
+        saved = t._adb_retry
+        calls = []
+
+        async def connect():
+            calls.append(1)
+            await asyncio.sleep(0.05)
+            raise OSError("no route to host")
+
+        async def go():
+            with patch.object(t, "adb_connect", new=connect):
+                a = t.retry_adb_soon()
+                b = t.retry_adb_soon()   # while the first runs: the same one
+                self.assertIs(a, b)
+                await asyncio.gather(a, return_exceptions=True)
+                c = t.retry_adb_soon()   # after it ended: a new one
+                self.assertIsNot(a, c)
+                await asyncio.gather(c, return_exceptions=True)
+
+        t.adb_only = False
+        try:
+            asyncio.run(go())
+        finally:
+            t._adb_retry = saved
+        self.assertEqual(len(calls), 2)
+
     def test_a_failed_connect_marks_it_and_a_good_one_clears_it(self):
         t = self.t
         t.adb_only, t.adb_ok, t._adb_lost_at = False, False, None
@@ -104,10 +133,12 @@ class ContinueWithAdbDown(unittest.IsolatedAsyncioTestCase):
         server._current.set(self.t.id)
         server.playing["item"] = None
         t = self.t
-        self.saved = {k: getattr(t, k) for k in ("paired", "remote", "connected", "adb_ok", "_adb_lost_at", "adb_only")}
+        self.saved = {k: getattr(t, k) for k in ("paired", "remote", "connected", "adb_ok", "_adb_lost_at", "adb_only", "_adb_retry")}
         t.paired, t.adb_only = True, False
         t.remote = MagicMock()
+        self.retry = MagicMock()   # the background adb reconnect: recorded here, run for real in one test
         self.patches = [
+            patch.object(t, "retry_adb_soon", new=self.retry),
             patch.object(server.finder, "find", new=AsyncMock(return_value=(BEST, None))),
             patch.object(server.finder, "episode_providers", new=AsyncMock(return_value=None)),
             patch.object(server, "push_now"),
@@ -151,10 +182,37 @@ class ContinueWithAdbDown(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(res["note_vars"], {"title": "Ozark", "app": "Netflix"})
         self.assertEqual(res["note"], "Opened the Ozark page in Netflix.")
         self.assertNotIn("started", res)   # not checked, so not claimed
+        self.retry.assert_called_once()     # and adb is tried again in the background, not waited on
 
-    async def test_adb_down_remote_down_says_how_to_fix_the_link_at_once(self):
+    async def test_adb_down_and_the_tv_off_says_not_connected_at_once(self):
+        """The TV is off or out of reach (the remote protocol is down too): that is what it says, not
+        "lost its link", whose advice would be wrong."""
         self.adb_down(remote_up=False)
         with patch.object(self.t, "adb", new=never), patch.object(self.t, "adb_connect", new=never), \
+                patch.object(server, "installed_packages", new=AsyncMock(return_value=None)):
+            started = time.monotonic()
+            with self.assertRaises(server.TVUnavailable) as cm:
+                await self.open_card()
+            took = time.monotonic() - started
+        self.assertLess(took, 2.0)
+        self.assertEqual(cm.exception.key, "err_tv_not_connected")
+        self.t.remote.send_launch_app_command.assert_not_called()
+
+    async def test_adb_down_and_the_tv_off_with_no_link_says_not_connected(self):
+        self.adb_down(remote_up=False)
+        with patch.object(server.finder, "find", new=AsyncMock(return_value=(NO_LINK, None))), \
+                patch.object(self.t, "adb", new=never), patch.object(self.t, "adb_connect", new=never), \
+                patch.object(server, "installed_packages", new=AsyncMock(return_value=None)):
+            with self.assertRaises(server.TVUnavailable) as cm:
+                await self.open_card()
+        self.assertEqual(cm.exception.key, "err_tv_not_connected")
+
+    async def test_adb_down_no_link_says_how_to_fix_the_link_at_once(self):
+        """The TV is on (remote protocol up) but the show has no link to hand over: only adb could open
+        it, so the answer is the fix for adb."""
+        self.adb_down(remote_up=True)
+        with patch.object(server.finder, "find", new=AsyncMock(return_value=(NO_LINK, None))), \
+                patch.object(self.t, "adb", new=never), patch.object(self.t, "adb_connect", new=never), \
                 patch.object(server, "installed_packages", new=AsyncMock(return_value=None)):
             started = time.monotonic()
             with self.assertRaises(server.ApiError) as cm:
@@ -175,6 +233,39 @@ class ContinueWithAdbDown(unittest.IsolatedAsyncioTestCase):
             with self.assertRaises(server.ApiError) as cm:
                 await self.open_card()
         self.assertEqual(cm.exception.key, "err_tv_link_lost")
+
+    async def test_the_background_reconnect_brings_the_next_play_back_to_adb(self):
+        """Someone follows the advice (Network debugging off and on): the reconnect play() started in
+        the background succeeds, and the next press takes the normal adb path."""
+        t = self.t
+        self.adb_down(remote_up=True)
+        self.retry.side_effect = lambda: server.TV.retry_adb_soon(t)
+
+        async def back(*a, **kw):
+            t.adb_ok, t._adb_lost_at = True, None
+            return True
+
+        with patch.object(t, "adb_connect", new=back), patch.object(t, "adb", new=never), \
+                patch.object(t, "start_intent", new=never), \
+                patch.object(server, "installed_packages", new=AsyncMock(return_value=None)):
+            res = json.loads((await self.open_card()).text)
+            self.assertEqual(res["note_key"], "note_opened_title_page")
+            self.assertIsNotNone(t._adb_retry)
+            await t._adb_retry
+        self.assertTrue(t.adb_ok)
+        self.assertFalse(t.adb_known_down)
+        t.remote.send_launch_app_command.reset_mock()
+        start = AsyncMock(return_value="adb")
+        with patch.object(t, "start_intent", new=start), \
+                patch.object(t, "wait_for_app", new=AsyncMock(return_value="com.netflix.ninja")), \
+                patch.object(t, "front_package", new=AsyncMock(return_value="com.netflix.ninja")), \
+                patch.object(server, "get_it_playing", new=AsyncMock(return_value=(True, None))), \
+                patch.object(server, "installed_packages", new=AsyncMock(return_value=None)):
+            res = json.loads((await self.open_card()).text)
+        self.assertEqual(start.await_args.args[0], LINK)
+        t.remote.send_launch_app_command.assert_not_called()
+        self.assertEqual(res["note_key"], "note_playing_in_app")
+        self.assertEqual(self.retry.call_count, 1)   # adb up: no second reconnect
 
     async def test_adb_up_takes_the_same_path_as_before(self):
         t = self.t

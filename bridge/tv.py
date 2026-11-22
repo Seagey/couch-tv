@@ -191,11 +191,12 @@ class TV:
         self._signer = None
         self._task = None
         self._adb_lost_at = None   # monotonic time of the last failed adb connect, None after a good one
+        self._adb_retry = None     # the one background reconnect started by retry_adb_soon
 
     # ---------- state ----------
     # How long a failed adb connect counts as "adb is down" (the bridge retries every few seconds
     # while it is down, so a real outage keeps this fresh; an old failure is tried again).
-    ADB_LOST_FOR = 300.0
+    ADB_LOST_FOR = 60.0
 
     @property
     def adb_known_down(self):
@@ -539,6 +540,21 @@ class TV:
             self._adb_lost_at = time.monotonic()
         self._changed()
         return self.adb_ok
+
+    def retry_adb_soon(self):
+        """Start one adb reconnect in the background, never waited on (a request that found adb down
+        answers at once; after someone switches Network debugging off and on, the next one uses adb
+        again). One at a time: while one runs, this does nothing."""
+        if self.adb_only or (self._adb_retry and not self._adb_retry.done()):
+            return self._adb_retry
+        task = asyncio.ensure_future(self.adb_connect())
+
+        def done(t):
+            if not t.cancelled() and t.exception():
+                self.log.info("adb reconnect: %s %s", type(t.exception()).__name__, t.exception())
+        task.add_done_callback(done)
+        self._adb_retry = task   # kept, so it is not garbage collected while it runs
+        return task
 
     async def adb_ready(self):
         if self.adb_ok:
