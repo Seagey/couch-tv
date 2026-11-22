@@ -35,6 +35,13 @@
   var S = {};
 
   S.en = {
+    welcome_title: "Welcome to Couch TV",
+    welcome_sub: "Choose how your home looks. You can change it any time in Home settings.",
+    welcome_code: "I have a design code",
+    welcome_code_sub: "Type the code you got from Couch TV Studio",
+    welcome_original: "Use Couch Original",
+    welcome_original_sub: "The standard Couch TV home, ready now",
+    welcome_studio: "No code yet? Pick a design on your phone at {site}, or scan this.",
     tw_fb_title: "Football scores",
     tw_fb_full_time: "Full time",
     tw_fb_loading: "Loading scores…",
@@ -1097,6 +1104,13 @@
   };
 
   S["zh-CN"] = {
+    welcome_title: "欢迎使用 Couch TV",
+    welcome_sub: "选择主页的样子。之后随时可以在主页设置中更改。",
+    welcome_code: "我有设计代码",
+    welcome_code_sub: "输入你从 Couch TV Studio 得到的代码",
+    welcome_original: "使用 Couch Original",
+    welcome_original_sub: "标准的 Couch TV 主页，现在就能用",
+    welcome_studio: "还没有代码？用手机在 {site} 挑一个设计，或扫描这个二维码。",
     tw_fb_title: "足球比分",
     tw_fb_full_time: "全场结束",
     tw_fb_loading: "正在加载比分…",
@@ -2158,6 +2172,13 @@
   };
 
   S.cs = {
+    welcome_title: "Vítá vás Couch TV",
+    welcome_sub: "Vyberte, jak bude domovská obrazovka vypadat. Kdykoli to změníte v Nastavení domovské obrazovky.",
+    welcome_code: "Mám kód návrhu",
+    welcome_code_sub: "Zadejte kód, který jste dostali z Couch TV Studio",
+    welcome_original: "Použít Couch Original",
+    welcome_original_sub: "Standardní domovská obrazovka Couch TV, hned připravená",
+    welcome_studio: "Ještě nemáte kód? Vyberte si návrh v telefonu na {site}, nebo naskenujte tento kód.",
     tw_fb_title: "Fotbalové výsledky",
     tw_fb_full_time: "Konec zápasu",
     tw_fb_loading: "Načítání výsledků…",
@@ -2836,6 +2857,13 @@
   };
 
   S.es = {
+    welcome_title: "Te damos la bienvenida a Couch TV",
+    welcome_sub: "Elige cómo se ve tu inicio. Puedes cambiarlo cuando quieras en Ajustes de inicio.",
+    welcome_code: "Tengo un código de diseño",
+    welcome_code_sub: "Escribe el código que te dio Couch TV Studio",
+    welcome_original: "Usar Couch Original",
+    welcome_original_sub: "El inicio estándar de Couch TV, listo ya",
+    welcome_studio: "¿Aún no tienes código? Elige un diseño en tu móvil en {site}, o escanea esto.",
     tw_fb_title: "Resultados de fútbol",
     tw_fb_full_time: "Final",
     tw_fb_loading: "Cargando resultados…",
@@ -3487,6 +3515,8 @@
 
   // Only what Mexico says differently; everything else comes from es.
   S["es-MX"] = {
+    welcome_sub: "Elige cómo se ve tu inicio. Puedes cambiarlo cuando quieras en Configuración de inicio.",
+    welcome_studio: "¿Aún no tienes código? Elige un diseño en tu celular en {site}, o escanea esto.",
     tw_fb_title: "Resultados de futbol",
     tw_fb_full_time: "Final",
     tw_fb_loading: "Cargando resultados…",
@@ -3806,6 +3836,13 @@
   };
 
   S.it = {
+    welcome_title: "Benvenuto in Couch TV",
+    welcome_sub: "Scegli l'aspetto della tua home. Puoi cambiarlo quando vuoi in Impostazioni della home.",
+    welcome_code: "Ho un codice di design",
+    welcome_code_sub: "Inserisci il codice che hai ricevuto da Couch TV Studio",
+    welcome_original: "Usa Couch Original",
+    welcome_original_sub: "La home standard di Couch TV, pronta subito",
+    welcome_studio: "Non hai ancora un codice? Scegli un design dal telefono su {site}, oppure inquadra questo.",
     tw_fb_title: "Risultati di calcio",
     tw_fb_full_time: "Finale",
     tw_fb_loading: "Caricamento risultati…",
@@ -4457,6 +4494,13 @@
 
   // German. The air conditioning words are the ones Home Assistant's German interface uses.
   S.de = {
+    welcome_title: "Willkommen bei Couch TV",
+    welcome_sub: "Wähle, wie dein Startbildschirm aussieht. Du kannst es jederzeit unter Startbildschirm ändern.",
+    welcome_code: "Ich habe einen Designcode",
+    welcome_code_sub: "Gib den Code von Couch TV Studio ein",
+    welcome_original: "Couch Original verwenden",
+    welcome_original_sub: "Der normale Couch TV Startbildschirm, sofort bereit",
+    welcome_studio: "Noch keinen Code? Such dir auf dem Handy unter {site} ein Design aus, oder scanne das hier.",
     tw_fb_title: "Fußballergebnisse",
     tw_fb_full_time: "Abpfiff",
     tw_fb_loading: "Ergebnisse werden geladen…",
@@ -5112,6 +5156,13 @@
   };
 
   S.tr = {
+    welcome_title: "Couch TV'ye hoş geldin",
+    welcome_sub: "Ana ekranının nasıl görüneceğini seç. Ana ekran ayarları'ndan istediğin zaman değiştirebilirsin.",
+    welcome_code: "Tasarım kodum var",
+    welcome_code_sub: "Couch TV Studio'dan aldığın kodu yaz",
+    welcome_original: "Couch Original'ı kullan",
+    welcome_original_sub: "Standart Couch TV ana ekranı, hemen hazır",
+    welcome_studio: "Henüz kodun yok mu? Telefonundan {site} adresinde bir tasarım seç ya da bunu tara.",
     tw_fb_title: "Futbol skorları",
     tw_fb_full_time: "Maç sonu",
     tw_fb_loading: "Skorlar yükleniyor…",
@@ -5762,6 +5813,13 @@
 
   // French. Not in the upstream repo yet; added here so the home speaks French.
   S.fr = {
+    welcome_title: "Bienvenue sur Couch TV",
+    welcome_sub: "Choisissez l'apparence de votre accueil. Vous pourrez la changer à tout moment dans Réglages de l'accueil.",
+    welcome_code: "J'ai un code de design",
+    welcome_code_sub: "Saisissez le code reçu de Couch TV Studio",
+    welcome_original: "Utiliser Couch Original",
+    welcome_original_sub: "L'accueil Couch TV standard, prêt tout de suite",
+    welcome_studio: "Pas encore de code ? Choisissez un design sur votre téléphone sur {site}, ou scannez ceci.",
     tw_fb_title: "Scores de football",
     tw_fb_full_time: "Fin du match",
     tw_fb_loading: "Chargement des scores…",
@@ -6416,6 +6474,13 @@
     video_apple: "Ce lien est sur le serveur vidéo d'Apple, auquel les TV Android ne font pas confiance. Utilise une copie de la vidéo sur un autre serveur.",
   };
   S.nl = {
+    welcome_title: "Welkom bij Couch TV",
+    welcome_sub: "Kies hoe je startscherm eruitziet. Je kunt het altijd wijzigen in Startinstellingen.",
+    welcome_code: "Ik heb een ontwerpcode",
+    welcome_code_sub: "Typ de code die je van Couch TV Studio kreeg",
+    welcome_original: "Couch Original gebruiken",
+    welcome_original_sub: "Het standaard startscherm van Couch TV, meteen klaar",
+    welcome_studio: "Nog geen code? Kies een ontwerp op je telefoon via {site}, of scan dit.",
     tw_fb_title: "Voetbaluitslagen",
     tw_fb_full_time: "Einde wedstrijd",
     tw_fb_loading: "Uitslagen laden…",
@@ -7095,6 +7160,13 @@
 
   // Anything this translation does not have yet speaks English rather than showing a key.
   S["sr-Latn-RS"] = {
+    welcome_title: "Dobro došli u Couch TV",
+    welcome_sub: "Izaberite kako izgleda početni ekran. Možete ga promeniti bilo kada u Podešavanjima početnog ekrana.",
+    welcome_code: "Imam kod dizajna",
+    welcome_code_sub: "Unesite kod koji ste dobili od Couch TV Studio",
+    welcome_original: "Koristi Couch Original",
+    welcome_original_sub: "Standardni Couch TV početni ekran, odmah spreman",
+    welcome_studio: "Još nemate kod? Izaberite dizajn na telefonu na {site}, ili skenirajte ovo.",
     tw_fb_title: "Fudbalski rezultati",
     tw_fb_full_time: "Kraj utakmice",
     tw_fb_loading: "Učitavanje rezultata…",
@@ -7749,6 +7821,13 @@
   // Polish. Words that change with a number (sekundy, minut, zdjęć) never follow the number:
   // "{n} s", "{n} min", "Zdjęcia: {n}".
   S.pl = {
+    welcome_title: "Witaj w Couch TV",
+    welcome_sub: "Wybierz, jak ma wyglądać ekran główny. Zmienisz to w każdej chwili w Ustawieniach ekranu głównego.",
+    welcome_code: "Mam kod projektu",
+    welcome_code_sub: "Wpisz kod otrzymany z Couch TV Studio",
+    welcome_original: "Użyj Couch Original",
+    welcome_original_sub: "Standardowy ekran główny Couch TV, gotowy od razu",
+    welcome_studio: "Nie masz jeszcze kodu? Wybierz projekt na telefonie na {site} albo zeskanuj ten kod.",
     tw_fb_title: "Wyniki piłkarskie",
     tw_fb_full_time: "Koniec meczu",
     tw_fb_loading: "Wczytywanie wyników…",
@@ -8812,6 +8891,13 @@
   for (var fk in S.en) if (!(fk in S.fr)) S.fr[fk] = S.en[fk];
 
     S.he = {
+    welcome_title: "ברוכים הבאים ל-Couch TV",
+    welcome_sub: "בוחרים איך מסך הבית ייראה. אפשר לשנות את זה בכל עת בהגדרות מסך הבית.",
+    welcome_code: "יש לי קוד עיצוב",
+    welcome_code_sub: "מקלידים את הקוד שקיבלתם מ-Couch TV Studio",
+    welcome_original: "שימוש ב-Couch Original",
+    welcome_original_sub: "מסך הבית הרגיל של Couch TV, מוכן עכשיו",
+    welcome_studio: "אין עדיין קוד? בוחרים עיצוב בטלפון באתר {site}, או סורקים את זה.",
     tw_fb_title: "תוצאות כדורגל",
     tw_fb_full_time: "סיום המשחק",
     tw_fb_loading: "טוען תוצאות…",
@@ -9473,6 +9559,13 @@
 
   // Portuguese (Brazil), translated locally from en.
   S.pt = {
+    welcome_title: "Boas-vindas ao Couch TV",
+    welcome_sub: "Escolha como fica sua tela inicial. Você pode mudar quando quiser em Ajustes da tela inicial.",
+    welcome_code: "Tenho um código de design",
+    welcome_code_sub: "Digite o código que você recebeu do Couch TV Studio",
+    welcome_original: "Usar o Couch Original",
+    welcome_original_sub: "A tela inicial padrão do Couch TV, pronta agora",
+    welcome_studio: "Ainda não tem código? Escolha um design no celular em {site}, ou escaneie isto.",
     tw_fb_title: "Placares de futebol",
     tw_fb_full_time: "Fim de jogo",
     tw_fb_loading: "Carregando placares…",
@@ -10134,6 +10227,13 @@
 
   // Arabic (ar). Right to left, like Hebrew. Messages from the bridge stay in English for now.
   S.ar = {
+    welcome_title: "مرحبًا بك في Couch TV",
+    welcome_sub: "اختر شكل شاشتك الرئيسية. يمكنك تغييره في أي وقت من إعدادات الرئيسية.",
+    welcome_code: "لدي رمز تصميم",
+    welcome_code_sub: "اكتب الرمز الذي حصلت عليه من Couch TV Studio",
+    welcome_original: "استخدام Couch Original",
+    welcome_original_sub: "شاشة Couch TV الرئيسية العادية، جاهزة الآن",
+    welcome_studio: "ليس لديك رمز بعد؟ اختر تصميمًا من هاتفك على {site}، أو امسح هذا الرمز.",
     tw_fb_title: "نتائج كرة القدم",
     tw_fb_full_time: "نهاية المباراة",
     tw_fb_loading: "جارٍ تحميل النتائج…",
@@ -10807,6 +10907,13 @@
 
   // Romanian. Bridge error and note keys are still shown in their supplied fallback language.
   S.ro = {
+    welcome_title: "Bine ai venit la Couch TV",
+    welcome_sub: "Alege cum arată ecranul principal. Îl poți schimba oricând din Setările ecranului principal.",
+    welcome_code: "Am un cod de design",
+    welcome_code_sub: "Scrie codul primit de la Couch TV Studio",
+    welcome_original: "Folosește Couch Original",
+    welcome_original_sub: "Ecranul principal standard Couch TV, gata acum",
+    welcome_studio: "Încă nu ai un cod? Alege un design pe telefon la {site} sau scanează asta.",
     tw_fb_title: "Scoruri de fotbal",
     tw_fb_full_time: "Final de meci",
     tw_fb_loading: "Se încarcă scorurile…",

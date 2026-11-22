@@ -2534,3 +2534,40 @@ html.theme-night:not(.theme-loop) .people:not(.focus), html.theme-night:not(.the
   -webkit-backdrop-filter: none; backdrop-filter: none; background: rgba(30, 20, 28, 0.62);
 }
 html.glass.theme-night:not(.theme-loop) .people:not(.focus), html.glass.theme-night:not(.theme-loop) .qbtn:not(.focus) { background: var(--glass-solid); }
+
+/* ---------- the first-run welcome (app.js welcomeStart): a TV never set up opens on this ----------
+   A solid ground, no blur and no animation, so it costs nothing on a Lighter home or an old WebView.
+   Flexbox with margins (no gap, no grid): it lays out the same on Chrome 53. Sizes in rem follow the
+   screen's width, so 1280x720 and 1920x1080 look alike. */
+.welcome {
+  display: none; position: fixed; top: 0; right: 0; bottom: 0; left: 0; z-index: 35;
+  -webkit-box-align: center; align-items: center; -webkit-box-pack: center; justify-content: center;
+  background: radial-gradient(ellipse at 50% 0%, #1d1a26 0%, #0b0b0e 70%); color: var(--text); text-shadow: none;
+}
+.welcome.on { display: -webkit-box; display: flex; }
+.wel-in { width: 76rem; max-width: calc(100vw - 2 * var(--safe-x)); text-align: center; }
+.wel-title { margin: 0; font-size: 4rem; line-height: 4.75rem; font-weight: 680; letter-spacing: -0.02em; }
+.wel-sub { margin: 1rem 0 0; font-size: 1.75rem; line-height: 2.375rem; color: var(--text-2); }
+.wel-picks { display: -webkit-box; display: flex; -webkit-box-pack: center; justify-content: center; margin-top: 4rem; }
+.wpick {
+  display: -webkit-box; display: flex; -webkit-box-orient: vertical; flex-direction: column; -webkit-box-align: start; align-items: flex-start;
+  width: 34rem; min-height: 19rem; margin: 0 1.25rem; padding: 2.5rem; border-radius: 2rem; text-align: left;
+  background: rgba(255, 255, 255, 0.08); box-shadow: inset 0 0 0 0.125rem rgba(255, 255, 255, 0.1);
+  transition: transform 160ms ease, background-color 160ms ease;
+}
+.wpick i { display: -webkit-box; display: flex; -webkit-box-align: center; align-items: center; -webkit-box-pack: center; justify-content: center;
+  width: 5rem; height: 5rem; border-radius: 1.25rem; background: rgba(255, 255, 255, 0.12); }
+.wpick svg { width: 2.75rem; height: 2.75rem; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+.wpick b { display: block; margin-top: auto; padding-top: 2rem; font-size: 2.5rem; line-height: 3rem; font-weight: 650; }
+.wpick small { display: block; margin-top: 0.625rem; font-size: 1.5rem; line-height: 2rem; color: var(--text-2); }
+.wpick.focus { background: #fff; color: #111; transform: scale(1.05); box-shadow: 0 0 0 0.375rem rgba(255, 255, 255, 0.35), 0 1.5rem 3rem rgba(0, 0, 0, 0.5); }
+.wpick.focus i { background: rgba(0, 0, 0, 0.07); }
+.wpick.focus small { color: rgba(0, 0, 0, 0.62); }
+[dir="rtl"] .wpick { text-align: right; }
+.wel-studio { display: -webkit-box; display: flex; -webkit-box-align: center; align-items: center; -webkit-box-pack: center; justify-content: center; margin-top: 4rem; }
+.wel-qr { display: block; flex: none; width: 7.5rem; height: 7.5rem; padding: 0.5rem; border-radius: 0.75rem; background: #fff; }
+.wel-qr svg { display: block; width: 100%; height: 100%; }
+.wel-studio p { margin: 0 0 0 1.75rem; max-width: 40rem; font-size: 1.5rem; line-height: 2.125rem; color: var(--text-2); text-align: left; }
+[dir="rtl"] .wel-studio p { margin: 0 1.75rem 0 0; text-align: right; }
+html.lighter .wpick { transition: none; }
+@media (prefers-reduced-motion: reduce) { .wpick { transition: none; } }
