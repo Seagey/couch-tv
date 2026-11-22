@@ -57,6 +57,16 @@ const NOT_DRAWN = {
   "FA Cup": "a football competition's own name on the scores card (origin/main #299), kept like an app's name"
 };
 const files = ["tv-home/web/app.js", "tv-home/web/design.js", "tv-home/web/design-code.js"];
+// The greeting and short line under the clock (origin/main, home.greeting): shown only while the home
+// speaks English (greetingOn), so its greetings and lines need no tw_ line. Taken from the GREET block
+// up to styleOf, so a new English line anywhere else is still caught.
+const appSrc = fs.readFileSync(path.join(ROOT, "tv-home/web/app.js"), "utf8");
+const gFrom = appSrc.indexOf("  var GREET = {"), gTo = appSrc.indexOf("  function styleOf(");
+ok(gFrom > 0 && gTo > gFrom, "the greeting words are where the test looks for them");
+ok(/HOME\.greeting === true && \/\^en\/i\.test\(/.test(appSrc), "the greeting still shows only in English");
+const ENGLISH_ONLY = new Set([...appSrc.slice(gFrom, gTo).matchAll(/"((?:[^"\\]|\\.)*)"/g)].map((m) => m[1]));
+// an SVG path (a quick button's icon), not words
+const svgPath = (s) => /^M[\d.]/.test(s);
 const left = [];
 let seen = 0;
 for (const f of files) {
@@ -67,7 +77,7 @@ for (const f of files) {
       const s = m[1];
       if (!/^(couch-tv Studio|[A-Z])[\w']*[ ,.:]/.test(s) || s.split(" ").length < 2 && !NOT_DRAWN[s] || /[<>{}=]|\.js|\.png|https?:/.test(s)) continue;
       seen++;
-      if (covered(s) || onPhone(s) || NOT_DRAWN[s]) continue;
+      if (covered(s) || onPhone(s) || NOT_DRAWN[s] || ENGLISH_ONLY.has(s) || svgPath(s)) continue;
       left.push(f + ": " + s);
     }
   }

@@ -31,7 +31,7 @@ relay.stdout.on('data', function (d) {
     if (line === 'HOME') launch(COUCH);
     else if (line === 'LGHOME') launch(LG_HOME);
     else if (line === 'OFF') toast('Home button: LG home. Press Home 3 times to switch back.');
-    else if (line === 'ON') toast('Home button: couch-tv');
+    else if (line === 'ON') toast('Home button: Couch TV');
   }
 });
 relay.on('exit', function (code) {

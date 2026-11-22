@@ -161,6 +161,14 @@ When the phone or the setup screen cannot get the TV to press keys, a Can't conn
 - **Phone remote:** added Next and Previous scene buttons on the phone remote.
 - **Home settings on a slow TV:** Up and Down move the focus in place, with no scroll animation or fade, so presses land on time (#301).
 - **Hisense Google TV:** back on Couch TV after a restart or wake, and Home goes straight to Couch TV with no flash of Google's home (#202, #297). After a cold start the home waits for its own page instead of showing an error page.
+- **Home button watch on the Couch TV home app:** when the TV stops the app and its Home button watch with it, the watch comes back on by itself within about 15 minutes. A watch you switched off stays off (#314).
+- **On-TV app:** holding OK on an app no longer offers Restart app and Quit app, which the on-TV app cannot do (#308).
+- **Fire TV on Fire OS 6 (on-TV app):** an app icon Fire OS 6 cannot draw no longer stops the app, and Home comes back to Couch TV more reliably after switching apps (#315).
+- **Roku OS 16:** Roku's own home is noticed again, so Couch TV comes back on top of it (#307).
+- **More apps:** opening and closing it no longer draws every icon again, and Up from its top row folds it back to the dock first (#303, #304).
+- **Designs:** the weather line no longer starts with a stray dot (#317).
+- **LG:** a loading screen in place of LG's still splash, LG's store as the App Store tile, app icons through the computer at home, and an app that closes straight to an HDMI input reopens Couch TV when `back_to_couch_inputs` is on (#302, #316).
+- **LG Home button Helper:** an optional second app that makes the Magic Remote's Home open Couch TV, with no root. It is off unless you install it and set `home_helper`; tried on one LG so far ([docs/LG.md](docs/LG.md), #316).
 
 ### New on the Couch TV home app on its own (option A), thanks alisalehi02 (#299)
 
@@ -177,6 +185,10 @@ Each is off until you turn it on in config.json:
 - **A way to measure a TV, thanks Gil124** ([#293](https://github.com/Seagey/couch-tv/pull/293)). `tv-home/tools/bench-tv.py` measures frames, memory and cold start; [docs/PERFORMANCE.md](docs/PERFORMANCE.md) has the steps.
 - **Two TVs in sync: review fixes, thanks FromTheGods** ([#295](https://github.com/Seagey/couch-tv/pull/295)).
 - **Bring back an app the home hides:** `home.show_packages`, for example the Google TV app.
+- **Reminders** (#313): a quick button you can add at the top of the home. Say a reminder into the remote's mic, like "call the plumber tomorrow at 6 pm", check the day and time, and it pops up when it is due. Kept on this TV. The reminder words are in English for now.
+- **A greeting under the clock** (#312): in the Night look, a greeting for whoever is watching and a short line under the clock (`home.greeting`, with a gentle or electric style per person in `home.person_styles`). Off unless you turn it on, and only shown when the home is in English.
+- **A slow zoom on the built-in scenes** (#311): the scenery drifts slowly past the clock (`home.scene_zoom`). Off unless you turn it on.
+- **Your own scene clips** (#310): a clip keeps its place when its scene comes back, can play with Lighter home on (`home.scene_clips_lighter`), and pauses after the home's idle time so the TV's screensaver can still start.
 
 ### Files
 
