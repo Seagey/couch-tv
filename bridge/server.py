@@ -1250,7 +1250,8 @@ async def h_webos_icon(request):
     try:
         data, kind = await tv.icon(request.match_info["id"])
     except (ValueError, TVUnavailable, ClientError, asyncio.TimeoutError) as e:
-        raise ApiError(404, str(e))
+        raise ApiError(404, str(e), key=getattr(e, "key", None) or "err_lg_no_icon",
+                       vars=getattr(e, "vars", None) or {"id": request.match_info["id"]})
     return web.Response(body=data, content_type=kind.split(";")[0], headers={"Cache-Control": "max-age=86400"})
 
 

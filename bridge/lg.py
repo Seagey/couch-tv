@@ -572,7 +572,7 @@ class LGTV:
         # Only an icon file on this TV's own address: never a fetch to anywhere else.
         if u.scheme != "https" or u.hostname != self.ip \
                 or not u.path.startswith("/resources/") or ".." in u.path:
-            raise ValueError(f"the TV lists no icon for {lid}")
+            raise messages.with_key(ValueError(f"the TV lists no icon for {lid}"), "err_lg_no_icon", id=lid)
         s = await self._http()
         async with s.get(url, ssl=False, allow_redirects=False) as r:
             data = b""
@@ -585,7 +585,7 @@ class LGTV:
         # The TV sends no Content-Type (an OLED B5, webOS 11.2), so the bytes decide.
         kind = "image/png" if data.startswith(b"\x89PNG") else "image/jpeg" if data.startswith(b"\xff\xd8") else None
         if not kind:
-            raise ValueError(f"the TV has no icon for {lid} ({r.status})")
+            raise messages.with_key(ValueError(f"the TV has no icon for {lid} ({r.status})"), "err_lg_no_icon", id=lid)
         self._icons[lid] = (data, kind)
         return self._icons[lid]
 
