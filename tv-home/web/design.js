@@ -2687,7 +2687,9 @@
     // a sheet over the home: a folder opened full screen, or the hold OK menu. The remote stays in it.
     function openSheet(title, items, hint) {
       closeSheet();
-      var el = h("div", "cw-sheet", { transform: "scale(" + innerWidth / 1920 + ")" }, [h("h2", "", null, [title])]);
+      // a menu (cw-msheet): a solid backdrop and rows that fit 1080 with the title and the hint (launch audit, 24 Nov
+      // 2026: on a Studio design the big clock showed through the rows, and the title and hint were cut off)
+      var el = h("div", "cw-sheet" + (items.menu ? " cw-msheet" : ""), { transform: "scale(" + innerWidth / 1920 + ")" }, [h("h2", "", null, [title])]);
       // a line to read, never a stop for the remote (a widget with nothing to set on the TV)
       if (items.note) el.appendChild(h("div", "cw-hint cw-note", { margin: "-24px 0 40px" }, [items.note]));
       var row = h("div", items.menu ? "cw-menu" : "cw-sheet-apps", null, items.nodes);
@@ -2719,7 +2721,8 @@
       // that sends one more OK) lands on settings, never on a widget's own page (a clock's Timers)
       var nodes = [mk("Settings", "gear"), mk("All apps", "more"), mk("Smart home", "smart")];
       var layer = w && w.getAttribute("data-detail");
-      if (layer && window.CouchDetail) { var op = mk("Open " + (window.CouchDetail.title(layer) || "this widget"), "detail"); op.__root = w; nodes.splice(2, 0, op); }
+      // an app folder's own layer is every app again: "All apps" is already here, so no "Open Apps" beside it
+      if (layer && layer !== "folder" && window.CouchDetail) { var op = mk("Open " + (window.CouchDetail.title(layer) || "this widget"), "detail"); op.__root = w; nodes.splice(2, 0, op); }
       // an app in a dock, row, folder or app tile: change, move or remove it, or add one (kept on this TV)
       var ctx = EDIT = appCtx();
       if (ctx) {

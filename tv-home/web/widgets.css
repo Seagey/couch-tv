@@ -147,6 +147,13 @@ html.cd-wmode #grid .app.focus { outline: none; }
 .cw-sheet .cw-hint { margin-top: 40px; font-size: 25px; color: rgba(255, 255, 255, 0.72); }
 .cw-menu .cw-mi { width: 640px; padding: 26px 34px; margin: 10px 0; border-radius: 28px; font-size: 34px; font-weight: 650; background: rgba(255, 255, 255, 0.1); }
 .cw-menu .cw-mi.cw-ifocus { background: #fff; color: #111; outline: none; }
+/* the hold OK menu (design.js openSheet, items.menu): solid, so nothing on the home (a big clock) shows through on a TV
+   without backdrop blur, and compact, so the title, up to nine rows and the hint all fit on a 1080 screen */
+.cw-sheet.cw-msheet { background: rgb(10, 11, 15); -webkit-backdrop-filter: none; backdrop-filter: none; padding: 40px 0; box-sizing: border-box; }
+.cw-sheet.cw-msheet h2 { font-size: 44px; margin: 0 0 24px; max-width: 1600px; text-align: center; }
+.cw-sheet.cw-msheet .cw-menu .cw-mi { padding: 16px 34px; margin: 6px 0; font-size: 30px; background: rgb(40, 42, 50); }
+.cw-sheet.cw-msheet .cw-menu .cw-mi.cw-ifocus { background: #fff; color: #111; }
+.cw-sheet.cw-msheet .cw-hint { margin-top: 22px; max-width: 1600px; text-align: center; }
 /* Add apps (design.js appSheet): every app on this TV, seven across, the picked ones numbered in their
    order; the focus is a thick white ring with a dark gap, so it reads on any icon colour from the couch */
 .cw-appsheet { -webkit-align-items: flex-start; align-items: flex-start; padding: 0 160px; box-sizing: border-box; }
