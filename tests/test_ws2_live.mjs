@@ -252,6 +252,8 @@ const phone = await ctx.newPage();
 phone.errors = []; phone.on("pageerror", (e) => phone.errors.push(String(e)));
 await phone.goto(ORIGIN + "/setup#pin=482913");
 await phone.waitForFunction(() => window.couchTv && window.couchTv.token());
+// (23 Nov) the phone opens on Widgets on your screen; the list these checks use is under More settings
+await phone.waitForFunction(() => document.body.classList.contains("gal"), null, { timeout: 8000 }).then(() => phone.click("#g-more"), () => {});
 await phone.waitForFunction(() => document.getElementById("widgets").style.display === "", null, { timeout: 10000 });
 {
   const titles = await phone.evaluate(() => [...document.querySelectorAll("#w-list details.wbox summary")].map((e) => e.textContent));
@@ -280,7 +282,8 @@ const ESPN_TODAY = LIVE ? null : { nrl: "Roosters", afl: "Sydney Swans", epl: "M
   t = await waitW(tvp, "sp", "Geelong", "Only my team");
   ok(!/Fremantle|Hawthorn/.test(t), "Only my team: Geelong's game only: " + t.slice(0, 200));
   r = await edit(tvp, "sp|sports", { team: null });
-  t = await waitW(tvp, "sp", "Pick your team", "Only my team with no team");
+  // (23 Nov: the widget names itself and asks for its team on the phone: "Your team's games", Set up on your phone)
+  t = await waitW(tvp, "sp", "Your team's games", "Only my team with no team");
   // the phone's own select for Your team, the way a person picks it
   await phone.evaluate(() => window.couchTv && null);
   r = await edit(tvp, "sp|sports", { league: "epl", team: "Manchester City", games: "live" });

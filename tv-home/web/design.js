@@ -1565,7 +1565,34 @@
       // each widget's own settings on this TV, by its id (app.js data().wset); none in the designer or a preview
       wset: DESIGNER || PREVIEW || FORCE_DEMO || DEMO_ON ? null : (data && data.wset) || null,
       clock24: hooks.clock24 ? hooks.clock24() : false, ha: !!(window.smartHome && window.smartHome.enabled && window.smartHome.enabled()), rooms: LIVE.rooms,
-      icon: function (name, size, set) { return icon(name, size, set); }, colour: colour, imgOk: imgOk };
+      icon: function (name, size, set) { return icon(name, size, set); }, colour: colour, imgOk: imgOk,
+      // a widget waiting for its town, photos or calendar shows the phone page's code (widgets.js
+      // setupFace): whether this home has that page, its address with the pairing code, and a way to ask
+      phone: !DESIGNER && !PREVIEW && typeof hooks.phoneLink === "function" && !!window.TVQR, phoneUrl: PLINK.url, wantPhone: askPhone };
+  }
+  // The phone page's address with its pairing code, kept while a widget on screen shows it as a code
+  // (asked again every 60 s while one is there; the code changes every few minutes): a new one draws
+  // the widgets again. Never in the designer or a preview.
+  var PLINK = { url: "", at: 0, busy: false };
+  var PLINK_RE = /^http:\/\/([^\/#?]+)(\/setup(?:\?tv=[A-Za-z0-9_-]+)?)#pin=(\d{6})$/;
+  function askPhone() {
+    if (PLINK.busy || DESIGNER || PREVIEW || typeof hooks.phoneLink !== "function" || Date.now() - PLINK.at < 5000) return;
+    PLINK.busy = true; PLINK.at = Date.now();
+    var done = function (u) {
+      PLINK.busy = false;
+      u = PLINK_RE.test(u || "") ? u : "";
+      if (u !== PLINK.url) { PLINK.url = u; if (D && ON) objects(D); }
+    };
+    try { hooks.phoneLink().then(done, function () { done(""); }); } catch (e) { done(""); }
+  }
+  if (typeof setInterval === "function") setInterval(function () { if (D && ON && document.querySelector('.cw[data-face="1"]') && Date.now() - PLINK.at >= 60000) askPhone(); }, 10000);
+  // the phone page at one widget, and at its step when it needs one (setup.html #widget=, &connect=)
+  function phoneAt(id, need) {
+    return hooks.phoneLink().then(function (u) {
+      if (!PLINK_RE.test(u || "")) throw new Error("no phone page");
+      if (u !== PLINK.url) { PLINK.url = u; PLINK.at = Date.now(); }
+      return u + (id ? "&widget=" + encodeURIComponent(id) : "") + (need ? "&connect=" + need : "");
+    });
   }
 
   // ---------------- smart home widgets ----------------
@@ -2055,6 +2082,24 @@
     if (ak !== appsKey && hooks.apps) { appsKey = ak; hooks.apps(); }
     tiles();
     tell("couchtv:applied");
+    setupSoon();
+  }
+  // A design that just arrived with widgets waiting for something private (a town, photos, a calendar):
+  // one card for 2 minutes, "Set up your widgets" and the code that opens the phone page at the first of
+  // them (setup.html #widgets). Once per design on this TV; Back closes it. Only where the phone page exists.
+  var SETUP_SEEN = "couchtv.design.setupcard", setupT = null;
+  function setupSoon() {
+    clearTimeout(setupT);
+    if (DESIGNER || PREVIEW || typeof hooks.phoneLink !== "function" || !window.TVQR) return;
+    var hk = hashOf(D);
+    if (store(SETUP_SEEN) === hk) return;
+    // the widgets' data (the town, photos) comes in a moment after the design: look once it has
+    setupT = setTimeout(function () {
+      if (!(D && ON) || hashOf(D) !== hk || !document.querySelector('.cw[data-face="1"]')) return;
+      if (NAV.sheetOpen() || (window.CouchDetail && window.CouchDetail.isOpen()) || ASK) return;
+      store(SETUP_SEEN, hk);
+      NAV.setupCard();
+    }, 4000);
   }
 
   function clear() {
@@ -2569,6 +2614,7 @@
       if (what === "detail" || what === "folder") { openDetail(el); return; }
       if (what === "menu") { holdMenu(); return; }
       if (what === "wphone" && !DESIGNER) { phoneSheet(arg); return; }
+      if (what === "wtv" && !DESIGNER) { tvEdit(arg); return; }
       if (what === "gear") tipUsed();
       if (what === "edit" || what === "pick") { edit(what === "pick" ? "pick" : arg, arg); return; }
       if (what === "addapp" && !DESIGNER) { EDIT = appCtx(); if (EDIT) picker("add"); return; }
@@ -2583,7 +2629,16 @@
         act: function (what, arg) { if (DESIGNER) { try { window.parent.postMessage({ type: "couchtv:open", name: String(arg || what) }, location.origin); } catch (x) {} return; } if (hooks.act) hooks.act(what, arg); },
         ha: hooks.ha && !DESIGNER ? function (a, e, v) { return hooks.ha(a, e, v); } : null,
         // Hold OK on an app inside a folder's full screen layer: the same menu as on the widget, for that app
-        hold: DESIGNER ? null : function (slot) { FORCE_SLOT = slot; holdMenu(); FORCE_SLOT = null; } };
+        hold: DESIGNER ? null : function (slot) { FORCE_SLOT = slot; holdMenu(); FORCE_SLOT = null; },
+        // a widget's setup layer: the phone page's code at its step, and "No phone? Set it up here"
+        phone: !DESIGNER && typeof hooks.phoneLink === "function" && window.TVQR ? phoneAt : null,
+        tvEdit: DESIGNER ? null : function (id) { if (window.CouchDetail) window.CouchDetail.close(true); tvEdit(id); } };
+    }
+    // the TV's own page for a widget (Home settings, the widget's page), else Home settings itself
+    function tvEdit(id) {
+      var Caps = window.CouchWidgetCaps, mine = widgetList().filter(function (x) { return x.id === id; })[0];
+      var has = mine && Caps && Caps.settings && Caps.settings(mine.kind).some(function (s) { return s && s.pre === true && (!Array.isArray(s.where) || s.where.indexOf("tv") >= 0); });
+      if (hooks.act) hooks.act(has ? "wset" : "gear", has ? mine.key : "");
     }
     function openDetail(el) {
       var root = el;
@@ -2641,65 +2696,85 @@
         // Settings stays first on an app too: one more OK from the hold lands on Settings, never on Change app
         nodes = [nodes[0]].concat(eds, nodes.slice(1));
       }
-      // the widget's own settings (widget-caps.js settings, docs/WIDGET-SETTINGS-CONTRACT.md), right after
-      // Settings: "Edit on the TV" opens its page in Home settings (app.js), and "Edit on your phone" shows
-      // a QR code that opens the phone's Home settings page at this widget, already paired. Only where that
-      // page exists (hooks.phoneLink: the on-TV app, the home computer for a TV it runs, the Couch TV home
-      // app's own page with no computer); anywhere else, Edit on the TV alone. A smart stack: the widget showing in it now. Every kind, so a
-      // widget with nothing to set says so in a line, never with an item that does nothing.
-      var pw = w, Caps = window.CouchWidgetCaps, note = "";
+      // the widget's own settings (widget-caps.js settings, docs/WIDGET-SETTINGS-CONTRACT.md). Where the
+      // phone page exists (hooks.phoneLink: the on-TV app, the home computer for a TV it runs, the Couch TV
+      // home app's own page) it comes first (owner, 23 Nov 2026: set widgets up on the phone, not the TV):
+      // "<Widget>: set up on your phone" for a widget waiting for something private, else "Edit on your
+      // phone", each a QR code with "No phone? Set it up here" under it. Anywhere else "Edit on the TV",
+      // right after Settings. A smart stack: the widget showing in it now. A widget with nothing to set
+      // says so in a line, never with an item that does nothing.
+      var pw = w, Caps = window.CouchWidgetCaps, note = "", after = 0;
       while (pw && !(pw.getAttribute && pw.getAttribute("data-obj"))) pw = pw.parentNode;
       var pid = pw && pw.getAttribute("data-obj");
       if (pid && !DESIGNER && Caps && Caps.settings) {
         var wid = w && typeof w.__at === "function" && w.getAttribute("data-kind") === "stack" ? pid + "/" + w.__at() : pid;
         // only a widget with a setting the TV or the phone offers now (pre: true), as Home settings lists them
         var mine = widgetList().filter(function (x) { return x.id === wid && Caps.settings(x.kind).some(function (s) { return s && s.pre === true && (!Array.isArray(s.where) || s.where.indexOf("tv") >= 0 || s.where.indexOf("phone") >= 0); }); })[0];
-        if (mine) {
-          var eds2 = [mk("Edit on the TV", "wset", mine.key)];
-          if (typeof hooks.phoneLink === "function" && window.TVQR) eds2.push(mk("Edit on your phone", "wphone", mine.id));
-          nodes.splice.apply(nodes, [1, 0].concat(eds2));
-        } else if (widgetList().some(function (x) { return x.id === wid; })) note = "Nothing to set for this widget on the TV. Change how it looks in couch-tv Studio.";
+        var known = widgetList().filter(function (x) { return x.id === wid; })[0];
+        var faceEl = w && w.getAttribute("data-face") ? w : w && w.querySelector ? w.querySelector('.cw-slot.on [data-face="1"]') : null, need = faceEl ? faceEl.getAttribute("data-need") || "" : "";
+        if (typeof hooks.phoneLink === "function" && window.TVQR && known && (mine || need)) {
+          var nm = (Caps.get(known.kind) || {}).name || known.kind;
+          nodes.unshift(mk(need ? nm + ": set up on your phone" : "Edit on your phone", "wphone", known.id + "|" + need));
+        } else if (mine) {
+          nodes.splice(1, 0, mk("Edit on the TV", "wset", mine.key)); after = 1;
+        } else if (known) note = "Nothing to set for this widget on the TV. Change how it looks in couch-tv Studio.";
       }
       // a smart stack: its own settings (when it moves on) after the widget showing in it
       if (pid && !DESIGNER && Caps && Caps.settings && wid !== pid && widgetList().some(function (x) { return x.id === pid && x.kind === "stack"; }) &&
         Caps.settings("stack").some(function (s) { return s && s.pre === true; })) {
-        nodes.splice(nodes.indexOf(nodes.filter(function (n) { return n.getAttribute("data-act") === "gear"; })[0]) + 1 + (mine ? eds2.length : 0), 0, mk("Edit the stack on the TV", "wset", pid + "|stack"));
+        nodes.splice(nodes.indexOf(nodes.filter(function (n) { return n.getAttribute("data-act") === "gear"; })[0]) + 1 + after, 0, mk("Edit the stack on the TV", "wset", pid + "|stack"));
         // the stack itself has something to set: only the widget showing now has nothing
         if (!mine) note = "Nothing to set for the widget showing now.";
       }
       openSheet(ctx && typeof ctx.slot === "number" ? (ctx.name || "App") : "Home", { menu: true, nodes: nodes, note: note }, "Back to close. Settings here is Couch TV's own: the remote's Settings button opens the TV's menu.");
     }
-    // Edit on your phone: a QR code with the phone's Home settings page, the pairing code and this widget
-    // (http://<tv>:5400/setup#pin=NNNNNN&widget=<id>). The phone page opens Widgets on this TV at it; the
-    // phone takes only the pin out of the address (shim.js). A computer has no camera: the address and the
-    // code to type are under it.
-    function phoneSheet(id) {
+    // Set up on your phone: a QR code with the phone's Home settings page, the pairing code, this widget
+    // and its step (http://<tv>:5400/setup#pin=NNNNNN&widget=<id>&connect=<need>), then "No phone? Set it
+    // up here" for a home with no phone to hand (the widget's page in Home settings). The phone takes only
+    // the pin out of the address (shim.js).
+    function phoneSheet(arg) {
       closeSheet();
+      var parts = String(arg || "").split("|"), id = parts[0], need = parts[1] || "";
       var fail = function () { say("The phone page is not ready on this TV. Use Edit on the TV instead."); };
       if (typeof hooks.phoneLink !== "function" || !window.TVQR) { fail(); return; }
-      hooks.phoneLink().then(function (url) {
-        // the TV itself, or the home computer for a TV it runs (with ?tv= when it runs more than one)
-        var m = /^http:\/\/([^\/#?]+)(\/setup(?:\?tv=[A-Za-z0-9_-]+)?)#pin=(\d{6})$/.exec(url || "");
-        if (!m) { fail(); return; }
-        var link = url + "&widget=" + encodeURIComponent(id), box = h("div", "cw-qr", { background: "#fff", padding: "24px", "border-radius": "24px", display: "inline-block" }, []);
+      phoneAt(id, need).then(function (link) {
+        var box = h("div", "cw-qr", { background: "#fff", padding: "24px", "border-radius": "24px", display: "inline-block" }, []);
         try { box.appendChild(window.TVQR.svg(link, 420)); } catch (e) { fail(); return; }
         box.setAttribute("data-link", link);
-        openSheet("Edit on your phone", { nodes: [box] }, "Scan with your phone's camera: it opens this widget's settings, already paired. Or on a computer: " +
-          m[1] + m[2] + ", code " + m[3].slice(0, 3) + " " + m[3].slice(3) + ". Back to close.");
+        var here = h("div", "cw-mi", null, ["No phone? Set it up here"]);
+        here.setAttribute("data-act", "wtv"); here.setAttribute("data-arg", id); here.setAttribute("data-name", "No phone? Set it up here");
+        openSheet("Set up on your phone", { menu: true, nodes: [box, here] });
+        // the code, the one line under it, then the small way for a home with no phone (a stop like the code)
+        if (sheet) { sheet.el.classList.add("cw-phone"); box.parentNode.insertBefore(h("div", "cw-hint", { margin: "28px 0 36px" }, ["Scan with your phone camera."]), here); }
         if (!sheet) return;
-        sheet.phone = id;   // drawn again when the code changes (phoneAgain)
+        sheet.phone = arg;   // drawn again when the code changes (phoneAgain)
         // and asked again every 20 s while it is open: a code that changed or ran out is never left on show
-        var mine = sheet;
+        var mine = sheet, url = link;
         (function again() {
           setTimeout(function () {
             if (sheet !== mine) return;
-            hooks.phoneLink().then(function (u2) {
+            phoneAt(id, need).then(function (u2) {
               if (sheet !== mine) return;
-              if (u2 !== url) phoneSheet(id); else again();
-            }, function () { if (sheet === mine) phoneSheet(id); });
+              if (u2 !== url) phoneSheet(arg); else again();
+            }, function () { if (sheet === mine) phoneSheet(arg); });
           }, 20000);
         })();
       }, fail);
+    }
+    // the card a new design brings when its widgets need setting up (setupSoon): 2 minutes, Back closes it
+    function setupCard() {
+      phoneAt("", "").then(function (u) {
+        var link = u + "&widgets", box = h("div", "cw-qr", { background: "#fff", padding: "24px", "border-radius": "24px", display: "inline-block" }, []);
+        try { box.appendChild(window.TVQR.svg(link, 420)); } catch (e) { return; }
+        box.setAttribute("data-link", link);
+        if (sheet && !sheet.arrive) return;   // something else opened meanwhile: leave it be
+        openSheet("Set up your widgets", { nodes: [box] }, "Scan with your phone camera.");
+        if (!sheet) return;
+        sheet.el.classList.add("cw-arrive");
+        sheet.arrive = true; sheet.phone = "arrive";
+        var mine = sheet;
+        setTimeout(function () { if (sheet === mine) closeSheet(); }, 120000);
+      }, function () {});
     }
     // ---- changing a container's apps with the remote ----
     var EDIT = null, MOVING = null, FORCE_SLOT = null;
@@ -2877,7 +2952,9 @@
       moving: function () { return !!MOVING; },
       sheetOpen: function () { return !!sheet; },
       // the phone code changed (the on-TV app, Auth.onPin): an open Edit on your phone draws its new QR
-      phoneAgain: function () { if (sheet && sheet.phone) phoneSheet(sheet.phone); },
+      phoneAgain: function () { if (document.querySelector('.cw[data-face="1"]')) { PLINK.at = 0; askPhone(); } if (sheet && sheet.phone) { if (sheet.arrive) setupCard(); else phoneSheet(sheet.phone); } },
+      // a design that needs setting up has just arrived: "Set up your widgets" and the phone page's code
+      setupCard: function () { setupCard(); },
       back: function () { if (window.CouchDetail && window.CouchDetail.isOpen()) { window.CouchDetail.close(); return true; } if (sheet) { closeSheet(); return true; } return false; },
       detail: function () { var t = target(); if (t) openDetail(t); },
       // the designer's Remote path: from every stop, where each press goes
@@ -2947,6 +3024,16 @@
     },
     // every widget on the home now, a stack's widgets too: [{ key: "<id>|<kind>", id, kind, label, x, y, w, h }]
     widgetList: function () { return widgetList(); },
+    // the phone's "Widgets on your screen": the design's look and each widget as the design has it (its box,
+    // opts and style, a stack's items), so the phone can draw the same widget. Only what the design holds.
+    screen: function () {
+      if (!(D && ON)) return null;
+      var cp = function (x) { return JSON.parse(JSON.stringify(x === undefined ? null : x)); };
+      return { look: cp(obj(D.look)), widgets: list(D.objects).map(obj).filter(function (o) { return o.type === "widget" && o.kind; }).map(function (o) {
+        return { id: o.id, kind: o.kind, x: +o.x || 0, y: +o.y || 0, w: +o.w || 0, h: +o.h || 0, opts: cp(obj(o.opts)), style: cp(obj(o.style)),
+          items: o.kind === "stack" ? list(o.items).map(function (it) { it = obj(it); return { kind: it.kind, opts: cp(obj(it.opts)), style: cp(obj(it.style)) }; }) : undefined };
+      }) };
+    },
     // the design's containers of apps, and changing one's apps the way Hold OK does (null: its own apps again)
     appWidgets: function () { return appWidgets(); },
     setApps: function (key, keys) {

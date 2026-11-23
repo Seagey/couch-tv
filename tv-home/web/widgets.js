@@ -625,6 +625,59 @@
     root.setAttribute("data-setup", kind);
     return empty(root, b, iconName, c.line, c.sub);
   }
+  // A widget that needs something private set up (owner, 23 Nov 2026): its name, one short line of what
+  // it shows, then "Set up on your phone" and a code the phone camera opens at this widget's step
+  // (setup.html #widget=<id>&connect=<need>). Never a list of TVs, steps or a paragraph. On a home with no
+  // phone page, OK on it opens the same card with "No phone? Set it up here" (widget-detail.js).
+  var ICON_OF_NEED = { town: "partly-cloudy", photos: "picture", calendar: "calendar", spotify: "music", wifi: "wifi", text: "edit", team: "tv", ha: "home" };
+  function needFor(o, env, root) {
+    var C = window.CouchWidgetCaps, own = root.getAttribute("data-need"), n = own || (C && C.setupNeed ? C.setupNeed(o.kind) : null), d = dataOf(env);
+    if (!n || (n === "team" && !own)) return null;
+    // a town or photos that are there already: the widget is only waiting for its data, never "set up"
+    if (n === "town" && ((d.place && coord(d.place.lat) && coord(d.place.lon)) || placeVal(tvSet(o, env, "place")))) return null;
+    if (n === "photos" && op(o).image) return null;
+    // the rest only from the setup card itself (soon): a calendar that is set but did not answer keeps its own words
+    if (n !== "town" && !own && !root.getAttribute("data-setup")) return null;
+    return n;
+  }
+  function phoneLink(o, env, need) {
+    var u = env && typeof env.phoneUrl === "string" ? env.phoneUrl : "";
+    if (!/^http:\/\/[^\s#]+#pin=\d{6}$/.test(u) || o.id === undefined || o.id === null) return "";
+    return u + "&widget=" + encodeURIComponent(String(o.id)) + "&connect=" + need;
+  }
+  function setupFace(root, b, o, env, need) {
+    var C = window.CouchWidgetCaps, f = (C && C.face && C.face(o.kind)) || { name: o.kind, line: "" }, phone = !!env.phone;
+    var tiny = b.h < 220 || b.w < 300, strip = b.h < 200 && b.w >= 300, wide = b.w >= 600 && b.h >= 300, tall = !wide && b.h >= 420 && b.w >= 300;
+    empty(root, b, "info", "", "");
+    while (root.childNodes.length > (root.firstChild && root.firstChild.className === "cw-bg" ? 1 : 0)) root.removeChild(root.lastChild);
+    root.classList.add("cw-face");
+    // on a coloured tile the call to action takes the tile's ink (yellow on a yellow note would vanish)
+    if (root.style.getPropertyValue && root.style.getPropertyValue("--tile")) root.classList.add("cw-face-tile");
+    root.setAttribute("data-setup", o.kind); root.setAttribute("data-need", need); root.setAttribute("data-face", "1");
+    var iconName = ICON_OF_NEED[need] || "info", go = phone ? "Set up on your phone" : "Press OK to set it up";
+    var link = phone ? phoneLink(o, env, need) : "";
+    if (phone && !link && env.wantPhone) try { env.wantPhone(); } catch (e) {}
+    var name = E("div", "cw-f1", "", [f.name]), line = f.line ? E("div", "cw-f2", "", [f.line]) : null, cta = E("div", "cw-f3", "", [go]);
+    var qr = function (size) {
+      if (!link || size < 120) return null;
+      var n = qrNode(link, size - 28);
+      if (!n) return null;
+      var box = E("div", "cw-fqr", "width:" + px(size) + ";height:" + px(size), [n]);
+      box.setAttribute("data-link", link);
+      return box;
+    };
+    if (strip) { add(root, E("div", "cw-row", "height:100%;justify-content:center", [ic(iconName, 40, "currentColor"), E("div", "cw-col", "margin-left:18px;min-width:0", [name, cta])])); root.classList.add("cw-strip"); return root; }
+    if (tiny) { add(root, [ic(iconName, 34, "currentColor"), name, cta]); root.classList.add("cw-tiny"); return root; }
+    if (wide) {
+      var q = qr(Math.min(b.h - 56, 320, Math.round(b.w * 0.45)));
+      add(root, E("div", "cw-row", "width:100%;height:100%;justify-content:center", [E("div", "cw-col", "min-width:0;flex:0 1 auto;align-items:flex-start;text-align:left", [ic(iconName, 46, "currentColor"), name, line, cta]),
+        q ? E("div", "", "flex:none;margin-left:36px", [q]) : null]));
+      return root;
+    }
+    var q2 = tall ? qr(Math.min(b.h - 230, b.w - 56, 300)) : null;
+    add(root, [ic(iconName, 40, "currentColor"), name, line, q2 ? E("div", "", "margin-top:16px", [q2]) : null, cta]);
+    return root;
+  }
   function live(root, every, fn) { REG.push({ el: root, every: every, at: 0, fn: fn }); startTick(); }
   function startTick() {
     if (TICK) return;
@@ -1243,6 +1296,7 @@
   // white on whatever was behind (white on a light look's beige): a dark panel under them, always readable
   function noPhotos(root, b) {
     empty(root, b, "picture", "Add your photos on the TV", "Settings (hold OK), Home settings, Your photos");
+    root.setAttribute("data-setup", root.getAttribute("data-kind") || "photo");
     var bg = null;
     for (var i = 0; i < root.childNodes.length; i++) if (root.childNodes[i].className === "cw-bg") bg = root.childNodes[i];
     if (!bg) { bg = E("div", "cw-bg"); root.insertBefore(bg, root.firstChild); }
@@ -2148,7 +2202,7 @@
   }
   R.battery = function (root, o, b, env) {
     var bt = batteriesOf(env);
-    if (!bt) return empty(root, b, "bolt", "Batteries show on a Google TV, Android TV or Fire TV", "Only Android shares the charge of paired remotes");
+    if (!bt) return empty(root, b, "bolt", "Not on this TV", "");
     if (bt.need === "permission") return soon(root, b, "bolt", "battery");
     if (!bt.devices || !bt.devices.length) return empty(root, b, "bolt", "No charge to show", "Paired remotes and controllers that report their charge show here");
     var low = +setting(o, env, "low", 20);
@@ -2452,7 +2506,7 @@
     var known = team && WW && !env.demo ? WW.teamOf(team, v) : null, wrong = !!team && !!WW && !env.demo && !known && !!(v.teams && v.teams.length >= 4);
     var tname = known ? known.short || known.name : team, realIn = id === "cricket" ? "cricket" : real;
     if (mode !== "all" && !team) mode = mode === "mine" ? "nomine" : mode;
-    if (mode === "nomine") { webEmpty(root, b, "tv", "Pick your team", "This widget shows only your team's games: pick it in this widget's settings, hold OK on the widget", "Pick a team"); root.setAttribute("data-setup", "sports"); return null; }
+    if (mode === "nomine") { webEmpty(root, b, "tv", "Pick your team", "This widget shows only your team's games: pick it in this widget's settings, hold OK on the widget", "Pick a team"); root.setAttribute("data-setup", "sports"); root.setAttribute("data-need", "team"); return null; }
     if (wrong && mode === "mine") { webEmpty(root, b, "tv", tl("{team} is not in the {league}", { team: team, league: realIn }), "Pick your team again in this widget's settings: hold OK on the widget", tl("Not in the {league}", { league: realIn })); return null; }
     var season = WW ? WW.seasonOf(v.games || [], t) : { off: "" };
     var offWords = season.off === "over" ? tl("The {league} season is over", { league: realIn }) : season.off === "soon" ? tl("The {league} season starts {when}", { league: realIn, when: WW.kickoff(season.at, t, env.clock24) }) : "";
@@ -2895,7 +2949,7 @@
   CR.battery = function (root, o, b, env) {
     // the one with the least charge left (the line under it says "Lowest charge")
     var bt = batteriesOf(env), x = bt && bt.devices && bt.devices.slice().sort(function (p, q) { return (+p.level) - (+q.level); })[0];
-    if (!bt) return empty(root, b, "bolt", "Needs an Android TV", "");
+    if (!bt) return empty(root, b, "bolt", "Not on this TV", "");
     if (bt.need === "permission") return soon(root, b, "bolt", "battery");
     if (!x) return empty(root, b, "bolt", "No charge to show", "");
     var low = +setting(o, env, "low", 20);
@@ -3193,7 +3247,7 @@
     if (env.demo) return { ok: true, minutes: 95, goal: 120, apps: [{ name: "YouTube", minutes: 52 }, { name: "ABC iview", minutes: 31 }, { name: "Netflix", minutes: 12 }] };
     var h = athome(env), s = h && h.screen;
     if (!s || s.why === "off") { soon(root, b, "timer", "screentime"); return null; }
-    if (s.why === "tv") { empty(root, b, "timer", b.w < 300 ? "Not on this TV" : "Screen time is not on this TV", "It needs a Google TV, Android TV or Fire TV"); return null; }
+    if (s.why === "tv") { empty(root, b, "timer", b.w < 300 ? "Not on this TV" : "Screen time is not on this TV", ""); return null; }
     if (s.why === "ontv") { empty(root, b, "timer", b.w < 300 ? "Needs a computer once" : "Screen time needs the Couch TV home app", "Put it on once from a computer with the free Setup app"); return null; }
     if (!s.ok) { empty(root, b, "timer", s.why === "access" ? (b.w < 300 ? "Allow it first" : "Allow screen time on this TV") : (b.w < 300 ? "Needs an update" : "Needs a newer Couch TV"), s.why === "access" ? "Settings (hold OK), Home settings, Designs, At home" : ""); return null; }
     return { ok: true, minutes: s.minutes || 0, goal: h.goal || 0, apps: s.apps || [] };
@@ -3231,6 +3285,8 @@
     if (!op(o).align) root.classList.add("cw-mid");
     try { (draw || function (r) { empty(r, b, "info", "This widget needs a newer Couch TV", ""); })(root, o, b, env, sh); }
     catch (e) { empty(root, b, "info", "This widget could not be drawn", ""); }
+    // something private to set up: the widget's own face with "Set up on your phone" (never in a demo)
+    if (root.getAttribute("data-empty") && !env.demo) { var need = needFor(o, env, root); if (need) setupFace(root, b, o, env, need); }
     // a label's words in their own box, so a long one ends in "..." (centred or not) instead of being cut
     [].forEach.call(root.querySelectorAll ? root.querySelectorAll(".cw-lab") : [], function (l) {
       [].slice.call(l.childNodes).forEach(function (t) { if (t.nodeType === 3 && t.textContent.trim()) { l.insertBefore(E("span", "cw-ell", "flex:0 1 auto;min-width:0;margin-right:0", [t.textContent]), t); l.removeChild(t); } });

@@ -74,8 +74,8 @@ try {
   ok(outside[0] === "Show all settings", "outside Home settings and the sheets: left alone");
   ok(outside[1] === "Show all settings" && outside[2] === "Sin configurar", "a typed value stays; Couch TV's own Not set is translated: " + outside.join(" | "));
   // a line with gaps keeps what is in them
-  const tpl = await page.evaluate(() => window.CouchTvWords.words("Scan with your phone's camera: it opens this widget's settings, already paired. Or on a computer: 192.0.2.7:5400/setup, code 123 456. Back to close."));
-  ok(/^Escanéalo con la cámara del móvil/.test(tpl) && tpl.indexOf("192.0.2.7:5400/setup") > 0 && tpl.indexOf("123 456") > 0, "the phone QR line keeps the address and code: " + tpl);
+  const tpl = await page.evaluate(() => window.CouchTvWords.words("Agenda: set up on your phone"));
+  ok(tpl === "Agenda: configúralo en el móvil", "a line with a gap keeps the widget's name: " + tpl);
   // whole lines: the gaps, the spaces around a line, nothing more and nothing less
   const whole = await page.evaluate(() => {
     const W = window.CouchTvWords.words, t = window.I18N.t;

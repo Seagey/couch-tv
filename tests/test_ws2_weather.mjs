@@ -592,6 +592,8 @@ phone.errors = []; phone.on("pageerror", (e) => phone.errors.push(String(e)));
 await meteo(phone);
 await phone.goto(ORIGIN + "/setup#pin=482913");
 await phone.waitForFunction(() => window.couchTv && window.couchTv.token());
+// (23 Nov) the phone opens on Widgets on your screen; the list these checks use is under More settings
+await phone.waitForFunction(() => document.body.classList.contains("gal"), null, { timeout: 8000 }).then(() => phone.click("#g-more"), () => {});
 await phone.waitForFunction(() => document.querySelectorAll("#w-list details").length > 0, null, { timeout: 10000 });
 {
   const titles = await phone.evaluate(() => [...document.querySelectorAll("#w-list summary")].map((e) => e.textContent));

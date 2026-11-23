@@ -378,6 +378,8 @@ async function phoneKeys() {
   await phone.goto("about:blank");
   await phone.goto(ORIGIN + "/setup#pin=482913");
   await phone.waitForFunction(() => window.couchTv && window.couchTv.token());
+  // (23 Nov) the phone opens on Widgets on your screen; the list these checks use is under More settings
+  await phone.waitForFunction(() => document.body.classList.contains("gal"), null, { timeout: 8000 }).then(() => phone.click("#g-more"), () => {});
   await phone.waitForFunction(() => document.querySelectorAll("#w-list details").length > 0 || document.getElementById("design-line").style.display === "", null, { timeout: 8000 });
   await phone.waitForTimeout(500);
   return phone.evaluate(() => [...document.querySelectorAll("#w-list details")].map((d) => d.getAttribute("data-key")));

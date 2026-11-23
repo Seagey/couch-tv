@@ -8009,8 +8009,11 @@
     if (!AH) return null;
     var r = AH.store.get(), st = r.stay || {};
     return { note: r.note ? { text: r.note.text, from: r.note.from || "" } : null, lists: r.lists || [], wifi: r.wifi || null, guide: r.guide || [],
-      cal: r.cal ? { host: CouchAtHome.calHost(r.cal.url) } : null,
-      stay: { host: st.url ? CouchAtHome.calHost(st.url) : "", checkin: st.checkin || "15:00", checkout: st.checkout || "10:00" },
+      // a calendar link's host only, and what the TV made of it (the phone's Check it): how many events it
+      // found, whether it is still reading, or one plain reason. Never an event or the link itself.
+      cal: r.cal ? { host: CouchAtHome.calHost(r.cal.url), count: CAL.url === r.cal.url && Array.isArray(CAL.events) ? CAL.events.length : null, busy: !!CAL.busy, error: CAL.url === r.cal.url ? CAL.err || "" : "" } : null,
+      stay: { host: st.url ? CouchAtHome.calHost(st.url) : "", checkin: st.checkin || "15:00", checkout: st.checkout || "10:00",
+        count: st.url && STAY.url === st.url && Array.isArray(STAY.events) ? STAY.events.length : null, busy: !!STAY.busy, error: st.url && STAY.url === st.url ? STAY.err || "" : "" },
       guest: (r.guest && r.guest.name) || "", lim: CouchAtHome.LIM, times_in: CouchAtHome.TIMES_IN, times_out: CouchAtHome.TIMES_OUT,
       // the design on screen, so the phone shows only what it uses (designView): rides along with At home,
       // the one answer the on-TV app already asks this page for, so no new way into the TV is needed
@@ -9210,7 +9213,12 @@
     if (!r.athome) hide.push("athome");
     if (!r.inputs) hide.push("inputs");
     var installed = [];
-    try { installed = arrangeItems().items.filter(function (it) { return (!it.kind || it.kind === "app") && it.package && !/^(screen|input):/.test(it.package); }).map(function (it) { return { key: (window.CouchApps && window.CouchApps.idOf(it.package)) || it.package, name: String(it.name || it.package) }; }); } catch (e) {}
+    // each with its picture for the phone (A2): the catalogue's own icon when it has one ("app-icons/..."
+    // under /tv/), and its package so a phone page that can ask the TV for the app's own icon does
+    try { installed = arrangeItems().items.filter(function (it) { return (!it.kind || it.kind === "app") && it.package && !/^(screen|input):/.test(it.package); }).map(function (it) {
+      var id = (window.CouchApps && window.CouchApps.idOf(it.package)) || it.package, c = window.CouchApps && window.CouchApps.get(id);
+      return { key: id, name: String(it.name || it.package), pkg: /^[A-Za-z0-9_.]{3,120}$/.test(it.package) ? it.package : "", icon: c && c.icon ? c.icon : "", colour: c && c.colour ? c.colour : "" };
+    }); } catch (e) {}
     return { on: true, hide: hide, inputs: !!r.inputs, town: townName(),
       // each setting as the phone draws it: its record, the choices (a TV list resolved here), the value
       // now (a private one only says it is set), whether it was changed on this TV, and whether it shows
@@ -9224,7 +9232,24 @@
             return o;
           }) };
       }),
-      apps: CouchDesign.appWidgets ? CouchDesign.appWidgets().map(function (a) { a.name = widgetName(a.kind); return a; }) : [], installed: installed };
+      apps: CouchDesign.appWidgets ? CouchDesign.appWidgets().map(function (a) { a.name = widgetName(a.kind); return a; }) : [], installed: installed,
+      screen: screenView() };
+  }
+  // The phone's "Widgets on your screen" (setup.html): every widget on the design where it sits, with its
+  // design's own look, options and style (all public: they came in the design), so the phone draws the real
+  // widget with the TV's own widgets.js and demo data; what it needs set up on the phone (widget-caps.js
+  // setupNeed) and whether the TV still shows it waiting (its "Set up on your phone" face). Nothing private.
+  function screenView() {
+    if (typeof CouchDesign === "undefined" || !CouchDesign.screen) return null;
+    var sv = CouchDesign.screen(), C = window.CouchWidgetCaps;
+    if (!sv) return null;
+    var waiting = function (id) { try { return !!document.querySelector('.cw-o[data-obj="' + String(id).replace(/[^A-Za-z0-9_-]/g, "") + '"] .cw[data-face="1"]'); } catch (e) { return false; } };
+    return { look: sv.look, widgets: sv.widgets.map(function (w) {
+      var face = waiting(w.id), need = face ? (document.querySelector('.cw-o[data-obj="' + String(w.id).replace(/[^A-Za-z0-9_-]/g, "") + '"] .cw[data-face="1"]').getAttribute("data-need") || "") : C && C.setupNeed ? C.setupNeed(w.kind) || "" : "";
+      if (need === "team" && !face) need = "";
+      return { id: w.id, key: w.id + "|" + w.kind, kind: w.kind, name: widgetName(w.kind), where: whereWords(w), x: w.x, y: w.y, w: w.w, h: w.h, opts: w.opts, style: w.style, items: w.items,
+        need: need || null, ready: !face };
+    }) };
   }
   // The design's own widgets from the phone (through the on-TV app's At home hand over, HomeActivity):
   // widget_set: { key, values: { <setting>: value or null } }, design_apps: { key, apps } (apps null: the
