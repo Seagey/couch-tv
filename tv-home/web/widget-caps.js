@@ -957,7 +957,10 @@
     note: "A note for everyone", list: "Shopping or to do", guide: "What guests need to know", sports: "Your team's games"
   };
   function setupNeed(kind) { return NEED_OF[kind] || null; }
-  function face(kind) { var c = C[kind]; return c && NEED_OF[kind] ? { name: c.name, line: FACE[kind] || "", need: NEED_OF[kind] } : null; }
+  // the name a waiting widget goes by on the TV, where it is not the kind's own name: the plain word people
+  // know for it (the kind id and the name in couch-tv Studio and Home settings stay as they are)
+  var FACE_NAME = { agenda: "Calendar" };
+  function face(kind) { var c = C[kind]; return c && NEED_OF[kind] ? { name: FACE_NAME[kind] || c.name, line: FACE[kind] || "", need: NEED_OF[kind] } : null; }
 
   var API = {
     v: 2,

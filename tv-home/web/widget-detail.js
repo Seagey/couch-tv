@@ -99,7 +99,7 @@
     if (need === "team" && !(S.from && S.from.getAttribute("data-need"))) need = "";
     var id = o && o.id !== undefined && o.id !== null ? String(o.id) : S.id, api = S.api || {};
     var NEED_ICON = { town: "partly-cloudy", photos: "picture", calendar: "calendar", spotify: "music", wifi: "wifi", text: "edit", team: "tv", ha: "home" };
-    S.body.appendChild(head(NEED_ICON[need] || "info", c.name, f ? f.line : ""));
+    S.body.appendChild(head(NEED_ICON[need] || "info", f ? f.name : c.name, f ? f.line : ""));
     var here = function () { if (api.tvEdit) api.tvEdit(id); };
     if (!need) {
       // nothing to set on the phone (a permission on the TV, a widget not on this TV): its one line

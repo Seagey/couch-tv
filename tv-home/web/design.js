@@ -2747,7 +2747,7 @@
         var known = widgetList().filter(function (x) { return x.id === wid; })[0];
         var faceEl = w && w.getAttribute("data-face") ? w : w && w.querySelector ? w.querySelector('.cw-slot.on [data-face="1"]') : null, need = faceEl ? faceEl.getAttribute("data-need") || "" : "";
         if (typeof hooks.phoneLink === "function" && window.TVQR && known && (mine || need)) {
-          var nm = (Caps.get(known.kind) || {}).name || known.kind;
+          var nm = ((Caps.face && Caps.face(known.kind)) || Caps.get(known.kind) || {}).name || known.kind;
           nodes.unshift(mk(need ? nm + ": set up on your phone" : "Edit on your phone", "wphone", known.id + "|" + need)); phoneFirst = 1;
         } else if (mine) {
           nodes.splice(1, 0, mk("Edit on the TV", "wset", mine.key)); after = 1;

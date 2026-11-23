@@ -95,7 +95,7 @@ for (const q of ["", "&ontv=1"]) {
   const page = await home([["agenda", 0, 0, 8, 4], ["note", 8, 0, 4, 2], ["clock", 12, 0, 4, 2], ["photo", 8, 2, 2, 2]], "&ontv=1");
   await page.waitForFunction(() => document.querySelector('.cw-o[data-obj="w0"] .cw[data-face="1"] .cw-fqr'), null, { timeout: 8000 });
   const f = await page.evaluate(() => { const c = document.querySelector('.cw-o[data-obj="w0"] .cw'); return { text: c.textContent, link: c.querySelector(".cw-fqr").getAttribute("data-link"), svg: !!c.querySelector(".cw-fqr svg") }; });
-  ok(/^Agenda/.test(f.text) && /Your next events/.test(f.text) && /Set up on your phone/.test(f.text), "the agenda names itself, says what it shows, then Set up on your phone: " + f.text);
+  ok(/^Calendar/.test(f.text) && /Your next events/.test(f.text) && /Set up on your phone/.test(f.text), "the agenda names itself (Calendar, the plain word), says what it shows, then Set up on your phone: " + f.text);
   ok(f.svg && f.link === "http://tv.example:5400/setup#pin=482913&widget=w0&connect=calendar", "with the code for its step: " + f.link);
   const small = await page.evaluate(() => document.querySelector('.cw-o[data-obj="w3"] .cw').textContent);
   ok(/Photo/.test(small) && /Set up on your phone/.test(small), "a tile says its name and Set up on your phone: " + small);
@@ -111,7 +111,7 @@ for (const q of ["", "&ontv=1"]) {
   await press(page, "Escape", 600);
   // Hold OK: phone first
   const items = await holdOn(page, "w0");
-  ok(items[0] === "Agenda: set up on your phone" && items.indexOf("Edit on the TV") < 0, "Hold OK: Agenda: set up on your phone, first (" + items.join(", ") + ")");
+  ok(items[0] === "Calendar: set up on your phone" && items.indexOf("Edit on the TV") < 0, "Hold OK: Calendar: set up on your phone, first (" + items.join(", ") + ")");
   if (SHOTS) await page.screenshot({ path: path.join(SHOTS, "tv-hold-ok.png") });
   await press(page, "Enter", 900);
   const sh = await page.evaluate(() => { const s = document.querySelector(".cw-sheet"); return { title: s.querySelector("h2").textContent, link: s.querySelector(".cw-qr").getAttribute("data-link"), text: s.textContent }; });

@@ -25,11 +25,13 @@ const withNeed = C.kinds().filter((k) => C.setupNeed(k));
 ok(withNeed.length >= 30, "kinds that need something private: " + withNeed.length);
 for (const k of withNeed) {
   const f = C.face(k);
-  ok(f && f.name === C.get(k).name && NEEDS.includes(f.need), k + ": a face with its name and need (" + JSON.stringify(f) + ")");
+  ok(f && f.name === (k === "agenda" ? "Calendar" : C.get(k).name) && NEEDS.includes(f.need), k + ": a face with its name and need (" + JSON.stringify(f) + ")");
   ok(f.line && f.line.split(" ").length <= 6 && !/[–—]/.test(f.line), k + ": one short line: " + f.line);
   ok(W[f.line] && LANGS.every((l) => W[f.line][l]), k + ": its line in every language");
 }
 ok(C.setupNeed("agenda") === "calendar" && C.setupNeed("weather") === "town" && C.setupNeed("photo") === "photos" && C.setupNeed("clock") === null, "agenda needs a calendar, weather a town, a photo photos, a clock nothing");
+ok(C.face("agenda").name === "Calendar" && C.get("agenda").name === "Agenda", "a waiting agenda is called Calendar on the TV, the plain word; its kind keeps its own name");
+{ const cw = { window: {} }; vm.runInNewContext(read("caps-words.js"), cw); const row = cw.window.CouchCapsWords.words.Calendar; ok(row && LANGS.every((l) => row[l]), "Calendar: in every language of caps-words.js, so the TV says it in its language"); }
 ok(C.setupNeed("commute") === null, "the commute keeps its own words (its place is a widget setting)");
 for (const k of C.kinds()) for (const tiny of [false, true]) {
   const c = C.card(k, tiny);
