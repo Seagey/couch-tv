@@ -216,9 +216,28 @@ class ReleaseScript(unittest.TestCase):
         self.assertEqual(self.log(), [f"check {self.dist} --release --matter --signer {CERT} --previous {self.prev} --ontv-signer {ONTV}"])
 
     def test_sums_passes_the_version_when_given(self):
-        rc, out = self.run_step("sums", "--previous", str(self.prev), "--version", "0.13.9")
+        rc, out = self.run_step("sums", "--previous", str(self.prev), "--version", "0.13.11")
         self.assertEqual(rc, 0, out)
-        self.assertEqual(self.log(), [f"check {self.dist} --release --matter --signer {CERT} --previous {self.prev} --ontv-signer {ONTV} --version 0.13.9"])
+        self.assertEqual(self.log(), [f"check {self.dist} --release --matter --signer {CERT} --previous {self.prev} --ontv-signer {ONTV} --version 0.13.11"])
+
+    def test_versions_before_0_13_11_are_debug_key_only_by_default(self):
+        # the key rotation starts at 0.13.11: "publish --version 0.13.10" checks what an ONTV_SIGN=0 build made
+        for v in ("0.13.10", "0.13.9", "0.12"):
+            self.calls.unlink(missing_ok=True)
+            rc, out = self.run_step("sums", "--previous", str(self.prev), "--version", v)
+            self.assertEqual(rc, 0, out)
+            self.assertEqual(self.log(), [f"check {self.dist} --release --matter --signer {CERT} --previous {self.prev} --version {v}"])
+        for v in ("0.13.11", "0.14", "1.0.0"):
+            self.calls.unlink(missing_ok=True)
+            rc, out = self.run_step("sums", "--previous", str(self.prev), "--version", v)
+            self.assertIn(f"--ontv-signer {ONTV}", self.log()[0])
+        # ONTV_SIGN still decides when it is set
+        self.calls.unlink(missing_ok=True)
+        rc, out = self.run_step("sums", "--previous", str(self.prev), "--version", "0.13.10", ONTV_SIGN="1")
+        self.assertIn(f"--ontv-signer {ONTV}", self.log()[0])
+        self.calls.unlink(missing_ok=True)
+        rc, out = self.run_step("sums", "--previous", str(self.prev), "--version", "0.13.11", ONTV_SIGN="0")
+        self.assertNotIn("--ontv-signer", self.log()[0])
 
     def test_sums_stops_when_a_samsung_file_is_missing(self):
         (self.dist / "couch-tv-samsung.wgt").unlink()

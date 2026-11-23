@@ -36,7 +36,7 @@ set -u
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
 DIST="$ROOT/dist"
 CERT=5b5ef39266a1b5bb2425ca8a0023003e895753630fffd4831efcf8c112372116
-# the on-TV app's own release key (0.13.10 on; also its Google Play app signing key): its two APKs are signed by
+# the on-TV app's own release key (0.13.11 on; also its Google Play app signing key): its two APKs are signed by
 # scripts/sign-ontv.sh with the proof of rotation from CERT, so TVs on Android 9 and newer move to it and keep
 # their settings, and Android 6 to 8 TVs still see CERT (coord/GOOGLE-PLAY-BUILD.md section 3a)
 ONTV_CERT=fab6cebbd4958043be63273fbba15f34447d6169d309f0c8e3bd65ac58469556
@@ -69,11 +69,6 @@ case "$(lower "$REMOTE_URL")" in *seagey/couch-tv*) OURS=1 ;; esac
 if [ $OURS = 1 ] && [ "$SIGNER" != "$CERT" ]; then
   echo "--signer must be couch-tv's own certificate ($CERT) for Seagey/couch-tv: TVs refuse any other"; exit 2
 fi
-# couch-tv's own on-TV APKs rotate to ONTV_CERT; a fork signs everything with its own --signer key, as before
-# ONTV_SIGN=0: one more release signed with the debug key alone (TVs on 0.13.9 and older refuse a rotated
-# file in Update now, because their own check predates the rotation; coord/GOOGLE-PLAY-BUILD.md section 3a)
-ONTV=""
-[ $OURS = 1 ] && [ "${ONTV_SIGN:-1}" != 0 ] && ONTV=$ONTV_CERT
 [ "$STEP" = play ] || { case "$PREVIOUS" in
   /*) [ -f "$PREVIOUS" ] || { echo "--previous $PREVIOUS: no such file"; exit 2; } ;;
   "") echo "--previous is required: last release's couch-tv-ontv.apk, an absolute path"; exit 2 ;;
@@ -82,6 +77,17 @@ esac; }
 if [ -n "$VERSION" ]; then
   echo "$VERSION" | grep -Eq '^[0-9]+\.[0-9]+(\.[0-9]+)?$' || { echo "--version must look like 0.13.9 (no v in front): $VERSION"; exit 2; }
 fi
+# couch-tv's own on-TV APKs rotate to ONTV_CERT from 0.13.11; a fork signs everything with its own --signer key,
+# as before. ONTV_SIGN=0: signed with the debug key alone. It is the default for a --version before 0.13.11
+# (0.13.10 is the one more release with the debug key alone: TVs on 0.13.9 and older refuse a rotated file in
+# Update now, because their own check predates the rotation; coord/GOOGLE-PLAY-BUILD.md section 3a), so
+# "publish --version 0.13.10" checks the files that "build" made without ONTV_SIGN set again.
+ver_lt() { awk -v a="$1" -v b="$2" 'BEGIN { split(a, x, "."); split(b, y, ".")
+  for (i = 1; i <= 3; i++) { if (x[i] + 0 < y[i] + 0) exit 0; if (x[i] + 0 > y[i] + 0) exit 1 } exit 1 }'; }
+ONTV_DEFAULT=1
+[ -n "$VERSION" ] && ver_lt "$VERSION" 0.13.11 && ONTV_DEFAULT=0
+ONTV=""
+[ $OURS = 1 ] && [ "${ONTV_SIGN:-$ONTV_DEFAULT}" != 0 ] && ONTV=$ONTV_CERT
 
 if [ -z "${ANDROID_HOME:-}" ]; then
   for d in "$HOME/Library/Android/sdk" "$HOME/Android/Sdk" "/opt/android-sdk"; do
