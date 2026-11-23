@@ -3214,7 +3214,7 @@ def clean_settings(s):
     sp = s.get("spotify")   # Home settings, Spotify (the local Now playing card): only the known keys
     if isinstance(sp, dict):
         o = {k: sp[k] for k in ("enabled", "show_card", "controls", "show_app", "hide_idle") if isinstance(sp.get(k), bool)}
-        if sp.get("seek_seconds") in (5, 10, 15, 30) and not isinstance(sp.get("seek_seconds"), bool):
+        if config.spotify_seek(sp.get("seek_seconds")):   # the one rule: config.SPOTIFY_SEEK_STEPS
             o["seek_seconds"] = sp["seek_seconds"]
         if sp.get("title_mode") in ("dots", "pingpong", "continuous"):
             o["title_mode"] = sp["title_mode"]
@@ -4023,9 +4023,12 @@ async def h_spotify_now(request):
 
 async def h_spotify_control(request):
     data = await body(request)
-    action = data.get("action", "").lower()
-    if not (tv.connected and tv.is_on and await tv.adb_ready()):
-        return bad(503, "TV not connected over ADB")
+    action = data.get("action")
+    # a number, a list or nothing is the caller's mistake: 400, never a 500. (Before 0.13.12 these paths called
+    # an undefined bad(), so every refusal here came back as a 500.)
+    if not isinstance(action, str):
+        raise ApiError(400, "action must be text")
+    action = action.lower()
     cmd_map = {
         "play": "play",
         "pause": "pause",
@@ -4037,10 +4040,12 @@ async def h_spotify_control(request):
     }
     cmd_key = cmd_map.get(action)
     if not cmd_key:
-        return bad(400, f"Unsupported action: {action}")
+        raise ApiError(400, "action must be one of: " + ", ".join(cmd_map))
+    if not (tv.connected and tv.is_on and await tv.adb_ready()):
+        raise ApiError(503, "TV not connected over ADB", key="err_tv_not_connected")
     try:
         await tv.adb("shell", "cmd", "media_session", "dispatch", cmd_key, timeout=5)
-    except Exception as e:
+    except Exception:
         key_map = {
             "play": "KEYCODE_MEDIA_PLAY",
             "pause": "KEYCODE_MEDIA_PAUSE",
@@ -4050,11 +4055,7 @@ async def h_spotify_control(request):
             "rewind": "KEYCODE_MEDIA_REWIND",
             "fast_forward": "KEYCODE_MEDIA_FAST_FORWARD",
         }
-        fallback_key = key_map.get(action)
-        if fallback_key:
-            await tv.adb("shell", "input", "keyevent", fallback_key, timeout=5)
-        else:
-            return bad(500, str(e))
+        await tv.adb("shell", "input", "keyevent", key_map[action], timeout=5)   # every cmd_map action has one
     return ok(success=True)
 
 

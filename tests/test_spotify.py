@@ -132,5 +132,53 @@ Sessions Stack - have 1 sessions:
         mock = (Path(__file__).parents[1] / "tv-home" / "web" / "mock.js").read_text(encoding="utf-8")
         self.assertIn('"spotify"', mock.split("var BRIDGE_KEYS = [", 1)[1].split("]", 1)[0])
 
+    def test_skip_step_one_rule(self):
+        # 0.13.12: config.json, Home settings and the home all take only 5, 10, 15 or 30 (config.SPOTIFY_SEEK_STEPS)
+        import server
+        self.assertEqual(config.SPOTIFY_SEEK_STEPS, (5, 10, 15, 30))
+        for v in (5, 10, 15, 30):
+            self.assertEqual(config._spotify({"seek_seconds": v})["seek_seconds"], v)
+            self.assertEqual(server.clean_settings({"spotify": {"seek_seconds": v}})["spotify"], {"seek_seconds": v})
+        for v in (1, 7, 20, 60, 120, 15.0, True, None, "15"):
+            self.assertEqual(config._spotify({"seek_seconds": v})["seek_seconds"], 10, v)
+            self.assertNotIn("spotify", server.clean_settings({"spotify": {"seek_seconds": v}}), v)
+        app = (Path(__file__).parents[1] / "tv-home" / "web" / "app.js").read_text(encoding="utf-8")
+        self.assertIn("[5, 10, 15, 30].indexOf(spRaw.seek_seconds)", app)
+        self.assertIn("var choices = [5, 10, 15, 30];", app)
+
+    def test_control_action_not_text_is_400(self):
+        import asyncio
+        from unittest.mock import AsyncMock, MagicMock, patch
+        from aiohttp.test_utils import make_mocked_request
+        import server
+
+        async def run():
+            mock_tv = MagicMock()
+            mock_tv.connected = True
+            mock_tv.is_on = True
+            mock_tv.adb_ready = AsyncMock(return_value=True)
+            mock_tv.adb = AsyncMock(return_value="")
+            out = []
+
+            async def status(data):
+                with patch("server.body", AsyncMock(return_value=data)):
+                    try:
+                        return (await server.h_spotify_control(make_mocked_request("POST", "/api/spotify/control"))).status
+                    except server.ApiError as e:   # the error middleware turns it into this status
+                        return e.status
+            with patch.object(server, "tv", mock_tv):
+                for action in (5, ["play"], {"a": 1}, True):
+                    out.append(await status({"action": action}))
+                out.append(await status({}))
+                out.append(await status({"action": "dance"}))
+                out.append(await status({"action": "Play"}))
+                mock_tv.adb_ready = AsyncMock(return_value=False)
+                out.append(await status({"action": "next"}))
+            mock_tv.adb.assert_awaited_once_with("shell", "cmd", "media_session", "dispatch", "play", timeout=5)
+            return out
+
+        self.assertEqual(asyncio.run(run()), [400, 400, 400, 400, 400, 400, 200, 503])
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -775,17 +775,23 @@ _ask = CONFIG.get("ask") if isinstance(CONFIG.get("ask"), dict) else {}
 ASK_ENABLED = bool(_ask["enabled"]) if isinstance(_ask.get("enabled"), bool) else _claude_present()
 
 
+# The Spotify card's skip step, in seconds: the one rule for config.json, Home settings (server.clean_settings)
+# and the home itself (app.js cycles through the same four). Anything else is the default, 10.
+SPOTIFY_SEEK_STEPS = (5, 10, 15, 30)
+
+
+def spotify_seek(v):
+    """v when it is one of SPOTIFY_SEEK_STEPS (a whole number, never True or False), else None."""
+    return v if isinstance(v, int) and not isinstance(v, bool) and v in SPOTIFY_SEEK_STEPS else None
+
+
 def _spotify(raw):
     """Configuration for Spotify local media session integration."""
     if not isinstance(raw, dict):
         return {"enabled": False, "seek_seconds": 10, "hide_idle": False, "title_mode": "pingpong", "show_app": True, "align": "classic"}
     out = {}
     out["enabled"] = bool(raw.get("enabled", False))
-    seek = raw.get("seek_seconds")
-    if isinstance(seek, (int, float)) and 1 <= int(seek) <= 120:
-        out["seek_seconds"] = int(seek)
-    else:
-        out["seek_seconds"] = 10
+    out["seek_seconds"] = spotify_seek(raw.get("seek_seconds")) or 10
     out["hide_idle"] = bool(raw.get("hide_idle", False))
     mode = raw.get("title_mode")
     if mode in ("dots", "pingpong", "continuous"):
