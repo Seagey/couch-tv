@@ -634,7 +634,7 @@
     var C = window.CouchWidgetCaps, own = root.getAttribute("data-need"), n = own || (C && C.setupNeed ? C.setupNeed(o.kind) : null), d = dataOf(env);
     if (!n || (n === "team" && !own)) return null;
     // a town or photos that are there already: the widget is only waiting for its data, never "set up"
-    if (n === "town" && ((d.place && coord(d.place.lat) && coord(d.place.lon)) || placeVal(tvSet(o, env, "place")))) return null;
+    if (n === "town" && ((d.place && coord(d.place.lat) && coord(d.place.lon)) || placeVal(tvSet(o, env, "town")) || placeVal(tvSet(o, env, "place")))) return null;
     if (n === "photos" && op(o).image) return null;
     // the rest only from the setup card itself (soon): a calendar that is set but did not answer keeps its own words
     if (n !== "town" && !own && !root.getAttribute("data-setup")) return null;

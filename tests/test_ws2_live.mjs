@@ -445,7 +445,7 @@ const ESPN_TODAY = LIVE ? null : { nrl: "Roosters", afl: "Sydney Swans", epl: "M
 }
 // the phone sets one too, through its own page: Words in, a select
 {
-  await phone.reload(); await phone.waitForFunction(() => document.getElementById("widgets").style.display === "", null, { timeout: 10000 });
+  await phone.reload(); await phone.waitForFunction(() => document.body.classList.contains("gal"), null, { timeout: 8000 }).then(() => phone.click("#g-more"), () => {}); await phone.waitForFunction(() => document.getElementById("widgets").style.display === "", null, { timeout: 10000 });
   await phone.evaluate(() => { const d = [...document.querySelectorAll("#w-list details.wbox")].find((x) => /^Word of the day/.test(x.querySelector("summary").textContent)); d.open = true; });
   const sel = phone.locator('#w-list select[data-ws="lang"]');
   await sel.selectOption("fr");
@@ -480,7 +480,7 @@ ok(!phone.errors.length, "no page errors on the phone: " + phone.errors.join("; 
   ok(/Headlines, /.test(rows), "the Headlines still on it is listed");
   const keys = (await design(other)).widgets.map((w) => w.kind);
   ok(keys.indexOf("news") >= 0 && !keys.some((k) => k !== "news" && KINDS.indexOf(k) >= 0), "the phone hears the Headlines and none of this group's other widgets (" + keys.join(", ") + ")");
-  await phone.reload(); await phone.waitForFunction(() => document.getElementById("widgets").style.display === "", null, { timeout: 10000 });
+  await phone.reload(); await phone.waitForFunction(() => document.body.classList.contains("gal"), null, { timeout: 8000 }).then(() => phone.click("#g-more"), () => {}); await phone.waitForFunction(() => document.getElementById("widgets").style.display === "", null, { timeout: 10000 });
   const titles = await phone.evaluate(() => [...document.querySelectorAll("#w-list details.wbox summary")].map((e) => e.textContent));
   ok(titles.some((t) => /^Headlines, /.test(t)) && !titles.some((t) => ["sports", "stocks", "commute", "quote", "word", "ask", "agent"].some((k) => t.indexOf(TITLES[k] + ", ") === 0)), "the phone's Widgets on this TV: Headlines, none of the others (" + titles.join("; ") + ")");
   ok(!other.errors.length, "no page errors: " + other.errors.join("; "));

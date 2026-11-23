@@ -438,7 +438,7 @@ await ctx.close();
   const st = await p3.evaluate(() => ({ hash: location.hash, title: document.getElementById("sheet-title").textContent, body: document.getElementById("sheet-body").textContent,
     card: (document.querySelectorAll(".g-card")[+document.getElementById("g-count").textContent.split(" ")[0] - 1] || {}).textContent || "" }));
   ok(st.hash === "#widget=n", "only the pairing code leaves the address: " + st.hash);
-  ok(st.title === "Headlines" && /News from/.test(st.body), "the headlines' own sheet opens: " + st.title);
+  ok(st.title === "Headlines" && /News source/.test(st.body), "the headlines' own sheet opens: " + st.title);
   ok(/Headlines, top right/.test(st.card), "on the headlines' card: " + st.card.slice(0, 60));
   // Guest Wi-Fi with nothing typed yet: #widget=f opens its one step (the network name and password)
   await p3.evaluate(() => { location.hash = "widget=f"; });

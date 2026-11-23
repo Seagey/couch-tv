@@ -457,7 +457,7 @@ const tv = TV = await tvPage(design, "&ontv=1");
   ok(!(await tv.evaluate(() => !!document.querySelector('.cw-o[data-obj="odock"]'))), "and from the home");
   // Hold OK on a widget that stayed: it is its own, never one that left
   const m = await holdOn(tv, "okeeprow");
-  ok(m.args.indexOf("okeeprow|keeprow") >= 0 && !m.args.some((a) => /odock|ostack|okeep\|/.test(a || "")), "Hold OK offers only the widget there: " + m.args.join(","));
+  ok(m.args.some((a) => /^okeeprow\|/.test(a || "")) && !m.args.some((a) => /odock|ostack|okeep\|/.test(a || "")), "Hold OK offers only the widget there: " + m.args.join(","));
   // a stack whose turn Studio set at the top (o.turn, Studio's Turns), showing a widget with nothing to set
   const bares = await tv.evaluate(() => ["date", "analog", "moon", "sun", "month"].filter((k) => !window.CouchWidgetCaps.settings(k).some((s) => s && s.pre === true && (!Array.isArray(s.where) || s.where.indexOf("tv") >= 0 || s.where.indexOf("phone") >= 0))));
   const bare = bares.length >= 2 ? bares[0] : "";

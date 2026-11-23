@@ -247,7 +247,8 @@ for (const [layer, w, q] of CASES) {
   ok(sm.items[0] === "Edit on your phone" && sm.items.indexOf("Edit on the TV") < 0, "a stack on the on-TV app: Edit on your phone first (" + sm.items.join(", ") + ")");
   await sp.evaluate(() => window.CouchDesign.nav.focus("w0", 0)); await sp.waitForTimeout(120);
   await sp.keyboard.down("Enter"); await sp.waitForTimeout(900); await sp.keyboard.up("Enter"); await sp.waitForTimeout(250);
-  await press(sp, "Enter", 800);
+  await press(sp, "ArrowDown", 120); await press(sp, "ArrowUp", 120); await press(sp, "Enter", 800);   // back up to the first item, Edit on your phone
+  await sp.waitForFunction(() => document.querySelector(".cw-sheet .cw-qr"), null, { timeout: 5000 }).catch(() => {});
   const link = await sp.evaluate(() => { const q = document.querySelector(".cw-sheet .cw-qr"); return q && q.getAttribute("data-link"); });
   ok(link === "http://tv.example:5400/setup#pin=482913&widget=" + encodeURIComponent("w0/" + at), "its QR names the widget in the stack: " + link);
   await sp.close();
