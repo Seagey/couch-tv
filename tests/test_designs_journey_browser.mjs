@@ -166,7 +166,10 @@ try {
   ok(/press Send to my TV there: it comes straight back to this TV/.test(await page.evaluate(() => document.querySelector(".share-home").textContent)), "and says Send comes straight back");
   takeAnswer = { state: "ok", code: "K7M2Q-XR4TP" };
   await page.waitForFunction(() => !document.querySelector(".share-home"), null, { timeout: 9000 });
-  ok(inbox.includes("take") && fetched[0] === "K7M2Q-XR4TP", "the phone's code comes back and is got (" + fetched.join(",") + ")");
+  // the screen closes first (inboxGot), then the code is fetched: wait for that request to reach the
+  // pretend store before looking, or a fast close is read as no fetch at all (seen once, 0.13.11)
+  for (let t = 0; t < 80 && !fetched.length; t++) await page.waitForTimeout(100);
+  ok(inbox.includes("take") && fetched[0] === "K7M2Q-XR4TP","the phone's code comes back and is got (" + fetched.join(",") + ")");
   await page.waitForFunction(() => document.querySelector(".cd-ask"), null, { timeout: 8000 });
   ok(true, "and the TV asks Use this design? first");
   await press("Escape", 400);   // Keep my home

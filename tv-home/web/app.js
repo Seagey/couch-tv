@@ -7259,9 +7259,15 @@
     // when it gets closer, so short lists and their headings never move
     var f = box.querySelector(".srow.focus");
     if (!f) { box.scrollTop = 0; return; }
-    // Up or Down just scrolled lines into view with no row to move to: leave the list there
+    // Up or Down just scrolled lines into view with no row to move to: leave the list there.
+    // A peek goes at least as far that way as the focused row needs to be on screen: keep is where a
+    // smooth scroll still under way had got to, not where it was going, so Down pressed fast on the
+    // last row (the update page after Up showed step 1) peeked from a list still on its way down and
+    // stopped with that row under the bottom edge for good (0.13.11 tests, 24 Nov 2026).
     if (pk) {
-      box.scrollTop = Math.max(0, Math.min(box.scrollHeight - box.clientHeight, keep + pk * Math.round(box.clientHeight * 0.6)));
+      var go = keep + pk * Math.round(box.clientHeight * 0.6), ft = f.offsetTop, fv = box.clientHeight, fe = fv / 4;
+      go = pk > 0 ? Math.max(go, ft + f.offsetHeight + fe - fv) : Math.min(go, ft - fe);
+      box.scrollTop = Math.max(0, Math.min(box.scrollHeight - box.clientHeight, go));
       return;
     }
     // a redraw for news (an update check, the calendar) while someone reads what they scrolled to:
