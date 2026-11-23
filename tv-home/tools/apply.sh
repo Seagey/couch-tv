@@ -88,6 +88,8 @@ esac
 # The screensaver quick button cuts the screen timeout for a moment (its own screensaver refuses
 # apps), which needs "modify system settings".
 "$PY" "$T" shell "appops set app.couchtv.launcher WRITE_SETTINGS allow" > /dev/null 2>&1 || true
+# Spotify local media session reading needs notification access (no accounts, local only).
+"$PY" "$T" shell "cmd notification allow_listener app.couchtv.launcher/app.couchtv.launcher.SpotifyMediaListener" > /dev/null 2>&1 || true
 
 echo "2/4  Keeping the TV's own home and setup on"
 present=$("$PY" "$T" shell "pm list packages" | sed 's/package://')

@@ -42,7 +42,7 @@
   // config.js. ST is the saved object; the rest are read from it in readConfig().
   var ST = {}, WX_SHOW = true, WX_F = false, WX_EVERY = 30, HIDDEN_TV = [];
   // Now playing (#31), on unless switched off; the navigation sound: system, soft or off (#32)
-  var NP_ON = true, SOUND_STYLE = "system";
+  var NP_ON = true, SOUND_STYLE = "system", SPOTIFY = { enabled: false, show_card: true, controls: true, seek_seconds: 10, hide_idle: false };
   // glass app icons: the focused app in its own colours, or staying glass (#32)
   var GLASS_FOCUS = "colour";
   // The focused tile's slow sway and glint: Home settings, Look, Moving tiles, else home.moving_tiles,
@@ -124,6 +124,9 @@
     next: '<svg viewBox="0 0 24 24" class="solid"><path d="M15 6h2v12h-2zM4 6v12l9-6z"/></svg>',
     play: '<svg viewBox="0 0 24 24" class="solid"><path d="M7 5v14l12-7z"/></svg>',
     pause: '<svg viewBox="0 0 24 24" class="solid"><path d="M6.5 5h4v14h-4zM13.5 5h4v14h-4z"/></svg>',
+    rewind: '<svg viewBox="0 0 24 24" class="solid"><path d="M11 6v12l-9-6zM21 6v12l-9-6z"/></svg>',
+    ff: '<svg viewBox="0 0 24 24" class="solid"><path d="M3 6v12l9-6zM13 6v12l9-6z"/></svg>',
+    spotify: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M7 9.5c3.5-1 7.5-.7 10.5 1M7.5 12.5c3-.8 6.5-.5 9 1M8 15.5c2.3-.6 5-.4 7 .8" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>',
     note: '<svg viewBox="0 0 24 24"><path d="M9 18V6l11-2v12"/><circle cx="6" cy="18" r="3"/><circle cx="17" cy="16" r="3"/></svg>',
     updown: '<svg viewBox="0 0 24 24"><path d="M8 9.5l4-4 4 4M8 14.5l4 4 4-4"/></svg>',
     sliders: '<svg viewBox="0 0 24 24"><path d="M4 7h9M17 7h3M4 17h3M11 17h9"/><circle cx="15" cy="7" r="2"/><circle cx="9" cy="17" r="2"/></svg>',
@@ -217,6 +220,14 @@
     // glass app icons (#25): set in Home settings, else home.glass_icons; off unless switched on
     GLASS_ICONS = typeof ST.glass_icons === "boolean" ? ST.glass_icons : HOME.glass_icons === true;
     NP_ON = typeof ST.now_playing === "boolean" ? ST.now_playing : HOME.now_playing !== false;
+    var spRaw = ST.spotify || (CFG && CFG.spotify) || {};
+    SPOTIFY = {
+      enabled: typeof spRaw.enabled === "boolean" ? spRaw.enabled : false,
+      show_card: typeof spRaw.show_card === "boolean" ? spRaw.show_card : true,
+      controls: typeof spRaw.controls === "boolean" ? spRaw.controls : true,
+      seek_seconds: [5, 10, 15, 30].indexOf(spRaw.seek_seconds) >= 0 ? spRaw.seek_seconds : 10,
+      hide_idle: typeof spRaw.hide_idle === "boolean" ? spRaw.hide_idle : false
+    };
     GLASS_FOCUS = (ST.glass_focus || HOME.glass_focus) === "glass" ? "glass" : "colour";
     document.documentElement.classList.toggle("gi-stay", GLASS_FOCUS === "glass");
     SOUND_STYLE = ["system", "soft", "off"].indexOf(ST.nav_sound || HOME.nav_sound) >= 0 ? (ST.nav_sound || HOME.nav_sound) : "system";
@@ -691,50 +702,228 @@
     el.classList.add("on");
   }
 
-  // ---------------- Now playing (#31) ----------------
-  // The song any app is playing behind the home (Spotify, YouTube Music, ...): its title, artist and
-  // cover, with previous, play or pause and next. The bridge or the on-TV app reads it from the TV's
-  // media sessions (/api/music) every 5 s while the home is on screen; the buttons are the remote's
-  // media keys. A paused song stays for ten minutes so play can start it again. No computer and no
-  // on-TV app (option A): Android lets no ordinary app read other apps' sessions, so no card.
-  var music = null, npI = 1;
-  function npVisible() { return NP_ON && !!music && !OFFLINE; }
-  // reachable with the remote: in the Night look it steps aside with the cards while More apps is open
+  // ---------------- Now playing (#31) + Spotify local integration ----------------
+  // The song any app is playing behind the home (Spotify, YouTube Music, ...): title, artist,
+  // album cover art, progress bar, and playback controls.
+  // With Spotify enabled: reads directly from TV's MediaController via TVOS or bridge, completely local,
+  // zero accounts/tokens. Fast-forward and rewind use seekTo(clamp(pos +/- interval, 0, duration)).
+  var music = null, npI = 2, currentNpBtns = [], npProgressTimer = null;
+
+  function fmtTime(ms) {
+    if (!ms || isNaN(ms) || ms < 0) return "0:00";
+    var sec = Math.floor(ms / 1000);
+    var m = Math.floor(sec / 60);
+    var s = sec % 60;
+    return m + ":" + (s < 10 ? "0" : "") + s;
+  }
+
+  function npVisible() {
+    if (!music) return false;
+    if (music.isSpotify) {
+      if (!SPOTIFY.enabled || !SPOTIFY.show_card) return false;
+      if (SPOTIFY.hide_idle && music.state !== "playing") return false;
+      return true;
+    }
+    return NP_ON && !OFFLINE;
+  }
+
   function npReach() { return npVisible() && !(NIGHT && expanded); }
+
+  function getPlaybackPosition() {
+    if (!music) return 0;
+    var pos = music.position || 0;
+    if (music.state === "playing" && music.lastUpdateLocal) {
+      var elapsed = Math.max(0, Date.now() - music.lastUpdateLocal);
+      pos += elapsed * (music.speed || 1.0);
+    }
+    if (music.duration && music.duration > 0) {
+      pos = Math.min(music.duration, Math.max(0, pos));
+    }
+    return Math.floor(pos);
+  }
+
+  function updateNpProgress() {
+    if (!music || !music.duration || music.duration <= 0) return;
+    var pos = getPlaybackPosition();
+    var curEl = $("np-pos");
+    var fillEl = $("np-fill");
+    if (curEl) curEl.textContent = fmtTime(pos);
+    if (fillEl) fillEl.style.width = Math.min(100, Math.max(0, (pos / music.duration) * 100)) + "%";
+  }
+
+  function startProgressTimer() {
+    clearInterval(npProgressTimer);
+    if (music && music.state === "playing" && music.duration > 0) {
+      npProgressTimer = setInterval(updateNpProgress, 500);
+    }
+  }
+
   function renderNp() {
     var el = $("np"), on = npVisible();
     el.classList.toggle("on", on);
     if (NIGHT) {
-      // the row shows while someone has a show on the go, or while a song plays
       var anyone = PEOPLE.some(function (p) { return (data.showsBy[p.id] || []).length; });
       $("shelf-section").classList.toggle("empty", !anyone && !on);
       $("np-slot").classList.toggle("on", on);
     }
-    if (!on) { el.innerHTML = ""; return; }
+    if (!on) {
+      clearInterval(npProgressTimer);
+      el.innerHTML = "";
+      currentNpBtns = [];
+      return;
+    }
+
     var playing = music.state === "playing";
-    // the cover from the bridge (Apple's music search); none yet, or none found: a music note
     var art = music.art ? '<img class="np-art" src="' + esc(music.art) + '" alt="" decoding="async" onerror="this.className=\'np-art gone\'">' :
       '<span class="np-art">' + ICONS.note + "</span>";
-    var btns = [["prev", t("np_prev")], [playing ? "pause" : "play", playing ? t("np_pause") : t("np_play")], ["next", t("np_next")]];
-    el.innerHTML = art + '<div class="np-t"><span class="np-app">' + esc((music.app && music.app.name) || t("np_head")) + "</span>" +
-      "<b>" + esc(music.title) + "</b><small>" + esc(music.artist || music.album || "") + "</small></div>" +
+
+    var btns = [];
+    if (music.isSpotify && SPOTIFY.controls) {
+      var actions = music.actions || 0;
+      var canPrev = !actions || (actions & 16) !== 0;
+      var canRewind = !actions || (actions & 256) !== 0 || (actions & 8) !== 0;
+      var canPlay = !actions || (actions & 512) !== 0 || (actions & 4) !== 0 || (actions & 2) !== 0;
+      var canFF = !actions || (actions & 256) !== 0 || (actions & 64) !== 0;
+      var canNext = !actions || (actions & 32) !== 0;
+
+      if (canPrev) btns.push({ act: "previous", label: t("np_prev"), icon: ICONS.prev });
+      if (canRewind) btns.push({ act: "rewind", label: t("np_rewind", { s: SPOTIFY.seek_seconds }), icon: ICONS.rewind });
+      if (canPlay) btns.push({ act: "play_pause", label: playing ? t("np_pause") : t("np_play"), icon: playing ? ICONS.pause : ICONS.play });
+      if (canFF) btns.push({ act: "fast_forward", label: t("np_ff", { s: SPOTIFY.seek_seconds }), icon: ICONS.ff });
+      if (canNext) btns.push({ act: "next", label: t("np_next"), icon: ICONS.next });
+    } else {
+      btns = [
+        { act: "previous", label: t("np_prev"), icon: ICONS.prev },
+        { act: "play_pause", label: playing ? t("np_pause") : t("np_play"), icon: playing ? ICONS.pause : ICONS.play },
+        { act: "next", label: t("np_next"), icon: ICONS.next }
+      ];
+    }
+    currentNpBtns = btns;
+    if (npI >= btns.length) npI = Math.max(0, btns.length - 1);
+
+    var curPos = getPlaybackPosition();
+    var hasDuration = music.duration && music.duration > 0;
+    var progHtml = hasDuration ? (
+      '<div class="np-prog-wrap">' +
+        '<span class="np-time" id="np-pos">' + fmtTime(curPos) + '</span>' +
+        '<div class="np-bar"><div class="np-fill" id="np-fill" style="width:' + Math.min(100, Math.max(0, (curPos / music.duration) * 100)) + '%"></div></div>' +
+        '<span class="np-time">' + fmtTime(music.duration) + '</span>' +
+      '</div>'
+    ) : '';
+
+    var appLabel = (music.app && music.app.name) || (music.isSpotify ? "Spotify" : t("np_head"));
+
+    el.innerHTML = art + '<div class="np-t"><span class="np-app">' + esc(appLabel) + "</span>" +
+      "<b>" + esc(music.title) + "</b><small>" + esc(music.artist || music.album || "") + "</small>" +
+      progHtml + "</div>" +
       '<div class="np-ctl">' + btns.map(function (b, i) {
-        return '<span class="nb' + (zone === "np" && i === npI ? " focus" : "") + '" role="button" aria-label="' + esc(b[1]) + '">' + ICONS[b[0]] + "</span>";
+        return '<span class="nb' + (zone === "np" && i === npI ? " focus" : "") + '" role="button" aria-label="' + esc(b.label) + '">' + b.icon + "</span>";
       }).join("") + "</div>";
+
+    startProgressTimer();
   }
+
+  function handleSpotifyState(s) {
+    if (!s || !s.available || !s.title) {
+      if (music && music.isSpotify) {
+        music = null;
+        renderNp();
+        if (zone === "np") paintFocus();
+      }
+      return;
+    }
+    var had = !!music;
+    music = {
+      isSpotify: true,
+      title: s.title,
+      artist: s.artist,
+      album: s.album,
+      duration: s.duration || 0,
+      state: s.state || "stopped",
+      position: s.position || 0,
+      lastUpdateLocal: Date.now(),
+      speed: s.speed || 0.0,
+      actions: s.actions || 0,
+      art: s.art || null,
+      app: { name: "Spotify", package: s.package || "com.spotify.tv.android" }
+    };
+    renderNp();
+    if (had !== !!music && zone === "np" && !music) paintFocus();
+  }
+
+  function refreshSpotify() {
+    if (!SPOTIFY.enabled) return;
+    if (TV && TV.spotifyState) {
+      try {
+        var raw = TV.spotifyState();
+        if (raw) handleSpotifyState(JSON.parse(raw));
+      } catch (e) {}
+      return;
+    }
+    if (!OFFLINE) {
+      api("GET", "/api/spotify/now_playing", null, 4000).then(function (j) {
+        if (j && j.spotify) handleSpotifyState(j.spotify);
+      }).catch(function () {});
+    }
+  }
+
   function refreshMusic() {
-    if (!NP_ON || OFFLINE || document.hidden) { if (music) { music = null; renderNp(); } return; }
+    if (SPOTIFY.enabled) {
+      refreshSpotify();
+      if (music && music.isSpotify) return;
+    }
+    if (!NP_ON || OFFLINE || document.hidden) {
+      if (music && !music.isSpotify) { music = null; renderNp(); }
+      return;
+    }
     api("GET", "/api/music", null, 5000).then(function (j) {
+      if (music && music.isSpotify) return;
       var had = !!music;
       music = j.music || null;
       renderNp();
-      if (had !== !!music && zone === "np" && !music) paintFocus();   // the card went away under the focus
-    }, function () { if (music) { music = null; renderNp(); if (zone === "np") paintFocus(); } });
+      if (had !== !!music && zone === "np" && !music) paintFocus();
+    }, function () {
+      if (music && !music.isSpotify) { music = null; renderNp(); if (zone === "np") paintFocus(); }
+    });
   }
+
   function npPress() {
-    if (!music) return;
-    var key = ["previous", "play_pause", "next"][npI];
-    if (key === "play_pause") { music.state = music.state === "playing" ? "paused" : "playing"; renderNp(); }   // straight away
+    if (!music || !currentNpBtns.length) return;
+    var btn = currentNpBtns[npI];
+    if (!btn) return;
+    var act = btn.act;
+
+    if (music.isSpotify && TV && TV.spotifyControl) {
+      if (act === "play_pause") {
+        music.state = music.state === "playing" ? "paused" : "playing";
+        music.lastUpdateLocal = Date.now();
+        renderNp();
+        TV.spotifyControl("play_pause", 0);
+      } else if (act === "rewind") {
+        TV.spotifyControl("rewind", SPOTIFY.seek_seconds * 1000);
+      } else if (act === "fast_forward") {
+        TV.spotifyControl("fast_forward", SPOTIFY.seek_seconds * 1000);
+      } else {
+        TV.spotifyControl(act, 0);
+      }
+      setTimeout(refreshSpotify, act === "play_pause" ? 1200 : 600);
+      return;
+    }
+
+    if (music.isSpotify && !OFFLINE) {
+      if (act === "play_pause") {
+        music.state = music.state === "playing" ? "paused" : "playing";
+        music.lastUpdateLocal = Date.now();
+        renderNp();
+      }
+      api("POST", "/api/spotify/control", { action: act, interval: SPOTIFY.seek_seconds }).catch(function (e) { note(e.message); });
+      setTimeout(refreshSpotify, act === "play_pause" ? 1200 : 600);
+      return;
+    }
+
+    // Generic media key fallback
+    var key = act === "previous" ? "previous" : act === "next" ? "next" : "play_pause";
+    if (key === "play_pause") { music.state = music.state === "playing" ? "paused" : "playing"; renderNp(); }
     api("POST", "/api/key", { key: key }).catch(function (e) { note(e.message); });
     setTimeout(refreshMusic, key === "play_pause" ? 1500 : 900);
   }
@@ -1550,10 +1739,11 @@
       return;
     }
     if (zone === "np") {
+      var maxNp = Math.max(0, currentNpBtns.length - 1);
       if (NIGHT) {
         // the first card of the row: right past the last button goes on to the shows
-        if (dx > 0 && npI === 2) { if (cards.length) { zone = "shelf"; s = 0; } }
-        else if (dx) npI = Math.max(0, Math.min(2, npI + dx));
+        if (dx > 0 && npI === maxNp) { if (cards.length) { zone = "shelf"; s = 0; } }
+        else if (dx) npI = Math.max(0, Math.min(maxNp, npI + dx));
         else if (dy < 0) { if (peopleOn()) toPeople(); else if (hasQuick()) { zone = "quick"; qi = 0; } }
         else if (dy > 0 && gridEls.length) {
           var nb = $("np").getBoundingClientRect();
@@ -1562,7 +1752,7 @@
         }
       } else {
         // Classic: top right, under the quick buttons
-        if (dx) npI = Math.max(0, Math.min(2, npI + dx));
+        if (dx) npI = Math.max(0, Math.min(maxNp, npI + dx));
         else if (dy < 0) { if (hasQuick()) zone = "quick"; else if (peopleOn()) toPeople(); }
         else if (dy > 0) {
           if (cards.length) zone = "shelf";
@@ -1592,7 +1782,7 @@
         pi = Math.max(0, Math.min(PEOPLE.length - 1, pi + dx));
       } else if (dy > 0) zone = NIGHT && npReach() ? "np" : cards.length ? "shelf" : "grid";
     } else if (zone === "shelf") {
-      if (dx < 0 && s === 0 && NIGHT && npReach()) { zone = "np"; npI = 2; }
+      if (dx < 0 && s === 0 && NIGHT && npReach()) { zone = "np"; npI = Math.max(0, currentNpBtns.length - 1); }
       else if (dx) s = Math.max(0, Math.min(shelfEls.length - 1, s + dx));
       else if (dy < 0) { if (peopleOn()) toPeople(); else if (!NIGHT && npReach()) zone = "np"; else if (hasQuick()) { zone = "quick"; qi = 0; } }
       else if (dy > 0 && gridEls.length) {
@@ -1777,7 +1967,7 @@
   // also on the computer (/api/settings), so the phone and the TV agree.
   var ST_KEY = "tvhome.settings";
   var SECS = [["language", "globe"], ["location", "pin"], ["weather", "cloud"], ["look", "look"],
-    ["apps", "apps"], ["people", "person"], ["quick", "bolt"], ["about", "info"]];
+    ["spotify", "spotify"], ["apps", "apps"], ["people", "person"], ["quick", "bolt"], ["about", "info"]];
   var SET = { col: "secs", sec: 0, ri: 0, keyFocus: null, sub: null, lift: null, confirm: null, dirty: false, typing: null,
     msg: "", geo: { q: "", list: null, busy: false, err: false } };
   var REPO_URL = "github.com/Seagey/couch-tv";
@@ -1871,6 +2061,7 @@
     if (id === "location") return locationRows();
     if (id === "weather") return weatherRows();
     if (id === "look") return lookRows();
+    if (id === "spotify") return spotifyRows();
     if (id === "apps") return appsRows();
     if (id === "people") return peopleRows();
     if (id === "quick") return quickRows();
@@ -2209,6 +2400,100 @@
   }
 
   // ---- apps: the same order as holding OK on the dock, plus hiding ----
+  
+  function spotifyRows() {
+    var rows = [];
+    rows.push(head(t("spotify_head")));
+    var isTizen = typeof window.tizen !== "undefined" || (TV && TV.isTizen);
+    if (isTizen) {
+      rows.push(info("spotify-unsupported", t("spotify_unsupported")));
+      return rows;
+    }
+    rows.push({
+      kind: "toggle",
+      key: "spotify-enabled",
+      label: t("spotify_enable"),
+      value: SPOTIFY.enabled ? t("on") : t("off"),
+      act: function () {
+        SPOTIFY.enabled = !SPOTIFY.enabled;
+        ST.spotify = ST.spotify || {};
+        ST.spotify.enabled = SPOTIFY.enabled;
+        saveSettings();
+        refreshSpotify();
+      }
+    });
+
+    var hasPerm = false;
+    try {
+      hasPerm = !!(TV && TV.spotifyHasPermission && TV.spotifyHasPermission());
+    } catch (e) {}
+    if (hasPerm) {
+      rows.push(info("spotify-perm", t("spotify_perm_ok")));
+    } else {
+      rows.push(info("spotify-perm", t("spotify_perm_needed"), "", t("spotify_perm_hint")));
+    }
+
+    if (SPOTIFY.enabled) {
+      rows.push(head(t("spotify_controls")));
+      rows.push({
+        kind: "toggle",
+        key: "spotify-show-card",
+        label: t("spotify_show_card"),
+        value: SPOTIFY.show_card ? t("on") : t("off"),
+        act: function () {
+          SPOTIFY.show_card = !SPOTIFY.show_card;
+          ST.spotify = ST.spotify || {};
+          ST.spotify.show_card = SPOTIFY.show_card;
+          saveSettings();
+          renderNp();
+        }
+      });
+      rows.push({
+        kind: "toggle",
+        key: "spotify-controls",
+        label: t("spotify_controls"),
+        value: SPOTIFY.controls ? t("on") : t("off"),
+        act: function () {
+          SPOTIFY.controls = !SPOTIFY.controls;
+          ST.spotify = ST.spotify || {};
+          ST.spotify.controls = SPOTIFY.controls;
+          saveSettings();
+          renderNp();
+        }
+      });
+      rows.push({
+        kind: "cycle",
+        key: "spotify-seek",
+        label: t("spotify_seek"),
+        value: SPOTIFY.seek_seconds + "s",
+        act: function () {
+          var choices = [5, 10, 15, 30];
+          var idx = choices.indexOf(SPOTIFY.seek_seconds);
+          SPOTIFY.seek_seconds = choices[(idx + 1) % choices.length];
+          ST.spotify = ST.spotify || {};
+          ST.spotify.seek_seconds = SPOTIFY.seek_seconds;
+          saveSettings();
+          renderNp();
+        }
+      });
+      rows.push({
+        kind: "toggle",
+        key: "spotify-hide-idle",
+        label: t("spotify_hide_idle"),
+        value: SPOTIFY.hide_idle ? t("on") : t("off"),
+        act: function () {
+          SPOTIFY.hide_idle = !SPOTIFY.hide_idle;
+          ST.spotify = ST.spotify || {};
+          ST.spotify.hide_idle = SPOTIFY.hide_idle;
+          saveSettings();
+          renderNp();
+        }
+      });
+    }
+    rows.push(info("spotify-note", t("spotify_note")));
+    return rows;
+  }
+
   function appsRows() {
     var arr = arrangeItems(), rows = [];
     var hidden = data.apps.filter(function (a) { return HIDDEN_TV.indexOf(a.package) >= 0; });
@@ -2867,6 +3152,10 @@
       return { package: r.package, title: r.title, episode_title: r.episode_title || null,
         season: r.season || null, episode: r.episode || null, engaged: r.engaged || 0 };
     });
+    // Apply whitelist if configured
+    if (CFG.watch_next_allow && Array.isArray(CFG.watch_next_allow)) {
+      rows = rows.filter(function (r) { return CFG.watch_next_allow.includes(r.package); });
+    }
     return api("POST", "/api/watch-next", { rows: rows });
   }
 

@@ -861,7 +861,11 @@ html.still .tile.focus .face, html.still .tile.focus .face::after { animation: n
 .np-app { display: block; font-size: 0.9375rem; line-height: 1.25rem; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: rgba(255, 255, 255, 0.62); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .np-t b { display: block; margin-top: 0.125rem; font-size: 1.375rem; line-height: 1.75rem; font-weight: 620; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .np-t small { display: block; font-size: 1.125rem; line-height: 1.5rem; color: rgba(255, 255, 255, 0.74); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.np-ctl { display: flex; flex: none; gap: 0.375rem; }
+.np-ctl { display: flex; flex: none; gap: 0.375rem; align-items: center; }
+.np-prog-wrap { display: flex; align-items: center; gap: 0.5rem; margin-top: 0.375rem; width: 100%; }
+.np-bar { flex: 1; height: 0.25rem; border-radius: 0.125rem; background: rgba(255, 255, 255, 0.2); overflow: hidden; position: relative; }
+.np-fill { height: 100%; border-radius: 0.125rem; background: #fff; width: 0%; transition: width 250ms linear; }
+.np-time { font-size: 0.8125rem; line-height: 1rem; color: rgba(255, 255, 255, 0.65); font-variant-numeric: tabular-nums; flex: none; }
 .nb { display: flex; align-items: center; justify-content: center; width: 2.875rem; height: 2.875rem; border-radius: 50%; color: #fff; background: rgba(255, 255, 255, 0.1); transition: transform 220ms var(--ease), background 220ms var(--ease), color 220ms var(--ease); }
 .nb svg { width: 1.25rem; height: 1.25rem; fill: currentColor; stroke: none; }
 .nb.focus { background: #fff; color: #111; transform: scale(1.12); box-shadow: 0 0.5rem 1.25rem rgba(0, 0, 0, 0.35); }
@@ -922,7 +926,7 @@ html.still .tile.focus .face, html.still .tile.focus .face::after { animation: n
 .theme-night .shelf-row { display: flex; align-items: stretch; gap: 1.375rem; }
 .theme-night .np-slot.on { display: flex; flex: none; }
 .theme-night .shelf-clip { flex: 1; min-width: 0; overflow: hidden; padding: 1.5rem; margin: -1.5rem; }
-.theme-night .np { width: 34rem; margin: 0; padding: 1rem; border-radius: 1.875rem; }
+.theme-night .np { width: 38rem; margin: 0; padding: 1rem; border-radius: 1.875rem; }
 .theme-night .np-art { width: 5.9375rem; height: 5.9375rem; border-radius: 1rem; }
 .theme-night .np-app { font-size: 1.1875rem; line-height: 1.5rem; }
 .theme-night .np-t b { margin-top: 0.375rem; font-size: 1.5625rem; line-height: 2rem; }

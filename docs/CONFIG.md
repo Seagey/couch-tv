@@ -296,6 +296,35 @@ anything outside Home Assistant.
 Preview with no TV and no Home Assistant: `?mock=1&ha=1` (see the end of this page). The doorbell
 card is drawn by the app itself, so it cannot be previewed in a browser.
 
+## Spotify (optional, local media session)
+
+Off unless enabled. Displays what the locally installed Spotify app is playing on the TV, complete with album cover art, live local progress bar, and playback controls (previous, rewind, play/pause, fast-forward, next).
+
+Completely local and privacy-friendly: uses Android's local `MediaSessionManager` + `MediaController`. **No accounts, tokens, client IDs, or network calls to Spotify are ever used.**
+
+```json
+"spotify": {
+  "enabled": true,
+  "seek_seconds": 10,
+  "hide_idle": false
+}
+```
+
+| Key | What it does |
+|---|---|
+| `enabled` [false] | `true` switches the Spotify integration on. Off by default with zero background overhead. |
+| `seek_seconds` [10] | Step in seconds for rewind and fast-forward controls (5, 10, 15, or 30). |
+| `hide_idle` [false] | `true` hides the Now Playing card when Spotify is paused or stopped. |
+
+### Permissions & Setup
+The integration reads local media sessions via a `NotificationListenerService` belonging to Couch-TV. On Android TV / Google TV, grant Notification Access once over ADB:
+```sh
+adb shell cmd notification allow_listener app.couchtv.launcher/app.couchtv.launcher.SpotifyMediaListener
+```
+`apply.sh` grants this automatically when setting up the TV. The TV app will indicate whether the permission is active under **Home settings &rarr; Spotify**.
+
+*Note:* Media sessions are an Android system feature and are not available on Samsung (Tizen).
+
 ## Everything else
 
 | Key | What it does |

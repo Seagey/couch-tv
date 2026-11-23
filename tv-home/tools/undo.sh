@@ -44,6 +44,8 @@ done
 "$PY" "$T" shell "appops set app.couchtv.launcher SYSTEM_ALERT_WINDOW default" > /dev/null 2>&1 || true
 # The screensaver button's "modify system settings" grant goes back too.
 "$PY" "$T" shell "appops set app.couchtv.launcher WRITE_SETTINGS default" > /dev/null 2>&1 || true
+# Spotify notification access goes back
+"$PY" "$T" shell "cmd notification disallow_listener app.couchtv.launcher/app.couchtv.launcher.SpotifyMediaListener" > /dev/null 2>&1 || true
 # Switch off the Home button watch apply.sh switched on (any TV with a stock home), and leave any
 # other accessibility service alone.
 # The grant goes first, so the app cannot put the watch back.
