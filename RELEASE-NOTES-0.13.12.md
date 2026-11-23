@@ -17,7 +17,8 @@ When you get a design by code on an Android TV, the TV now tells Couch TV Studio
 
 ### Now playing: every music app, and Spotify fixes
 
-- **Since 0.13.11 the Now playing card's new look reaches every music app, not only Spotify:** the wider card in the Night look, the progress bar with the time, and long titles that scroll (Home settings, Look, Long titles). The 0.13.11 notes only spoke of Spotify.
+- **Since 0.13.11 the Now playing card's new look reaches every music app, not only Spotify:** the wider card in the Night look, the progress bar with the time, and long titles that scroll. The 0.13.11 notes only spoke of Spotify.
+- **App name, Long titles and Card alignment now sit under Now playing** in Home settings, Look, on every home. In 0.13.11 they showed only after switching Spotify on, though they shape every app's card.
 - **Spotify's card follows at once.** The TV home app now changes the card the moment the song, play or pause changes, instead of up to 5 seconds later.
 - **Nothing goes to Spotify.** A cover the Spotify app gives only as a link is no longer loaded, so the card truly sends nothing to Spotify. Such a song shows the music note instead.
 - **The Spotify rows show only where the card works:** the Couch TV home app on an Android TV, with or without a computer at home. Not in a browser, on the on-TV app or on a TV a computer runs without Android.

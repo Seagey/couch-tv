@@ -6530,6 +6530,7 @@
     rows.push({ kind: "toggle", key: "ambient-music", label: t("ambient_music"), value: AMBIENT_MUSIC ? t("on") : t("off"), act: function () {
       AMBIENT_MUSIC = !AMBIENT_MUSIC; ST.ambient_music = AMBIENT_MUSIC; saveSettings(); renderAmbientMusic();
     } });
+    rows = rows.concat(npLookRows());
     rows.push(info("np-note", t(OFFLINE ? "np_note_offline" : "np_note")));
     // the local Spotify card (#321) sits under Now playing here, not in a section of its own: one more
     // section pushed the last one off a 1080 screen
@@ -6678,6 +6679,28 @@
 
   // ---- apps: the same order as holding OK on the dock, plus hiding ----
   
+  // App name, Long titles and Card alignment shape every music app's Now playing card (and align the Night
+  // look's Keep watching row), so they sit under Now playing on every home, not only where Spotify's card
+  // works. They are still kept in ST.spotify, where 0.13.11 saved them.
+  function npLookRows() {
+    function keep(k, v) { ST.spotify = ST.spotify || {}; ST.spotify[k] = v; saveSettings(); }
+    return [
+      { kind: "toggle", key: "spotify-show-app", label: t("spotify_show_app"), value: SPOTIFY.show_app !== false ? t("on") : t("off"), act: function () {
+        SPOTIFY.show_app = SPOTIFY.show_app === false; keep("show_app", SPOTIFY.show_app); renderNp();
+      } },
+      { kind: "cycle", key: "spotify-title-mode", label: t("spotify_title_mode"), value: t("spotify_title_" + (SPOTIFY.title_mode || "pingpong")), act: function () {
+        var choices = ["dots", "pingpong", "continuous"];
+        SPOTIFY.title_mode = choices[(choices.indexOf(SPOTIFY.title_mode || "pingpong") + 1) % choices.length];
+        keep("title_mode", SPOTIFY.title_mode); renderNp();
+      } },
+      { kind: "cycle", key: "spotify-align", label: t("spotify_align"), value: t("spotify_align_" + (SPOTIFY.align || "classic")), act: function () {
+        var choices = ["classic", "center"];
+        SPOTIFY.align = choices[(choices.indexOf(SPOTIFY.align || "classic") + 1) % choices.length];
+        keep("align", SPOTIFY.align); applySpotifyAlign(); renderGrid(); renderShelf();
+      } }
+    ];
+  }
+
   function spotifyRows() {
     var rows = [];
     if (!spotifyWorks()) return rows;   // only where the card can work (spotifyWorks), never a switch that does nothing
@@ -6728,19 +6751,6 @@
       });
       rows.push({
         kind: "toggle",
-        key: "spotify-show-app",
-        label: t("spotify_show_app"),
-        value: SPOTIFY.show_app !== false ? t("on") : t("off"),
-        act: function () {
-          SPOTIFY.show_app = SPOTIFY.show_app === false ? true : false;
-          ST.spotify = ST.spotify || {};
-          ST.spotify.show_app = SPOTIFY.show_app;
-          saveSettings();
-          renderNp();
-        }
-      });
-      rows.push({
-        kind: "toggle",
         key: "spotify-controls",
         label: t("spotify_controls"),
         value: SPOTIFY.controls ? t("on") : t("off"),
@@ -6778,38 +6788,6 @@
           ST.spotify.hide_idle = SPOTIFY.hide_idle;
           saveSettings();
           renderNp();
-        }
-      });
-      rows.push({
-        kind: "cycle",
-        key: "spotify-title-mode",
-        label: t("spotify_title_mode"),
-        value: t("spotify_title_" + (SPOTIFY.title_mode || "pingpong")),
-        act: function () {
-          var choices = ["dots", "pingpong", "continuous"];
-          var idx = choices.indexOf(SPOTIFY.title_mode || "pingpong");
-          SPOTIFY.title_mode = choices[(idx + 1) % choices.length];
-          ST.spotify = ST.spotify || {};
-          ST.spotify.title_mode = SPOTIFY.title_mode;
-          saveSettings();
-          renderNp();
-        }
-      });
-      rows.push({
-        kind: "cycle",
-        key: "spotify-align",
-        label: t("spotify_align"),
-        value: t("spotify_align_" + (SPOTIFY.align || "classic")),
-        act: function () {
-          var choices = ["classic", "center"];
-          var idx = choices.indexOf(SPOTIFY.align || "classic");
-          SPOTIFY.align = choices[(idx + 1) % choices.length];
-          ST.spotify = ST.spotify || {};
-          ST.spotify.align = SPOTIFY.align;
-          saveSettings();
-          applySpotifyAlign();
-          renderGrid();
-          renderShelf();
         }
       });
     }

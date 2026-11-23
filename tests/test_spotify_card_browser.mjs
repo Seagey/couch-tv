@@ -75,6 +75,11 @@ try {
   ok(/Now playing/.test(rows), "browser: Look has its Now playing rows");
   ok(!/Spotify integration/.test(rows), "browser: no Spotify rows where the card cannot work");
   ok(!/only supported on Android/.test(rows), "browser: no row saying it is not supported either");
+  // App name, Long titles and Card alignment shape every app's Now playing card: under Now playing everywhere
+  ok(/App name/.test(rows) && /Long titles/.test(rows) && /Card alignment/.test(rows), "browser: App name, Long titles and Card alignment under Now playing");
+  const lookList = await page.evaluate(() => [...document.querySelectorAll("#set-rows > *")].map((r) => r.textContent));
+  const at = (re) => lookList.findIndex((x) => re.test(x));
+  ok(at(/^Long titles/) > at(/^Now playing$/) && at(/^Now playing$/) >= 0 && at(/^Long titles/) < at(/^Your photos$/), "browser: Long titles sits in the Now playing part of Look");
   ok(page.errors.length === 0, "browser: no page errors (" + page.errors.join(" | ") + ")");
   await page.close();
 
@@ -84,6 +89,14 @@ try {
   ok(/Spotify integration/.test(rows), "app + computer: the Spotify rows show");
   ok(/Notification access required/.test(rows), "app + computer: says access is needed");
   ok(!/adb shell/.test(rows), "app + computer: no adb line, the computer gives the access");
+  ok(/Long titles/.test(rows), "app + computer, Spotify off: Long titles still there");
+  // Long titles changes and is kept in Home settings (ST.spotify, as 0.13.11 saved it)
+  for (let i = 0; i < 80 && !/^Long titles/.test(await page.evaluate(() => (document.querySelector(".srow.focus") || {}).textContent || "")); i++) {
+    await page.keyboard.press("ArrowDown"); await page.waitForTimeout(60);
+  }
+  await page.keyboard.press("Enter"); await page.waitForTimeout(300);
+  const saved = await page.evaluate(() => ((JSON.parse(localStorage.getItem("mock:tvhome.settings") || "{}").s || {}).spotify || {}).title_mode);
+  ok(saved === "continuous", "Long titles moves on from Ping pong and is kept (" + saved + ")");
   await page.close();
 
   // 3. the TV home app with no computer at home: the adb line is the way to give it
