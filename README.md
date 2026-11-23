@@ -362,6 +362,10 @@ gains a permission these tables do not explain.
 - **Spotify playback access** (`SpotifySessionAccess`, Home): a notification listener you switch on yourself
   in Android settings, only when you turn on the Spotify card. It lets the home read the Spotify TV app's
   song and send previous, play or pause and next. It reads no notifications.
+- **Spotify Now playing card** (`SpotifyMediaListener`, Home): a notification listener that `apply.sh` grants
+  over ADB (docs/CONFIG.md, Spotify). The home asks it only when `spotify.enabled` is on: it reads the
+  Spotify app's song, cover and position from the TV's own media session and sends its playback buttons,
+  with no account and nothing sent to Spotify. It reads no notifications.
 - **TCL placeholder input** (`TclPlaceholderInput`, Home): an empty TV input, switched on only on a
   TCL, so TCL's start manager lets Home start at power on. It shows nothing and receives nothing.
 - **Sync listener** (`Listener`, sync helper): a notification listener, granted over ADB, only so the
