@@ -133,6 +133,28 @@ await load(false);
 s = await slots("d");
 ok(s[0][1] === "au.com.stan.and" && s[1][1] === "com.disney.disneyplus" && s[2][1] === "com.sbs.ondemand.tv", "after a reload the dock is as the person left it");
 ok((await slots("f")).filter((x) => x[0] === "app").map((x) => x[1]).join(",") === "au.net.abc.iview,au.com.kayosports.tv", "and the folder too");
+
+// Hebrew (right to left): the Change app picker's tiles run from the right, so Left goes on to the next app
+await page.evaluate(() => window.I18N.set("he"));
+ok(await page.evaluate(() => document.documentElement.dir) === "rtl", "Hebrew turns the page right to left");
+await focus("d", 0); await hold();
+const hm = await page.evaluate(() => [...document.querySelectorAll(".cw-sheet .cw-mi")].map((e) => e.getAttribute("data-name")));
+ok(hm.indexOf("Change app") >= 0, "Hold OK in Hebrew still offers Change app (" + hm.join(", ") + ")");
+for (let k = 0; k < hm.indexOf("Change app"); k++) await press("ArrowDown", 80);
+await press("Enter", 400);
+const picked = () => page.evaluate(() => { const ns = [...document.querySelectorAll(".cw-sheet [data-act=pick]")]; return { at: ns.findIndex((x) => x.classList.contains("cw-ifocus")), lefts: ns.slice(0, 2).map((x) => x.getBoundingClientRect().left) }; });
+let pk = await picked();
+ok(pk.at === 0 && pk.lefts[0] > pk.lefts[1], "the picker's first app is on the right: " + pk.lefts.join(" > "));
+await press("ArrowRight", 100);
+ok((await picked()).at === 0, "Right at the first app (the right edge) stays on it");
+await press("ArrowLeft", 100);
+ok((await picked()).at === 1, "Left goes on to the next app, to its left");
+await press("ArrowRight", 100);
+ok((await picked()).at === 0, "and Right comes back to the first");
+await press("Escape", 400);
+ok(!(await page.evaluate(() => !!document.querySelector(".cw-sheet"))) && (await slots("d"))[0][1] === "au.com.stan.and", "Back closes the picker and changes nothing");
+await page.evaluate(() => window.I18N.set("en"));
+ok(await page.evaluate(() => document.documentElement.dir) === "ltr", "English turns it back");
 await page.screenshot({ path: path.join(process.env.SHOTS || "/tmp", "app-edit.png") });
 
 // 5. a new design by code: keep the app changes, or take the design's own apps

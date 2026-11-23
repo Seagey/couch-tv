@@ -3023,6 +3023,9 @@
     function sheetKey(e, a) {
       if (a) {
         var n = sheet.nodes.length, cols = sheet.el.querySelector(".cw-menu") ? 1 : Math.max(1, Math.round(sheet.el.querySelector(".cw-sheet-apps").offsetWidth / 244));
+        // Hebrew and Arabic: a one app picker's tiles (Change app, Add app) run from the right, so Left and
+        // Right swap, as in Add apps and for the home's own arrows
+        if (a[0] && cols > 1 && document.documentElement.dir === "rtl") a = [-a[0], a[1]];
         var ni = sheet.i + a[0] + a[1] * cols;
         if (ni >= 0 && ni < n && !(a[0] && Math.floor(ni / cols) !== Math.floor(sheet.i / cols))) sheet.i = ni;
         paintSheet();
