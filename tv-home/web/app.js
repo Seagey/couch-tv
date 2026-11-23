@@ -42,7 +42,7 @@
   // config.js. ST is the saved object; the rest are read from it in readConfig().
   var ST = {}, WX_SHOW = true, WX_F = false, WX_EVERY = 30, HIDDEN_TV = [];
   // Now playing (#31), on unless switched off; the navigation sound: system, soft or off (#32)
-  var NP_ON = true, SOUND_STYLE = "system", SPOTIFY = { enabled: false, show_card: true, controls: true, seek_seconds: 10, hide_idle: false };
+  var NP_ON = true, SOUND_STYLE = "system", SPOTIFY = { enabled: false, show_card: true, controls: true, seek_seconds: 10, hide_idle: false, title_mode: "pingpong" };
   // glass app icons: the focused app in its own colours, or staying glass (#32)
   var GLASS_FOCUS = "colour";
   // The focused tile's slow sway and glint: Home settings, Look, Moving tiles, else home.moving_tiles,
@@ -226,7 +226,8 @@
       show_card: typeof spRaw.show_card === "boolean" ? spRaw.show_card : true,
       controls: typeof spRaw.controls === "boolean" ? spRaw.controls : true,
       seek_seconds: [5, 10, 15, 30].indexOf(spRaw.seek_seconds) >= 0 ? spRaw.seek_seconds : 10,
-      hide_idle: typeof spRaw.hide_idle === "boolean" ? spRaw.hide_idle : false
+      hide_idle: typeof spRaw.hide_idle === "boolean" ? spRaw.hide_idle : false,
+      title_mode: ["dots", "pingpong", "continuous"].indexOf(spRaw.title_mode) >= 0 ? spRaw.title_mode : "pingpong"
     };
     GLASS_FOCUS = (ST.glass_focus || HOME.glass_focus) === "glass" ? "glass" : "colour";
     document.documentElement.classList.toggle("gi-stay", GLASS_FOCUS === "glass");
@@ -819,15 +820,66 @@
     ) : '';
 
     var appLabel = (music.app && music.app.name) || (music.isSpotify ? "Spotify" : t("np_head"));
+    var titleMode = SPOTIFY.title_mode || "pingpong";
+    var titleContent = "";
+    if (titleMode === "continuous") {
+      titleContent = '<div class="np-title-wrap mode-continuous">' +
+        '<div class="np-title-track">' +
+          '<b class="np-title">' + esc(music.title) + '</b>' +
+          '<span class="np-title-spacer"></span>' +
+          '<b class="np-title np-title-dup" aria-hidden="true">' + esc(music.title) + '</b>' +
+          '<span class="np-title-spacer"></span>' +
+        '</div>' +
+      '</div>';
+    } else if (titleMode === "pingpong") {
+      titleContent = '<div class="np-title-wrap mode-pingpong">' +
+        '<div class="np-title-track">' +
+          '<b class="np-title">' + esc(music.title) + '</b>' +
+        '</div>' +
+      '</div>';
+    } else {
+      titleContent = '<div class="np-title-wrap mode-dots">' +
+        '<b class="np-title">' + esc(music.title) + '</b>' +
+      '</div>';
+    }
 
     el.innerHTML = art + '<div class="np-t"><span class="np-app">' + esc(appLabel) + "</span>" +
-      "<b>" + esc(music.title) + "</b><small>" + esc(music.artist || music.album || "") + "</small>" +
+      titleContent + "<small>" + esc(music.artist || music.album || "") + "</small>" +
       progHtml + "</div>" +
       '<div class="np-ctl">' + btns.map(function (b, i) {
         return '<span class="nb' + (zone === "np" && i === npI ? " focus" : "") + '" role="button" aria-label="' + esc(b.label) + '">' + b.icon + "</span>";
       }).join("") + "</div>";
 
+    updateTitleMarquee();
     startProgressTimer();
+  }
+
+  function updateTitleMarquee() {
+    var wrap = $("np") ? $("np").querySelector(".np-title-wrap") : null;
+    if (!wrap) return;
+    var titleEl = wrap.querySelector(".np-title");
+    if (!titleEl) return;
+    if (wrap.classList.contains("mode-dots")) {
+      wrap.classList.remove("overflowing");
+      return;
+    }
+    var wrapWidth = wrap.clientWidth;
+    var titleWidth = titleEl.scrollWidth;
+    if (wrapWidth > 0 && titleWidth > wrapWidth + 4) {
+      wrap.classList.add("overflowing");
+      var overflow = titleWidth - wrapWidth;
+      wrap.style.setProperty("--marquee-overflow", overflow + "px");
+      if (wrap.classList.contains("mode-pingpong")) {
+        var dur = Math.max(5, Math.min(22, Math.round(overflow / 30) + 3));
+        wrap.style.setProperty("--marquee-dur", dur + "s");
+      } else if (wrap.classList.contains("mode-continuous")) {
+        var totalDist = titleWidth + 48;
+        var cDur = Math.max(6, Math.min(25, Math.round(totalDist / 35)));
+        wrap.style.setProperty("--marquee-dur", cDur + "s");
+      }
+    } else {
+      wrap.classList.remove("overflowing");
+    }
   }
 
   function handleSpotifyState(s) {
@@ -2530,6 +2582,21 @@
           SPOTIFY.hide_idle = !SPOTIFY.hide_idle;
           ST.spotify = ST.spotify || {};
           ST.spotify.hide_idle = SPOTIFY.hide_idle;
+          saveSettings();
+          renderNp();
+        }
+      });
+      rows.push({
+        kind: "cycle",
+        key: "spotify-title-mode",
+        label: t("spotify_title_mode"),
+        value: t("spotify_title_" + (SPOTIFY.title_mode || "pingpong")),
+        act: function () {
+          var choices = ["dots", "pingpong", "continuous"];
+          var idx = choices.indexOf(SPOTIFY.title_mode || "pingpong");
+          SPOTIFY.title_mode = choices[(idx + 1) % choices.length];
+          ST.spotify = ST.spotify || {};
+          ST.spotify.title_mode = SPOTIFY.title_mode;
           saveSettings();
           renderNp();
         }

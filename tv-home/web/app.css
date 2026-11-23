@@ -868,7 +868,51 @@ html.still .tile.focus .face, html.still .tile.focus .face::after { animation: n
 .np-art svg { width: 2rem; height: 2rem; fill: none; stroke: rgba(255, 255, 255, 0.8); stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
 .np-t { flex: 1; min-width: 0; }
 .np-app { display: block; font-size: 0.9375rem; line-height: 1.25rem; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: rgba(255, 255, 255, 0.62); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.np-t b { display: block; margin-top: 0.125rem; font-size: 1.375rem; line-height: 1.75rem; font-weight: 620; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.np-t b, .np-title { display: block; margin-top: 0.125rem; font-size: 1.375rem; line-height: 1.75rem; font-weight: 620; white-space: nowrap; }
+.np-title-wrap { display: block; width: 100%; overflow: hidden; position: relative; margin-top: 0.125rem; line-height: 1.75rem; }
+.np-title-wrap.overflowing:not(.mode-dots) {
+  mask-image: linear-gradient(90deg, #000 0%, #000 calc(100% - 1.25rem), transparent 100%);
+  -webkit-mask-image: linear-gradient(90deg, #000 0%, #000 calc(100% - 1.25rem), transparent 100%);
+}
+.np-title-wrap.mode-dots .np-title,
+.np-title-wrap:not(.overflowing) .np-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.np-title-wrap.mode-pingpong.overflowing .np-title-track {
+  display: inline-block;
+  white-space: nowrap;
+  will-change: transform;
+  animation: np-pingpong var(--marquee-dur, 6s) ease-in-out infinite alternate;
+}
+.np-title-wrap.mode-pingpong.overflowing .np-title {
+  display: inline-block;
+}
+@keyframes np-pingpong {
+  0%, 15% { transform: translateX(0); }
+  85%, 100% { transform: translateX(calc(-1 * var(--marquee-overflow, 60px))); }
+}
+.np-title-wrap.mode-continuous.overflowing .np-title-track {
+  display: flex;
+  align-items: center;
+  width: max-content;
+  white-space: nowrap;
+  will-change: transform;
+  animation: np-continuous var(--marquee-dur, 10s) linear infinite;
+}
+.np-title-wrap.mode-continuous.overflowing .np-title {
+  display: inline-block;
+  flex: none;
+}
+.np-title-spacer {
+  display: inline-block;
+  width: 3rem;
+  flex: none;
+}
+@keyframes np-continuous {
+  0% { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
 .np-t small { display: block; font-size: 1.125rem; line-height: 1.5rem; color: rgba(255, 255, 255, 0.74); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .np-ctl { display: flex; flex: none; gap: 0.375rem; align-items: center; }
 .np-prog-wrap { display: flex; align-items: center; gap: 0.5rem; margin-top: 0.375rem; width: 100%; }
@@ -924,6 +968,17 @@ html.still .tile.focus .face, html.still .tile.focus .face::after { animation: n
 .glass .set-side, .glass .set-main, .glass .gear-pop, .glass .app-pop, .glass .sleep-menu { background: rgba(28, 26, 34, 0.97); }
 }
 @media (prefers-reduced-motion: reduce) {
+  .np-title-wrap .np-title-track,
+  .np-title-wrap .np-title {
+    animation: none !important;
+    transform: none !important;
+  }
+  .np-title-dup, .np-title-spacer { display: none !important; }
+  .np-title {
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    white-space: nowrap !important;
+  }
   .glass .settings.on .set-side, .glass .settings.on .set-main, .glass .gear-pop.on, .glass .app-pop.on, .glass .sleep-menu.on { animation: none; }
   .glass .srow, .glass .ssec, .glass .grow, .nb, .sleep-menu .opt { transition: none; }
   .glass .srow.focus, .glass .ssec.focus, .glass .grow.focus, .nb.focus, .glass .ncard.focus, .glass.theme-night .app.focus { transform: none; }
@@ -938,7 +993,8 @@ html.still .tile.focus .face, html.still .tile.focus .face::after { animation: n
 .theme-night .np { width: 38rem; margin: 0; padding: 1rem; border-radius: 1.875rem; }
 .theme-night .np-art { width: 5.9375rem; height: 5.9375rem; border-radius: 1rem; }
 .theme-night .np-app { font-size: 1.1875rem; line-height: 1.5rem; }
-.theme-night .np-t b { margin-top: 0.375rem; font-size: 1.5625rem; line-height: 2rem; }
+.theme-night .np-t b, .theme-night .np-title { margin-top: 0.375rem; font-size: 1.5625rem; line-height: 2rem; }
+.theme-night .np-title-wrap { margin-top: 0.375rem; line-height: 2rem; }
 .theme-night .np-t small { font-size: 1.25rem; line-height: 1.625rem; }
 .theme-night.gearing .np-slot, .theme-night.apping .np-slot { opacity: 0; }
 .no-flex-gap.theme-night .shelf-row > * + * { margin-left: 1.375rem; }
