@@ -108,3 +108,32 @@ with that widget's settings, not once for the whole home, when a setting changes
   how to set it, in plain words.
 - If a widget cannot work on this kind of TV, it says so plainly, and couch-tv Studio warns before it
   is placed.
+
+## Set up on the phone (0.13.10)
+
+- A widget waiting for something private (`widget-caps.js` `setupNeed`: town, photos, calendar, spotify,
+  wifi, text, team, ha) shows its name, one short line (`face`) and "Set up on your phone" with a code.
+  The TV never says which TVs a widget works on. With no phone page it says "Press OK to set it up".
+- Hold OK puts "<Widget>: set up on your phone" (or "Edit on your phone") first; its sheet has "No phone? Set
+  it up here", which opens the widget's page in Home settings. Edit on the TV is offered only where no phone
+  page exists.
+- A design that arrives with a widget waiting shows "Set up your widgets" and a code for 2 minutes, once.
+
+### The phone page links (setup.html)
+
+All of these go in the URL fragment only, so they never reach a server, and the page takes each out of the
+address as soon as it is read:
+
+- `http://<tv>:5400/setup#pin=<6 digits>&widget=<object id>&connect=<need>`: the TV's code for one widget.
+  `need` is one of town, photos, calendar, spotify, wifi, text, team, ha. Older pages ignore `&connect=`.
+- `http://<tv>:5400/setup#pin=<6 digits>&widgets`: walks through every widget still waiting, then "All set.
+  Look at your TV."
+- `#town=<name>|<lat>|<lon>[|<time zone>]`, for couch-tv Studio's "Set up my widgets" link to the person's own
+  TV (it may be the only part, or join the others with `&`). Each part is encoded with `encodeURIComponent`,
+  joined by `|` (encoded `%7C` is fine too). `name` is the town only (at most 60 letters, never a street),
+  `lat` and `lon` are decimal degrees (the page rounds them to 2 places, about a kilometre), the time zone is
+  an IANA name such as `Australia/Sydney` (left out: the TV works it out). Example:
+  `http://<tv address>:5400/setup#widgets&town=Ballarat%7C-37.56%7C143.85%7CAustralia%2FMelbourne`.
+  The page asks "Use Ballarat for the weather?" and saves it only on Yes, the same way its Town search does
+  (`settings_patch.place`). It is never put in a design, the design store, the gallery or My TVs; a link
+  that goes through a server (a typed code, the TV's inbox) never carries it.

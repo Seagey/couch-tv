@@ -33,6 +33,8 @@ class PhoneServerTest {
             "www/ontv/setup.html" -> ByteArrayInputStream("<title>Home settings</title><script src=\"/ontv/shim.js\"></script>".toByteArray())
             "www/ontv/shim.js" -> ByteArrayInputStream("// shim".toByteArray())
             "www/tv/phone-words.js" -> ByteArrayInputStream("// words".toByteArray())
+            "www/tv/widgets.js" -> ByteArrayInputStream("// widgets".toByteArray())
+            "www/tv/widgets.css" -> ByteArrayInputStream(".cw {}".toByteArray())
             else -> null
         }
         override fun page(code: String): JSONObject? { codes += code; return answer(code) }
@@ -52,6 +54,7 @@ class PhoneServerTest {
         override fun codeChanged() { changed++ }
         override fun showCode(code: String) { shown += code }
         override fun tmpDir() = dir
+        override fun appIcon(pkg: String): ByteArray? = if (pkg == "com.netflix.ninja") byteArrayOf(0x89.toByte(), 0x50, 0x4E, 0x47) else null
         // smart home set up from a phone on this same server: HaPhone's own rules, with no Android context
         override fun ha(method: String, path: String, query: Map<String, String>, body: String, hostHeader: String?, port: Int) =
             app.couchtv.ha.HaPhone.handleFor(null, method, path, query, body, hostHeader, port) { name ->
@@ -307,6 +310,19 @@ class PhoneServerTest {
         assertEquals(404, call("GET", "/tv/caps-words.js").status)   // not in this build: not found
         assertEquals(404, call("GET", "/tv/app.js").status)          // nothing else of the home
         assertEquals(404, call("GET", "/tv/../ontv/shim.js").status)
+    }
+
+    // Widgets on your screen (setup.html) draws each widget with the home's own files, and the apps card
+    // shows the TV's own icons, only to a paired phone
+    @Test fun widgetKitAndAppIcons() {
+        assertEquals("// widgets", call("GET", "/tv/widgets.js").body)
+        assertEquals(".cw {}", call("GET", "/tv/widgets.css").body)
+        assertEquals(404, call("GET", "/tv/design.js").status)            // not part of the kit
+        assertEquals(401, call("GET", "/api/appicon/com.netflix.ninja").status)
+        val t = paired()
+        assertEquals(200, call("GET", "/api/appicon/com.netflix.ninja", token = t).status)
+        assertEquals(404, call("GET", "/api/appicon/com.not.here", token = t).status)
+        assertEquals(400, call("GET", "/api/appicon/a%2F..%2Fx", token = t).status)
     }
 
     @Test fun qrReusesALiveCode() {
