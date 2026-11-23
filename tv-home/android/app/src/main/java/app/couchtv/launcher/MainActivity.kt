@@ -1139,7 +1139,6 @@ class MainActivity : Activity() {
             }
             return true
         }
-        }
     }
 
     private fun speechIntent(prompt: String): Intent =
