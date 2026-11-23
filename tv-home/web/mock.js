@@ -81,7 +81,7 @@
   var arg = function (name) { var m = q.match(new RegExp("[?&]" + name + "=([^&]*)")); if (!m) return null; try { return decodeURIComponent(m[1].replace(/\+/g, " ")); } catch (e) { return null; } };
   // the Home settings keys the bridge keeps (bridge/server.py clean_settings); keep the two lists alike
   var BRIDGE_KEYS = ["lang", "place", "wx_show", "wx_unit", "wx_every", "look", "idle_photo_seconds", "keep_photo", "keep_photo_pick", "glass", "glass_icons",
-    "moving_tiles", "dock", "lighter", "glass_amount", "clock_style", "now_playing", "keep_watching", "keep_watching_style", "ambient_music", "sun_sync", "ambient_weather",
+    "moving_tiles", "dock", "lighter", "glass_amount", "clock_style", "now_playing", "keep_watching", "keep_watching_style", "spotify", "ambient_music", "sun_sync", "ambient_weather",
     "ambient_sun_grade", "nav_sound", "start_focus", "glass_focus", "video", "video_url", "scene_order", "scenes_off", "scene_seconds", "clock", "photos",
     "hidden_apps", "quick", "soundscape", "smart_idle", "input_tile", "shelf_follows_app", "widgets", "widgets_design", "widgets_base", "show_clock", "hi_res", "icon_set"];
   if (arg("reset")) {

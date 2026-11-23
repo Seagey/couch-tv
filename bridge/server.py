@@ -3211,6 +3211,17 @@ def clean_settings(s):
         out["keep_watching"] = s["keep_watching"]
     if s.get("keep_watching_style") in ("card", "poster"):   # Night: wide cards or poster tiles (#192)
         out["keep_watching_style"] = s["keep_watching_style"]
+    sp = s.get("spotify")   # Home settings, Spotify (the local Now playing card): only the known keys
+    if isinstance(sp, dict):
+        o = {k: sp[k] for k in ("enabled", "show_card", "controls", "show_app", "hide_idle") if isinstance(sp.get(k), bool)}
+        if sp.get("seek_seconds") in (5, 10, 15, 30) and not isinstance(sp.get("seek_seconds"), bool):
+            o["seek_seconds"] = sp["seek_seconds"]
+        if sp.get("title_mode") in ("dots", "pingpong", "continuous"):
+            o["title_mode"] = sp["title_mode"]
+        if sp.get("align") in ("classic", "center"):
+            o["align"] = sp["align"]
+        if o:
+            out["spotify"] = o
     if isinstance(s.get("ambient_music"), bool):
         out["ambient_music"] = s["ambient_music"]
     if isinstance(s.get("sun_sync"), bool):

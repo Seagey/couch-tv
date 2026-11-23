@@ -117,5 +117,20 @@ Sessions Stack - have 1 sessions:
         self.assertTrue(can_prev)
         self.assertTrue(can_seek)
 
+    def test_bridge_keeps_home_settings_spotify(self):
+        # Home settings, Spotify is saved through /api/settings: the bridge keeps the known keys, so the
+        # home's settings sync does not drop them and restart the home with the card off again
+        import server
+        s = {"enabled": True, "show_card": False, "controls": True, "show_app": False, "hide_idle": True,
+             "seek_seconds": 15, "title_mode": "dots", "align": "center"}
+        self.assertEqual(server.clean_settings({"spotify": dict(s)})["spotify"], s)
+        out = server.clean_settings({"spotify": {"enabled": "yes", "seek_seconds": 7, "title_mode": "x",
+                                                 "align": "right", "evil": "<b>", "controls": False}})
+        self.assertEqual(out["spotify"], {"controls": False})
+        self.assertNotIn("spotify", server.clean_settings({"spotify": "on"}))
+        self.assertNotIn("spotify", server.clean_settings({"spotify": {"seek_seconds": True}}))
+        mock = (Path(__file__).parents[1] / "tv-home" / "web" / "mock.js").read_text(encoding="utf-8")
+        self.assertIn('"spotify"', mock.split("var BRIDGE_KEYS = [", 1)[1].split("]", 1)[0])
+
 if __name__ == "__main__":
     unittest.main()
