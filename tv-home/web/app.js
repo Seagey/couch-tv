@@ -6637,7 +6637,7 @@
     askKind = "upd";
     if (!UPD || !UPD.supported || UPD.answered || kidsOn()) return;
     if (HOME.updates === "notify" || HOME.updates === "manual") { upd().auto(HOME.updates === "notify"); return; }
-    if (welcomeSeen || zone === "welcome" || kept(WELCOME_KEY) === "ask") { updLater = true; return; }
+    if (welcomeSeen || zone === "welcome" || kept(WELCOME_KEY) === "ask" || welcomeJustAnswered()) { updLater = true; return; }
     if (zone !== "grid" && zone !== "shelf" && zone !== "people" && zone !== "quick") return;
     askKind = "upd";
     zone = "updask"; ai = 0;
@@ -6650,6 +6650,7 @@
     if (!updLater || document.hidden || kept(WELCOME_KEY) === "ask") return;
     if (zone !== "grid" && zone !== "shelf" && zone !== "people" && zone !== "quick") return;   // still waiting
     updLater = false; welcomeSeen = false;
+    keep(WELCOME_AT_KEY, 0);   // the calm moment came: the time the welcome was answered no longer holds it back
     updRead();
     updAsk();
   }
@@ -6737,6 +6738,15 @@
   // "tvhome.welcome": "ask" while it is due, else what closed it ("code", "original", "settings"), or
   // "set" for a TV that was already set up when this version first ran (an update never shows it).
   var WELCOME_KEY = "tvhome.welcome", STUDIO_SITE = "couchtv.joshuaseage.com", wi = 0;
+  // When the welcome was answered (ms). A design code applied from it starts the home again (design.js reloads
+  // the page), and that new start has no welcomeSeen: without this the update question came up behind "Use this
+  // design?" (the TCL, 23 Nov 2026). For WELCOME_CALM_MS after the answer a start keeps the question back until
+  // the home comes to the front again (updAskLater), which then clears it.
+  var WELCOME_AT_KEY = "tvhome.welcome.at", WELCOME_CALM_MS = 30 * 60 * 1000;
+  function welcomeJustAnswered() {
+    var at = +kept(WELCOME_AT_KEY) || 0;
+    return at > 0 && Date.now() - at < WELCOME_CALM_MS;
+  }
   // A TV nobody has set up: the launcher's own copy with no computer (option A) or the on-TV app
   // (option C), with nothing chosen or kept on it yet. Worked out before readConfig(), so nothing the
   // first start keeps by itself (Lighter home, the apps it has seen) is taken for a setup.
@@ -6819,6 +6829,7 @@
   }
   function welcomeClose(how) {
     keep(WELCOME_KEY, how);
+    keep(WELCOME_AT_KEY, Date.now());
     var el = $("welcome");
     if (el) el.classList.remove("on");
     document.documentElement.classList.remove("welcoming");

@@ -83,15 +83,39 @@ try {
   await awayAndBack(); await page.waitForTimeout(3500);
   ok(!(await updAsk()), "and never comes back on later home opens");
 
-  // the next start also counts as later: a reload after the welcome was answered asks once the home is up
+  // a start straight after the welcome (a design applied from it reloads the page) does not ask; a later
+  // start does
   await freshTv();
   await press("Escape", 500);   // Back on the welcome: Couch Original
   ok(!(await welcome()), "Back answers the welcome");
   await page.waitForTimeout(3500);
   ok(!(await updAsk()), "no question straight after Back either");
+  ok(await page.evaluate(() => +localStorage.getItem("mock:tvhome.welcome.at") > Date.now() - 60000), "the time the welcome was answered is kept");
+  await page.reload(); await ready();
+  await page.waitForTimeout(5000);
+  ok(!(await updAsk()) && !(await welcome()), "a start straight after the welcome: no welcome, no question");
+  await awayAndBack();
+  await page.waitForFunction(() => document.getElementById("gear-pop").classList.contains("ask"), null, { timeout: 8000 });
+  ok(await updAsk(), "the home back in front after that start: asked then");
+  await freshTv();
+  await press("Escape", 500);
+  await page.evaluate(() => localStorage.setItem("mock:tvhome.welcome.at", JSON.stringify(Date.now() - 31 * 60 * 1000)));
   await page.reload(); await ready();
   await page.waitForFunction(() => document.getElementById("gear-pop").classList.contains("ask"), null, { timeout: 8000 });
-  ok(await updAsk() && !(await welcome()), "the next start asks it, with no welcome");
+  ok(await updAsk() && !(await welcome()), "a start long after the welcome asks it, with no welcome");
+
+  // the TCL: I have a design code, then the design is applied and the home starts again (design.js reloads):
+  // "Use this design?" and the home after it never have the update question behind them
+  await freshTv();
+  await press("Enter", 500);
+  ok(await page.evaluate(() => document.getElementById("settings").classList.contains("on")), "I have a design code opens the code box");
+  await page.evaluate(() => { localStorage.setItem("couchtv.design.ok", "x"); location.reload(); });
+  await ready();
+  await page.waitForTimeout(6000);
+  ok(!(await updAsk()) && !(await welcome()), "the start after a design is applied from the welcome: no update question");
+  await awayAndBack();
+  await page.waitForFunction(() => document.getElementById("gear-pop").classList.contains("ask"), null, { timeout: 8000 });
+  ok(await updAsk(), "asked later, when the home comes back to the front");
 
   // a design code instead: Home settings opens, still no question over it or after it
   await freshTv();
