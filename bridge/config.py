@@ -778,7 +778,7 @@ ASK_ENABLED = bool(_ask["enabled"]) if isinstance(_ask.get("enabled"), bool) els
 def _spotify(raw):
     """Configuration for Spotify local media session integration."""
     if not isinstance(raw, dict):
-        return {"enabled": False, "seek_seconds": 10, "hide_idle": False, "title_mode": "pingpong", "show_app": True}
+        return {"enabled": False, "seek_seconds": 10, "hide_idle": False, "title_mode": "pingpong", "show_app": True, "align": "classic"}
     out = {}
     out["enabled"] = bool(raw.get("enabled", False))
     seek = raw.get("seek_seconds")
@@ -793,6 +793,11 @@ def _spotify(raw):
     else:
         out["title_mode"] = "pingpong"
     out["show_app"] = bool(raw.get("show_app", True))
+    align = raw.get("align")
+    if align in ("classic", "center"):
+        out["align"] = align
+    else:
+        out["align"] = "classic"
     return out
 
 
