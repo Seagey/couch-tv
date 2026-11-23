@@ -158,9 +158,14 @@ class SetupWordsTest {
     @Test fun saysPlainlyWhenTheTvNeverAnswered() {
         // the whole Allow debugging wait went by with no answer (a real TCL kept a hidden question open)
         assertEquals(SetupWords.NOT_ASKED, SetupWords.keysLine(false, false, false, notAsked = true))
-        assertTrue(SetupWords.NOT_ASKED.contains("restart the TV"))
+        assertTrue(SetupWords.NOT_ASKED.contains("restart it"))
+        // Android's own words for its box, and the way to its Allow button (Down lands on Cancel)
+        assertTrue(SetupWords.NOT_ASKED.contains("\"Allow USB debugging?\""))
+        val wait = SetupWords.keysLine(false, true, false)
+        assertTrue(wait, wait.contains("\"Allow USB debugging?\"") && wait.contains("Down, Left, press Allow") && !wait.contains("press OK"))
+        assertTrue(wait.split(" ").size <= 14)
         // a new wait under way wins over the old no answer
-        assertTrue(SetupWords.keysLine(false, true, false, notAsked = true).startsWith("Look at the TV"))
+        assertTrue(SetupWords.keysLine(false, true, false, notAsked = true).startsWith("On the TV's \"Allow USB debugging?\""))
         // connected wins over everything
         assertEquals("The phone remote can press every key and type on the TV.", SetupWords.keysLine(true, false, false, notAsked = true))
     }

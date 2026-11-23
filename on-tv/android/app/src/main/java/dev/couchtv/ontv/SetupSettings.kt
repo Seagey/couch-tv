@@ -65,7 +65,7 @@ object SetupSettings {
         val third = if (pairing) KeyStep("Pair with a code",
             "In Wireless debugging, choose Pair device with pairing code. Scan this with your phone and type that code there.",
             SetupWords.CONNECT, Action.CONNECT, SetupWords.BACK, Action.BACK, phoneQr = true)
-        else KeyStep("Let Couch TV in", "Press Connect. When the TV asks, tick Always allow and press Allow.",
+        else KeyStep("Let Couch TV in", "Press Connect. On \"Allow USB debugging?\", tick Always allow, then Down, Left, Allow.",
             SetupWords.CONNECT, Action.CONNECT, SetupWords.BACK, Action.BACK)
         return listOf(first, second, third)
     }

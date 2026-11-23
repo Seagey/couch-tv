@@ -1599,8 +1599,8 @@
   function showAdb(a) {
     var s = $('adb-status');
     if (a.connected) { s.className = 'status ok'; s.textContent = 'The phone can press keys.'; }
-    else if (a.state === 'waiting_for_allow' || a.state === 'connecting') { s.className = 'status'; s.textContent = 'Look at the TV. If it asks "Allow debugging?", tick Always allow and press OK.'; }
-    else if (a.unanswered) { s.className = 'status bad'; s.textContent = 'No answer from the TV. If it did not show its Allow debugging question, restart the TV, then try again.'; }
+    else if (a.state === 'waiting_for_allow' || a.state === 'connecting') { s.className = 'status'; s.textContent = 'On the TV\'s "Allow USB debugging?", tick Always allow, then Down, Left, press Allow.'; }
+    else if (a.unanswered) { s.className = 'status bad'; s.textContent = 'No answer. If the TV never asked "Allow USB debugging?", restart it and retry.'; }
     else { s.className = 'status bad'; s.textContent = 'The phone can\'t press keys yet.' + (a.error ? ' ' + a.error : ''); }
   }
   // Who serves this page. The on-TV app (no mode): everything. A home computer ("bridge", for a Samsung,
