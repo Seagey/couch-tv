@@ -3972,7 +3972,7 @@ async def h_music(request):
 SPOTIFY_PACKAGES = {"com.spotify.tv.android", "com.spotify.music"}
 
 
-async def spotify_now():
+async def spotify_session_now():
     """Spotify media session state, read via dumpsys media_session."""
     if not (tv.connected and tv.is_on and await tv.adb_ready()):
         return {"available": False, "state": "stopped"}
@@ -4005,7 +4005,7 @@ async def spotify_now():
 
 
 async def h_spotify_now(request):
-    return ok(spotify=await spotify_now())
+    return ok(spotify=await spotify_session_now())
 
 
 async def h_spotify_control(request):
@@ -4075,6 +4075,22 @@ async def h_spotify_login(request):
     except ValueError as e:
         return web.Response(text=str(e), status=400)
     raise web.HTTPFound(url)
+
+
+async def h_spotify_callback(request):
+    _loopback_only(request)
+    q = request.query
+    if q.get("error"):
+        return web.Response(text="Spotify said: " + q["error"], status=400)
+    try:
+        await spotify_now.finish_login(q.get("state"), q.get("code"))
+    except (ValueError, RuntimeError) as e:
+        return web.Response(text=str(e), status=400)
+    return web.Response(text="Spotify is connected to couch-tv. You can close this tab.")
+
+
+async def h_spotify_status(request):
+    return ok(**spotify_now.status())
 
 
 async def h_continue(request):

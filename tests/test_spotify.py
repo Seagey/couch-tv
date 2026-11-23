@@ -15,31 +15,31 @@ class TestSpotifyIntegration(unittest.TestCase):
     def test_spotify_config_defaults(self):
         self.assertEqual(
             config._spotify(None),
-            {"enabled": False, "seek_seconds": 10, "hide_idle": False, "title_mode": "pingpong"}
+            {"enabled": False, "seek_seconds": 10, "hide_idle": False, "title_mode": "pingpong", "show_app": True}
         )
         self.assertEqual(
             config._spotify({}),
-            {"enabled": False, "seek_seconds": 10, "hide_idle": False, "title_mode": "pingpong"}
+            {"enabled": False, "seek_seconds": 10, "hide_idle": False, "title_mode": "pingpong", "show_app": True}
         )
 
     def test_spotify_config_custom(self):
-        cfg = {"enabled": True, "seek_seconds": 15, "hide_idle": True, "title_mode": "continuous"}
+        cfg = {"enabled": True, "seek_seconds": 15, "hide_idle": True, "title_mode": "continuous", "show_app": False}
         self.assertEqual(
             config._spotify(cfg),
-            {"enabled": True, "seek_seconds": 15, "hide_idle": True, "title_mode": "continuous"}
+            {"enabled": True, "seek_seconds": 15, "hide_idle": True, "title_mode": "continuous", "show_app": False}
         )
         # Clamping / validation of seek_seconds and title_mode
         self.assertEqual(
             config._spotify({"seek_seconds": -5, "title_mode": "invalid"}),
-            {"enabled": False, "seek_seconds": 10, "hide_idle": False, "title_mode": "pingpong"}
+            {"enabled": False, "seek_seconds": 10, "hide_idle": False, "title_mode": "pingpong", "show_app": True}
         )
         self.assertEqual(
-            config._spotify({"seek_seconds": 300, "title_mode": "dots"}),
-            {"enabled": False, "seek_seconds": 10, "hide_idle": False, "title_mode": "dots"}
+            config._spotify({"seek_seconds": 300, "title_mode": "dots", "show_app": True}),
+            {"enabled": False, "seek_seconds": 10, "hide_idle": False, "title_mode": "dots", "show_app": True}
         )
         self.assertEqual(
             config._spotify({"seek_seconds": "invalid"}),
-            {"enabled": False, "seek_seconds": 10, "hide_idle": False, "title_mode": "pingpong"}
+            {"enabled": False, "seek_seconds": 10, "hide_idle": False, "title_mode": "pingpong", "show_app": True}
         )
 
     def test_spotify_media_session_parsing(self):

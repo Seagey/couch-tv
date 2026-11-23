@@ -133,7 +133,7 @@
   var WX_AMBIENT = true, WX_SUN_GRADE = true;
   // Now playing (#31), on unless switched off; the navigation sound: system, soft or off (#32)
   var NP_ON = true, KW_ON = true, SOUND_STYLE = "system", START_FOCUS = "people",
-    SPOTIFY = { enabled: false, show_card: true, controls: true, seek_seconds: 10, hide_idle: false, title_mode: "pingpong" };
+    SPOTIFY = { enabled: false, show_card: true, controls: true, seek_seconds: 10, hide_idle: false, title_mode: "pingpong", show_app: true };
   // Keep watching follows the app the remote is on (home.shelf_follows_app), off unless switched on
   var SHELF_FOLLOW = false;
   // Ambient sleep soundscapes (rain, fire, waves, brown noise)
@@ -643,7 +643,8 @@
       controls: typeof spRaw.controls === "boolean" ? spRaw.controls : true,
       seek_seconds: [5, 10, 15, 30].indexOf(spRaw.seek_seconds) >= 0 ? spRaw.seek_seconds : 10,
       hide_idle: typeof spRaw.hide_idle === "boolean" ? spRaw.hide_idle : false,
-      title_mode: ["dots", "pingpong", "continuous"].indexOf(spRaw.title_mode) >= 0 ? spRaw.title_mode : "pingpong"
+      title_mode: ["dots", "pingpong", "continuous"].indexOf(spRaw.title_mode) >= 0 ? spRaw.title_mode : "pingpong",
+      show_app: typeof spRaw.show_app === "boolean" ? spRaw.show_app : true
     };
     // the Keep watching row: Home settings win over home.keep_watching; off hides it and stops fetching it
     KW_ON = typeof ST.keep_watching === "boolean" ? ST.keep_watching : HOME.keep_watching !== false;
@@ -2811,7 +2812,10 @@
       '</div>'
     ) : '';
 
+    var showApp = SPOTIFY.show_app !== false;
+    el.classList.toggle("no-app", !showApp);
     var appLabel = (music.app && music.app.name) || (music.isSpotify ? "Spotify" : t("np_head"));
+    var appHtml = showApp ? ('<span class="np-app">' + esc(appLabel) + "</span>") : '';
     var titleMode = SPOTIFY.title_mode || "pingpong";
     var titleContent = "";
     if (titleMode === "continuous") {
@@ -2835,7 +2839,7 @@
       '</div>';
     }
 
-    el.innerHTML = art + '<div class="np-t"><span class="np-app">' + esc(appLabel) + "</span>" +
+    el.innerHTML = art + '<div class="np-t">' + appHtml +
       titleContent + "<small>" + esc(music.artist || music.album || "") + "</small>" +
       progHtml + "</div>" +
       '<div class="np-ctl">' + btns.map(function (b, i) {
@@ -6650,6 +6654,19 @@
           SPOTIFY.show_card = !SPOTIFY.show_card;
           ST.spotify = ST.spotify || {};
           ST.spotify.show_card = SPOTIFY.show_card;
+          saveSettings();
+          renderNp();
+        }
+      });
+      rows.push({
+        kind: "toggle",
+        key: "spotify-show-app",
+        label: t("spotify_show_app"),
+        value: SPOTIFY.show_app !== false ? t("on") : t("off"),
+        act: function () {
+          SPOTIFY.show_app = SPOTIFY.show_app === false ? true : false;
+          ST.spotify = ST.spotify || {};
+          ST.spotify.show_app = SPOTIFY.show_app;
           saveSettings();
           renderNp();
         }

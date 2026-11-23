@@ -775,7 +775,8 @@ Completely local and privacy-friendly: uses Android's local `MediaSessionManager
   "enabled": true,
   "seek_seconds": 10,
   "hide_idle": false,
-  "title_mode": "pingpong"
+  "title_mode": "pingpong",
+  "show_app": true
 }
 ```
 
@@ -785,6 +786,7 @@ Completely local and privacy-friendly: uses Android's local `MediaSessionManager
 | `seek_seconds` [10] | Step in seconds for rewind and fast-forward controls (5, 10, 15, or 30). |
 | `hide_idle` [false] | `true` hides the Now Playing card when Spotify is paused or stopped. |
 | `title_mode` ["pingpong"] | Display mode for long song titles: `"dots"` (standard `...` truncation), `"pingpong"` (ping-pong marquee sliding), or `"continuous"` (continuous scrolling marquee). |
+| `show_app` [true] | `true` displays the "SPOTIFY" label above the song title; `false` hides it and proportionally centers and sizes the playback controls and track details. |
 
 ### Permissions & Setup
 The integration reads local media sessions via a `NotificationListenerService` belonging to Couch-TV. On Android TV / Google TV, grant Notification Access once over ADB:
