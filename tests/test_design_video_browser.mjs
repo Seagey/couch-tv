@@ -248,6 +248,28 @@ if (LONG) { // 4c. an official design's long loop: played whole, looping; kept, 
   await page.close();
 }
 
+{ // 4c. a 1 GB TV (Lighter home is on by itself there): the video still plays, the Designs line says it is a
+  // smaller copy, and Show the still picture instead is a choice this TV keeps (0.13.10)
+  const oneGb = async (page) => page.addInitScript(() => Object.defineProperty(Navigator.prototype, "deviceMemory", { get: () => 1, configurable: true }));
+  const page = await home(loop("rain", { home: { lighter: true } }), { cdp: oneGb });
+  ok(await page.evaluate(() => navigator.deviceMemory) === 1, "the page reads 1 GB of memory");
+  await until(page, "playing");
+  ok(/smaller copy, as this TV has 1 GB of memory/.test(await page.evaluate(() => window.CouchDesign.videoNote())), "1 GB with Lighter home: the video plays, and Designs says it is a smaller copy");
+  ok(await page.evaluate(() => window.CouchDesign.hasVideo() && window.CouchDesign.videoStill() === false), "the design has a video, and the still picture is not chosen");
+  await page.evaluate(() => window.CouchDesign.videoStill(true));
+  await until(page, "still", 8000);
+  ok(/chosen on this TV/.test((await vstate(page)).why) && !(await vstate(page)).src, "Show the still picture instead: the video stops and lets go (" + (await vstate(page)).why + ")");
+  await page.goto(BASE + "?mock=1&design=local&designstore=" + encodeURIComponent(ORIGIN));
+  await page.waitForFunction(() => document.documentElement.classList.contains("cd"));
+  await until(page, "still", 8000);
+  ok(await page.evaluate(() => window.CouchDesign.videoStill() === true && window.CouchDesign.videoNote() === ""), "the choice is kept when the home opens again, and the note leaves it to the Designs row");
+  await page.evaluate(() => window.CouchDesign.videoStill(false));
+  await until(page, "playing");
+  ok(true, "turned off again: the video plays");
+  ok(page.errors.length === 0, "no errors: " + page.errors.slice(0, 2).join(" | "));
+  await page.close();
+}
+
 { // 5. the cost at 4x slower CPU (the throttle Chrome's own tools use for a slow phone)
   const bcdp = await browser.newBrowserCDPSession();
   const throttle = async (page) => { const c = await page.context().newCDPSession(page); await c.send("Emulation.setCPUThrottlingRate", { rate: 4 }); page.cdp = c; };

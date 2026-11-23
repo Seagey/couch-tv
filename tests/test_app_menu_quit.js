@@ -16,12 +16,13 @@ function setup({ OFFLINE = false, PREVIEW = false, ON_TV = false, bridge = true,
     TV: { uninstall() {}, appInfo() {} }, OFFLINE, PREVIEW, ON_TV, data: { bridge }, zone: 'grid', hintFlash: '',
     t: (key, vars) => key + (vars ? ':' + vars.name : ''),
     flash: text => calls.flash.push(text),
-    setTimeout, paintFocus() {}, renderAppMenu() {}, closeAppMenu() {},
+    setTimeout, clearTimeout, paintFocus() {}, renderAppMenu() {}, closeAppMenu() {},
     api: (...args) => { calls.api.push(JSON.stringify(args.slice(0, 3))); return api(...args); }
   };
   vm.createContext(context);
-  vm.runInContext('var amI = 0, amItems = [], amApp = null;', context);
-  for (const name of ['openAppMenu', 'bridgeCanStop', 'stopApp', 'doAppMenu']) vm.runInContext(pull(name), context);
+  vm.runInContext('var amI = 0, amItems = [], amApp = null, openingT = null;', context);
+  // tvLaunch: opening an app goes through it (it lets go of a design's video first, 0.13.10)
+  for (const name of ['openAppMenu', 'bridgeCanStop', 'stopApp', 'doAppMenu', 'designVideo', 'videoOpening', 'tvLaunch']) vm.runInContext(pull(name), context);
   return { context, calls };
 }
 
