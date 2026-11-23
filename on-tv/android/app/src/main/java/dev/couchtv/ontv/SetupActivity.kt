@@ -41,6 +41,12 @@ class SetupActivity : Activity() {
     /** the key walk-through: which screen of SetupSettings.keySteps, and its status line on the last one */
     private var keyIndex = 0
     private var keyStatus: TextView? = null
+    // the wait for the TV's "Allow USB debugging?" box after Connect (AllowWait): when it started, whether something
+    // came over this screen in it (the box), whether the app stepped aside once, and whether the hidden line is up
+    private var waitStartedAt = 0L
+    private var waitLostFocus = false
+    private var steppedAside = false
+    private var hiddenShown = false
 
     private val tick = object : Runnable { override fun run() { refresh(); main.postDelayed(this, 1500) } }
     private val pinListener: (String?) -> Unit = { main.post { refresh() } }
@@ -242,10 +248,31 @@ class SetupActivity : Activity() {
             SetupSettings.Action.NEXT -> { keyIndex++; show(SetupSteps.Screen.KEYS) }
             SetupSettings.Action.BACK -> if (keyIndex > 0) { keyIndex--; show(SetupSteps.Screen.KEYS) } else show(SetupSteps.Screen.SETTINGS, SetupSettings.Item.PHONE)
             SetupSettings.Action.CONNECT -> {
+                if (waitStartedAt > 0) return   // one wait at a time: a second connect would only queue behind the first
                 keyStatus?.text = "Connecting. If the TV asks \"Allow debugging?\", tick Always allow and press OK."
-                Thread { Adb.ensure(interactive = true); main.post { refresh() } }.start()
+                waitStartedAt = System.currentTimeMillis(); waitLostFocus = false; steppedAside = false; hiddenShown = false
+                if (AllowWait.keepScreenOn(true)) window.addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+                Thread { Adb.ensure(interactive = true); main.post { waitEnded(); refresh() } }.start()
             }
         }
+    }
+
+    private fun waitingForAllow() = waitStartedAt > 0 && (Adb.state == "waiting_for_allow" || Adb.state == "connecting")
+
+    /** The Connect wait is over (allowed, refused or ran out): the screen may sleep again, and the setup screen comes back if it stepped aside. */
+    private fun waitEnded() {
+        waitStartedAt = 0L; hiddenShown = false
+        runCatching { window.clearFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON) }
+        if (AllowWait.comeBack(steppedAside, Adb.connected, inFront) && !isFinishing && !isDestroyed)
+            runCatching { startActivity(Intent(this, SetupActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT)) }
+        steppedAside = false
+    }
+
+    /** The app's task to the back once, so a box left behind this screen can show. Nothing in the box is pressed. */
+    private fun stepAside() {
+        steppedAside = true   // before the move: the focus this screen loses now is not the box coming up
+        android.util.Log.i("couchtv.adb", "allow wait: no box over the setup screen after ${System.currentTimeMillis() - waitStartedAt} ms, stepping aside")
+        if (!moveTaskToBack(true)) android.util.Log.w("couchtv.adb", "allow wait: could not move the task back")
     }
 
     private fun buildKeysDone(): SetupScreens.Step {
@@ -295,7 +322,7 @@ class SetupActivity : Activity() {
         when (screen) {
             SetupSteps.Screen.SETTINGS -> show(backTo)
             SetupSteps.Screen.HOME_HELP -> show(SetupSteps.Screen.HOME_STEP)
-            SetupSteps.Screen.KEYS -> keyAction(SetupSettings.Action.BACK)
+            SetupSteps.Screen.KEYS -> if (AllowWait.backStepsAside(hiddenShown, waitingForAllow())) stepAside() else keyAction(SetupSettings.Action.BACK)
             SetupSteps.Screen.KEYS_DONE -> show(SetupSteps.Screen.SETTINGS, SetupSettings.Item.PHONE)
             SetupSteps.Screen.UNDO_CONFIRM -> show(SetupSteps.Screen.SETTINGS, SetupSettings.Item.UNDO)
             SetupSteps.Screen.OPEN_STEP -> if (Store.str(SetupSteps.DONE_KEY) == "1") show(SetupSteps.Screen.READY) else show(SetupSteps.Screen.HOME_STEP)
@@ -356,6 +383,8 @@ class SetupActivity : Activity() {
     override fun onWindowFocusChanged(has: Boolean) {
         super.onWindowFocusChanged(has)
         if (has && askSince > 0) { main.removeCallbacks(ask); main.post(ask) }
+        // something came over this screen during the Allow wait: the box showed, so the person is reading it
+        if (!has && waitStartedAt > 0 && inFront && !steppedAside) waitLostFocus = true
     }
     @Deprecated("Android's own home question answers here")
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
@@ -436,6 +465,12 @@ class SetupActivity : Activity() {
                 // the link came up: the walk-through is done
                 if (Adb.connected) { show(SetupSteps.Screen.KEYS_DONE); return }
                 val st = Adb.status()
+                if (keyStatus != null && waitStartedAt > 0) {
+                    val h = AllowWait.hint(System.currentTimeMillis() - waitStartedAt, waitingForAllow(), hasWindowFocus(), waitLostFocus, inFront, steppedAside)
+                    if (h.sayHidden) { hiddenShown = true; keyStatus?.text = SetupWords.ALLOW_HIDDEN }
+                    if (h.stepAside) stepAside()
+                    if (h.sayHidden) return
+                }
                 if (keyStatus != null && (st["state"] != "off" || Adb.unanswered))
                     keyStatus?.text = SetupWords.keysLine(false, st["state"] == "waiting_for_allow" || st["state"] == "connecting", st["state"] == "needs_pairing", Adb.unanswered)
                         .let { if (it.startsWith("The phone remote opens apps")) "" else it }

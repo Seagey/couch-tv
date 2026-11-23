@@ -40,6 +40,9 @@ object SetupWords {
     /** The whole "Allow debugging?" wait ran out with no answer (Adb.unanswered): nobody pressed, or the TV never asked. */
     const val NOT_ASKED = "No answer from the TV. If it did not show its Allow debugging question, restart the TV, then try again."
 
+    /** Connect is waiting and the setup screen kept its focus: the TV's box is likely hidden behind it (AllowWait). */
+    const val ALLOW_HIDDEN = "The TV's Allow box may be hidden. Press Back once to see it, or switch USB debugging off and on."
+
     /** What the phone remote can do now, without the word ADB. */
     fun keysLine(connected: Boolean, waiting: Boolean, needsPairing: Boolean, notAsked: Boolean = false): String = when {
         connected -> "The phone remote can press every key and type on the TV."
