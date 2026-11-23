@@ -41,8 +41,12 @@ The rules:
     (BIND_ACCESSIBILITY_SERVICE in the manifest), so the two files can never be swapped.
  7. Every APK is signed with one and the same key, and with --signer (or --previous, last release's APK)
     the key the TVs already have: Update now, the launcher's Updater and Android itself refuse another.
+    With --ontv-signer (from 0.13.10, the on-TV app's own release key, scripts/sign-ontv.sh): the two on-TV
+    APKs show that key to Android 9 and newer, the --signer key to Android 6 to 8, and carry the proof of
+    rotation from the --signer key to it; every other APK keeps the --signer key; --previous must be
+    in the on-TV APKs' keys (the old key, or the release key once a rotated release is out).
 
-Usage: python3 scripts/check-release-apks.py [dist] [--release] [--matter] [--signer SHA256]
+Usage: python3 scripts/check-release-apks.py [dist] [--release] [--matter] [--signer SHA256] [--ontv-signer SHA256]
                                              [--previous OLD.apk] [--skip-signer] [--version X.Y.Z]
 --version: versionName of the home and on-TV APKs must be X.Y.Z; with --previous, the on-TV APK's
 versionCode must be higher than that one's.
@@ -203,12 +207,72 @@ def badging(apk):
     return m.group(1), int(m.group(2)), m.group(3)
 
 
-def signers(apk):
-    """The SHA-256 of every signing certificate, from apksigner (which also verifies the signature)."""
-    r = subprocess.run([tool("apksigner"), "verify", "--print-certs", str(apk)], capture_output=True, text=True)
+def signers(apk, min_sdk=None, max_sdk=None):
+    """The SHA-256 of every signing certificate, from apksigner (which also verifies the signature). With
+    min_sdk / max_sdk: the signer Android of those versions sees (a rotated APK shows the old key to Android 8
+    and older, the new one from its rotation version on)."""
+    cmd = [tool("apksigner"), "verify", "--print-certs"]
+    if min_sdk is not None:
+        cmd += ["--min-sdk-version", str(min_sdk)]
+    if max_sdk is not None:
+        cmd += ["--max-sdk-version", str(max_sdk)]
+    r = subprocess.run(cmd + [str(apk)], capture_output=True, text=True)
     if r.returncode != 0:
-        raise RuntimeError(f"{apk.name} does not verify: {(r.stderr or r.stdout).strip()[:200]}")
-    return sorted(set(re.findall(r"certificate SHA-256 digest: ([0-9a-f]{64})", r.stdout)))
+        raise RuntimeError(f"{Path(apk).name} does not verify: {(r.stderr or r.stdout).strip()[:200]}")
+    return sorted(set(re.findall(r"Signer #\d+ certificate SHA-256 digest: ([0-9a-f]{64})", r.stdout)))
+
+
+def lineage(apk):
+    """The proof of rotation's certificates (oldest first) in a v3 signed APK, or [] when it has none."""
+    r = subprocess.run([tool("apksigner"), "lineage", "--in", str(apk), "--print-certs"], capture_output=True, text=True)
+    if r.returncode != 0:
+        return []
+    return re.findall(r"Signer #\d+ in lineage certificate SHA-256 digest: ([0-9a-f]{64})", r.stdout)
+
+
+# The on-TV app's key rotation (0.13.10 on, coord/GOOGLE-PLAY-BUILD.md, scripts/sign-ontv.sh): from this
+# Android version on the on-TV APKs are signed by the Couch TV release key, below it by the old key.
+ROTATION_SDK = 28
+
+
+def check_ontv_rotation(dist, ontv, expect=None, previous=None):
+    """Rule 7 for a release whose on-TV APKs moved to their own key (--ontv-signer). The on-TV APKs: Android 9
+    and newer see only the release key (ontv), Android 6 to 8 only the old key (expect: TVs that cannot rotate
+    still update), and the proof of rotation runs from the old key to the release key. Every other APK: the old
+    key, as before. --previous (last release's on-TV APK): its signer is the old key or the release key, so
+    Android and Update now take this release as an update."""
+    errs = []
+    ontv = ontv.lower()
+    old = expect.lower() if expect else None
+    seen = {}
+    for p in sorted(dist.glob("*.apk")):
+        try:
+            if p.name in ONTV:
+                new_side = signers(p, min_sdk=ROTATION_SDK)
+                old_side = signers(p, max_sdk=ROTATION_SDK - 1)
+                lin = lineage(p)
+                if new_side != [ontv]:
+                    errs.append(f"{p.name}: Android 9 and newer see {', '.join(s[:12] for s in new_side) or 'no signer'}, not the release key ({ontv[:12]}...): sign it with scripts/sign-ontv.sh")
+                if old and old_side != [old]:
+                    errs.append(f"{p.name}: Android 6 to 8 see {', '.join(s[:12] for s in old_side) or 'no signer'}, not the key those TVs have ({old[:12]}...)")
+                if old and (len(lin) < 2 or lin[0] != old or lin[-1] != ontv):
+                    errs.append(f"{p.name}: no proof of rotation from {old[:12]}... to {ontv[:12]}... (~/.couchtv-keys/couchtv.lineage)")
+                seen[p.name] = set(new_side) | set(old_side) | set(lin)
+            else:
+                got = signers(p)
+                if old and got != [old]:
+                    errs.append(f"{p.name} is not signed with the key TVs already have ({old[:12]}...): they would refuse it")
+        except RuntimeError as x:
+            errs.append(str(x))
+    if previous and not errs:
+        try:
+            prev = signers(Path(previous))
+        except RuntimeError as x:
+            return errs + [f"--previous: {x}"]
+        for n, keys in seen.items():
+            if not set(prev) <= keys:
+                errs.append(f"{n} does not carry last release's key ({', '.join(s[:12] for s in prev)}...): TVs would refuse it")
+    return errs
 
 
 def check_same_app(dist):
@@ -318,6 +382,7 @@ def main(argv=None):
     ap.add_argument("--release", action="store_true", help="SHA256SUMS.txt must be there and right")
     ap.add_argument("--matter", action="store_true", help="the on-TV APKs must carry Matter")
     ap.add_argument("--signer", help="SHA-256 of the signing certificate TVs already have")
+    ap.add_argument("--ontv-signer", help="SHA-256 of the Couch TV release key the on-TV APKs rotate to (rule 7)")
     ap.add_argument("--previous", help="last release's APK: the same signer")
     ap.add_argument("--skip-signer", action="store_true")
     ap.add_argument("--version", help="the release's version: versionName of the home and on-TV APKs")
@@ -330,7 +395,7 @@ def main(argv=None):
     errs += check_same_app(dist)
     errs += check_plain_and_watch(dist)
     if not a.skip_signer:
-        errs += check_signer(dist, a.signer, a.previous)
+        errs += check_ontv_rotation(dist, a.ontv_signer, a.signer, a.previous) if a.ontv_signer else check_signer(dist, a.signer, a.previous)
     if a.version:
         errs += check_version(dist, a.version, a.previous)
     for p in sorted(dist.glob("*.apk")):

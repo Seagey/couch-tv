@@ -184,6 +184,7 @@ class Server(private val ctx: Context, port: Int) : NanoWSD(port) {
                     b.optString("service").ifEmpty { null }, b.optString("who").ifEmpty { null })))
             }
             "POST /api/ask" -> {
+                if (!Ask.available) throw ApiError(404, PlayRules.ASK_OFF)   // the Google Play build
                 if (Kids.isKid(body(s).optString("who").ifEmpty { Now.who })) throw ApiError(403, "Ask is off for a kids profile.")
                 if (!Ask.enabled) throw ApiError(501, "Ask AI is off. To switch it on, open Home settings on your phone, Ask AI, and add a key from an AI service (or a model on a home computer).")
                 val b = body(s)

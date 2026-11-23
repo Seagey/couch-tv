@@ -34,12 +34,17 @@ object Ask {
         return AskConfig(c.provider, c.base, c.model, AskWire.usableKey(Store.str("ask_key"), Store.str("ask_key_origin"), c.provider, c.base))
     }
 
-    val enabled get() = Store.bool("ask_enabled") && config().ready
+    /** This build has Ask AI at all: not the Google Play build (PlayRules.askAi). */
+    val available get() = PlayRules.askAi(BuildConfig.FLAVOR)
+
+    val enabled get() = available && Store.bool("ask_enabled") && config().ready
 
     /** For the setup page. The key itself never leaves the TV: only whether there is one. */
     fun status(): JSONObject {
+        // Play: off and not offered, so the setup page and the phone remote show no Ask (PlayRules.askAi)
+        if (!available) return JSONObject().put("available", false).put("enabled", false).put("ready", false).put("has_key", false)
         val c = config()
-        return JSONObject().put("enabled", Store.bool("ask_enabled")).put("has_key", !c.key.isNullOrEmpty()).put("model", c.model)
+        return JSONObject().put("available", true).put("enabled", Store.bool("ask_enabled")).put("has_key", !c.key.isNullOrEmpty()).put("model", c.model)
             .put("provider", c.provider).put("base", c.base).put("keyless_ok", !c.isAnthropic && AskWire.isLocalUrl(c.base)).put("ready", c.ready)
     }
 
@@ -50,6 +55,7 @@ object Ask {
      * old key is also deleted; that is only tidiness, since it could no longer be used anyway.
      */
     fun save(b: JSONObject) {
+        if (!available) return   // Play: nothing about Ask is kept
         if (b.has("ask_provider") || b.has("ask_base") || b.has("ask_model")) {
             val old = config()
             val p = if (b.has("ask_provider")) b.optString("ask_provider").trim().ifEmpty { AskWire.ANTHROPIC } else old.provider

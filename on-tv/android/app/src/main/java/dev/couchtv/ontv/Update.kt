@@ -309,9 +309,18 @@ object Update {
         val b = signers(theirs) { pm.getPackageArchiveInfo(file.path, it) }
         // Some Android 9 builds read no signer from a file that is not installed yet: then Android's
         // installer makes the same check and says no itself (INSTALL_FAILED_UPDATE_INCOMPATIBLE).
-        if (a.isNotEmpty() && b.isNotEmpty() && a != b) return "other_key"
+        // A file that rotated from this app's key to a newer one (its history lists ours) is an update too.
+        if (!UpdateRules.signerOk(a, b, history(theirs))) return "other_key"
         return ""
     }
+
+    /** The file's signing certificate history (oldest first), Android 9 and newer; empty when there is none. */
+    private fun history(p: PackageInfo): List<String> =
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.P) emptyList()
+        else runCatching {
+            val s = p.signingInfo
+            if (s == null || s.hasMultipleSigners()) emptyList() else s.signingCertificateHistory?.map { it.toCharsString() } ?: emptyList()
+        }.getOrDefault(emptyList())
 
     private fun signers(p: PackageInfo, again: (Int) -> PackageInfo?): Set<String> {
         val list: Array<Signature>? = (if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) p.signingInfo?.apkContentsSigners else null)

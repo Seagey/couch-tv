@@ -15,6 +15,7 @@ package dev.couchtv.ontv
  *  - No self grants over ADB (draw over apps, usage access, secure settings, TV listings), no wireless
  *    debugging switched back on after a restart, no Hisense launch list and no TCL AUTO_START, no
  *    /api/screenshot, and web link cards show a QR code instead of opening a browser.
+ *  - No Ask AI (askAi), and no READ_TV_LISTINGS (tvListings): Keep watching uses what the app sees itself.
  */
 object PlayRules {
     const val PLAY = "play"
@@ -38,8 +39,17 @@ object PlayRules {
     fun screenshots(store: String) = !play(store)
     /** Web link cards open the TV's browser (TV quality TV-WB says a TV app must not). Play: a QR code for the phone. */
     fun opensBrowser(store: String) = !play(store)
-    /** Ask AI answers carry a Report this answer button (Play's AI generated content policy). */
-    fun reportAnswers(store: String) = play(store)
+    /**
+     * Ask AI (Ask.kt, POST /api/ask, the TV home's Ask sheet and widget, the phone remote's Ask button). Not in the
+     * first Play build (the owner's choice, 23 Nov 2026), so Play's AI generated content rules do not apply to it.
+     */
+    fun askAi(store: String) = !play(store)
+    /**
+     * Keep watching reads Android's Watch Next rows (WatchNext.kt), which needs READ_TV_LISTINGS. Android only
+     * ever gave it to this app over its own ADB link, which the Play build never uses for grants, so the Play
+     * manifest leaves the permission out and Keep watching uses what the app sees itself.
+     */
+    fun tvListings(store: String) = !play(store)
     /**
      * The Hisense rebind (App.rebindWatch) writes the list without the watch, then with it again, only when it is
      * already listed, and needs the secure settings grant, which the Play build never has. In Play only after Agree.
@@ -94,9 +104,8 @@ object PlayRules {
     const val UPDATES = "Couch TV updates through Google Play."
     /** A web link card in Play: the phone opens it. */
     const val LINK_ON_PHONE = "Scan to open this on your phone"
-    /** Ask AI's report button in Play. */
-    const val REPORT = "Report this answer"
-    const val REPORT_DONE = "Thanks. This answer is reported."
+    /** Ask AI in Play: not in this build. */
+    const val ASK_OFF = "Ask AI is not in this version of Couch TV."
 }
 
 /** This build's answers to PlayRules, from BuildConfig. */

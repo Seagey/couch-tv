@@ -83,6 +83,8 @@ object Store {
         // HDMI ports pinned as dock tiles, in the TV home's home.inputs shape (docs/CONFIG.md).
         // Left out when none are set, so the home is exactly as before.
         .also { c -> inputs().takeIf { it.length() > 0 }?.let { c.put("home", JSONObject().put("inputs", it)) } }
+        // the Google Play build has no Ask AI: the phone remote hides its Ask button (remote/src/App.jsx, askOn)
+        .also { c -> if (!PlayRules.askAi(BuildConfig.FLAVOR)) c.put("ask", JSONObject().put("enabled", false).put("available", false)) }
 
     /** Pinned inputs: [{port, label, icon, id?}], set from /api/settings "inputs". */
     fun inputs(): JSONArray = str("inputs")?.let { runCatching { JSONArray(it) }.getOrNull() } ?: JSONArray()

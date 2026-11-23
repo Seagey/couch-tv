@@ -16,6 +16,8 @@
     <uses-permission android:name="android.permission.WRITE_SECURE_SETTINGS" tools:node="remove" />
     <uses-permission android:name="android.permission.PACKAGE_USAGE_STATS" tools:node="remove" />
     <uses-permission android:name="com.android.providers.tv.permission.READ_EPG_DATA" tools:node="remove" />
+    <!-- Watch Next rows for Keep watching: only ever granted over ADB, so out of Play (PlayRules.tvListings). -->
+    <uses-permission android:name="android.permission.READ_TV_LISTINGS" tools:node="remove" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" tools:node="remove" />
     <!-- Implied by the manifest merger only because libadb-android's manifest names no targetSdk (the GitHub
          APKs carry them too). The app uses none of them; Play would list them in the Data safety review. -->

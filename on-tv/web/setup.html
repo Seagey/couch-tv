@@ -1162,6 +1162,8 @@
     $('ask-model').placeholder = p.model ? '' : 'the model name your service gives you';
   };
   function showAsk(a) {
+    // the Google Play build has no Ask AI (PlayRules.askAi): no card, no jump link
+    if (a.available === false) { $('ask').style.display = 'none'; var j = document.querySelector('.jump a[href="#ask"]'); if (j) j.style.display = 'none'; return; }
     var p = askFor(a);
     $('ask-service').value = p.id; $('ask-base').value = a.base || p.base; $('ask-model').value = a.model || ''; $('ask-hint').textContent = p.hint;
     $('ask-model').placeholder = p.model ? '' : 'the model name your service gives you';

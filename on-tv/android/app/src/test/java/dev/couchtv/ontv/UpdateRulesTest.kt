@@ -21,6 +21,21 @@ class UpdateRulesTest {
         assertFalse(UpdateRules.newer("0.13.4", "0.13.5"))
     }
 
+    @Test fun takesTheRotatedReleaseKeyButNoStranger() {
+        val debug = setOf("debug"); val release = setOf("release")
+        assertTrue("same key", UpdateRules.signerOk(debug, debug, emptyList()))
+        // 0.13.10: v3 signed by the release key, with the proof of rotation from the debug key
+        assertTrue("rotated from ours", UpdateRules.signerOk(debug, release, listOf("debug", "release")))
+        // after the move, later releases carry the release key (with or without the history)
+        assertTrue(UpdateRules.signerOk(release, release, listOf("debug", "release")))
+        assertFalse("a stranger's key", UpdateRules.signerOk(debug, setOf("other"), emptyList()))
+        assertFalse("a stranger's rotation", UpdateRules.signerOk(debug, setOf("other"), listOf("someone", "other")))
+        // never back: an old key file over a rotated install is not an update
+        assertFalse(UpdateRules.signerOk(release, debug, emptyList()))
+        // no signer read from the file: Android's installer decides
+        assertTrue(UpdateRules.signerOk(debug, emptySet(), emptyList()))
+    }
+
     @Test fun readsTheLatestReleaseForThisApp() {
         val f = UpdateRules.read(release("v0.13.6", "couch-tv-home.apk", "couch-tv-ontv.apk", "couch-tv-ontv-watch.apk"), watch = false)
         assertNotNull(f)

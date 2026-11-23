@@ -19,6 +19,7 @@ tv-home/tvs/
 # Builds and tools
 *.apk
 *.aab
+dist-play/
 build/
 .gradle/
 .kotlin/

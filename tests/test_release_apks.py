@@ -357,6 +357,39 @@ class ReleaseApkRules(unittest.TestCase):
             crc.signers = old
         self.assertEqual(errs, ["--previous: old.apk does not verify: broken"])
 
+    # 0.13.10: the on-TV APKs rotate from the old (debug) key to the Couch TV release key
+    def rotation(self, ontv_new=None, ontv_old=None, lin=None, home=None, prev=None):
+        OLD, NEW = "0" * 64, "f" * 64
+        ontv_new = ontv_new or [NEW]; ontv_old = ontv_old or [OLD]; lin = [OLD, NEW] if lin is None else lin
+        home = home or [OLD]; prev = prev or [OLD]
+
+        def sig(p, min_sdk=None, max_sdk=None):
+            n = Path(p).name
+            if n == "old.apk":
+                return prev
+            if n in crc.ONTV:
+                return ontv_new if min_sdk else ontv_old if max_sdk else ontv_new
+            return home
+        old_s, old_l = crc.signers, crc.lineage
+        crc.signers, crc.lineage = sig, (lambda p: lin if Path(p).name in crc.ONTV else [])
+        try:
+            keep = Dist()   # the folder lives as long as this object
+            return crc.check_ontv_rotation(keep.d, NEW, OLD, "/abs/old.apk")
+        finally:
+            crc.signers, crc.lineage = old_s, old_l
+
+    def test_a_rotated_on_tv_release_passes(self):
+        self.assertEqual(self.rotation(), [])
+        # the next release: last release's on-TV APK already carries the release key
+        self.assertEqual(self.rotation(prev=["f" * 64]), [])
+
+    def test_rotation_faults_are_named(self):
+        self.assertTrue(any("Android 9 and newer" in e for e in self.rotation(ontv_new=["0" * 64])))
+        self.assertTrue(any("Android 6 to 8" in e for e in self.rotation(ontv_old=["f" * 64])))
+        self.assertTrue(any("no proof of rotation" in e for e in self.rotation(lin=[])))
+        self.assertTrue(any("couch-tv-home.apk" in e for e in self.rotation(home=["f" * 64])))
+        self.assertTrue(any("last release's key" in e for e in self.rotation(prev=["a" * 64])))
+
     # M2: the version inside the APKs is the release's version, and the on-TV versionCode goes up
     def test_version_must_match_and_go_up(self):
         info = {"couch-tv-home.apk": ("app.couchtv.launcher", 1309, "0.13.9"),

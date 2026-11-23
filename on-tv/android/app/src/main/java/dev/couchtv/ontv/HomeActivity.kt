@@ -113,8 +113,8 @@ class HomeActivity : Activity() {
             addJavascriptInterface(Update.Page(this@HomeActivity, this, base), "TVUP")
             // Home settings, About, Make Home open Couch TV (HomeKey.kt)
             addJavascriptInterface(HomeKey.Page(this@HomeActivity, this, base), "TVHK")
-            // Play: Report this answer under an Ask AI answer (AskReport.kt, ask.js)
-            if (PlayRules.reportAnswers(BuildConfig.FLAVOR)) addJavascriptInterface(AskReport.Page(), "TVPLAY")
+            // Play: no Ask AI, so no Ask sheet and the Ask AI widget says so (PlayPage.kt, ask.js)
+            if (!PlayRules.askAi(BuildConfig.FLAVOR)) addJavascriptInterface(PlayPage(), "TVPLAY")
             webViewClient = object : WebViewClient() {
                 override fun onPageFinished(view: WebView, url: String) { if (url.startsWith(base)) { ready = true; view.requestFocus(); sendWaitingAtHome() } }
                 override fun onReceivedError(view: WebView, req: WebResourceRequest, err: WebResourceError) {

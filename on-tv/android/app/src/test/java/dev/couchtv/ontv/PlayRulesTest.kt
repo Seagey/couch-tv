@@ -1,6 +1,5 @@
 package dev.couchtv.ontv
 
-import org.json.JSONArray
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -32,13 +31,15 @@ class PlayRulesTest {
         assertFalse(PlayRules.changesTvRules("play"))
         assertFalse(PlayRules.screenshots("play"))
         assertFalse(PlayRules.opensBrowser("play"))
-        assertTrue(PlayRules.reportAnswers("play"))
+        assertFalse(PlayRules.askAi("play"))
+        assertFalse(PlayRules.tvListings("play"))
         // the GitHub builds keep all of it
         assertTrue(PlayRules.switchesWatchOnItself("github"))
         assertTrue(PlayRules.changesTvRules("github"))
         assertTrue(PlayRules.screenshots("github"))
         assertTrue(PlayRules.opensBrowser("github"))
-        assertFalse(PlayRules.reportAnswers("github"))
+        assertTrue(PlayRules.askAi("github"))
+        assertTrue(PlayRules.tvListings("github"))
     }
 
     @Test fun theDisclosureComesBeforeAccessibility() {
@@ -93,23 +94,11 @@ class PlayRulesTest {
 
     @Test fun playWordsNameNoGitHubOrApkAndHaveNoDashes() {
         listOf(PlayRules.DISCLOSE_TITLE, PlayRules.DISCLOSE_LINE, PlayRules.READY, PlayRules.READY_PHONE, PlayRules.UPDATES,
-            PlayRules.LINK_ON_PHONE, PlayRules.REPORT, PlayRules.REPORT_DONE).forEach {
+            PlayRules.LINK_ON_PHONE, PlayRules.ASK_OFF).forEach {
             assertFalse(it, it.contains("GitHub", ignoreCase = true))
             assertFalse(it, it.contains("apk", ignoreCase = true))
             assertFalse(it, it.contains("download", ignoreCase = true))
             assertFalse(it, it.contains('—') || it.contains('–') || it.contains("-"))
         }
-    }
-
-    @Test fun reportsKeepTheLastFifty() {
-        var list: JSONArray? = null
-        for (i in 1..55) list = AskReport.added(list, "q$i", "a$i", i.toLong())
-        assertEquals(50, list!!.length())
-        assertEquals("q6", list.getJSONObject(0).getString("q"))
-        assertEquals("a55", list.getJSONObject(49).getString("a"))
-        // long text is cut
-        val one = AskReport.added(null, "x".repeat(900), "y".repeat(3000), 0L).getJSONObject(0)
-        assertEquals(500, one.getString("q").length)
-        assertEquals(2000, one.getString("a").length)
     }
 }

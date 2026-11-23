@@ -46,7 +46,7 @@ class PlayBuildTest {
         val asked = info.requestedPermissions?.toSet() ?: emptySet()
         listOf("android.permission.QUERY_ALL_PACKAGES", "android.permission.REQUEST_INSTALL_PACKAGES",
             "android.permission.SYSTEM_ALERT_WINDOW", "android.permission.WRITE_SECURE_SETTINGS",
-            "android.permission.PACKAGE_USAGE_STATS", "com.android.providers.tv.permission.READ_EPG_DATA",
+            "android.permission.PACKAGE_USAGE_STATS", "com.android.providers.tv.permission.READ_EPG_DATA", "android.permission.READ_TV_LISTINGS",
             "android.permission.FOREGROUND_SERVICE_SPECIAL_USE", "android.permission.READ_PHONE_STATE",
             "android.permission.READ_EXTERNAL_STORAGE", "android.permission.WRITE_EXTERNAL_STORAGE").forEach { assertFalse(it, it in asked) }
         listOf("android.permission.INTERNET", "android.permission.REQUEST_DELETE_PACKAGES",
@@ -155,10 +155,23 @@ class PlayBuildTest {
         assertNull("no settings opened", shadowOf(a).nextStartedActivity)
     }
 
-    @Test fun reportKeepsTheAnswerOnTheTv() {
-        assertTrue(AskReport.Page().report("What is on?", "Bluey"))
-        val kept = Store.readJson("ask-reports.json") as org.json.JSONArray
-        assertEquals("Bluey", kept.getJSONObject(kept.length() - 1).getString("a"))
+    @Test fun noAskAiInPlay() {
+        assertFalse(Ask.available)
+        Store.putBool("ask_enabled", true)
+        assertFalse("never on, whatever was saved", Ask.enabled)
+        val s = Ask.status()
+        assertFalse(s.getBoolean("available")); assertFalse(s.getBoolean("enabled"))
+        // the setup page cannot switch it on either
+        Ask.save(JSONObject().put("ask_enabled", true).put("ask_key", "sk-test"))
+        assertFalse(Ask.enabled)
+        assertTrue("the TV home is told", PlayPage().askOff())
+        assertFalse("the phone remote is told", Store.publicConfig().getJSONObject("ask").getBoolean("enabled"))
+    }
+
+    @Test fun noWatchNextRowsInPlay() {
+        assertFalse(WatchNext.granted())
+        assertTrue(WatchNext.rows().isEmpty())
+        assertTrue(WatchNext.cards(emptySet(), 5).isEmpty())
     }
 
     @Test fun notNowRemembersNothing() {
