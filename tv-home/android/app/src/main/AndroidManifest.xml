@@ -187,6 +187,16 @@
             </intent-filter>
             <meta-data android:name="android.accessibilityservice" android:resource="@xml/key_watch" />
         </service>
+        <!-- Spotify MediaSession listener: reads and controls local Spotify playback without accounts or tokens. -->
+        <service
+            android:name=".SpotifyMediaListener"
+            android:exported="true"
+            android:label="Couch-TV Spotify Media Listener"
+            android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE">
+            <intent-filter>
+                <action android:name="android.service.notification.NotificationListenerService" />
+            </intent-filter>
+        </service>
         <service
             android:name=".SpotifySessionAccess"
             android:exported="false"

@@ -583,6 +583,16 @@ html.who-gentle.scene-fog .mood:not(.dark) .mood-hi { text-shadow: 0 0 0.5rem rg
 
 /* Keep watching: three glass cards */
 .theme-night .shelf { top: 40rem; left: var(--safe-x); right: var(--safe-x); }
+html.spotify-align-center .theme-night .shelf,
+html.spotify-align-center.theme-night .shelf {
+  left: 50%;
+  right: auto;
+  transform: translateX(-50%);
+  width: calc(12 * 7rem + 11 * 1.625rem + 3.5rem);
+  max-width: calc(100vw - 2 * var(--safe-x));
+  box-sizing: border-box;
+  padding: 0 1.75rem;
+}
 .theme-night .shelf-head { height: 2.25rem; margin-bottom: 1rem; }
 .theme-night .shelf-head h2 { font-size: 1.5625rem; font-weight: 600; color: rgba(255, 255, 255, 0.78); }
 .theme-night .shelf-track { gap: 1.375rem; }
@@ -596,6 +606,26 @@ html.who-gentle.scene-fog .mood:not(.dark) .mood-hi { text-shadow: 0 0 0.5rem rg
 .ncard .nbar { display: block; height: 0.3125rem; margin-top: 0.625rem; border-radius: 0.2rem; background: rgba(255, 255, 255, 0.25); overflow: hidden; }
 .ncard .nbar i { height: 100%; background: #fff; }
 .ncard.focus { transform: scale(1.05); box-shadow: 0 0 0 0.1875rem #fff, 0 1.25rem 2.5rem rgba(0, 0, 0, 0.45); }
+/* home.keep_watching_style "poster" (#192): the Classic poster tiles in the Night row, each two dock
+   columns wide (two 7rem icons and the 1.625rem between them) with the dock's gap between tiles, so
+   six fit where the wide cards fit three. On Night the photo stays put under the clock, so there is no
+   title at the top as on Classic: the focused tile shows its title and line under it, on one line, and
+   the row sits 2rem higher than the cards to leave room for it above the dock. The clip reaches down
+   far enough to show it. */
+html.kw-poster.theme-night .shelf { top: 38rem; }
+html.kw-poster.theme-night .shelf-track { gap: 1.625rem; }
+html.kw-poster.theme-night .shelf .show { width: 15.625rem; height: 8.789rem; }
+html.kw-poster.theme-night .shelf .show .face { border-radius: 1.125rem; }
+html.kw-poster.theme-night .shelf .show.focus .face { box-shadow: 0 0 0 0.1875rem #fff, 0 1.25rem 2.5rem rgba(0, 0, 0, 0.45); }
+html.kw-poster.theme-night .shelf-clip { padding-bottom: 3.5rem; margin-bottom: -3.5rem; }
+html.kw-poster.theme-night .shelf .show.focus .caption {
+  display: block; opacity: 1; position: absolute; left: 0; right: auto; top: 100%; width: 31rem; padding-top: 0.875rem;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-shadow: 0 0.125rem 0.75rem rgba(0, 0, 0, 0.6);
+}
+html.kw-poster.theme-night .shelf .show .caption b,
+html.kw-poster.theme-night .shelf .show .caption span { display: inline; }
+html.kw-poster.theme-night .shelf .show .caption b { font-size: 1.375rem; line-height: 1.75rem; font-weight: 600; color: #fff; }
+html.kw-poster.theme-night .shelf .show .caption span { margin-left: 0.75rem; font-size: 1.1875rem; line-height: 1.75rem; color: rgba(255, 255, 255, 0.78); }
 
 /* the dock */
 .theme-night .apps { top: auto; bottom: 2.875rem; left: 50%; right: auto; transform: translateX(-50%); }
@@ -1141,6 +1171,7 @@ html.who-gentle.scene-fog .mood:not(.dark) .mood-hi { text-shadow: 0 0 0.5rem rg
 .no-flex-gap .people > * + * { margin-left: 0.5rem; }
 .no-flex-gap .shelf-track > * + * { margin-left: var(--gap); }
 .no-flex-gap.theme-night .shelf-track > * + * { margin-left: 1.375rem; }
+.no-flex-gap.kw-poster.theme-night .shelf-track > * + * { margin-left: 1.625rem; }
 .no-flex-gap .ncard > * + * { margin-left: 1.25rem; }
 .no-flex-gap .ncard .nap > img { margin-right: 0.625rem; }   /* the app's name after it is text, not an element */
 .no-flex-gap .plist > * + * { margin-top: 0.25rem; }
@@ -1206,9 +1237,57 @@ html.who-gentle.scene-fog .mood:not(.dark) .mood-hi { text-shadow: 0 0 0.5rem rg
 .np-art svg { width: 2rem; height: 2rem; fill: none; stroke: rgba(255, 255, 255, 0.8); stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
 .np-t { flex: 1; min-width: 0; }
 .np-app { display: block; font-size: 0.9375rem; line-height: 1.25rem; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: rgba(255, 255, 255, 0.62); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.np-t b { display: block; margin-top: 0.125rem; font-size: 1.375rem; line-height: 1.75rem; font-weight: 620; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.np-t b, .np-title { display: block; margin-top: 0.125rem; font-size: 1.375rem; line-height: 1.75rem; font-weight: 620; white-space: nowrap; }
+.np-title-wrap { display: block; width: 100%; overflow: hidden; position: relative; margin-top: 0.125rem; line-height: 1.75rem; }
+.np-title-wrap.overflowing:not(.mode-dots) {
+  mask-image: linear-gradient(90deg, #000 0%, #000 calc(100% - 1.25rem), transparent 100%);
+  -webkit-mask-image: linear-gradient(90deg, #000 0%, #000 calc(100% - 1.25rem), transparent 100%);
+}
+.np-title-wrap.mode-dots .np-title,
+.np-title-wrap:not(.overflowing) .np-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.np-title-wrap.mode-pingpong.overflowing .np-title-track {
+  display: inline-block;
+  white-space: nowrap;
+  will-change: transform;
+  animation: np-pingpong var(--marquee-dur, 6s) ease-in-out infinite alternate;
+}
+.np-title-wrap.mode-pingpong.overflowing .np-title {
+  display: inline-block;
+}
+@keyframes np-pingpong {
+  0%, 15% { transform: translateX(0); }
+  85%, 100% { transform: translateX(calc(-1 * var(--marquee-overflow, 60px))); }
+}
+.np-title-wrap.mode-continuous.overflowing .np-title-track {
+  display: flex;
+  align-items: center;
+  width: max-content;
+  white-space: nowrap;
+  will-change: transform;
+  animation: np-continuous var(--marquee-dur, 10s) linear infinite;
+}
+.np-title-wrap.mode-continuous.overflowing .np-title {
+  display: inline-block;
+  flex: none;
+}
+.np-title-spacer {
+  display: inline-block;
+  width: 3rem;
+  flex: none;
+}
+@keyframes np-continuous {
+  0% { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
 .np-t small { display: block; font-size: 1.125rem; line-height: 1.5rem; color: rgba(255, 255, 255, 0.74); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.np-ctl { display: flex; flex: none; gap: 0.375rem; }
+.np-ctl { display: flex; flex: none; gap: 0.375rem; align-items: center; }
+.np-prog-wrap { display: flex; align-items: center; gap: 0.5rem; margin-top: 0.375rem; width: 100%; }
+.np-bar { flex: 1; height: 0.25rem; border-radius: 0.125rem; background: rgba(255, 255, 255, 0.2); overflow: hidden; position: relative; }
+.np-fill { height: 100%; border-radius: 0.125rem; background: #fff; width: 0%; transition: width 250ms linear; }
+.np-time { font-size: 0.8125rem; line-height: 1rem; color: rgba(255, 255, 255, 0.65); font-variant-numeric: tabular-nums; flex: none; }
 .nb { display: flex; align-items: center; justify-content: center; width: 2.875rem; height: 2.875rem; border-radius: 50%; color: #fff; background: rgba(255, 255, 255, 0.1); transition: transform 220ms var(--ease), background 220ms var(--ease), color 220ms var(--ease); }
 .nb svg { width: 1.25rem; height: 1.25rem; fill: currentColor; stroke: none; }
 .nb.focus { background: #fff; color: #111; transform: scale(1.12); box-shadow: 0 0.5rem 1.25rem rgba(0, 0, 0, 0.35); }
@@ -1258,6 +1337,17 @@ html.who-gentle.scene-fog .mood:not(.dark) .mood-hi { text-shadow: 0 0 0.5rem rg
 .glass .set-side, .glass .set-main, .glass .gear-pop, .glass .app-pop, .glass .sleep-menu { background: rgba(28, 26, 34, 0.97); }
 }
 @media (prefers-reduced-motion: reduce) {
+  .np-title-wrap .np-title-track,
+  .np-title-wrap .np-title {
+    animation: none !important;
+    transform: none !important;
+  }
+  .np-title-dup, .np-title-spacer { display: none !important; }
+  .np-title {
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    white-space: nowrap !important;
+  }
   .glass .settings.on .set-side, .glass .settings.on .set-main, .glass .gear-pop.on, .glass .app-pop.on, .glass .sleep-menu.on { animation: none; }
   .glass .srow, .glass .ssec, .glass .grow, .nb, .sleep-menu .opt { transition: none; }
   .glass .srow.focus, .glass .ssec.focus, .glass .grow.focus, .nb.focus, .glass .ncard.focus, .glass.theme-night .app.focus { transform: none; }
@@ -1271,7 +1361,7 @@ html.who-gentle.scene-fog .mood:not(.dark) .mood-hi { text-shadow: 0 0 0.5rem rg
 .theme-night .shelf-clip { flex: 1; min-width: 0; overflow: hidden; padding: 1.5rem; margin: -1.5rem; }
 /* Beside Now playing the clip's left edge stays inside the gap, so scrolled cards stop short of the card */
 .theme-night:not(.no-flex-gap) .np-slot.on + .shelf-clip { padding-left: 1.25rem; margin-left: -1.25rem; }
-.theme-night .np { width: 34rem; margin: 0; padding: 1rem; border-radius: 1.875rem; }
+.theme-night .np { width: 38rem; margin: 0; padding: 1rem; border-radius: 1.875rem; }
 .theme-night .np-art { width: 5.9375rem; height: 5.9375rem; border-radius: 1rem; }
 html.spotify-row.theme-night .gclock { font-size: 19rem; top: 7rem; }
 html.spotify-row.theme-night .np-slot.on { position: absolute; left: 0; top: -23rem; z-index: 2; }
@@ -1316,12 +1406,27 @@ html.theme-night #football-scores.on { display: flex; position: fixed; z-index: 
 .football-count { margin-top: auto; text-align: right; }
 html.gearing #football-scores, html.apping #football-scores, html.expanded #football-scores { visibility: hidden; }
 .theme-night .np-app { font-size: 1.1875rem; line-height: 1.5rem; }
-.theme-night .np-t b { margin-top: 0.375rem; font-size: 1.5625rem; line-height: 2rem; }
+.theme-night .np-t b, .theme-night .np-title { margin-top: 0.375rem; font-size: 1.5625rem; line-height: 2rem; }
+.theme-night .np-title-wrap { margin-top: 0.375rem; line-height: 2rem; }
 .theme-night .np-t small { font-size: 1.25rem; line-height: 1.625rem; }
 .theme-night.gearing .np-slot, .theme-night.apping .np-slot, .theme-night.shelfmenu .np-slot { opacity: 0; }
 /* no flex gap: the clip itself steps 1.375rem clear of Now playing (with the same 1.25rem inside the gap
    as above), and keeps its -1.5rem when Now playing is hidden, as a gap after a hidden card is no gap */
 .no-flex-gap.theme-night .np-slot.on + .shelf-clip { padding-left: 1.25rem; margin-left: 0.125rem; }
+
+/* When app name is hidden: center and size track details and control elements */
+.np.no-app .np-app { display: none; }
+.np.no-app .np-t { display: flex; flex-direction: column; justify-content: center; }
+.np.no-app .np-t b, .np.no-app .np-title, .np.no-app .np-title-wrap { margin-top: 0; }
+.np.no-app .np-ctl { align-self: center; gap: 0.5rem; }
+.np.no-app .nb { width: 3.125rem; height: 3.125rem; }
+.np.no-app .nb svg { width: 1.375rem; height: 1.375rem; }
+.theme-night .np.no-app .np-t { min-height: 5.9375rem; justify-content: center; }
+.theme-night .np.no-app .np-t b, .theme-night .np.no-app .np-title, .theme-night .np.no-app .np-title-wrap { margin-top: 0; }
+.theme-night .np.no-app .np-t b, .theme-night .np.no-app .np-title { font-size: 1.625rem; line-height: 2.125rem; }
+.theme-night .np.no-app .np-ctl { align-self: center; gap: 0.5625rem; }
+.theme-night .np.no-app .nb { width: 3.25rem; height: 3.25rem; }
+.theme-night .np.no-app .nb svg { width: 1.4375rem; height: 1.4375rem; }
 
 /* ================= Lighter home (Home settings, Look, Lighter home; home.lighter) =================
    #58: for a slow box (a Xiaomi Mi Box, a Fire stick). Nothing is blurred, no tile casts a soft

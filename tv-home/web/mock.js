@@ -35,6 +35,7 @@
 //   inputs=4            the Input button lists four HDMI ports (one eARC), as the launcher reads them
 //   gfocus=glass        home.glass_focus: with glass app icons, the focused app stays glass
 //   banners=1           home.dock_banners: the Night dock shows each app's wide TV banner
+//   kwstyle=poster      home.keep_watching_style: the Night row as Classic poster tiles
 //   music=1             Now playing: a pretend song in Spotify (music=paused: paused; music=noart: no cover)
 //   newapp=1            an app turns up that this TV has not seen before (the New dot)
 //   down                the bridge is not answering      offline=1   the saved copy, no bridge at all
@@ -80,7 +81,7 @@
   var arg = function (name) { var m = q.match(new RegExp("[?&]" + name + "=([^&]*)")); if (!m) return null; try { return decodeURIComponent(m[1].replace(/\+/g, " ")); } catch (e) { return null; } };
   // the Home settings keys the bridge keeps (bridge/server.py clean_settings); keep the two lists alike
   var BRIDGE_KEYS = ["lang", "place", "wx_show", "wx_unit", "wx_every", "look", "idle_photo_seconds", "keep_photo", "keep_photo_pick", "glass", "glass_icons",
-    "moving_tiles", "dock", "lighter", "glass_amount", "clock_style", "now_playing", "keep_watching", "ambient_music", "sun_sync", "ambient_weather",
+    "moving_tiles", "dock", "lighter", "glass_amount", "clock_style", "now_playing", "keep_watching", "keep_watching_style", "ambient_music", "sun_sync", "ambient_weather",
     "ambient_sun_grade", "nav_sound", "start_focus", "glass_focus", "video", "video_url", "scene_order", "scenes_off", "scene_seconds", "clock", "photos",
     "hidden_apps", "quick", "soundscape", "smart_idle", "input_tile", "shelf_follows_app", "widgets", "widgets_design", "widgets_base", "show_clock", "hi_res", "icon_set"];
   if (arg("reset")) {
@@ -103,6 +104,7 @@
   }
   if (arg("quick") !== null) cfg.tvs[0].quick = arg("quick").split(",").filter(Boolean);
   if (arg("banners")) cfg.home.dock_banners = true;
+  if (arg("kwstyle")) cfg.home.keep_watching_style = arg("kwstyle");   // home.keep_watching_style: card or poster (#192)
   if (arg("inputs")) {
     window.MOCK_INPUTS = [
       { id: "mock/hdmi1", label: "HDMI 1", type: "hdmi", devices: ["PlayStation 5"] },
