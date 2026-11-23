@@ -3968,6 +3968,83 @@ async def h_music(request):
     return ok(music=await music_now())
 
 
+# ---------- Spotify local media session integration ----------
+SPOTIFY_PACKAGES = {"com.spotify.tv.android", "com.spotify.music"}
+
+
+async def spotify_session_now():
+    """Spotify media session state, read via dumpsys media_session."""
+    if not (tv.connected and tv.is_on and await tv.adb_ready()):
+        return {"available": False, "state": "stopped"}
+    try:
+        out = await tv.adb("shell", "cat /proc/uptime; dumpsys media_session", timeout=8)
+    except Exception:
+        return {"available": False, "state": "stopped"}
+    found = [x for x in _sessions(out) if x.get("package") in SPOTIFY_PACKAGES and x.get("title")]
+    if not found:
+        return {"available": False, "state": "stopped"}
+    pick = next((x for x in found if x.get("state") == "PLAYING"), found[0])
+    key = ((pick.get("subtitle") or "").lower(), pick["title"].lower())
+    if key not in music_art and key not in music_art_pending:
+        music_art_pending.add(key)
+        asyncio.ensure_future(_music_artwork(pick.get("subtitle"), pick["title"]))
+    return {
+        "available": True,
+        "package": pick.get("package"),
+        "title": pick.get("title", ""),
+        "artist": pick.get("subtitle", ""),
+        "album": pick.get("album", ""),
+        "duration": pick.get("duration", 0),
+        "state": STATES.get(pick.get("state"), "stopped"),
+        "position": pick.get("position", 0),
+        "last_update": pick.get("updated", 0),
+        "speed": pick.get("speed", 0.0),
+        "actions": pick.get("actions", 0),
+        "art": music_art.get(key) or None,
+    }
+
+
+async def h_spotify_now(request):
+    return ok(spotify=await spotify_session_now())
+
+
+async def h_spotify_control(request):
+    data = await body(request)
+    action = data.get("action", "").lower()
+    if not (tv.connected and tv.is_on and await tv.adb_ready()):
+        return bad(503, "TV not connected over ADB")
+    cmd_map = {
+        "play": "play",
+        "pause": "pause",
+        "play_pause": "play-pause",
+        "next": "next",
+        "previous": "previous",
+        "rewind": "rewind",
+        "fast_forward": "fast-forward",
+    }
+    cmd_key = cmd_map.get(action)
+    if not cmd_key:
+        return bad(400, f"Unsupported action: {action}")
+    try:
+        await tv.adb("shell", "cmd", "media_session", "dispatch", cmd_key, timeout=5)
+    except Exception as e:
+        key_map = {
+            "play": "KEYCODE_MEDIA_PLAY",
+            "pause": "KEYCODE_MEDIA_PAUSE",
+            "play_pause": "KEYCODE_MEDIA_PLAY_PAUSE",
+            "next": "KEYCODE_MEDIA_NEXT",
+            "previous": "KEYCODE_MEDIA_PREVIOUS",
+            "rewind": "KEYCODE_MEDIA_REWIND",
+            "fast_forward": "KEYCODE_MEDIA_FAST_FORWARD",
+        }
+        fallback_key = key_map.get(action)
+        if fallback_key:
+            await tv.adb("shell", "input", "keyevent", fallback_key, timeout=5)
+        else:
+            return bad(500, str(e))
+    return ok(success=True)
+
+
 async def h_music_queue(request):
     """The Up next widget: the next songs on the Spotify account (bridge/spotify_now.py), or queue None
     when Spotify is not connected here. TVs do not share any app's queue, so Spotify is the only source."""
@@ -4395,6 +4472,9 @@ def _sessions(out):
                 cur[key] = int(m.group(1)) if m else None
             m = re.search(r"speed=([-\d.]+)", line)
             cur["speed"] = float(m.group(1)) if m else 0.0
+            m = re.search(r"actions=(\d+)", line)
+            if m:
+                cur["actions"] = int(m.group(1))
             pos = cur.get("position")
             if pos is not None and pos >= 0:
                 if uptime_ms and cur.get("updated") and cur.get("state") == "PLAYING" and cur.get("speed", 0.0) > 0:
@@ -5945,6 +6025,8 @@ def make_app():
     r.add_get("/api/spotify/login", h_spotify_login)
     r.add_get("/api/spotify/callback", h_spotify_callback)
     r.add_get("/api/spotify/status", h_spotify_status)
+    r.add_get("/api/spotify/now_playing", h_spotify_now)
+    r.add_post("/api/spotify/control", h_spotify_control)
     r.add_post("/api/continue/open", h_continue_open)
     r.add_post("/api/continue/hide", h_continue_hide)
     r.add_get("/api/plex/art", h_plex_art)

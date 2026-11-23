@@ -157,6 +157,9 @@ class MainActivity : Activity() {
         Doorbell.start(this)   // smart home (optional): nothing happens unless a doorbell is set up
         FireWatch.ensure(this)   // Fire TV only, and only once a computer has switched it on
         main.postDelayed({ FireWatch.rebindIfUnbound(applicationContext) }, 10_000L)   // listed but not bound after a force-stop
+        SpotifyMediaListener.onStateChangedListener = { json ->
+            js("window.tv && tv.spotifyUpdate && tv.spotifyUpdate($json)")
+        }
         // At power-on the page is often asked for before Wi-Fi is up: try again the moment it is.
         val netBack = object : android.net.ConnectivityManager.NetworkCallback() {
             override fun onAvailable(network: android.net.Network) {
@@ -1092,6 +1095,29 @@ class MainActivity : Activity() {
         @JavascriptInterface
         fun removePhoto(name: String) {
             photoFile(name)?.delete()
+        }
+
+        // ---------------- Spotify local media session ----------------
+        @JavascriptInterface
+        fun spotifyState(): String {
+            val listener = SpotifyMediaListener.instance
+            return listener?.currentStateJson()?.toString() ?: JSONObject().apply {
+                put("available", false)
+                put("package", JSONObject.NULL)
+                put("state", "stopped")
+                put("has_permission", SpotifyMediaListener.hasNotificationAccess(this@MainActivity))
+                put("listener_connected", SpotifyMediaListener.isListenerConnected())
+            }.toString()
+        }
+
+        @JavascriptInterface
+        fun spotifyControl(action: String, param: Long): Boolean {
+            return SpotifyMediaListener.instance?.executeControl(action, param) ?: false
+        }
+
+        @JavascriptInterface
+        fun spotifyHasPermission(): Boolean {
+            return SpotifyMediaListener.hasNotificationAccess(this@MainActivity)
         }
 
         // Reminders (reminders.js): Android's own speech screen (Google's "Speak now" on Google TV),

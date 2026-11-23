@@ -772,6 +772,30 @@ _ask = CONFIG.get("ask") if isinstance(CONFIG.get("ask"), dict) else {}
 ASK_ENABLED = bool(_ask["enabled"]) if isinstance(_ask.get("enabled"), bool) else _claude_present()
 
 
+def _spotify(raw):
+    """Configuration for Spotify local media session integration."""
+    if not isinstance(raw, dict):
+        return {"enabled": False, "seek_seconds": 10, "hide_idle": False, "title_mode": "pingpong", "show_app": True}
+    out = {}
+    out["enabled"] = bool(raw.get("enabled", False))
+    seek = raw.get("seek_seconds")
+    if isinstance(seek, (int, float)) and 1 <= int(seek) <= 120:
+        out["seek_seconds"] = int(seek)
+    else:
+        out["seek_seconds"] = 10
+    out["hide_idle"] = bool(raw.get("hide_idle", False))
+    mode = raw.get("title_mode")
+    if mode in ("dots", "pingpong", "continuous"):
+        out["title_mode"] = mode
+    else:
+        out["title_mode"] = "pingpong"
+    out["show_app"] = bool(raw.get("show_app", True))
+    return out
+
+
+SPOTIFY = _spotify(CONFIG.get("spotify"))
+
+
 def save_tvs():
     """Write the TV list back (used by pair_tv.py after pairing). Writes config.json."""
     data = dict(CONFIG)
@@ -793,6 +817,7 @@ def public():
                          **({"inputs": _inputs(t["inputs"])} if isinstance(t.get("inputs"), list) else {}))
                      for t in TVS],
             "default_tv": DEFAULT_TV, "ask": {"enabled": ASK_ENABLED}, "phone_remote": PHONE_REMOTE,
+            "spotify": SPOTIFY,
             # only when config.json has one: without it the home is exactly as before
             **({"design": DESIGN} if DESIGN else {}),
             **({"design_store": DESIGN_STORE} if DESIGN_STORE is not None else {})}

@@ -211,6 +211,8 @@ esac
 # The screensaver quick button cuts the screen timeout for a moment (its own screensaver refuses
 # apps), which needs "modify system settings".
 "$PY" "$T" shell "appops set app.couchtv.launcher WRITE_SETTINGS allow" > /dev/null 2>&1 || true
+# Spotify local media session reading needs notification access (no accounts, local only).
+"$PY" "$T" shell "cmd notification allow_listener app.couchtv.launcher/app.couchtv.launcher.SpotifyMediaListener" > /dev/null 2>&1 || true
 # couch-tv Studio's Screen time widget reads Android's usage numbers: only with SCREEN_TIME=1.
 # Without it nothing changes (a switch made in the TV's own Usage access screen stays as it is).
 if [ "${SCREEN_TIME:-}" = 1 ]; then
