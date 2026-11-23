@@ -94,6 +94,7 @@ The digital, tall, glass, flip, analogue and word clocks in a Studio design can 
 - **A design sent again from Studio wins.** Send the same design again with one choice changed (a 24 hour clock, say) and that change now shows, even if the TV had changed that setting before. Changes on the TV to other settings stay.
 - **Ask AI** no longer tells you to use a particular kind of TV to speak a question: press OK, then the microphone on the TV's keyboard.
 - **Option B:** a failed connect to the TV's debugging port is now closed properly instead of being left open on the TV, and the bridge waits up to 60 seconds for someone to press Allow.
+- **Option B: keep the TV's own keyboard (#318).** A new setting for each TV in `config.json`, `"phone_keyboard": false`, keeps the TV's own on-screen keyboard for text boxes instead of "Use the keyboard on your mobile device". The cost: the TV then stops saying which app is in front over the bridge's link, so the current app can show as empty. Left out, nothing changes (docs/CONFIG.md).
 
 ### Installed from Downloader
 
@@ -101,6 +102,8 @@ This release comes from fixing what a person hits when they put Couch TV on a TV
 
 To update a TV that came from Downloader: Home settings, Updates, **Update to**, or type **8180170** in Downloader again and press Install. Your settings stay.
 
+Downloader always installs the plain version of the on-TV app, without the Home button watch. If your TV used the Home button version (you pressed **Make Home open Couch TV**), open Couch TV after the update and press **Make Home open Couch TV** again (Settings, Phone remote, Set it up), so the Home button opens Couch TV again. Update to keeps the version your TV has, so this only follows a Downloader install.
+
 ### Next time: a new signing key for the on-TV app
 
-0.13.10 itself is signed the same way as before, so every TV takes it the usual way. From 0.13.11 the on-TV app moves to its own release key, and 0.13.10 is the version that knows how to accept it: please update to 0.13.10 first. A TV that skips 0.13.10 and goes straight to 0.13.11 or later will say the file has another key in Update to; install that one with Downloader (code 8180170) or over the old app from a computer instead, once, and your settings stay. Android checks the new key itself.
+0.13.10 itself is signed the same way as before, so every TV takes it the usual way. From 0.13.11 the on-TV app moves to its own release key on TVs with Android 9 and newer, and 0.13.10 is the version that knows how to accept it: please update to 0.13.10 first. A TV on Android 6, 7 or 8 keeps seeing the old key and updates the usual way. A TV on Android 9 or newer that skips 0.13.10 and goes straight to 0.13.11 or later will say the file has another key in Update to; install that one with Downloader (code 8180170) or over the old app from a computer instead, once, and your settings stay. Android checks the new key itself.
