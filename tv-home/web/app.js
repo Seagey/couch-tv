@@ -8146,10 +8146,6 @@
       return { package: r.package, title: r.title, episode_title: r.episode_title || null,
         season: r.season || null, episode: r.episode || null, engaged: r.engaged || 0 };
     });
-    // Apply whitelist if configured
-    if (CFG.watch_next_allow && Array.isArray(CFG.watch_next_allow)) {
-      rows = rows.filter(function (r) { return CFG.watch_next_allow.indexOf(r.package) >= 0; });   // indexOf: old TV WebViews
-    }
     return api("POST", "/api/watch-next", { rows: rows });
   }
 
