@@ -53,6 +53,17 @@ class SetupStepsTest {
         assertEquals(HomeAsk.NO_QUESTION, SetupSteps.explainReason(none, googleHome = false, blocked = HomeAsk.NO_QUESTION))
     }
 
+    @Test fun backFromPhoneRemoteOpenedFromTheHomeGoesBackToTheHome() {
+        // Couch TV from the apps row, Open the home, gear, Phone remote: the setup screen is the task root and the
+        // home was cleared above it, so Back opens the home again (not a bare finish onto Google's home)
+        assertEquals(SetupSteps.SettingsBack.REOPEN_HOME, SetupSteps.settingsBack(fromHome = true, taskRoot = true))
+        // Couch TV is the Home app: the home is under the setup screen, so finishing goes back to it
+        assertEquals(SetupSteps.SettingsBack.FINISH, SetupSteps.settingsBack(fromHome = true, taskRoot = false))
+        // Settings opened from the setup screen itself: Back goes to the setup screen, whatever the task
+        assertEquals(SetupSteps.SettingsBack.BACK_TO, SetupSteps.settingsBack(fromHome = false, taskRoot = true))
+        assertEquals(SetupSteps.SettingsBack.BACK_TO, SetupSteps.settingsBack(fromHome = false, taskRoot = false))
+    }
+
     @Test fun stepOneIsDoneOnlyWhenCouchTvIsTheHome() {
         assertTrue(SetupSteps.stepOneDone(true))
         assertFalse(SetupSteps.stepOneDone(false))
