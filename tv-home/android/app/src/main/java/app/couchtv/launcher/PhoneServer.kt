@@ -49,6 +49,8 @@ class PhoneServer(private val host: Host, val auth: PhoneAuth, port: Int) : Nano
          * HaPhone's own, the same on every server.
          */
         fun ha(method: String, path: String, query: Map<String, String>, body: String, hostHeader: String?, port: Int): HaPhone.Reply? = null
+        /** An installed app's icon as a PNG, for the phone page's apps card (Widgets on your screen), or null. */
+        fun appIcon(pkg: String): ByteArray? = null
     }
 
     class Refused(val status: Int, message: String) : Exception(message)
@@ -62,6 +64,8 @@ class PhoneServer(private val host: Host, val auth: PhoneAuth, port: Int) : Nano
             uri == "/" -> newFixedLengthResponse(Response.Status.REDIRECT, "text/plain", "").apply { addHeader("Location", "/setup") }
             // the page's words in the phone's language, from the home's own files (bundled at www/tv), when this build has them
             WORDS.matches(uri) -> asset("www" + uri, "application/javascript")
+            // Widgets on your screen draws each widget with the home's own widget files (and the catalogue's app icons)
+            KIT.matches(uri) -> asset("www" + uri, if (uri.endsWith(".css")) "text/css" else if (uri.endsWith(".png")) "image/png" else "application/javascript")
             uri == "/setup" || uri == "/setup/" -> asset("www/ontv/setup.html", "text/html; charset=utf-8")
             uri == "/ontv/shim.js" -> asset("www/ontv/shim.js", "application/javascript")
             uri == "/ha" || uri.startsWith("/ha/") -> ha(s)
@@ -128,6 +132,12 @@ class PhoneServer(private val host: Host, val auth: PhoneAuth, port: Int) : Nano
         val photoGet = m == Method.GET && path.startsWith("/api/photo/")
         if (!auth.valid(tokenOf(s, photoGet))) throw Refused(401, "pair this phone first: open this page on your phone and type the code from the TV")
         if (m == Method.POST && path == "/api/photos") return addPhoto(s)
+        if (m == Method.GET && path.startsWith("/api/appicon/")) {
+            val pkg = path.removePrefix("/api/appicon/")
+            if (!PKG.matches(pkg)) throw Refused(400, "no such app")
+            val png = host.appIcon(pkg) ?: throw Refused(404, "no such app")
+            return newFixedLengthResponse(Response.Status.OK, "image/png", java.io.ByteArrayInputStream(png), png.size.toLong()).apply { addHeader("Cache-Control", "private, max-age=86400") }
+        }
         if (photoGet) {
             val f = host.photo(path.removePrefix("/api/photo/")) ?: throw Refused(404, "no such photo")
             return newFixedLengthResponse(Response.Status.OK, "image/jpeg", f.inputStream(), f.length()).apply { addHeader("Cache-Control", "no-store") }
@@ -309,6 +319,8 @@ class PhoneServer(private val host: Host, val auth: PhoneAuth, port: Int) : Nano
         const val MAX_UPLOAD = 25L * 1024 * 1024
         private val PATCH_KEYS = setOf("place")
         private val WORDS = Regex("/tv/(phone-words|caps-words)\\.js")
+        private val KIT = Regex("/tv/((icon-sets|app-catalogue|widget-words|widget-lines|widgets|widget-caps|qr)\\.js|widgets\\.css|app-icons/[a-z0-9_.-]{1,40}\\.png)")
+        private val PKG = Regex("[A-Za-z0-9_.]{3,120}")
         private val EDIT_KEYS = setOf("note", "lists", "wifi", "guide", "cal_url", "stay_url", "checkin", "checkout", "widget_set", "design_apps")
 
         /** This TV's address on the home network (IPv4, not the TV itself), or null when it has none. */

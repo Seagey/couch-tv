@@ -252,6 +252,8 @@ const phone = await ctx.newPage();
 phone.errors = []; phone.on("pageerror", (e) => phone.errors.push(String(e)));
 await phone.goto(ORIGIN + "/setup#pin=482913");
 await phone.waitForFunction(() => window.couchTv && window.couchTv.token());
+// (23 Nov) the phone opens on Widgets on your screen; the list these checks use is under More settings
+await phone.waitForFunction(() => document.body.classList.contains("gal"), null, { timeout: 8000 }).then(() => phone.click("#g-more"), () => {});
 await phone.waitForFunction(() => document.getElementById("widgets").style.display === "", null, { timeout: 10000 });
 {
   const titles = await phone.evaluate(() => [...document.querySelectorAll("#w-list details.wbox summary")].map((e) => e.textContent));
@@ -280,7 +282,8 @@ const ESPN_TODAY = LIVE ? null : { nrl: "Roosters", afl: "Sydney Swans", epl: "M
   t = await waitW(tvp, "sp", "Geelong", "Only my team");
   ok(!/Fremantle|Hawthorn/.test(t), "Only my team: Geelong's game only: " + t.slice(0, 200));
   r = await edit(tvp, "sp|sports", { team: null });
-  t = await waitW(tvp, "sp", "Pick your team", "Only my team with no team");
+  // (23 Nov: the widget names itself and asks for its team on the phone: "Your team's games", Set up on your phone)
+  t = await waitW(tvp, "sp", "Your team's games", "Only my team with no team");
   // the phone's own select for Your team, the way a person picks it
   await phone.evaluate(() => window.couchTv && null);
   r = await edit(tvp, "sp|sports", { league: "epl", team: "Manchester City", games: "live" });
@@ -442,7 +445,7 @@ const ESPN_TODAY = LIVE ? null : { nrl: "Roosters", afl: "Sydney Swans", epl: "M
 }
 // the phone sets one too, through its own page: Words in, a select
 {
-  await phone.reload(); await phone.waitForFunction(() => document.getElementById("widgets").style.display === "", null, { timeout: 10000 });
+  await phone.reload(); await phone.waitForFunction(() => document.body.classList.contains("gal"), null, { timeout: 8000 }).then(() => phone.click("#g-more"), () => {}); await phone.waitForFunction(() => document.getElementById("widgets").style.display === "", null, { timeout: 10000 });
   await phone.evaluate(() => { const d = [...document.querySelectorAll("#w-list details.wbox")].find((x) => /^Word of the day/.test(x.querySelector("summary").textContent)); d.open = true; });
   const sel = phone.locator('#w-list select[data-ws="lang"]');
   await sel.selectOption("fr");
@@ -477,7 +480,7 @@ ok(!phone.errors.length, "no page errors on the phone: " + phone.errors.join("; 
   ok(/Headlines, /.test(rows), "the Headlines still on it is listed");
   const keys = (await design(other)).widgets.map((w) => w.kind);
   ok(keys.indexOf("news") >= 0 && !keys.some((k) => k !== "news" && KINDS.indexOf(k) >= 0), "the phone hears the Headlines and none of this group's other widgets (" + keys.join(", ") + ")");
-  await phone.reload(); await phone.waitForFunction(() => document.getElementById("widgets").style.display === "", null, { timeout: 10000 });
+  await phone.reload(); await phone.waitForFunction(() => document.body.classList.contains("gal"), null, { timeout: 8000 }).then(() => phone.click("#g-more"), () => {}); await phone.waitForFunction(() => document.getElementById("widgets").style.display === "", null, { timeout: 10000 });
   const titles = await phone.evaluate(() => [...document.querySelectorAll("#w-list details.wbox summary")].map((e) => e.textContent));
   ok(titles.some((t) => /^Headlines, /.test(t)) && !titles.some((t) => ["sports", "stocks", "commute", "quote", "word", "ask", "agent"].some((k) => t.indexOf(TITLES[k] + ", ") === 0)), "the phone's Widgets on this TV: Headlines, none of the others (" + titles.join("; ") + ")");
   ok(!other.errors.length, "no page errors: " + other.errors.join("; "));

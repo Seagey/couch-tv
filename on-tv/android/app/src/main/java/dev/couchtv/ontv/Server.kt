@@ -104,6 +104,12 @@ class Server(private val ctx: Context, port: Int) : NanoWSD(port) {
             val f = Photos.file(path.removePrefix("/api/photo/")) ?: return json(404, err("no such photo"))
             return newFixedLengthResponse(Response.Status.OK, "image/jpeg", f.inputStream(), f.length()).noStore()
         }
+        // an installed app's icon for the phone page's apps card (Widgets on your screen)
+        if (m == Method.GET && path.startsWith("/api/appicon/")) {
+            if (!authed(s)) return json(401, err("pair this phone first"))
+            val png = AppIcon.png(ctx, path.removePrefix("/api/appicon/")) ?: return json(404, err("no such app"))
+            return newFixedLengthResponse(Response.Status.OK, "image/png", java.io.ByteArrayInputStream(png), png.size.toLong()).apply { addHeader("Cache-Control", "private, max-age=86400") }
+        }
         // Always read the body first: an unread body would be taken as the start of the next request
         // on a kept-alive connection (seen in testing after a 401).
         bodies[s] = readBody(s)

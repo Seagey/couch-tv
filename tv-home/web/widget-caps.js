@@ -896,6 +896,8 @@
     if (c.status === "not-built") return { line: tiny ? "Not on this TV" : c.name + ": not on this TV", sub: c.needs[0].replace(/^Needs /, "It needs ") };
     var s = SHORT[c.needs[0]];
     if (s) return { line: tiny ? s[2] : s[0], sub: s[1] };
+    // the TV never says which TVs a widget works on (owner, 23 Nov 2026): a need that names TVs is not drawn
+    if (/Hisense|Samsung|Roku|Apple TV|Fire TV|Google TV|Android TV|website home/.test(c.needs[0])) return { line: tiny ? "Set up needed" : c.what, sub: "" };
     return { line: tiny ? "Set up needed" : c.needs[0], sub: WHERE[c.setup.where] || "" };
   }
   // the numbered steps for a widget on one TV system (a platform-setup.js key, or "android", "web",
@@ -932,8 +934,36 @@
     return out;
   }
 
+  // What a widget that is not set up yet says on the TV (owner, 23 Nov 2026): its name, one short line of
+  // what it shows, then "Set up on your phone" and a code. The phone page (setup.html, #connect=<need>)
+  // opens the step for `need`. Only private things a design never carries are here: the town, photos, a
+  // calendar link, Spotify, Home Assistant, the guest WiFi, words typed at home and a team.
+  var NEED = {
+    town: ["solar", "weather", "bigtemp", "hourly", "week", "rain", "uv", "sun", "air", "surf", "date"],
+    photos: ["photo", "slideshow", "mosaic", "artframe", "memory"],
+    calendar: ["agenda"], spotify: ["queue"], wifi: ["wifi"], text: ["note", "list", "guide"], team: ["sports"],
+    ha: ["speakers", "aircon", "scenes", "controls", "camera", "doorbell", "energy", "sensor"]
+  };
+  var NEED_OF = {};
+  Object.keys(NEED).forEach(function (n) { NEED[n].forEach(function (k) { NEED_OF[k] = n; }); });
+  // one short line each (widget-lines.js has them in every language)
+  var FACE = {
+    solar: "Sunrise and sunset", sun: "Sunrise and sunset", weather: "Your town's weather", bigtemp: "Your town's weather", hourly: "The next few hours",
+    week: "The next 7 days", rain: "Rain in the next three hours", uv: "Today's UV", air: "How clean the air is", surf: "The swell at your beach",
+    date: "Today's date and weather", photo: "One of your photos", artframe: "One of your photos", slideshow: "Your photos, one after another",
+    mosaic: "A few of your photos", memory: "Photos from this day", agenda: "Your next events", queue: "Your Spotify queue",
+    speakers: "Your speakers", aircon: "Your aircon", scenes: "Your scenes", controls: "Your lights and switches", camera: "Your camera",
+    doorbell: "Your doorbell", energy: "Your solar and power", sensor: "A reading from your home", wifi: "A code guests scan to join",
+    note: "A note for everyone", list: "Shopping or to do", guide: "What guests need to know", sports: "Your team's games"
+  };
+  function setupNeed(kind) { return NEED_OF[kind] || null; }
+  function face(kind) { var c = C[kind]; return c && NEED_OF[kind] ? { name: c.name, line: FACE[kind] || "", need: NEED_OF[kind] } : null; }
+
   var API = {
     v: 2,
+    // what a widget needs set up on the phone ("town", "photos", "calendar", "spotify", "wifi", "text",
+    // "team", "ha") or null, and its face on the TV until then ({ name, line, need })
+    setupNeed: setupNeed, face: face, needs: function () { return JSON.parse(JSON.stringify(NEED)); },
     platforms: PLATFORMS.slice(),
     groups: { android: ANDROID.slice(), web: WEB.slice(), vidaa: VIDAA.slice(), native: Object.keys(NATIVE) },
     // the kinds Couch TV draws itself on a Roku ("Roku OS") or an Apple TV ("tvOS"); [] elsewhere

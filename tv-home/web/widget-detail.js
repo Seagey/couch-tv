@@ -84,36 +84,45 @@
   // ---------------- the layers: B[name](o, env) adds to S.body ----------------
   var B = {};
 
-  // the setup record (widget-caps.js), for a widget with nothing real to show yet
-  var STATUS = { works: ["Works on this TV", "#30d158"], setup: ["Set it up first", "#ffd60a"], computer: ["Needs a home computer", "#ff9f0a"], no: ["Not possible on this TV", "#8e8e93"], "not-built": ["Not in Couch TV", "#ff9f0a"] };
+  // A widget with nothing real to show yet (owner, 23 Nov 2026: "I'd rather people not be editing their
+  // widgets on the TV screen at all"). Its name and one short line of what it shows; when it needs
+  // something private set (widget-caps.js face): "Set up on your phone", "Scan with your phone camera."
+  // and the code the phone opens at this widget's step, and one small "No phone? Set it up here" that
+  // opens its page in Home settings. Never which TVs it works on, never steps, never a paragraph.
   B.setup = function (o, env) {
     // Ask AI and From your AI with nothing to show yet open their own layer, which sets them up
     if ((o.kind === "ask" || o.kind === "agent") && B[o.kind]) return B[o.kind](o, env || {});
     var kind = (S.from && S.from.getAttribute("data-setup")) || o.kind, C = window.CouchWidgetCaps, c = C && C.get(kind);
     S.panel.classList.add("cwd-setup");
     if (!c) { S.body.appendChild(head("info", "This widget", "It needs a newer Couch TV")); return; }
-    // what each kind of TV needs for it (widget-caps.js platforms[p].need), the best of its group
-    var RANK = ["works", "setup", "computer", "no"];
-    var group = function (keys) { var best = 3; keys.forEach(function (k) { var p = c.platforms[k], i = RANK.indexOf(p ? p.need || (p.on === "yes" ? "works" : p.on === "no" ? "no" : "setup") : "no"); if (i >= 0 && i < best) best = i; }); return RANK[best]; };
-    var WORD = { works: ["Works", "yes"], setup: ["Set up first", "setup"], computer: ["Needs a home computer", "partial"], no: ["Not possible", "no"] };
-    var tvs = [["Google TV, Android TV, Fire TV", ["Google TV", "Android TV", "Fire OS"]], ["Samsung, LG, Philips, Panasonic", ["Tizen", "webOS", "Saphi", "TiVo OS", "My Home Screen"]],
-      ["Hisense", ["VIDAA"]], ["Roku, Apple TV and others", ["Roku OS", "tvOS", "Vega OS", "Titan OS", "SmartCast", "Other"]]];
-    var left = E("div", "cwd-col", "width:820px", [label("What it shows"), E("div", "cwd-text", "", [c.what]), label("What it needs"),
-      E("div", "cwd-list", "", c.needs.map(function (n) { return E("div", "cwd-li", "", [E("i", "cwd-bullet"), E("span", "", "", [n])]); })),
-      label("Which TVs"), E("div", "cwd-col", "", tvs.map(function (g) { var v = c.status === "not-built" ? ["Not possible", "no"] : WORD[group(g[1])]; return E("div", "cwd-tvrow", "", [E("span", "", "", [g[0]]), E("b", "cwd-tv-" + v[1], "", [v[0]])]); }))]);
-    // the steps for this TV: the Android home has window.TVOS; a Hisense says so in its browser's name
-    // (the designer and a browser preview, ?mock, stand in for the Android home)
-    var sys = window.TVOS || S.api.designer || /[?&]mock\b/.test(location.search) ? "android" : /VIDAA|Hisense/i.test(navigator.userAgent || "") ? "vidaa" : "web";
-    var steps = C.steps ? C.steps(kind, sys) : [c.setup.how], none = steps.length === 1 && /^Nothing to set up\.$/.test(steps[0]);
-    // the pill says what this TV needs for it (works, set up first, a home computer, not possible)
-    var mine = c.status === "not-built" ? "not-built" : group(C.groups && C.groups[sys] ? C.groups[sys] : ["Google TV"]), st = STATUS[mine] || STATUS.setup;
-    S.body.appendChild(head("info", c.name, "", st[1]));
-    S.subEl.appendChild(E("span", "cwd-pill", "background:" + st[1], [st[0]]));
-    var right = E("div", "cwd-col", "flex:1;margin-left:64px;min-width:0", [label(c.status === "not-built" ? "What you can do" : none ? "Nothing to set up" : "How to set it up on this TV"),
-      E("div", "cwd-list", "", steps.map(function (s, i) { return E("div", "cwd-li", "", [E("b", "", "flex:none;width:44px", [String(i + 1) + "."]), E("span", "", "", [s])]); })),
-      none ? null : label("Until then"), none ? null : E("div", "cwd-text", "", [c.until]),
-      label("OK on the widget"), E("div", "cwd-text", "", [c.ok])]);
-    S.body.appendChild(E("div", "cwd-row cwd-grow", "align-items:flex-start;margin-top:30px", [left, right]));
+    var f = C.face ? C.face(kind) : null, need = (S.from && S.from.getAttribute("data-need")) || (f && f.need) || "";
+    if (need === "team" && !(S.from && S.from.getAttribute("data-need"))) need = "";
+    var id = o && o.id !== undefined && o.id !== null ? String(o.id) : S.id, api = S.api || {};
+    var NEED_ICON = { town: "partly-cloudy", photos: "picture", calendar: "calendar", spotify: "music", wifi: "wifi", text: "edit", team: "tv", ha: "home" };
+    S.body.appendChild(head(NEED_ICON[need] || "info", c.name, f ? f.line : ""));
+    var here = function () { if (api.tvEdit) api.tvEdit(id); };
+    if (!need) {
+      // nothing to set on the phone (a permission on the TV, a widget not on this TV): its one line
+      var cd = C.card ? C.card(kind, false) : { line: "", sub: "" };
+      S.body.appendChild(E("div", "cwd-col cwd-grow cwd-center", "", [E("div", "cwd-mid", "text-align:center;max-width:1300px", [cd.line]),
+        cd.sub ? E("div", "cwd-small", "margin-top:16px;text-align:center;max-width:1300px", [cd.sub]) : null]));
+      return;
+    }
+    var box = E("div", "cwd-qr", "width:420px;height:420px;border-radius:32px;background:#fff;display:flex;align-items:center;justify-content:center;flex:none");
+    var noPhone = F(btn("tv", "No phone? Set it up here"), here, "No phone? Set it up here");
+    var words = E("div", "cwd-col", "margin-left:72px;max-width:900px", [E("div", "cwd-big", "", ["Set up on your phone"]),
+      E("div", "cwd-text", "margin-top:18px", ["Scan with your phone camera."]), E("div", "", "margin-top:56px", [noPhone])]);
+    if (!api.phone) {
+      // no phone page on this home: the one way left is the TV's own page
+      S.body.appendChild(E("div", "cwd-col cwd-grow cwd-center", "", [F(btn("tv", "No phone? Set it up here"), here, "No phone? Set it up here")]));
+      return;
+    }
+    S.body.appendChild(E("div", "cwd-row cwd-grow cwd-center", "", [box, words]));
+    var mine = S;
+    api.phone(id, need).then(function (link) {
+      if (S !== mine || !link || !window.TVQR) return;
+      try { var q = window.TVQR.svg(link, 372); q.style.cssText = "display:block;width:372px;height:372px"; box.appendChild(q); box.setAttribute("data-link", link); } catch (e) {}
+    }, function () {});
   };
 
   // timers: one at a time, kept on the TV (widgets.js Timer)

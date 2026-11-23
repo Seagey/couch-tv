@@ -113,7 +113,7 @@ const typeHere = { de: /Gib hier den Code ein, den couch-tv Studio auf deinem Ha
 for (const [l, re] of Object.entries(typeHere)) ok(re.test(TV[l].tw_type_code_phone), l + ": Get a design is typed on the TV: " + TV[l].tw_type_code_phone);
 // Arabic and Hebrew: addresses and codes in left to right isolates
 for (const l of ["ar", "he"]) {
-  for (const k of ["tw_scan_widget", "set_phone_pc", "tw_ha_connected_to_host_scan_to_ch"]) {
+  for (const k of ["set_phone_pc", "tw_ha_connected_to_host_scan_to_ch"]) {   // (tw_scan_widget went with the old Edit on your phone hint, 23 Nov)
     const holes = TV.en[k].match(/\{\w+\}(\/setup)?/g);
     ok(holes.every((h) => TV[l][k].includes("⁦" + h + "⁩")), l + " " + k + ": every address and code isolated");
   }

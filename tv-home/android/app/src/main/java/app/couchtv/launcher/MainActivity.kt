@@ -396,6 +396,8 @@ class MainActivity : Activity() {
             return runCatching { JSONObject(v) }.getOrNull()
         }
         override fun addPhoto(file: java.io.File): String? = shown?.get()?.copyPhoto(android.net.Uri.fromFile(file))
+        // an installed app's icon for the phone page's apps card (the same 256 px picture the home draws)
+        override fun appIcon(pkg: String): ByteArray? = shown?.get()?.let { a -> runCatching { a.iconImage(pkg) }.getOrNull() }
         override fun photo(name: String): java.io.File? {
             if (!Regex("[A-Za-z0-9_-]{1,64}\\.jpg").matches(name)) return null
             return java.io.File(java.io.File(app.filesDir, "photos"), name).takeIf { it.isFile }

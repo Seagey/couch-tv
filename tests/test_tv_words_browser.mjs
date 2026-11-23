@@ -74,13 +74,13 @@ try {
   ok(outside[0] === "Show all settings", "outside Home settings and the sheets: left alone");
   ok(outside[1] === "Show all settings" && outside[2] === "Sin configurar", "a typed value stays; Couch TV's own Not set is translated: " + outside.join(" | "));
   // a line with gaps keeps what is in them
-  const tpl = await page.evaluate(() => window.CouchTvWords.words("Scan with your phone's camera: it opens this widget's settings, already paired. Or on a computer: 192.0.2.7:5400/setup, code 123 456. Back to close."));
-  ok(/^Escanéalo con la cámara del móvil/.test(tpl) && tpl.indexOf("192.0.2.7:5400/setup") > 0 && tpl.indexOf("123 456") > 0, "the phone QR line keeps the address and code: " + tpl);
+  const tpl = await page.evaluate(() => window.CouchTvWords.words("Agenda: set up on your phone"));
+  ok(tpl === "Agenda: configúralo en el móvil", "a line with a gap keeps the widget's name: " + tpl);
   // whole lines: the gaps, the spaces around a line, nothing more and nothing less
   const whole = await page.evaluate(() => {
     const W = window.CouchTvWords.words, t = window.I18N.t;
     return [
-      [W("Scan with your phone's camera: it opens this widget's settings, already paired. Or on a computer: 192.0.2.7:5400/setup, code 123 456. Back to close."), t("tw_scan_widget", { addr: "192.0.2.7:5400", code: "123 456" })],
+      [W("Weather: set up on your phone"), t("tw_setup_name_phone", { name: "Weather" })],
       [W("\n   Show all settings  "), "\n   Mostrar todos los ajustes  "],
       [W("Connected to homeassistant.local:8123. Scan to change what shows."), t("tw_ha_connected_to_host_scan_to_ch", { host: "homeassistant.local:8123" })],
       [W("Updated to 0.13.9. Your settings stay."), "Actualizado a 0.13.9. Tus ajustes se mantienen."],
@@ -105,9 +105,9 @@ try {
   // Arabic and Hebrew: the address and the code read left to right inside the line (U+2066 ... U+2069)
   for (const l of ["ar", "he"]) {
     await page.evaluate((x) => window.I18N.set(x), l);
-    const iso = await page.evaluate(() => [window.CouchTvWords.words("Scan with your phone's camera: it opens this widget's settings, already paired. Or on a computer: 192.0.2.7:5400/setup, code 123 456. Back to close."),
+    const iso = await page.evaluate(() => [window.CouchTvWords.words("Agenda: set up on your phone"),
       window.I18N.t("set_phone_pc", { addr: "192.0.2.7:5400/setup", code: "123 456" }), window.CouchTvWords.words("Connected to homeassistant.local. Scan to change what shows.")]);
-    ok(iso[0].includes("⁦192.0.2.7:5400/setup⁩") && iso[0].includes("⁦123 456⁩"), l + ": the sheet line isolates the address and code: " + JSON.stringify(iso[0]));
+    ok(iso[0] && iso[0].includes("⁦Agenda⁩"), l + ": the Hold OK line isolates the widget's name: " + JSON.stringify(iso[0]));
     ok(iso[1].includes("⁦192.0.2.7:5400/setup⁩") && iso[1].includes("⁦123 456⁩"), l + ": the computer line isolates them: " + JSON.stringify(iso[1]));
     ok(iso[2].includes("⁦homeassistant.local⁩"), l + ": the Smart home line isolates the address");
   }

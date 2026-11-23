@@ -592,6 +592,8 @@ phone.errors = []; phone.on("pageerror", (e) => phone.errors.push(String(e)));
 await meteo(phone);
 await phone.goto(ORIGIN + "/setup#pin=482913");
 await phone.waitForFunction(() => window.couchTv && window.couchTv.token());
+// (23 Nov) the phone opens on Widgets on your screen; the list these checks use is under More settings
+await phone.waitForFunction(() => document.body.classList.contains("gal"), null, { timeout: 8000 }).then(() => phone.click("#g-more"), () => {});
 await phone.waitForFunction(() => document.querySelectorAll("#w-list details").length > 0, null, { timeout: 10000 });
 {
   const titles = await phone.evaluate(() => [...document.querySelectorAll("#w-list summary")].map((e) => e.textContent));
@@ -684,13 +686,13 @@ await tv.close();
 {
   // the mock home with no town at all (?nowx=1: no weather in its config, nothing in Home settings)
   const tv3 = await tvPage({ v: 1, background: { colour: "#1d3a4f" }, objects: [{ id: "wx", type: "widget", kind: "weather", x: 40, y: 40, w: 460, h: 300 }, { id: "bt", type: "widget", kind: "bigtemp", x: 600, y: 40, w: 460, h: 300 }] }, "&nowx=1");
-  ok(/Set your town/.test(await objText(tv3, "wx")), "no home town: the weather says Set your town");
+  ok(/Set your town|Your town's weather/.test(await objText(tv3, "wx")), "no home town: the weather says it needs the town");
   const r = await tv3.evaluate(() => window.tv.atHomeEdit({ widget_set: { key: "wx|weather", values: { town: { name: "Bells Beach", lat: -38.37, lon: 144.28, timezone: "Australia/Sydney" } } } }));
   ok(r.ok, "a place for the weather widget saves with no home town");
   await tv3.waitForFunction(() => /30°/.test((document.querySelector('.cw-o[data-obj="wx"]') || {}).textContent || ""), null, { timeout: 10000 });
   const a = await objText(tv3, "wx"), b = await objText(tv3, "bt");
   has(a, "Bells Beach", "no home town: the widget with its own place shows it"); has(a, "30°", "with that place's reading");
-  ok(/Set your town/.test(b), "the widget without one still says Set your town, never Bells Beach's: " + b);
+  ok(/Set your town|Your town's weather/.test(b), "the widget without one still asks for the town, never Bells Beach's: " + b);
   hasNot(b, "30°", "never another widget's place");
   ok(!tv3.errors.length, "no page errors: " + tv3.errors.join("; "));
   await tv3.close();

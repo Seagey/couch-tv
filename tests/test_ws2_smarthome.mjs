@@ -232,7 +232,8 @@ group = "solar";
   r = await draw(W("solar"), env({}));
   ok(r.text === home, "sun clock cleared: the home's town again");
   r = await draw(W("solar"), { data: { ha: HA, wset: {} } });
-  ok(/Set your town for the sun/.test(r.text) && /Hold OK, then Edit on the TV, then Place/.test(r.text), "sun clock with no town: says the real way to set one: " + r.text);
+  // (23 Nov: its name, what it shows, and the one way: on the phone, or OK on a home with no phone page)
+  ok(/^Sun clock/.test(r.text) && /Sunrise and sunset/.test(r.text) && /Set up on your phone|Press OK to set it up/.test(r.text), "sun clock with no town: says what it is and where to set it: " + r.text);
 }
 group = "battery";
 {
@@ -494,6 +495,8 @@ phone.errors = []; phone.on("pageerror", (e) => phone.errors.push(String(e)));
 await meteo(phone);
 await phone.goto(ORIGIN + "/setup#pin=482913");
 await phone.waitForFunction(() => window.couchTv && window.couchTv.token());
+// (23 Nov) the phone opens on Widgets on your screen; the list these checks use is under More settings
+await phone.waitForFunction(() => document.body.classList.contains("gal"), null, { timeout: 8000 }).then(() => phone.click("#g-more"), () => {});
 await phone.waitForFunction(() => document.querySelectorAll("#w-list details").length > 0, null, { timeout: 10000 });
 {
   const keys = await phone.evaluate(() => [...document.querySelectorAll("#w-list details")].map((d) => d.getAttribute("data-key")));

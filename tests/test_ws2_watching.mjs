@@ -367,16 +367,16 @@ const tv = TV = await tvPage(design, "&ontv=1");
   for (const k of KINDS) {
     const m = await holdOn(tv, "o" + k);
     if (k === "stack") ok(m.items.indexOf("Edit the stack on the TV") > 0 && m.args.indexOf("ostack|stack") >= 0, "Hold OK on the stack: Edit the stack on the TV (" + m.items.join(", ") + ")");
-    else ok(m.items.indexOf("Edit on the TV") > 0 && m.items.indexOf("Edit on your phone") > 0 && m.args.indexOf("o" + k + "|" + k) >= 0, "Hold OK on " + k + ": Edit on the TV and Edit on your phone (" + m.items.join(", ") + ")");
+    // (23 Nov) the phone first, "<Widget>: set up on your phone" while it waits; the TV's own page is behind "No phone? Set it up here"
+    else ok(/^(Edit on your phone|.+: set up on your phone)$/.test(m.items[0]) && m.items.indexOf("Edit on the TV") < 0 && m.args[0].indexOf("o" + k + "|") === 0, "Hold OK on " + k + ": the phone first (" + m.items.join(", ") + ")");
   }
   // Edit on the TV opens the dock's own page, its apps named
   await tv.evaluate(() => window.CouchDesign.nav.focus("odock", 0)); await tv.waitForTimeout(200);
   await tv.keyboard.down("Enter"); await tv.waitForTimeout(900); await tv.keyboard.up("Enter"); await tv.waitForTimeout(300);
   const items = await tv.evaluate(() => [...document.querySelectorAll(".cw-sheet .cw-mi")].map((e) => e.textContent));
-  for (let k = 0; k < items.indexOf("Edit on the TV"); k++) await press(tv, "ArrowDown", 120);
-  await press(tv, "Enter", 700);
+  await press(tv, "Enter", 800); await press(tv, "ArrowDown", 150); await press(tv, "Enter", 700);   // the phone's sheet, then No phone? Set it up here
   const head = await tv.textContent("#set-head"), pg = await tv.evaluate(() => [...document.querySelectorAll("#set-rows .srow")].map((e) => e.textContent.trim()).join(" | "));
-  ok(/Dock, bottom right/.test(head) && /Netflix, YouTube/.test(pg) && /All apps at the end/.test(pg) && /hold OK on an app/.test(pg), "Edit on the TV: the dock's page, its apps and the All apps tile: " + pg.slice(0, 200));
+  ok(/Dock, bottom right/.test(head) && /Netflix, YouTube/.test(pg) && /All apps at the end/.test(pg) && /hold OK on an app/.test(pg), "No phone? Set it up here: the dock's page, its apps and the All apps tile: " + pg.slice(0, 200));
   for (let k = 0; k < 6 && await tv.evaluate(() => document.getElementById("settings").classList.contains("on")); k++) await press(tv, "Escape", 250);
   await tv.waitForTimeout(700);
 }
@@ -413,6 +413,8 @@ const tv = TV = await tvPage(design, "&ontv=1");
   phone.errors = []; phone.on("pageerror", (e) => phone.errors.push(String(e)));
   await phone.goto(ORIGIN + "/setup#pin=482913");
   await phone.waitForFunction(() => window.couchTv && window.couchTv.token());
+  // (23 Nov) the phone opens on Widgets on your screen; the list these checks use is under More settings
+  await phone.waitForFunction(() => document.body.classList.contains("gal"), null, { timeout: 8000 }).then(() => phone.click("#g-more"), () => {});
   await phone.waitForFunction(() => document.querySelectorAll("#w-list summary").length > 0, null, { timeout: 10000 });
   let titles = await phone.evaluate(() => [...document.querySelectorAll("#w-list summary")].map((e) => e.textContent).join(" | "));
   KINDS.forEach((k) => ok(titles.indexOf(NAMES[k] + ", ") >= 0, k + " has a box on the phone page"));
@@ -455,7 +457,7 @@ const tv = TV = await tvPage(design, "&ontv=1");
   ok(!(await tv.evaluate(() => !!document.querySelector('.cw-o[data-obj="odock"]'))), "and from the home");
   // Hold OK on a widget that stayed: it is its own, never one that left
   const m = await holdOn(tv, "okeeprow");
-  ok(m.args.indexOf("okeeprow|keeprow") >= 0 && !m.args.some((a) => /odock|ostack|okeep\|/.test(a || "")), "Hold OK offers only the widget there: " + m.args.join(","));
+  ok(m.args.some((a) => /^okeeprow\|/.test(a || "")) && !m.args.some((a) => /odock|ostack|okeep\|/.test(a || "")), "Hold OK offers only the widget there: " + m.args.join(","));
   // a stack whose turn Studio set at the top (o.turn, Studio's Turns), showing a widget with nothing to set
   const bares = await tv.evaluate(() => ["date", "analog", "moon", "sun", "month"].filter((k) => !window.CouchWidgetCaps.settings(k).some((s) => s && s.pre === true && (!Array.isArray(s.where) || s.where.indexOf("tv") >= 0 || s.where.indexOf("phone") >= 0))));
   const bare = bares.length >= 2 ? bares[0] : "";

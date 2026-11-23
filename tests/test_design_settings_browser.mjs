@@ -248,16 +248,17 @@ async function holdOn(page, id) {
   await press(tv, "Escape", 300);
 }
 {
-  // the on-TV app (it serves the phone page): Edit on the TV, then Edit on your phone with the QR code
+  // the on-TV app (it serves the phone page): the phone first (owner, 23 Nov 2026), its sheet a QR code
+  // with "No phone? Set it up here" for the TV's own page; no Edit on the TV in the menu
   const ontv = await tvPage(design, "&ontv=1");
   const m = await holdOn(ontv, "s");
-  ok(m.items[0] === "Settings" && m.items[1] === "Edit on the TV" && m.items[2] === "Edit on your phone", "on the on-TV app, surf: Settings, Edit on the TV, Edit on your phone (" + m.items.join(", ") + ")");
-  await press(ontv, "ArrowDown", 120); await press(ontv, "ArrowDown", 120); await press(ontv, "Enter", 800);
+  ok(m.items[0] === "Edit on your phone" && m.items[1] === "Settings" && m.items.indexOf("Edit on the TV") < 0, "on the on-TV app, surf: Edit on your phone first, then Settings (" + m.items.join(", ") + ")");
+  await press(ontv, "Enter", 800);
   const q = await ontv.evaluate(() => { const s = document.querySelector(".cw-sheet"); return s && { title: s.querySelector("h2").textContent, link: (s.querySelector(".cw-qr") || {}).getAttribute && s.querySelector(".cw-qr").getAttribute("data-link"),
-    svg: !!s.querySelector(".cw-qr svg"), hint: (s.querySelector(".cw-hint") || {}).textContent || "", items: s.querySelectorAll(".cw-mi").length }; });
-  ok(q && q.title === "Edit on your phone" && q.svg, "Edit on your phone shows a QR code: " + JSON.stringify(q));
+    svg: !!s.querySelector(".cw-qr svg"), hint: (s.querySelector(".cw-hint") || {}).textContent || "", items: [...s.querySelectorAll(".cw-mi")].map((x) => x.textContent) }; });
+  ok(q && q.title === "Set up on your phone" && q.svg, "Edit on your phone shows a QR code: " + JSON.stringify(q));
   ok(q && q.link === "http://tv.example:5400/setup#pin=482913&widget=s", "the QR opens the phone page at this widget, already paired: " + (q && q.link));
-  ok(q && /Or on a computer: tv\.example:5400\/setup, code 482 913\./.test(q.hint), "with the computer line under it: " + (q && q.hint));
+  ok(q && q.hint === "Scan with your phone camera." && q.items.join() === "No phone? Set it up here", "one line under it, and No phone? Set it up here: " + JSON.stringify(q));
   ok(q && !/[–—]/.test(q.hint + q.title), "no dashes");
   // M3 (21 Nov): while it is open the sheet asks the TV again every 20 s and draws the new code
   const qrNow = () => ontv.evaluate(() => { const s = document.querySelector(".cw-sheet .cw-qr"); return s ? s.getAttribute("data-link") : null; });
@@ -267,21 +268,20 @@ async function holdOn(page, id) {
   await press(ontv, "Escape", 300);
   ok(!(await ontv.evaluate(() => window.CouchDesign.nav.sheetOpen())), "Back closes the QR");
   // pairing locked (the TV answers 429): the open QR goes away, never a dead code on show
-  await holdOn(ontv, "s"); await press(ontv, "ArrowDown", 120); await press(ontv, "ArrowDown", 120); await press(ontv, "Enter", 800);
+  await holdOn(ontv, "s"); await press(ontv, "Enter", 800);
   ok(/pin=555666/.test((await qrNow()) || ""), "the QR is open again");
   await ontv.evaluate(() => localStorage.setItem("mock:phoneLinkFail", "1"));
   await ontv.waitForTimeout(21000);
   ok((await qrNow()) === null, "when the TV stops giving a code (locked), the QR goes within 20 s");
   await ontv.evaluate(() => { localStorage.removeItem("mock:phoneLinkFail"); localStorage.removeItem("mock:phonePin"); });
   if (await ontv.evaluate(() => window.CouchDesign.nav.sheetOpen())) await press(ontv, "Escape", 300);
-  // a widget with nothing to set: still no QR item on the on-TV app
-  // the House guide (Parts of the guide, kept on this TV): both Edit items on the on-TV app too
+  // the House guide (Parts of the guide, kept on this TV, and nothing written yet): set up on the phone, first
   const m3 = await holdOn(ontv, "g");
-  ok(m3.items[1] === "Edit on the TV" && m3.items[2] === "Edit on your phone", "House guide on the on-TV app: Edit on the TV and Edit on your phone (" + m3.items.join(", ") + ")");
+  ok(/^(House guide: set up on your phone|Edit on your phone)$/.test(m3.items[0]) && m3.items.indexOf("Edit on the TV") < 0, "House guide on the on-TV app: the phone first (" + m3.items.join(", ") + ")");
   await press(ontv, "Escape", 300);
-  // Edit on the TV opens the widget's own page there too
-  await holdOn(ontv, "n"); await press(ontv, "ArrowDown", 120); await press(ontv, "Enter", 600);
-  ok(/Headlines, top right/.test(await ontv.textContent("#set-head")), "Edit on the TV opens the headlines' own page: " + await ontv.textContent("#set-head"));
+  // No phone? Set it up here opens the widget's own page on the TV
+  await holdOn(ontv, "n"); await press(ontv, "Enter", 800); await press(ontv, "ArrowDown", 150); await press(ontv, "Enter", 600);
+  ok(/Headlines, top right/.test(await ontv.textContent("#set-head")), "No phone? Set it up here opens the headlines' own page: " + await ontv.textContent("#set-head"));
   await closeSettings(ontv);
   ok(!ontv.errors.length, "no page errors on the on-TV app: " + ontv.errors.join("; "));
   await ontv.close();
@@ -320,6 +320,9 @@ await meteo(phone);
 await phone.goto(ORIGIN + "/setup#pin=482913");
 await phone.waitForFunction(() => window.couchTv && window.couchTv.token());
 await phone.waitForFunction(() => document.getElementById("design-line").style.display === "", null, { timeout: 8000 });
+// (23 Nov) the phone opens on Widgets on your screen; the page these checks use is under More settings
+await phone.waitForFunction(() => document.body.classList.contains("gal"), null, { timeout: 8000 });
+await phone.click("#g-more");
 {
   const st = await phone.evaluate(() => {
     const vis = (id) => { const e = document.getElementById(id); return e.style.display !== "none" && !e.classList.contains("hidden-by-design"); };
@@ -422,7 +425,7 @@ await phone.waitForFunction(() => document.getElementById("design-line").style.d
 }
 await ctx.close();
 
-// ---- 5a. the TV's Edit on your phone QR: /setup#pin=...&widget=<id> opens that widget, paired ----
+// ---- 5a. the TV's QR: /setup#pin=...&widget=<id> opens that widget on Widgets on your screen, paired ----
 {
   const c3 = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
   const p3 = await c3.newPage();
@@ -430,35 +433,28 @@ await ctx.close();
   await meteo(p3);
   await p3.goto(ORIGIN + "/setup#pin=482913&widget=n");
   await p3.waitForFunction(() => window.couchTv && window.couchTv.token());
-  await p3.waitForFunction(() => document.querySelector('#w-list details[data-key="n|news"]'), null, { timeout: 8000 });
+  await p3.waitForFunction(() => !document.getElementById("sheet").hidden, null, { timeout: 10000 });
   await p3.waitForTimeout(400);
-  const st = await p3.evaluate(() => ({ hash: location.hash, open: [...document.querySelectorAll("main > section.fold")].filter((s) => !s.classList.contains("shut")).map((s) => s.id),
-    news: document.querySelector('#w-list details[data-key="n|news"]').open, hi: document.querySelector('#w-list details[data-key="n|news"]').classList.contains("hi"),
-    surf: document.querySelector('#w-list details[data-key="s|surf"]').open, his: document.querySelectorAll("#w-list .hi").length,
-    top: document.querySelector('#w-list details[data-key="n|news"]').getBoundingClientRect().top }));
+  const st = await p3.evaluate(() => ({ hash: location.hash, title: document.getElementById("sheet-title").textContent, body: document.getElementById("sheet-body").textContent,
+    card: (document.querySelectorAll(".g-card")[+document.getElementById("g-count").textContent.split(" ")[0] - 1] || {}).textContent || "" }));
   ok(st.hash === "#widget=n", "only the pairing code leaves the address: " + st.hash);
-  ok(st.open.length === 1 && st.open[0] === "widgets", "Widgets on this TV is the section open: " + st.open.join(","));
-  ok(st.news && st.hi && st.his === 1 && !st.surf, "the headlines' box is open and marked, the others shut");
-  ok(st.top >= -2 && st.top < 844, "and scrolled into view: " + Math.round(st.top));
-  // round 2: Guest Wi-Fi has a setting of its own now (Hide the password): #widget=f opens its box
+  ok(st.title === "Headlines" && /News source/.test(st.body), "the headlines' own sheet opens: " + st.title);
+  ok(/Headlines, top right/.test(st.card), "on the headlines' card: " + st.card.slice(0, 60));
+  // Guest Wi-Fi with nothing typed yet: #widget=f opens its one step (the network name and password)
   await p3.evaluate(() => { location.hash = "widget=f"; });
   await p3.reload();
   await p3.waitForFunction(() => window.couchTv && window.couchTv.token());
-  await p3.waitForFunction(() => document.querySelector('#w-list details[data-key="f|wifi"].hi'), null, { timeout: 8000 });
-  ok(await p3.evaluate(() => { const d = document.querySelector('#w-list details[data-key="f|wifi"]'); return d.open && /Hide the password/.test(d.textContent) && document.querySelectorAll("#w-list .hi").length === 1; }),
-    "#widget=f (Guest Wi-Fi): its box opens, marked, with Hide the password");
-  // a widget the TV has nothing to set for (the App grid, while it has no TV setting): the section opens and says so
-  if (!(await p3.evaluate(() => /App grid/.test(document.getElementById("w-list").textContent)))) {
-    await p3.evaluate(() => { location.hash = "widget=a"; });
-    await p3.reload();
-    await p3.waitForFunction(() => window.couchTv && window.couchTv.token());
-    await p3.waitForFunction(() => /nothing to set here/.test(document.getElementById("w-msg").textContent), null, { timeout: 8000 });
-    ok(await p3.evaluate(() => !document.getElementById("widgets").classList.contains("shut") && !document.querySelector("#w-list .hi")), "#widget=a (App grid): Widgets on this TV opens and says there is nothing to set");
-  }
+  await p3.waitForFunction(() => !document.getElementById("sheet").hidden, null, { timeout: 10000 });
+  ok(await p3.evaluate(() => document.getElementById("sheet-title").textContent === "Guest Wi-Fi" && !!document.getElementById("g-ssid")), "#widget=f (Guest Wi-Fi): its step opens, the network name first");
+  // the App grid: its apps, with the TV's apps to add
+  await p3.evaluate(() => { location.hash = "widget=a"; });
+  await p3.reload();
+  await p3.waitForFunction(() => window.couchTv && window.couchTv.token());
+  await p3.waitForFunction(() => !document.getElementById("sheet").hidden, null, { timeout: 10000 });
+  ok(await p3.evaluate(() => /App grid/.test(document.getElementById("sheet-title").textContent) && !!document.querySelector("#g-apps")), "#widget=a (App grid): its apps");
   ok(!p3.errors.length, "no page errors: " + p3.errors.join("; "));
   await c3.close();
 }
-
 // ---- 5b. no design on the TV: the phone shows everything; #section= opens its section ----
 {
   const plain = await tvPage(null);
