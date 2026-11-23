@@ -6639,22 +6639,50 @@
     if (HOME.updates === "notify" || HOME.updates === "manual") { upd().auto(HOME.updates === "notify"); return; }
     if (welcomeSeen || zone === "welcome" || kept(WELCOME_KEY) === "ask" || welcomeJustAnswered()) { updLater = true; return; }
     if (zone !== "grid" && zone !== "shelf" && zone !== "people" && zone !== "quick") return;
+    // never behind "Use this design?" or any other sheet on the home: it waits for the sheet to go
+    if (updSheetUp()) { updLater = true; updFront(); return; }
     askKind = "upd";
     zone = "updask"; ai = 0;
     clearFocus();
     renderAsk();
   }
+  // Something on top of the home: a design's "Use this design?", its widget sheets and details, Share this
+  // home, Home settings, or a question already up (the gear pop up).
+  function updSheetUp() {
+    var CD = typeof CouchDesign !== "undefined" ? CouchDesign : null;
+    try {
+      if (CD && CD.asking && CD.asking()) return true;
+      if (CD && CD.nav && CD.nav.sheetOpen && CD.nav.sheetOpen()) return true;
+      if (window.CouchDetail && window.CouchDetail.isOpen && window.CouchDetail.isOpen()) return true;
+      if (typeof CouchShare !== "undefined" && CouchShare.isOpen && CouchShare.isOpen()) return true;
+    } catch (e) { return true; }
+    var s = $("settings"), w = $("welcome"), g = $("gear-pop");
+    return !!((s && s.classList.contains("on")) || (w && w.classList.contains("on")) || (g && g.classList.contains("on")));
+  }
   // the home is back in front after the welcome's start: ask then, once the person is on the home (not in
-  // Home settings or a menu), after a short calm moment
+  // Home settings, a menu or a sheet), after a short calm moment
   function updAskLater() {
-    if (!updLater || document.hidden || kept(WELCOME_KEY) === "ask") return;
-    if (zone !== "grid" && zone !== "shelf" && zone !== "people" && zone !== "quick") return;   // still waiting
+    updWait = 0;
+    if (!updLater || document.hidden || PAGE_PAUSED || kept(WELCOME_KEY) === "ask") return;
+    if ((zone !== "grid" && zone !== "shelf" && zone !== "people" && zone !== "quick") || updSheetUp()) {
+      updWait = setTimeout(updAskLater, 3000);   // still waiting: asked once the home is clear
+      return;
+    }
     updLater = false; welcomeSeen = false;
     keep(WELCOME_AT_KEY, 0);   // the calm moment came: the time the welcome was answered no longer holds it back
     updRead();
     updAsk();
   }
-  document.addEventListener("visibilitychange", function () { if (!document.hidden && updLater) setTimeout(updAskLater, 2500); });
+  // The home came to the front. On an Android TV that is the launcher's tv.resume() (back from an app) or
+  // tv.home() (Home pressed with the home already in front, no visibility change at all: the emulator test of
+  // 0.13.10 never got the question back), and the page's own visibilitychange elsewhere.
+  var updWait = 0;
+  function updFront() {
+    if (!updLater) return;
+    if (updWait) clearTimeout(updWait);
+    updWait = setTimeout(updAskLater, 2500);
+  }
+  document.addEventListener("visibilitychange", function () { if (!document.hidden) updFront(); });
   function askRows() {
     if (askKind === "dev") {
       return [[ICONS.devmode, t("dev_ask_yes"), t("dev_ask_yes_sub")], [ICONS.sliders, t("dev_ask_no"), t("dev_ask_no_sub")]];
@@ -8556,7 +8584,7 @@
   // the native side calls these
   // Home on the remote also re-reads the lists, so an order arranged on the phone shows straight away
   window.tv = { back: function () { if (typeof CouchShare !== "undefined" && CouchShare.close()) return; if (typeof CouchDesign !== "undefined" && CouchDesign.back && CouchDesign.back()) return; if (idleAmbientActive) { setIdleAmbient(false); resetSmartIdle(); return; } if (idlePhotoInput(null)) return; goHome(); resetIdlePhoto(); resetSmartIdle(); },
-    home: function () { forgetFocus(); if (zone === "welcome") return;   // the first-run welcome stays until it is answered
+    home: function () { forgetFocus(); updFront(); if (zone === "welcome") return;   // the first-run welcome stays until it is answered
       clipWake(); if (idleAmbientActive) { setIdleAmbient(false); resetSmartIdle(); return; } if (idlePhotoInput(null)) return; if (zone === "settings") closeSettings(); else goHome(); refresh(); resetIdlePhoto(); resetSmartIdle(); },
     screenOff: function () { toggleScreenOff(true); },
     wakeScreen: function () { toggleScreenOff(false); },
@@ -8566,7 +8594,7 @@
     settingsKey: function () { blip(0, 0); settingsKey(); },
     // the phone code changed (HomeActivity, Auth.onPin): the QR and computer line draw the new one
     phoneLink: function () { PHONE_QR.url = ""; phoneQr(); if (typeof CouchDesign !== "undefined" && CouchDesign.nav && CouchDesign.nav.phoneAgain) CouchDesign.nav.phoneAgain(); },
-    resume: function () { PAGE_PAUSED = false; clock(); designVideo("away", false); toggleScreenOff(false); setIdleAmbient(false); resetSmartIdle(); okReset(); refresh(); if (!OFFLINE) refreshQuick(); refreshWeather(); startVideo(); clipWake(); sceneVideos(true); refreshMusic(); refreshCards(true); if (window.AmbientWeather) window.AmbientWeather.resume(); resetIdlePhoto(); kwArtAgain(); },
+    resume: function () { PAGE_PAUSED = false; clock(); designVideo("away", false); toggleScreenOff(false); setIdleAmbient(false); resetSmartIdle(); okReset(); refresh(); if (!OFFLINE) refreshQuick(); refreshWeather(); startVideo(); clipWake(); sceneVideos(true); refreshMusic(); refreshCards(true); if (window.AmbientWeather) window.AmbientWeather.resume(); resetIdlePhoto(); kwArtAgain(); updFront(); },
     // an app is in front: the video background stops until the home is back
     // (and a design's video background lets go of the TV's decoder, which the app may need)
     pause: function () { saveFocusNow(); PAGE_PAUSED = true; pauseVideo(); designVideo("away", true); },
