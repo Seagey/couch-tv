@@ -96,7 +96,13 @@ it can switch wireless debugging back on after a restart, the way Shizuku does).
    adb install -r couch-tv-ontv.apk
    ```
    Or copy the APK to the TV with a file app and open it there.
-3. On the TV, open **Couch TV**. It shows the address and a phone code.
+3. On the TV, open **Couch TV**. A new TV gets two steps, done with the TV remote alone:
+   **Step 1 of 2, Make Couch TV your home** (one press asks Android where it can; a TV that keeps
+   Google's home on the Home button, like a TCL with Android TV 11, says so in one line, with More help
+   behind it), then **Step 2 of 2, Open your new home**, where the home's own welcome offers a design code
+   or Couch Original. Later opens show **Couch TV is ready** with Open the home and **Settings**. Settings
+   has the phone remote (QR, address and code), Use as home screen and Stop being the home screen, Make Home
+   open Couch TV, Let the phone press keys, the computer route and the notes.
 
 ## Updates
 
@@ -119,7 +125,7 @@ type 8180170 again.
 
 ## Pair a phone
 
-1. Scan the QR code on the TV with the phone's camera. While a code is showing, the QR holds it
+1. On the TV, open Couch TV, then **Settings**: the phone remote is at the top. Scan its QR code with the phone's camera. While a code is showing, the QR holds it
    too (after a `#`, so it is never sent in a request line or kept in a log), and the phone pairs
    with no typing. The page takes the code out of its address at once.
 2. Or open the address the TV shows, for example `http://192.0.2.10:5400`, and type the 6 digit code
@@ -151,13 +157,13 @@ app that has an accessibility service ("App blocked to protect your device", see
 in November 2026). Both are the same app with the same name and key, so one installs over the other.
 With the plain APK, the Couch TV setup screen says that Google's home keeps the Home button (on Google TV,
 and on a TCL with Google's Android TV Home, which opened it by name although Couch TV held the home role),
-and More, Home button from a computer, gives the steps: `adb connect <tv-ip>:5555` (with Wireless debugging,
+and Settings, Home button from a computer, gives the steps: `adb connect <tv-ip>:5555` (with Wireless debugging,
 `adb pair` with the address, port and code from Pair device with pairing code first), then
 `adb install -r couch-tv-ontv-watch.apk` (settings stay), then Couch TV home watch on in Settings, Accessibility,
 then **Use as home screen** on the Couch TV setup screen: the watch only acts while that is on. With the watch APK
 the button shows on Google TV too (with the plain APK it is hidden there while off).
 **Make Home open Couch TV, no computer (0.13.9 or newer).** Once Couch TV can press keys on the TV (its own link to the
-TV, More, Let the phone press keys: the same link Update to ... uses), the setup screen, the phone's Home settings
+TV, Settings, Let the phone press keys: the same link Update to ... uses), the setup screen, the phone's Home settings
 page and Home settings, About on the TV show **Make Home open Couch TV** on Google TV, on a TV with Google's
 Android TV Home, and on a Fire TV whose Fire OS still allows the link. One press (HomeKey.kt, rules in
 HomeKeyRules.kt): it downloads `couch-tv-ontv-watch.apk` from GitHub's latest release with Update's checks (https
@@ -181,8 +187,8 @@ plain Android TV, not Google TV) the press changes nothing until Couch TV can pr
 Android TV 11 installed from Downloader with no computer (23 Nov 2026), switching the home on put Google's home in
 front, and Android only lets the app bring its setup screen back from behind with "draw over apps", which it gets
 over its own key link; so the person was left on Google's home with no question. Now the setup screen stays in front
-and says: Couch TV stays one press away in the apps row; let Couch TV press keys (More, Let the phone press keys),
-then press **Make Home open Couch TV**; or More, Home button from a computer. Once Couch TV can press keys, Use as
+and says: Couch TV stays one press away in the apps row; let Couch TV press keys (Settings, Let the phone press keys),
+then press **Make Home open Couch TV**; or Settings, Home button from a computer. Once Couch TV can press keys, Use as
 home screen asks Android again. The same note (HomeAsk.kt, SetupWords.noAskNote) comes up on any TV where Android
 answered at once with no question, had no request or Home settings screen at all, or where the setup screen was
 covered by the TV's own home and the person only came back later; that TV is remembered and not asked the same way

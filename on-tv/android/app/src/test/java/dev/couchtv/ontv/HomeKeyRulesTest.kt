@@ -229,16 +229,15 @@ class HomeKeyRulesTest {
         // the busy words go once the update is over; a blocked Fire TV gets its steps, not a second "could not connect"
         assertTrue(hk.contains("if (error == \"update_busy\" && !Update.working) error = \"\""))
         assertTrue(hk.contains("error = if (why == \"adb\" && fireBlocked()) \"\" else why"))
-        // the setup screen: one row (QR, button, words beside it), the button hidden by default, the reason alone after a failed press
+        // Settings, Home button: the button (hidden by default) over its words, and the help page QR on the right of them
         val sa = java.io.File("src/main/java/dev/couchtv/ontv/SetupActivity.kt").readText()
         assertFalse(sa.contains("hkBtnRow"))
-        assertTrue(sa.indexOf("hkRow.addView(hkBtn)") in 0 until sa.indexOf("hkRow.addView(hkLine)"))
-        // the help page QR sits at the top right (beside the phone's QR, no taller), never in the row under the buttons
-        assertTrue(sa.contains("top.addView(hkQr)"))
-        assertFalse(sa.contains("hkRow.addView(hkQr)"))
+        assertTrue(sa.indexOf("hkWords.addView(look.actions(hkBtn))") in 0 until sa.indexOf("hkWords.addView(hkLine)"))
+        assertTrue(sa.indexOf("hk.addView(hkWords") in 0 until sa.indexOf("hk.addView(hkQr"))
+        assertTrue(sa.contains("apply { visibility = View.GONE }"))
         assertTrue(HomeKeyRules.STEPS.endsWith("scan the code on the right for the steps."))
         assertTrue(HomeKeyRules.STEPS_FIRE.endsWith("scan the code on the right for the steps."))
-        assertTrue(sa.contains("button(HomeKeyRules.BUTTON) { HomeKey.start(this); refresh() }.apply { visibility = View.GONE }"))
+        assertTrue(sa.contains("button(HomeKeyRules.BUTTON) { HomeKey.start(this@SetupActivity); refresh() }.apply { visibility = View.GONE }"))
         assertTrue(sa.contains("hkLine.text = if (err.isNotEmpty() && v == \"ready\") err else"))
     }
 

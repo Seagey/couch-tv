@@ -113,9 +113,12 @@ class HomeAskTest {
 
     @Test fun theSetupScreenNeverLeavesThePersonOnAnotherHome() {
         val src = File("src/main/java/dev/couchtv/ontv/SetupActivity.kt").readText()
-        val press = src.substringAfter("homeBtn = button(\"\")").substringBefore("main1.addView(homeBtn)")
+        // step 1's big button and Settings' Use as home screen both switch the home on through turnHomeOn
+        val press = src.substringAfter("private fun turnHomeOn()").substringBefore("override fun onResume()")
+        assertTrue(src.contains("HomeStep.ASK, SetupSteps.HomeStep.SWITCH -> turnHomeOn()"))
+        assertTrue(src.substringAfter("private fun homeButtonPressed()").substringBefore("private fun turnHomeOn()").contains("if (on) turnHomeOn()"))
         // EXPLAIN returns before the home alias is switched on
-        assertTrue(press.indexOf("plan == HomeAsk.Plan.EXPLAIN") in 0 until press.indexOf("App.setHomeEnabled(this, on)"))
+        assertTrue(press.indexOf("plan == HomeAsk.Plan.EXPLAIN") in 0 until press.indexOf("App.setHomeEnabled(this, true)"))
         assertTrue(press.contains("Store.putStr(HomeAsk.PENDING_KEY"))
         val resume = src.substringAfter("override fun onResume()").substringBefore("override fun ")
         assertTrue(resume.contains("HomeAsk.askAfterAway(away)") && resume.contains("giveUp(HomeAsk.LEFT)"))

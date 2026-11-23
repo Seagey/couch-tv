@@ -63,13 +63,13 @@ class SetupWordsTest {
         // TCL beginner test, 0.13.3: Home kept opening Google's home with no warning on the TV
         val gtv = SetupWords.homeNote(true, false, true, watchApk = false)
         assertTrue(gtv.contains("That is normal"))
-        assertTrue(gtv.contains("see More, Home button from a computer"))
+        assertTrue(gtv.contains("see Settings, Home button from a computer"))
         // Google's Android TV Home (a TCL): Couch TV held the home role, Home still opened Google's
         val tcl = SetupWords.homeNote(true, true, false, watchApk = false, googleHome = true)
         // 0.13.6: never "Couch TV is your home screen" there, since Home still opens Google's home
         assertTrue(tcl.startsWith("Android lists Couch TV as the home app"))
         assertFalse(tcl.contains("is your home screen"))
-        assertTrue(tcl.contains("That is normal: see More, Home button from a computer"))
+        assertTrue(tcl.contains("That is normal: see Settings, Home button from a computer"))
         // a TV with no Google home, or the watch APK: no warning
         assertEquals("Couch TV is your home screen. Press Home on the remote to see it.", SetupWords.homeNote(true, true, false))
         assertEquals("Couch TV is your home screen. Press Home on the remote to see it.",
@@ -130,7 +130,7 @@ class SetupWordsTest {
         assertFalse(tcl.contains("No computer needed"))
         assertTrue(tcl.contains("Couch TV stays one press away: open it from the apps row."))
         assertTrue(tcl.contains("Let the phone press keys") && tcl.contains("Make Home open Couch TV"))
-        assertTrue(tcl.contains("More, Home button from a computer"))
+        assertTrue(tcl.contains("Settings, Home button from a computer"))
         assertTrue(SetupWords.noAskNote(HomeAsk.NO_QUESTION).contains("no question for choosing a home screen"))
         assertTrue(SetupWords.noAskNote(HomeAsk.LEFT).contains("then press Use as home screen"))
         // the note only takes over while the home is off; asking wins while Android is being asked
@@ -163,5 +163,72 @@ class SetupWordsTest {
         assertTrue(SetupWords.keysLine(false, true, false, notAsked = true).startsWith("Look at the TV"))
         // connected wins over everything
         assertEquals("The phone remote can press every key and type on the TV.", SetupWords.keysLine(true, false, false, notAsked = true))
+    }
+
+    // ---- the step screens (owner approved the mockups, 23 Nov 2026) ----
+
+    private fun stepWords(): List<String> {
+        val out = ArrayList<String>()
+        for (k in SetupSteps.HomeStep.values()) for (r in listOf("google", HomeAsk.LEFT, HomeAsk.NO_QUESTION)) {
+            out += SetupWords.homeStepLine(k, false, r); out += SetupWords.homeStepLine(k, true, r)
+            out += SetupWords.homeStepButton(k); out += SetupWords.homeStepSecond(k); out += SetupWords.helpLine(r)
+        }
+        out += listOf(SetupWords.HOME_TITLE, SetupWords.OPEN_TITLE, SetupWords.OPEN_LINE, SetupWords.OPEN_BUTTON, SetupWords.HOME_DONE,
+            SetupWords.READY_TITLE, SetupWords.readyLine(true), SetupWords.readyLine(false), SetupWords.READY_NOTE_START + SetupWords.SETTINGS,
+            SetupWords.HELP_TITLE, SetupWords.HELP_KEYS_BUTTON, SetupWords.stepOf(1), SetupWords.stepOf(2)) + SetupWords.HELP_WAYS
+        return out
+    }
+
+    @Test fun theStepsSayExactlyTheApprovedWords() {
+        assertEquals("Step 1 of 2", SetupWords.stepOf(1))
+        assertEquals("Make Couch TV your home", SetupWords.HOME_TITLE)
+        assertEquals("Then the Home button on your remote opens Couch TV.", SetupWords.homeStepLine(SetupSteps.HomeStep.ASK))
+        assertEquals("Make it my home", SetupWords.homeStepButton(SetupSteps.HomeStep.ASK))
+        assertEquals("Skip", SetupWords.homeStepSecond(SetupSteps.HomeStep.ASK))
+        assertEquals("This TV keeps Google's home on the Home button. Couch TV stays one press away in your apps row.",
+            SetupWords.homeStepLine(SetupSteps.HomeStep.EXPLAIN, reason = "google"))
+        assertEquals("Next", SetupWords.homeStepButton(SetupSteps.HomeStep.EXPLAIN))
+        assertEquals("More help", SetupWords.homeStepSecond(SetupSteps.HomeStep.EXPLAIN))
+        assertEquals("Open your new home", SetupWords.OPEN_TITLE)
+        assertEquals("Pick a design or start with Couch Original. You can change it any time from your phone or computer.", SetupWords.OPEN_LINE)
+        assertEquals("Open the home", SetupWords.OPEN_BUTTON)
+        assertEquals("Couch TV is ready", SetupWords.READY_TITLE)
+        assertEquals("Press Home on your remote, or open your home from here.", SetupWords.readyLine(true))
+        assertEquals("Want a phone remote? It's in Settings", SetupWords.READY_NOTE_START + SetupWords.SETTINGS)
+    }
+
+    @Test fun theStepsAreShort() {
+        // one short line per screen: the long notes live in Settings and behind More help
+        stepWords().forEach { assertTrue("too long: $it", it.split(' ').size <= 22) }
+        assertTrue(SetupWords.homeStepButton(SetupSteps.HomeStep.ASK).split(' ').size <= 4)
+    }
+
+    @Test fun theStepsHaveNoJargonDashesOrHedges() {
+        stepWords().forEach {
+            assertFalse(it, jargon.containsMatchIn(it))
+            assertFalse(it, Regex("[–—]|\\s-\\s|\\bBeta\\b|Experimental|coming soon", RegexOption.IGNORE_CASE).containsMatchIn(it))
+            assertFalse(it, Regex("couch-tv(?![-./])").containsMatchIn(it))
+            // no phone pairing at the start: the steps never mention codes or scanning a phone
+            assertFalse(it, Regex("phone code|pair", RegexOption.IGNORE_CASE).containsMatchIn(it))
+        }
+    }
+
+    @Test fun theStepsHandOverToTheHomesWelcome() {
+        // the home's first-run welcome (tv-home/web, first-run-welcome) offers a design code or Couch Original
+        assertTrue(SetupWords.OPEN_LINE.contains("design") && SetupWords.OPEN_LINE.contains("Couch Original"))
+    }
+
+    @Test fun moreHelpGivesBothWaysRound() {
+        assertTrue(SetupWords.helpLine("google").contains("TCL"))
+        assertTrue(SetupWords.HELP_WAYS[0].contains("Make Home open Couch TV"))
+        assertTrue(SetupWords.HELP_WAYS[1].contains("computer"))
+        assertTrue(SetupWords.homeStepLine(SetupSteps.HomeStep.BUSY, busy = "Downloading… 40%") == "Downloading… 40%")
+    }
+
+    @Test fun settingsIsWhereTheOldMoreWas() {
+        listOf(SetupWords.noAskNote("google"), SetupWords.noAskNote(HomeAsk.LEFT), SetupWords.keysLine(false, false, true), HomeKeyRules.STEPS).forEach {
+            assertFalse(it, Regex("\\bMore\\b").containsMatchIn(it))
+            assertTrue(it, it.contains("Settings"))
+        }
     }
 }

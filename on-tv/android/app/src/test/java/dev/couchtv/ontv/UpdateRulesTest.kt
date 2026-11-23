@@ -117,7 +117,7 @@ class UpdateRulesTest {
         val computer = UpdateRules.steps(watch = true).joinToString(" ")
         // plain words (WORDING-PROPOSAL-0139 3c): the commands stay behind More help on the TV, not here
         assertTrue(computer.contains("couch-tv-ontv-watch.apk"))
-        assertTrue(computer.contains("More help, Home button from a computer"))
+        assertTrue(computer.contains("Settings, Home button from a computer"))
         assertFalse(computer.contains("adb "))
         assertTrue(UpdateRules.how(true).startsWith("This is the Home button version of Couch TV."))
         for (s in UpdateRules.steps(false) + UpdateRules.steps(true) + UpdateRules.how(false) + UpdateRules.how(true)) {

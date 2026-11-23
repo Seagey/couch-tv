@@ -58,6 +58,11 @@ android {
     // the native library per processor, and the PAA roots that check a device was certified.
     sourceSets["main"].jniLibs.srcDir("../matter/jni")
     sourceSets["main"].assets.srcDir("../matter/assets")
+    // The setup screen's fonts: static cuts of the couch-tv Studio site's Nunito Black and Inter (SIL Open Font
+    // Licence 1.1, setup-assets/fonts/README.md). Not in src/main/assets, which copyWeb clears and git ignores.
+    sourceSets["main"].assets.srcDir("setup-assets")
+    // SetupShotsTest draws the setup screens on a computer (Robolectric), so it needs the app's own resources.
+    testOptions { unitTests.isIncludeAndroidResources = true }
 }
 
 dependencies {
@@ -76,6 +81,8 @@ dependencies {
     testImplementation("junit:junit:4.13.2")
     // A real org.json for the tests that read and build JSON (AskWireTest): Android's own copy is only a stub on a computer (JSON licence).
     testImplementation("org.json:json:20240303")
+    // SetupShotsTest: the setup screens drawn on a computer, with Android's own graphics (MIT).
+    testImplementation("org.robolectric:robolectric:4.14.1")
 }
 
 // The phone remote and the TV home are built elsewhere in the repo. Copy them in before every build.
@@ -106,3 +113,6 @@ tasks.named("preBuild") { dependsOn(copyWeb) }
 // tv-home/android/shared/java (package app.couchtv.ha), served here by Server.kt (/ha, /api/ha).
 android.sourceSets.getByName("main").java.srcDir(File(repoRoot, "tv-home/android/shared/java"))
 android.sourceSets.getByName("test").java.srcDir(File(repoRoot, "tv-home/android/shared/test"))
+
+// -PsetupShots=<folder>: SetupShotsTest saves PNGs of the setup screens there (skipped without it).
+tasks.withType<Test>().configureEach { systemProperty("setupShots", (project.findProperty("setupShots") as String?) ?: "") }

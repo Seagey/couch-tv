@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The couch-tv mark, from the Studio site's header lockup (img/brand/couchtv-studio-lockup.svg). -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="37dp" android:height="30dp" android:viewportWidth="112" android:viewportHeight="92">
+    <path android:fillColor="#F2441B" android:pathData="M18,0h76a18,18 0 0 1 18,18v40a18,18 0 0 1 -18,18h-76a18,18 0 0 1 -18,-18v-40a18,18 0 0 1 18,-18z"/>
+    <path android:fillColor="#FBFAF7" android:pathData="M30,29h52a6,6 0 0 1 6,6v10a6,6 0 0 1 -6,6h-52a6,6 0 0 1 -6,-6v-10a6,6 0 0 1 6,-6z"/>
+    <path android:fillColor="#FFC81E" android:pathData="M25,21h0a9,9 0 0 1 9,9v16a9,9 0 0 1 -9,9h-0a9,9 0 0 1 -9,-9v-16a9,9 0 0 1 9,-9z"/>
+    <path android:fillColor="#FFC81E" android:pathData="M87,21h0a9,9 0 0 1 9,9v16a9,9 0 0 1 -9,9h-0a9,9 0 0 1 -9,-9v-16a9,9 0 0 1 9,-9z"/>
+    <path android:fillColor="#9CCBF0" android:pathData="M42,19h28a8,8 0 0 1 8,8v2a8,8 0 0 1 -8,8h-28a8,8 0 0 1 -8,-8v-2a8,8 0 0 1 8,-8z"/>
+    <path android:fillColor="#14131A" android:pathData="M38,84h36a4,4 0 0 1 4,4v0a4,4 0 0 1 -4,4h-36a4,4 0 0 1 -4,-4v-0a4,4 0 0 1 4,-4z"/>
+</vector>

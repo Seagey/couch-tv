@@ -310,7 +310,7 @@
 
   <section class="card" id="xiaomi" style="display:none">
     <h2>Xiaomi: Couch TV in PatchWall's place (optional, off by default)</h2>
-    <p>The remote's PatchWall button opens Couch TV, PatchWall opens Couch TV instead, and Couch TV opens when the TV is switched on, unless the TV is going back to an HDMI input. The Home button is not changed. It needs the Home button version of Couch TV (couch-tv-ontv-watch.apk), put on from a computer (the steps are on the TV: Couch TV, More, Home button from a computer), switched on in the TV's Settings, Accessibility, Couch TV home watch; with this on, that watch also checks each remote key for the PatchWall button and passes every other key on.</p>
+    <p>The remote's PatchWall button opens Couch TV, PatchWall opens Couch TV instead, and Couch TV opens when the TV is switched on, unless the TV is going back to an HDMI input. The Home button is not changed. It needs the Home button version of Couch TV (couch-tv-ontv-watch.apk), put on from a computer (the steps are on the TV: Couch TV, Settings, Home button from a computer), switched on in the TV's Settings, Accessibility, Couch TV home watch; with this on, that watch also checks each remote key for the PatchWall button and passes every other key on.</p>
     <label class="check"><input type="checkbox" id="pw-on"> Couch TV in PatchWall's place</label>
     <p id="pw-state"></p>
     <div class="row"><button class="go" id="pw-save">Save</button></div>
@@ -1060,7 +1060,7 @@
         $('pw-on').checked = !!j.patchwall_replace;
         $('pw-state').textContent = j.watch ? '' : j.watch_apk
           ? 'Keep Couch TV on Home is off: switch on Couch TV home watch in the TV\'s Settings, Accessibility.'
-          : 'This version of Couch TV can\'t keep the Home button: Google Play Protect blocks that part in apps put on from a phone. To get it, put the Home button version (couch-tv-ontv-watch.apk) on from a computer (Couch TV on the TV, More, Home button from a computer), then switch on Couch TV home watch in the TV\'s Settings, Accessibility.';
+          : 'This version of Couch TV can\'t keep the Home button: Google Play Protect blocks that part in apps put on from a phone. To get it, put the Home button version (couch-tv-ontv-watch.apk) on from a computer (Couch TV on the TV, Settings, Home button from a computer), then switch on Couch TV home watch in the TV\'s Settings, Accessibility.';
       }
       showAsk(j.ask);
       showPhones(j);
