@@ -4,7 +4,7 @@
 #   bash scripts/sign-ontv.sh apk <in.apk> <out.apk>   a GitHub APK (couch-tv-ontv.apk, couch-tv-ontv-watch.apk)
 #   bash scripts/sign-ontv.sh aab <in.aab> <out.aab>   the Google Play bundle, with the upload key
 #
-# apk: the old key (the Mac's debug key, which every GitHub release before 0.13.10 carries) signs v1 and v2, so
+# apk: the old key (the Mac's debug key, which every GitHub release up to and including 0.13.10 carries) signs v1 and v2, so
 #      Android 6 to 8 TVs still take the update; the Couch TV release key signs v3 with the proof of rotation
 #      (~/.couchtv-keys/couchtv.lineage, debug key -> release key, --rotation-min-sdk-version 28; public, but
 #      kept beside the keys because the repo privacy scan trips on its binary bytes), so

@@ -41,7 +41,7 @@ The rules:
     (BIND_ACCESSIBILITY_SERVICE in the manifest), so the two files can never be swapped.
  7. Every APK is signed with one and the same key, and with --signer (or --previous, last release's APK)
     the key the TVs already have: Update now, the launcher's Updater and Android itself refuse another.
-    With --ontv-signer (from 0.13.10, the on-TV app's own release key, scripts/sign-ontv.sh): the two on-TV
+    With --ontv-signer (from 0.13.11, the on-TV app's own release key, scripts/sign-ontv.sh): the two on-TV
     APKs show that key to Android 9 and newer, the --signer key to Android 6 to 8, and carry the proof of
     rotation from the --signer key to it; every other APK keeps the --signer key; --previous must be
     in the on-TV APKs' keys (the old key, or the release key once a rotated release is out).
@@ -230,7 +230,7 @@ def lineage(apk):
     return re.findall(r"Signer #\d+ in lineage certificate SHA-256 digest: ([0-9a-f]{64})", r.stdout)
 
 
-# The on-TV app's key rotation (0.13.10 on, coord/GOOGLE-PLAY-BUILD.md, scripts/sign-ontv.sh): from this
+# The on-TV app's key rotation (0.13.11 on, coord/GOOGLE-PLAY-BUILD.md, scripts/sign-ontv.sh): from this
 # Android version on the on-TV APKs are signed by the Couch TV release key, below it by the old key.
 ROTATION_SDK = 28
 

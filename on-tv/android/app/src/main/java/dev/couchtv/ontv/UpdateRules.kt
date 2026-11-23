@@ -37,7 +37,7 @@ object UpdateRules {
 
     /**
      * May a file signed by [theirs] replace this app, signed by [mine]? The same signer, or (Android 9 and
-     * newer) a file whose proof of rotation lists this app's signer: from 0.13.10 GitHub releases move from the
+     * newer) a file whose proof of rotation lists this app's signer: from 0.13.11 GitHub releases move from the
      * old debug key to the Couch TV release key (~/.couchtv-keys/couchtv.lineage, scripts/sign-ontv.sh),
      * and Android itself takes that update and keeps the app's data. [theirHistory] is the file's signing
      * certificate history (PackageInfo.signingInfo.signingCertificateHistory, oldest first, the current signer
