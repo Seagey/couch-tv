@@ -13,7 +13,7 @@ The newest release is **0.13.11**. The TV apps come from [the Releases page](htt
 - **Add apps:** Hold OK on an app in a folder, the Dock, an app grid or Games, then Add apps: one sheet with every app on the TV, pick as many as you want, Back saves. Also in Home settings, on the widget's page.
 - **Fonts from Couch TV Studio:** widgets set in Jost or Cormorant Garamond now draw in those fonts on the TV.
 - **The on-TV app's own signing key:** from 0.13.11 the on-TV app is signed with its own release key on Android 9 and newer. 0.13.10 knows how to accept it.
-- **Fixes:** no weather line over a widget design's smart stack, the update question comes back when you press Home, and the design code error names Couch TV Studio.
+- **Fixes:** no weather line over a widget design's smart stack, the update question comes back when you press Home, Back on an Android TV closes the Ask AI sheet, and the design code error names Couch TV Studio.
 
 ### 23 November 2026: release 0.13.10, a simpler start on a new TV and widgets set up on your phone
 

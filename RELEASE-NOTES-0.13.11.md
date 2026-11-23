@@ -28,6 +28,7 @@ A widget set in **Jost** or **Cormorant Garamond** in Couch TV Studio drew in th
 - **No weather line over your widgets.** On a design made of widgets with no date or weather of its own, the standard home's top line (the town, the moon and the weather) was drawn over a smart stack and behind a Wi-Fi tile. It now steps aside with the rest of the home's top, as the date and clock already did. A design without widgets still shows it.
 - **The update question comes back.** After a design code from the welcome, "Tell you when a new Couch TV version is out?" waited for the home to come to the front again, but pressing Home never brought it. Now it asks a moment after you press Home or come back from an app, and never while "Use this design?", Home settings, Share this home or another sheet is on top: it waits until that has gone.
 - **Home settings keeps the row you are on in view.** On a long page, pressing Down quickly at the last row could leave that row under the bottom edge of the screen. The page now always scrolls far enough to show it.
+- **Back closes the Ask AI sheet on Android TVs.** Pressing Back while Ask AI was open went past it to the home behind. Now Back closes Ask AI first.
 - **The design code error names Couch TV Studio** on the on-TV app and from the computer at home, as the TV does.
 
 ### The on-TV app's own signing key
