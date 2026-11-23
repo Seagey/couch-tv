@@ -50,7 +50,9 @@ const design = { v: 1, background: { colour: "#26303f" }, objects: [
   { id: "t2", type: "text", text: "Never loads", font: "Pacifico", size: 90, x: 100, y: 300 },
   { id: "f", type: "widget", kind: "folder", x: 1100, y: 100, w: 160, h: 160, opts: { label: "Apps", apps: ["netflix", "stan", "iview"] } },
   // a folder in Jost: its name must draw in Jost, the home's own file (not Inter)
-  { id: "fj", type: "widget", kind: "folder", x: 1100, y: 500, w: 460, h: 360, style: { panel: "paper", font: "jost" }, opts: { label: "Free to air", apps: ["iview", "sbs", "9now"] } }
+  { id: "fj", type: "widget", kind: "folder", x: 1100, y: 500, w: 460, h: 360, style: { panel: "paper", font: "jost" }, opts: { label: "Free to air", apps: ["iview", "sbs", "9now"] } },
+  // a folder in Cormorant Garamond: the same, from its own file
+  { id: "fc", type: "widget", kind: "folder", x: 100, y: 500, w: 460, h: 360, style: { panel: "paper", font: "cormorant" }, opts: { label: "Film night", apps: ["netflix", "stan"] } }
 ] };
 await page.goto(BASE + "?mock=1&reset=1");
 await page.evaluate((d) => { localStorage.clear(); localStorage.setItem("tvdesigner.design", JSON.stringify(d)); }, design);
@@ -70,6 +72,14 @@ const jost = await page.evaluate(async () => {
 });
 ok(/^"?Jost/.test(jost.family) && jost.loaded && jost.check, "a Jost folder's name draws in Jost, from the home's own file (" + JSON.stringify(jost) + ")");
 ok(!asked.some((u) => /jost/i.test(u)), "Jost is the home's own: never asked of the store");
+const corm = await page.evaluate(async () => {
+  const lab = [...document.querySelectorAll(".cw-k-folder .cw-lab")].find((e) => /Film night/.test(e.textContent));
+  await document.fonts.ready;
+  return { family: lab ? getComputedStyle(lab).fontFamily : "", loaded: [...document.fonts].some((f) => f.family.replace(/"/g, "") === "Cormorant Garamond" && f.status === "loaded"),
+    check: document.fonts.check('650 25px "Cormorant Garamond"', "Film night") };
+});
+ok(/^"?Cormorant Garamond/.test(corm.family) && corm.loaded && corm.check, "a Cormorant Garamond folder's name draws in it, from the home's own file (" + JSON.stringify(corm) + ")");
+ok(!asked.some((u) => /cormorant/i.test(u)), "Cormorant Garamond is the home's own: never asked of the store");
 
 // Hold OK in the folder's full screen layer
 await page.evaluate(() => window.CouchDesign.nav.focus("f", -1));

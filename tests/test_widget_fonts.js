@@ -25,8 +25,8 @@ for (const f of css.matchAll(/@font-face\s*\{([^}]*)\}/g)) {
   const fam = (/font-family:\s*["']?([^"';]+)/.exec(f[1]) || [])[1], src = (/url\(([^)]+)\)/.exec(f[1]) || [])[1];
   if (fam && src) faces[fam] = src.replace(/["']/g, "");
 }
-// Cormorant Garamond has no file yet: a known gap, said here so it is not forgotten
-const KNOWN_GAP = ["cormorant"];
+// a font with no file yet goes here, said so it is not forgotten (Cormorant Garamond was, to 23 Nov 2026)
+const KNOWN_GAP = [];
 for (const name of Object.keys(FONT)) {
   if (KNOWN_GAP.indexOf(name) >= 0) continue;
   const fam = first(FONT[name]), file = faces[fam];
@@ -36,6 +36,9 @@ for (const name of Object.keys(FONT)) {
 ok(faces.Jost === "fonts/jost-latin-wght.woff2" && /font-family: "Jost"; font-weight: 100 900/.test(css), "Jost ships with every weight (one variable file)");
 const jost = fs.readFileSync(path.join(web, "fonts/jost-latin-wght.woff2"));
 ok(jost.slice(0, 4).toString() === "wOF2" && jost.length < 40000, "a small woff2 (" + jost.length + " bytes)");
+ok(faces["Cormorant Garamond"] === "fonts/cormorant-garamond-latin-wght.woff2" && /font-family: "Cormorant Garamond"; font-weight: 300 700/.test(css), "Cormorant Garamond ships with every weight (one variable file)");
+const corm = fs.readFileSync(path.join(web, "fonts/cormorant-garamond-latin-wght.woff2"));
+ok(corm.slice(0, 4).toString() === "wOF2" && corm.length < 40000, "a small woff2 (" + corm.length + " bytes)");
 // the folder's name has no font of its own: it follows the widget's
 ok(!/\.cw-lab\s*\{[^}]*font-family/.test(css), "a label (.cw-lab) never sets its own font");
 ok(/root\.style\.fontFamily = FONT\[st\.font\]/.test(widgets), "the widget's box carries its font");
