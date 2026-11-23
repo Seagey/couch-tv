@@ -180,6 +180,11 @@
      "type": "choice"
     },
     {
+     "key": "rule",
+     "label": "Counts to",
+     "type": "choice"
+    },
+    {
      "key": "unit",
      "label": "Count in",
      "type": "choice"
@@ -491,7 +496,7 @@
    "settings": [
     {
      "key": "sport",
-     "label": "Game mode",
+     "label": "What it shows",
      "type": "choice"
     },
     {
