@@ -45,6 +45,9 @@ ok(/"No phone\? Set it up here"/.test(design) && /"No phone\? Set it up here"/.t
 ok(/u \+ "&widgets"/.test(design) && /"Set up your widgets"/.test(design) && /120000/.test(design), "a new design's card: Set up your widgets, #widgets, 2 minutes");
 ok(/"&connect=" \+ need/.test(widgets), "the widget's code opens its step (&connect=)");
 ok(!/Batteries show on a Google TV|Needs an Android TV|It needs a Google TV, Android TV or Fire TV/.test(widgets), "the batteries and screen time widgets name no TV");
+// the Ask sheet and the Ask AI widget (ask.js): no line the TV draws names a kind of TV (comments may)
+const askLines = (read("ask.js").replace(/^\s*\/\/.*$/gm, "").match(/"(?:[^"\\]|\\.)*"/g) || []).filter((s) => TV_NAMES.test(s));
+ok(askLines.length === 0, "ask.js draws no TV type: " + askLines.join(" | "));
 const I = {}; { const c2 = { window: {}, localStorage: { getItem() { return null; } }, navigator: { language: "en" }, document: { documentElement: { setAttribute() {} }, addEventListener() {} } }; Object.assign(c2.window, c2); vm.runInNewContext(read("i18n.js"), c2); Object.assign(I, c2.window.I18N.strings); }
 for (const k of ["tw_setup_phone", "tw_setup_name_phone", "tw_no_phone_here", "tw_scan_camera", "tw_setup_widgets"]) ok(LANGS.every((l) => typeof I[l][k] === "string" && I[l][k]), k + ": in every language of i18n.js");
 console.log("widget setup words: " + n + " checks passed");

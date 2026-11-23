@@ -508,7 +508,7 @@
     var answer = E("div", "cask-answer");
     function draw() {
       while (answer.firstChild) answer.removeChild(answer.firstChild);
-      if (!last) { answer.appendChild(E("div", "cask-hint", "Ask anything. On a Google TV, press OK on the box and then the microphone on the TV's keyboard to say it. Or use Ask on the phone remote: its answer shows here too.")); return; }
+      if (!last) { answer.appendChild(E("div", "cask-hint", "Ask anything. Press OK on the box, then the microphone on the TV's keyboard, to say it. Or use Ask on the phone remote: its answer shows here too.")); return; }
       answer.appendChild(E("div", "cask-q", last.q));
       answer.appendChild(E("div", "cask-a" + (last.err ? " err" : ""), last.pending ? "Thinking..." : last.err || last.a));
     }
