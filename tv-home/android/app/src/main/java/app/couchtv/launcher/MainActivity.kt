@@ -301,6 +301,8 @@ class MainActivity : Activity() {
             if (event.action == KeyEvent.ACTION_UP && event.repeatCount == 0 && pageReady) js("window.tv && tv.settingsKey && tv.settingsKey()")
             return true
         }
+        // The mic/search button: the TV's own assistant opens, the page never sees it (VoiceKeys)
+        VoiceKeys.handle(this, event)?.let { return it }
         // The TV's own keys (TV/channels, guide, channel up and down, last channel, input): the home
         // uses none of them, and the WebView would swallow them. Hand them back unhandled so the TV's
         // own system gets them (Philips handles TV as an unhandled key fallback), for #90.
