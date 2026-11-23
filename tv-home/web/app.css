@@ -7,6 +7,21 @@
   font-family: "Inter"; font-weight: 100 900; font-display: block;
   src: url(fonts/inter-latin-wght-normal.woff2) format("woff2");
 }
+/* Jost: a widget's "jost" font (widgets.js FONT). The home's own font, so it ships here (Latin, every
+   weight; SIL Open Font License 1.1, The Jost Project Authors). Without this file "jost" quietly drew
+   in Inter: a folder's name, people's names, every word in a Jost widget. Fetched only when a design
+   uses it. */
+@font-face {
+  font-family: "Jost"; font-weight: 100 900; font-display: block;
+  src: url(fonts/jost-latin-wght.woff2) format("woff2");
+}
+/* Cormorant Garamond: a widget's "cormorant" font (widgets.js FONT). The home's own font, so it ships
+   here (Latin, weights 300 to 700; SIL Open Font License 1.1, The Cormorant Project Authors). Without
+   this file "cormorant" quietly drew in Inter. Fetched only when a design uses it. */
+@font-face {
+  font-family: "Cormorant Garamond"; font-weight: 300 700; font-display: block;
+  src: url(fonts/cormorant-garamond-latin-wght.woff2) format("woff2");
+}
 
 :root {
   --bg: #0b0b0e;
