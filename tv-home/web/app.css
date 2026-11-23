@@ -590,6 +590,26 @@ html.who-gentle.scene-fog .mood:not(.dark) .mood-hi { text-shadow: 0 0 0.5rem rg
 .ncard .nbar { display: block; height: 0.3125rem; margin-top: 0.625rem; border-radius: 0.2rem; background: rgba(255, 255, 255, 0.25); overflow: hidden; }
 .ncard .nbar i { height: 100%; background: #fff; }
 .ncard.focus { transform: scale(1.05); box-shadow: 0 0 0 0.1875rem #fff, 0 1.25rem 2.5rem rgba(0, 0, 0, 0.45); }
+/* home.keep_watching_style "poster" (#192): the Classic poster tiles in the Night row, each two dock
+   columns wide (two 7rem icons and the 1.625rem between them) with the dock's gap between tiles, so
+   six fit where the wide cards fit three. On Night the photo stays put under the clock, so there is no
+   title at the top as on Classic: the focused tile shows its title and line under it, on one line, and
+   the row sits 2rem higher than the cards to leave room for it above the dock. The clip reaches down
+   far enough to show it. */
+html.kw-poster.theme-night .shelf { top: 38rem; }
+html.kw-poster.theme-night .shelf-track { gap: 1.625rem; }
+html.kw-poster.theme-night .shelf .show { width: 15.625rem; height: 8.789rem; }
+html.kw-poster.theme-night .shelf .show .face { border-radius: 1.125rem; }
+html.kw-poster.theme-night .shelf .show.focus .face { box-shadow: 0 0 0 0.1875rem #fff, 0 1.25rem 2.5rem rgba(0, 0, 0, 0.45); }
+html.kw-poster.theme-night .shelf-clip { padding-bottom: 3.5rem; margin-bottom: -3.5rem; }
+html.kw-poster.theme-night .shelf .show.focus .caption {
+  display: block; opacity: 1; position: absolute; left: 0; right: auto; top: 100%; width: 31rem; padding-top: 0.875rem;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-shadow: 0 0.125rem 0.75rem rgba(0, 0, 0, 0.6);
+}
+html.kw-poster.theme-night .shelf .show .caption b,
+html.kw-poster.theme-night .shelf .show .caption span { display: inline; }
+html.kw-poster.theme-night .shelf .show .caption b { font-size: 1.375rem; line-height: 1.75rem; font-weight: 600; color: #fff; }
+html.kw-poster.theme-night .shelf .show .caption span { margin-left: 0.75rem; font-size: 1.1875rem; line-height: 1.75rem; color: rgba(255, 255, 255, 0.78); }
 
 /* the dock */
 .theme-night .apps { top: auto; bottom: 2.875rem; left: 50%; right: auto; transform: translateX(-50%); }
@@ -1135,6 +1155,7 @@ html.who-gentle.scene-fog .mood:not(.dark) .mood-hi { text-shadow: 0 0 0.5rem rg
 .no-flex-gap .people > * + * { margin-left: 0.5rem; }
 .no-flex-gap .shelf-track > * + * { margin-left: var(--gap); }
 .no-flex-gap.theme-night .shelf-track > * + * { margin-left: 1.375rem; }
+.no-flex-gap.kw-poster.theme-night .shelf-track > * + * { margin-left: 1.625rem; }
 .no-flex-gap .ncard > * + * { margin-left: 1.25rem; }
 .no-flex-gap .ncard .nap > img { margin-right: 0.625rem; }   /* the app's name after it is text, not an element */
 .no-flex-gap .plist > * + * { margin-top: 0.25rem; }

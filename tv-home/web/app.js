@@ -134,6 +134,7 @@
   // Now playing (#31), on unless switched off; the navigation sound: system, soft or off (#32)
   var NP_ON = true, KW_ON = true, SOUND_STYLE = "system", START_FOCUS = "people",
     SPOTIFY = { enabled: false, show_card: true, controls: true, seek_seconds: 10, hide_idle: false, title_mode: "pingpong", show_app: true };
+  var KW_POSTER = false;   // Night: Keep watching as Classic poster tiles, not wide cards (home.keep_watching_style, #192)
   // Keep watching follows the app the remote is on (home.shelf_follows_app), off unless switched on
   var SHELF_FOLLOW = false;
   // Ambient sleep soundscapes (rain, fire, waves, brown noise)
@@ -648,6 +649,8 @@
     };
     // the Keep watching row: Home settings win over home.keep_watching; off hides it and stops fetching it
     KW_ON = typeof ST.keep_watching === "boolean" ? ST.keep_watching : HOME.keep_watching !== false;
+    // Home settings win over home.keep_watching_style; "card" (the wide glass cards) unless "poster"
+    KW_POSTER = (ST.keep_watching_style || HOME.keep_watching_style) === "poster";
     GLASS_FOCUS = (ST.glass_focus || HOME.glass_focus) === "glass" ? "glass" : "colour";
     document.documentElement.classList.toggle("gi-stay", GLASS_FOCUS === "glass");
     SOUND_STYLE = ["system", "soft", "off"].indexOf(ST.nav_sound || HOME.nav_sound) >= 0 ? (ST.nav_sound || HOME.nav_sound) : "system";
@@ -3897,8 +3900,14 @@
     return KW_ON && (data.shows.length > 0 || PEOPLE.some(function (p) { return (data.showsBy[p.id] || []).length > 0; }));
   }
 
+  // home.keep_watching_style "poster" (#192): the Night row uses the Classic tiles. Not in the Loop look
+  // (its own thumbnails), the TV's own Spotify row (its own tiles) or a couch-tv Studio design (its own shapes).
+  function postersFit() { return NIGHT && !LOOP && !LOCAL_SPOTIFY && !(typeof CouchDesign !== "undefined" && CouchDesign.on()); }
+  function nightPosters() { return postersFit() && KW_POSTER; }
+
   function renderShelf() {
     var track = $("shelf");
+    document.documentElement.classList.toggle("kw-poster", nightPosters());
     data.shows = KW_ON ? visibleShows() : [];   // the whole row, or one app's cards while the remote follows it
     if (typeof CouchDesign !== "undefined" && CouchDesign.dataChanged) CouchDesign.dataChanged("shows", [who, data.shows.map(function (x) { return x.title + (x.progress || ""); })]);
     var anyone = rowHasCards();
@@ -3936,7 +3945,7 @@
       addCards(track);
       return;
     }
-    if (NIGHT) {
+    if (NIGHT && !nightPosters()) {
       // lock screen notifications: glass cards, three in view, the row slides past the third
       track.innerHTML = data.shows.map(function (it) {
         var art = slim(it.backdrop || it.poster), pkg = it.app && it.app.package;
@@ -3951,6 +3960,8 @@
       addCards(track);
       return;
     }
+    // Classic, and the Night look's poster style: plain 16:9 tiles (on Night two dock columns wide, the
+    // focused one with its title under it, as the photo there stays put under the clock)
     track.innerHTML = data.shows.map(function (it) {
       var art = slim(it.backdrop || it.poster);
       var pkg = it.app && it.app.package;
@@ -3987,7 +3998,7 @@
         parent.appendChild(n);
         return n;
       };
-      if (NIGHT) {
+      if (NIGHT && !nightPosters()) {
         el.className = "tile ncard ccard";
         if (img) { img.className = "thumb"; el.appendChild(img); }
         var tx = document.createElement("div");
@@ -6394,6 +6405,11 @@
     rows.push({ kind: "toggle", key: "shelf-follows-app", label: t("shelf_follow"), sub: t("shelf_follow_sub"), value: SHELF_FOLLOW ? t("on") : t("off"), act: function () {
       SHELF_FOLLOW = !SHELF_FOLLOW; ST.shelf_follows_app = SHELF_FOLLOW; saveSettings();
       if (!SHELF_FOLLOW && followPkg) { followPkg = null; renderShelf(); }   // the whole row again, straight away
+    } });
+    // the Night row as Classic poster tiles, more to a row (#192); Classic already has them
+    if (KW_ON && postersFit()) rows.push({ kind: "toggle", key: "kw-posters", label: t("kw_posters"), value: KW_POSTER ? t("on") : t("off"), act: function () {
+      KW_POSTER = !KW_POSTER; ST.keep_watching_style = KW_POSTER ? "poster" : "card"; saveSettings();
+      renderShelf(); s = Math.max(0, Math.min(s, shelfEls.length - 1));
     } });
     rows.push({ kind: "cycle", key: "start-focus", label: t("start_focus"), sub: t("start_focus_sub"),
       value: t("start_focus_" + START_FOCUS), act: function () {
