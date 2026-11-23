@@ -1,5 +1,5 @@
 // Words a design must never put on a TV: phone numbers and web addresses, however they are written
-// (tv-home/web/design.js, scam and flags). Every trick from review round 5 of couch-tv Studio, five
+// (tv-home/web/design.js, scam and flags). Every trick from review round 5 of Couch TV Studio, five
 // more, and ordinary words that must still show. Run: node tests/test_design_words.js
 const assert = require("assert");
 const fs = require("fs");

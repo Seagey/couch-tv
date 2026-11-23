@@ -149,8 +149,8 @@ try {
     await pg.waitForFunction(() => document.getElementById("people-now").textContent !== "Checking…");
     ok(!(await pg.$("#ctv-pair")), "a phone with the computer's phone remote paired opens it with no code");
     for (const id of ["photos", "athome", "dapps"]) ok(await pg.isHidden("#" + id), "Roku: left out #" + id);
-    // widgets: the design lives on the Roku, so the page says where a widget is changed (couch-tv Studio)
-    ok(await pg.isVisible("#widgets") && /changed in couch-tv Studio/.test(await pg.textContent("#widgets")) && /on the Roku/.test(await pg.textContent("#widgets")), "Roku: Widgets says to change them in couch-tv Studio");
+    // widgets: the design lives on the Roku, so the page says where a widget is changed (Couch TV Studio)
+    ok(await pg.isVisible("#widgets") && /changed in Couch TV Studio/.test(await pg.textContent("#widgets")) && /on the Roku/.test(await pg.textContent("#widgets")), "Roku: Widgets says to change them in Couch TV Studio");
     ok(!(await pg.$$("#w-list details")).length, "Roku: no widget boxes it could not save");
     ok(await pg.isVisible("#town") && await pg.isVisible("#people"), "Roku: the town and people are there");
     ok(/takes the town and the people from here/.test(await pg.textContent("#intro-from")), "Roku: it says what reaches the TV");

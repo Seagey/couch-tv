@@ -1,4 +1,4 @@
-// The apps a design may name (couch-tv Studio's app picker, and the TV that opens them). A dock, an
+// The apps a design may name (Couch TV Studio's app picker, and the TV that opens them). A dock, an
 // app row, a folder or an app tile in a design stores catalogue ids ("netflix", "stan", "iview"), never
 // package names, so one design works on every kind of TV: the TV turns each id into the app it has
 // installed (packages for its system, else the app's name in its list), and a person changes them with

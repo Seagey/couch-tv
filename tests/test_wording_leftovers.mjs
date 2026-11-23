@@ -63,11 +63,11 @@ const ur = read("on-tv/android/app/src/main/java/dev/couchtv/ontv/UpdateRules.kt
 ok(ur.includes("This is the Home button version of Couch TV.") && !ur.includes("has the Home button watch"), "UpdateRules: the Home button version");
 ok(!/"[^"]*adb (connect|install)[^"]*"/.test(ur), "UpdateRules: no adb commands on screen");
 
-// 5. Couch TV on screen (couch-tv stays in links, file names, couch-tv Studio, and the name the Hue app shows: bridge/direct.py devicetype couch-tv#home)
+// 5. Couch TV on screen (couch-tv stays in links, file names, Couch TV Studio, and the name the Hue app shows: bridge/direct.py devicetype couch-tv#home)
 for (const [where, S] of [["TV", TV], ["phone", R]]) {
   const left = [];
   for (const l of Object.keys(S)) for (const k of Object.keys(S[l] || {})) if (typeof S[l][k] === "string" && /couch-tv(?! Studio|-ontv|-home)/.test(S[l][k]) && k !== "about_code" && k !== "tw_hue_unpair_sub") left.push(l + "." + k);
-  ok(left.length === 0, where + ": couch-tv only as a name of a link, file or couch-tv Studio: " + left.slice(0, 6).join(", "));
+  ok(left.length === 0, where + ": couch-tv only as a name of a link, file or Couch TV Studio: " + left.slice(0, 6).join(", "));
 }
 
 // 6. today's TV words: every tw_ word in all 16 TV blocks (es-MX through es)
@@ -109,7 +109,7 @@ ok(!/DW\.|DESIGN_WORDS\./.test(sheets + read("remote/src/App.jsx")), "the phone 
 // Fable's NO-GO of 20 Nov: the words it named
 ok(TV.de.tw_keep_home === "Meinen Startbildschirm behalten" && TV.de.tw_check_first.includes("Meinen Startbildschirm behalten lässt"), "de: Meinen Startbildschirm behalten, button and note");
 // Get a design's line means typing on the TV the code the phone shows (not typing on the phone)
-const typeHere = { de: /Gib hier den Code ein, den couch-tv Studio auf deinem Handy zeigt/, pl: /Wpisz tutaj kod, który couch-tv Studio pokazuje/, ar: /اكتب هنا الرمز الذي يعرضه/, he: /הקלידו כאן את הקוד ש-couch-tv Studio מציג/, nl: /Typ hier de code die/, cs: /Napište sem kód, který/, pt: /Digite aqui o código que/, "sr-Latn-RS": /Ukucajte ovde kod koji/, tr: /gösterdiği kodu buraya yaz/, ro: /Tastează aici codul pe care/ };
+const typeHere = { de: /Gib hier den Code ein, den Couch TV Studio auf deinem Handy zeigt/, pl: /Wpisz tutaj kod, który Couch TV Studio pokazuje/, ar: /اكتب هنا الرمز الذي يعرضه/, he: /הקלידו כאן את הקוד ש-Couch TV Studio מציג/, nl: /Typ hier de code die/, cs: /Napište sem kód, který/, pt: /Digite aqui o código que/, "sr-Latn-RS": /Ukucajte ovde kod koji/, tr: /gösterdiği kodu buraya yaz/, ro: /Tastează aici codul pe care/ };
 for (const [l, re] of Object.entries(typeHere)) ok(re.test(TV[l].tw_type_code_phone), l + ": Get a design is typed on the TV: " + TV[l].tw_type_code_phone);
 // Arabic and Hebrew: addresses and codes in left to right isolates
 for (const l of ["ar", "he"]) {

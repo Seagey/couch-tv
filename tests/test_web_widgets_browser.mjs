@@ -120,7 +120,7 @@ for (const c of CASES) {
     for (let i = 0; i < 16 && !found; i++) { found = (await page.evaluate(() => document.getElementById("set-head").textContent)) === "Designs"; if (!found) await press(page, "ArrowDown", 120); }
     // the Commute is one row in Widgets on this home (its own settings page), with the place set on this TV
     const listed = await page.evaluate(() => document.getElementById("settings").innerText);
-    ok(found && /Widgets on this home/i.test(listed) && /Commute, /.test(listed) && /Where to: Parramatta/.test(listed), "commute: couch-tv Studio lists the Commute in Widgets on this home, Where to Parramatta (" + listed.replace(/\s+/g, " ").slice(0, 600) + ")");
+    ok(found && /Widgets on this home/i.test(listed) && /Commute, /.test(listed) && /Where to: Parramatta/.test(listed), "commute: Couch TV Studio lists the Commute in Widgets on this home, Where to Parramatta (" + listed.replace(/\s+/g, " ").slice(0, 600) + ")");
     await press(page, "ArrowRight", 200);
     for (let i = 0; i < 20 && !/^Commute, /.test(await page.evaluate(() => (document.querySelector("#set-rows .srow.focus") || {}).textContent || "")); i++) await press(page, "ArrowDown", 100);
     await press(page, "Enter", 400);

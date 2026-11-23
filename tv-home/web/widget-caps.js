@@ -1,7 +1,7 @@
 // What every widget needs to show real things, how to set it up on each kind of TV, what it shows
 // until then, what OK opens, which TVs can run it, and the sizes it comes in. One record per widget
 // kind, read by the TV (widgets.js draws the setup card from it, widget-detail.js the setup steps) and
-// by couch-tv Studio (the info tips, the gallery badges and the size menu). Data only: no page, no
+// by Couch TV Studio (the info tips, the gallery badges and the size menu). Data only: no page, no
 // network.
 //
 // A record:
@@ -27,7 +27,7 @@
 //   ok          what OK on the remote opens (the detail layer, widget-detail.js), or what it does
 //   platforms   { <tvs/platform-setup.js key>: { on, need, note } }
 //                 on    "yes" | "setup" | "partial" | "no" (the older field the designer reads)
-//                 need  "works" (nothing to do), "setup" (a step on the TV or in couch-tv Studio),
+//                 need  "works" (nothing to do), "setup" (a step on the TV or in Couch TV Studio),
 //                       "computer" (needs a computer at home that stays on) or "no" (not possible)
 //                 note  one plain line about that TV
 //   sizes       { s: named sizes, min: [w, h] in half cells, x: extra sizes } (the shape of
@@ -64,13 +64,13 @@
   var NATIVE_NAME = { "Roku OS": "Roku", tvOS: "Apple TV" };
   function drawnOn(kind, p) { return !!NATIVE[p] && NATIVE[p].indexOf(kind) >= 0; }
   // Fire TV on Vega OS, Philips on Titan OS, VIZIO and unknown TVs: their couch-tv (where there is one)
-  // does not draw couch-tv Studio designs.
+  // does not draw Couch TV Studio designs.
   var NO_HOME = "Designs don't show on this TV.";
   var NOT_HERE = ["Not possible on this TV: designs show on Google TV, Android TV, Fire TV, Samsung, LG, Hisense, Philips (older), TiVo OS, Panasonic, Roku and Apple TV."];
   var NOT_NATIVE = "Shows on Google TV, Android TV and Fire TV.";
   var NATIVE_PHOTO = { photo: true, artframe: true };
-  var NATIVE_CHANGE = "To change this widget, change it in couch-tv Studio and send the design again.";
-  var NATIVE_PHOTO_NOTE ="Shows the photo put in the widget in couch-tv Studio. This TV's own photos do not show here.";
+  var NATIVE_CHANGE = "To change this widget, change it in Couch TV Studio and send the design again.";
+  var NATIVE_PHOTO_NOTE ="Shows the photo put in the widget in Couch TV Studio. This TV's own photos do not show here.";
   var NATIVE_SEND = { "Roku OS": "Tap Send to my TV, then on the Roku: press the star button, pick Get a design by code, and type the code.",
     tvOS: "Tap Send to my TV, then on the Apple TV: Settings, Home design, Get a design, and type the code." };
 
@@ -105,17 +105,17 @@
   // the classic home's gear. The remote's own Settings button often opens the TV's menu instead, so say so.
   var OPEN = "Hold OK and pick Settings (or OK on the gear at the screen edge), then Home settings. The remote's Settings button opens the TV's menu.";
   var SEND = "Tap Send to my TV, then on the TV: Home settings, Designs, Get a design, and type the code.";
-  function inStudio(what) { return ["Open your design in couch-tv Studio on your phone.", "Tap the widget, then " + what + ".", SEND]; }
+  function inStudio(what) { return ["Open your design in Couch TV Studio on your phone.", "Tap the widget, then " + what + ".", SEND]; }
   var TOWN = [OPEN, "Go down to Location and press OK.", "Pick Search for a town or city, type your town, then press OK.", "Pick your town in the list. The weather shows within a minute."];
   // a weather widget can also have a place of its own (its Place setting, Hold OK on the widget)
   var TOWN_OWN = TOWN.concat(["Or for this widget only: hold OK on it, pick Edit on the TV, then Place."]);
   var BEACH = [OPEN, "Go down to Location and press OK.", "Pick Search for a town or city, type the beach town nearest you, then press OK.", "Pick it in the list. The swell shows within a minute (inland towns have no swell)."];
   var BEACH_OWN = BEACH.concat(["Or for this widget only: hold OK on it, pick Edit on the TV, then Beach."]);
-  var PHOTOS_ANDROID = [OPEN, "Go down to Look and scenes, then down to Your photos.", "Pick Add photos from a USB drive or this TV, and choose up to 50 photos.", "Or put one photo in the widget itself, in couch-tv Studio."];
-  var PHOTOS_LINK = [OPEN, "Go down to Look and scenes, then down to Your photos.", "Pick Add a photo from a web address, type the photo's address, then press OK.", "Or put one photo in the widget itself, in couch-tv Studio."];
+  var PHOTOS_ANDROID = [OPEN, "Go down to Look and scenes, then down to Your photos.", "Pick Add photos from a USB drive or this TV, and choose up to 50 photos.", "Or put one photo in the widget itself, in Couch TV Studio."];
+  var PHOTOS_LINK = [OPEN, "Go down to Look and scenes, then down to Your photos.", "Pick Add a photo from a web address, type the photo's address, then press OK.", "Or put one photo in the widget itself, in Couch TV Studio."];
   var NOTHING = ["Nothing to set up."];
   // the time widgets: nothing to set up, and their own settings are on the TV too (Hold OK, Edit on the TV)
-  var EDIT_TV = "To change how it looks: hold OK on the widget, then pick Edit on the TV. Or change it in couch-tv Studio.";
+  var EDIT_TV = "To change how it looks: hold OK on the widget, then pick Edit on the TV. Or change it in Couch TV Studio.";
   var CLOCK_STEPS = ["Nothing to set up.", EDIT_TV];
   var NOT_YET = ["Nothing to set up: Couch TV cannot show this."];
   var WATCH = {
@@ -196,10 +196,10 @@
     solar: { name: "Sun clock", status: "works", what: "The sun's path today, with sunrise and sunset", needs: [TOWN_NEED],
       setup: setup("tv", TOWN.concat(["Or a place for this widget alone: hold OK on it, then Edit on the TV, Place."])), until: "\"Set your town for the sun\", and where", build: "",
       ok: "Opens the forecast: sunrise and sunset for the week", platforms: plat("setup", "computer", "setup"), sizes: sz(["wtile", "small", "medium"], [4, 2]) },
-    worldclock: { name: "World clocks", status: "works", what: "The time in two to four cities", needs: ["Nothing: it uses the TV's own clock. Pick the cities on the TV or in couch-tv Studio"],
-      setup: setup("nothing", ["Nothing to set up: with no cities picked it shows this TV's own town, London, New York and Tokyo.", "To pick the cities: hold OK on the widget, then pick Edit on the TV. Or pick them in couch-tv Studio."]), until: "Always shows the times", build: "",
+    worldclock: { name: "World clocks", status: "works", what: "The time in two to four cities", needs: ["Nothing: it uses the TV's own clock. Pick the cities on the TV or in Couch TV Studio"],
+      setup: setup("nothing", ["Nothing to set up: with no cities picked it shows this TV's own town, London, New York and Tokyo.", "To pick the cities: hold OK on the widget, then pick Edit on the TV. Or pick them in Couch TV Studio."]), until: "Always shows the times", build: "",
       ok: "Opens World clocks: every city big, day or night", platforms: EVERY(), sizes: sz(["tile", "wtile", "small", "medium", "wide"], [2, 2]) },
-    countdown: { name: "Countdown", status: "works", what: "Sleeps, days or weeks to a date", needs: ["The date and its name, picked on the TV or in couch-tv Studio"],
+    countdown: { name: "Countdown", status: "works", what: "Sleeps, days or weeks to a date", needs: ["The date and its name, picked on the TV or in Couch TV Studio"],
       setup: setup("designer", inStudio("pick the date, and a year for a one off day, and type its name").concat(["Or on the TV: hold OK on the widget, then pick Edit on the TV."])), until: "Always shows the count", build: "",
       ok: "Nothing: it is to look at", platforms: EVERY(), sizes: sz(["tile", "wtile", "small"], [2, 2]) },
     date: { name: "Date", status: "works", what: "Today's date, with the weather if you like", needs: ["Nothing for the date. The weather line needs your town"],
@@ -294,7 +294,7 @@
         vidaa: ["Install the app from the TV's own app store.", "Needs a home computer to open it: the website home cannot open apps."] }),
       until: "\"This app is not on this TV\"", build: "",
       ok: "Opens the app", platforms: plat("works", "computer", "computer", { vidaa: "Needs a home computer: the website home cannot open apps." }), sizes: sz(["tile", "small"], [2, 2]) },
-    folder: { name: "App folder", status: "works", what: "A box of apps with a name", needs: ["The apps, picked in couch-tv Studio or on the TV, and installed on this TV"],
+    folder: { name: "App folder", status: "works", what: "A box of apps with a name", needs: ["The apps, picked in Couch TV Studio or on the TV, and installed on this TV"],
       setup: setup("designer", inStudio("pick the apps for it").concat(["Or on the TV: hold OK on an app to change, move or remove it, or on Add app to add one."])), until: "Apps this TV does not have are dimmed: \"Not on this TV\"", build: "",
       ok: "Opens the folder full screen, every app big", platforms: plat("works", "computer", "computer", { vidaa: "Needs a home computer: the website home cannot open apps." }), sizes: sz(["tile", "small", "tall", "medium", "large"], [2, 2]) },
     dock: { name: "Dock", status: "works", what: "A row of your apps", needs: ["Nothing: it shows this TV's apps"],
@@ -369,9 +369,9 @@
       sizes: sz(["tile", "wtile", "small", "medium"], [2, 2]) },
 
     // ---------- lists and the family ----------
-    bins: { name: "Bin night", status: "setup", what: "Tonight's bins with their lid colours", needs: ["Your bin night and bins, set on the widget on the TV or in couch-tv Studio"],
+    bins: { name: "Bin night", status: "setup", what: "Tonight's bins with their lid colours", needs: ["Your bin night and bins, set on the widget on the TV or in Couch TV Studio"],
       setup: setup("tv", ["Move to the Bin night widget, hold OK, then pick Edit on the TV.", "Pick the bin night, the names and lid colours of the bins, and whether they take turns.",
-        "Taking turns? Pick which bin goes out this week, and Couch TV keeps count from there.", "Or set the same in couch-tv Studio: tap the widget, then send the design to your TV."]),
+        "Taking turns? Pick which bin goes out this week, and Couch TV keeps count from there.", "Or set the same in Couch TV Studio: tap the widget, then send the design to your TV."]),
       until: "\"Set your bin night in this widget's settings\"", build: "",
       ok: "Nothing: it is to look at", platforms: plat("setup", "computer", "setup"), sizes: sz(["tile", "wtile", "small"], [2, 2]) },
     people: { name: "People", status: "works", what: "Who is watching. OK switches person", needs: ["The people who watch, added on the TV"],
@@ -398,7 +398,7 @@
     // a typed card (a title and words from the design) shows on every TV; a live number from home is the
     // extra that needs the computer at home (bridge/custom_cards.py)
     card: { name: "Custom card", status: "works", what: "Your own title and words, or a live number from your home: solar today, the pool",
-      needs: ["Your title and words, typed in couch-tv Studio", "For a live number: a home computer that stays on, running Couch TV"],
+      needs: ["Your title and words, typed in Couch TV Studio", "For a live number: a home computer that stays on, running Couch TV"],
       setup: setup("designer", inStudio("type a title and its words").concat(["For a live number: on the home computer, add it to Couch TV's settings under Custom cards, with no words in the widget."])),
       until: "Always shows your words. A card for a live number with no computer: \"Needs a home computer\", and where", build: "",
       ok: "Opens every custom card big", platforms: EVERY(), sizes: sz(["tile", "wtile", "small"], [2, 2]) },
@@ -413,8 +413,8 @@
     news: { name: "Headlines", status: "works", what: "One to four of the latest headlines from a news feed you pick (ABC News unless you choose another)",
       needs: ["Nothing on a Google TV, Android TV or Fire TV: Couch TV reads the feed itself", "On other TVs, the home computer, which reads the feed for the TV"],
       setup: setup("designer", {
-        android: ["Nothing to set up: the headlines come from the best source for your country (ABC News in Australia).", "On the TV: hold OK on the widget, then Edit on the TV (or Edit on your phone).", "Pick News source: ABC News, SBS, The Guardian, BBC or RNZ, and How many headlines.", "Or in couch-tv Studio on your phone: tap the widget and pick them there, then send the design."],
-        web: ["Keep the home computer on: it reads the news feed for this TV.", "On the TV: hold OK on the widget, then Edit on the TV (or Edit on your phone).", "Pick News source: ABC News, SBS, The Guardian, BBC or RNZ, and How many headlines.", "Or in couch-tv Studio on your phone: tap the widget and pick them there, then send the design."],
+        android: ["Nothing to set up: the headlines come from the best source for your country (ABC News in Australia).", "On the TV: hold OK on the widget, then Edit on the TV (or Edit on your phone).", "Pick News source: ABC News, SBS, The Guardian, BBC or RNZ, and How many headlines.", "Or in Couch TV Studio on your phone: tap the widget and pick them there, then send the design."],
+        web: ["Keep the home computer on: it reads the news feed for this TV.", "On the TV: hold OK on the widget, then Edit on the TV (or Edit on your phone).", "Pick News source: ABC News, SBS, The Guardian, BBC or RNZ, and How many headlines.", "Or in Couch TV Studio on your phone: tap the widget and pick them there, then send the design."],
         vidaa: ["Needs a home computer that stays on, running Couch TV. The website home cannot read news feeds.", "On the TV: hold OK on the widget, then Edit on the TV (or Edit on your phone).", "Pick News source and How many headlines."] }),
       until: "\"Getting the headlines\" for a moment. If the feed cannot be read, it says so and tries again in a few minutes", build: "",
       ok: "Opens the headlines: the latest six, with how long ago each came out", platforms: plat("works", "computer", "computer", { android: "Couch TV on the TV reads the feed: no computer needed.", vidaa: "Needs a home computer: the website home cannot read news feeds." }), sizes: sz(["wtile", "small", "tall", "medium"], [4, 2]) },
@@ -439,7 +439,7 @@
       ok: "Opens the watchlist: each price, today's move and today's line", platforms: plat("works", "computer", "computer", { android: "Couch TV on the TV reads the prices: no computer needed.", vidaa: "Needs a home computer: the website home cannot read share prices." }), sizes: sz(["tile", "wtile", "small", "tall"], [2, 2]) },
     // OSRM's free route server with OpenStreetMap roads, asked by the TV itself: the usual drive, no live
     // traffic (that needs a paid map service). Both places stay on the TV (Location, and Commute in
-    // couch-tv Studio's section of Home settings), never in a design
+    // Couch TV Studio's section of Home settings), never in a design
     commute: { name: "Commute", status: "setup", what: "The usual drive to work or school by road, and when to leave to arrive on time. No live traffic",
       needs: ["Your town, and where you drive to, set on the TV (never in the design)"],
       setup: setup("tv", [OPEN, "Go down to Location and set your town, if it is not set yet.", "On the TV: hold OK on the widget, then Edit on the TV (or Edit on your phone).", "Pick Where to: type the town or suburb you drive to and pick it. Leave from is your home's town unless you pick another.", "For when to leave: pick Arrive by and the minutes past the hour, then Minutes to spare and Weekdays only."]),
@@ -447,7 +447,7 @@
       ok: "Opens the drive: how long, how far, and when to leave", platforms: plat("setup", "computer", "setup", { android: "The places are kept on the TV. Drive time without traffic.", web: "Works while the home computer is on. The places are kept on the TV." }), sizes: sz(["tile", "wtile", "small", "medium"], [2, 2]) },
 
     // ---------- guests and the room ----------
-    welcome: { name: "Welcome words", status: "works", what: "A greeting in your own words, or each guest by name with their check in or check out time from your bookings calendar", needs: ["The words, typed in couch-tv Studio, or on the TV (hold OK on the widget, Edit on the TV) or the phone", "For guest names: your Airbnb, Booking.com or VRBO calendar link, typed on the TV"],
+    welcome: { name: "Welcome words", status: "works", what: "A greeting in your own words, or each guest by name with their check in or check out time from your bookings calendar", needs: ["The words, typed in Couch TV Studio, or on the TV (hold OK on the widget, Edit on the TV) or the phone", "For guest names: your Airbnb, Booking.com or VRBO calendar link, typed on the TV"],
       setup: setup("designer", {
         android: inStudio("type the words (no numbers or web addresses). For guest names, pick Guest name from: Bookings calendar").concat([
           "On the TV: Home settings, Designs, At home, Guests. Paste your Airbnb, Booking.com or VRBO calendar link with the phone remote's Type on the TV.",
@@ -459,7 +459,7 @@
       until: "Always shows the words. With guest names on and no bookings link yet: \"Add your bookings calendar\", and where", build: "",
       ok: "Nothing: it is to look at", platforms: EVERY(), sizes: sz(["wline", "wtile", "medium", "wide"], [4, 1]) },
     quick: { name: "Quick buttons", status: "works", what: "Sleep timer, picture mode, look, input and more", needs: ["Nothing: buttons this TV cannot do are left out"],
-      setup: setup("tv", { android: [OPEN, "Go down to Quick buttons and press OK.", "OK shows or hides a button. Hold OK on one to move it along.", "Or pick this widget's own buttons in couch-tv Studio."],
+      setup: setup("tv", { android: [OPEN, "Go down to Quick buttons and press OK.", "OK shows or hides a button. Hold OK on one to move it along.", "Or pick this widget's own buttons in Couch TV Studio."],
         web: [OPEN, "Go down to Quick buttons and press OK.", "OK shows or hides a button. Picture mode and input need a Google TV, Android TV or Fire TV."],
         vidaa: [OPEN, "Go down to Quick buttons and press OK.", "OK shows or hides a button. Picture mode and input need a Google TV, Android TV or Fire TV."] }),
       until: "Buttons this TV cannot do are left out", build: "",
@@ -494,13 +494,13 @@
       platforms: plat("setup", "setup", "setup", { android: "Your own key on this TV, a model at home, or Couch TV at home. Speak with the TV keyboard's microphone or the phone remote.",
         web: "Your own key on this TV, or the home computer's Claude on your own plan. Speak with the phone remote's microphone.", vidaa: "Your own key or a model at home, typed with the TV remote." }),
       sizes: sz(["wtile", "small", "medium", "wide", "large"], [4, 2]) },
-    agent: { name: "From your AI", status: "setup", what: "Messages your own AI agent sends to the TV. The agent can also put a couch-tv Studio design on the TV (you press OK first)",
+    agent: { name: "From your AI", status: "setup", what: "Messages your own AI agent sends to the TV. The agent can also put a Couch TV Studio design on the TV (you press OK first)",
       needs: [AGENT_NEED, "An AI app that can use tools (MCP), such as Claude Desktop, Claude Code or Cursor, or any program on your network"],
       setup: setup("tv", [
         "Needs the Couch TV app on this TV, or a home computer running Couch TV: they hold the TV's own address for your agent.",
         "In your AI app, add Couch TV's TV tools with the TV app's or home computer's address and pairing key. The guide Connect your own AI agent has the lines to copy.",
         "Ask your AI: \"Show 'Dinner is ready' on the TV\". It shows over the home and in this widget.",
-        "To change the home: ask it to design one with couch-tv Studio's tools and send it. The TV asks \"Use this design?\" first: press OK."]),
+        "To change the home: ask it to design one with Couch TV Studio's tools and send it. The TV asks \"Use this design?\" first: press OK."]),
       until: "\"Connect your AI agent\", and OK shows how", build: "",
       ok: "Opens the last message in full, and how to connect your agent",
       platforms: plat("setup", "computer", "computer", { android: "Through the Couch TV app on this TV (no computer at home needed) or a home computer.", web: "Works while the home computer is on.", vidaa: "Needs a home computer running Couch TV: the website home has nothing an agent can reach." }),
@@ -528,7 +528,7 @@
   // design key a screen writes from this choice, worked out when it is saved), suggest (text: ready made
   // values to pick), private (never leaves the TV and the home Wi-Fi), needs ({ apps, bridge, ha }).
   // Two types beyond the contract's list: "tvlist" (one of the things kept on this TV: its lists, its
-  // photos) and "image" (one photo put in the widget in couch-tv Studio).
+  // photos) and "image" (one photo put in the widget in Couch TV Studio).
   var ALL = ["studio", "tv", "phone"], ON_TV = ["tv", "phone"], STUDIO = ["studio"];
   function st(key, label, type, dflt, help, store, where, pre, more) {
     var s = { key: key, label: label, type: type, "default": dflt, help: help, store: store, where: where.slice(), pre: !!pre };
@@ -556,9 +556,9 @@
   var CLOCK_FMT = function () { return st("format", "12 or 24 hour", "choice", "auto", "Follow this TV uses the clock set in Home settings, Look and scenes.", "design", ALL, true,
     { options: [["auto", "Follow this TV"], ["12h", "12 hour"], ["24h", "24 hour"]] }); };
   var HEADING = function (help, pre) { return st("label", "Heading", "text", "", help, "design", ALL, pre !== false, { max: 40 }); };
-  var PHOTO = function () { return st("photo", "Photo", "tvlist", "first", "Which of this TV's photos shows here. A photo put in the widget in couch-tv Studio shows instead. Add photos in Home settings, Look and scenes, Your photos.", "tv", ON_TV, true, { from: "photos", "private": true }); };
+  var PHOTO = function () { return st("photo", "Photo", "tvlist", "first", "Which of this TV's photos shows here. A photo put in the widget in Couch TV Studio shows instead. Add photos in Home settings, Look and scenes, Your photos.", "tv", ON_TV, true, { from: "photos", "private": true }); };
   var IMAGE = function () { return st("image", "Photo in the widget", "image", "", "Put one photo in the widget itself. It shows on every TV this design goes to.", "design", STUDIO, true); };
-  // a heading that is not private: kept in the design since 0.13.10, so couch-tv Studio can set it too
+  // a heading that is not private: kept in the design since 0.13.10, so Couch TV Studio can set it too
   var HEADING_TV = function (help) { return st("label", "Heading", "text", "", help, "design", ALL, true, { max: 40 }); };
   var HA = { ha: true };
   var LIDS = [["#ffd60a", "Yellow"], ["#30d158", "Green"], ["#ff453a", "Red"], ["#0a84ff", "Blue"], ["#8e8e93", "Grey"], ["#1d1b18", "Black"], ["#a2845e", "Brown"], ["#bf5af2", "Purple"]];
@@ -763,7 +763,7 @@
   Object.keys(LATER).forEach(function (k) { SETTINGS[k] = (SETTINGS[k] || []).concat(LATER[k]); });
   // a clock's own time zone (owner, 23 Nov 2026: Studio's Basic designer asks "Which time zone? Your TV's
   // time zone, or pick another"): an IANA id kept in the design; empty, or a zone the TV does not know,
-  // keeps the TV's own time. Picked in couch-tv Studio or on the phone, never with the TV remote.
+  // keeps the TV's own time. Picked in Couch TV Studio or on the phone, never with the TV remote.
   ["clock", "tallclock", "glassclock", "flipclock", "analog", "wordclock"].forEach(function (k) {
     SETTINGS[k] = (SETTINGS[k] || []).concat([st("zone", "Time zone", "zone", "", "Empty uses this TV's own time zone.", "design", ["studio", "phone"], true)]);
   });
@@ -843,7 +843,7 @@
   });
   // a quote's built in lines are in the web home only: a Roku or an Apple TV shows the words typed in it
   ["Roku OS", "tvOS"].forEach(function (p) {
-    C.quote.platforms[p] = { on: "setup", need: "setup", note: "Shows your own words only: type them in couch-tv Studio." };
+    C.quote.platforms[p] = { on: "setup", need: "setup", note: "Shows your own words only: type them in Couch TV Studio." };
   });
   // a smart stack on a Roku moves on once a minute, and the remote does not flick it
   C.stack.platforms["Roku OS"].note += " On a Roku it moves on to the next widget once a minute; Left and Right do not flick it.";
@@ -868,7 +868,7 @@
 
   // the setup card a TV shows for a widget that has nothing real to show yet: the first line says what
   // is missing, the second where to go. Built only from this file, never from a design.
-  var WHERE = { tv: "OK here shows the steps", phone: "Set up from the phone remote", computer: "OK here shows how to set it up", designer: "Set up in couch-tv Studio", nothing: "" };
+  var WHERE = { tv: "OK here shows the steps", phone: "Set up from the phone remote", computer: "OK here shows how to set it up", designer: "Set up in Couch TV Studio", nothing: "" };
   var SHORT = {};
   // [the line, where to go, the line for a tile (two short lines at most)]
   SHORT[TOWN_NEED] = ["Set your town", "Home settings, Location", "Set your town"];
@@ -876,7 +876,7 @@
   SHORT[WATCH_NEED] = ["Needs the Couch TV app on this TV or a home computer", "OK here shows how", "Needs setting up"];
   SHORT[HA_NEED] = ["Needs Home Assistant", "Home settings, Designs, Smart home", "Needs Home Assistant"];
   SHORT[QUEUE_NEED] = ["Needs Spotify connected", "On the home computer. OK here shows how", "Needs Spotify"];
-  SHORT[C.card.needs[0]] = ["Type your words in couch-tv Studio", "Or a live number from the home computer. OK here shows how", "Type your words"];
+  SHORT[C.card.needs[0]] = ["Type your words in Couch TV Studio", "Or a live number from the home computer. OK here shows how", "Type your words"];
   SHORT[C.surf.needs[0]] = ["Set your town by the beach", "Home settings, Location", "Set your town"];
   var AT = "Settings (hold OK), Home settings, Designs, At home";
   SHORT[NOTE_NEED] = ["Write a note", AT, "Write a note"];
@@ -914,7 +914,7 @@
   function nativeSteps(kind, p) {
     var c = C[kind];
     if (c.status === "not-built" || !drawnOn(kind, p)) return [NOT_NATIVE];
-    if (NATIVE_PHOTO[kind]) return ["Open your design in couch-tv Studio on your phone.", "Tap the widget, then put one photo in it.", NATIVE_SEND[p]];
+    if (NATIVE_PHOTO[kind]) return ["Open your design in Couch TV Studio on your phone.", "Tap the widget, then put one photo in it.", NATIVE_SEND[p]];
     // the steps up to the first one on the TV's own menus (a Studio send becomes this TV's own), then
     // one line for the rest; a leading "Nothing to set up" stays
     var web = c.setup.steps.web || c.setup.steps.android, out = [], onTv = false;
@@ -958,7 +958,7 @@
   };
   function setupNeed(kind) { return NEED_OF[kind] || null; }
   // the name a waiting widget goes by on the TV, where it is not the kind's own name: the plain word people
-  // know for it (the kind id and the name in couch-tv Studio and Home settings stay as they are)
+  // know for it (the kind id and the name in Couch TV Studio and Home settings stay as they are)
   var FACE_NAME = { agenda: "Calendar" };
   function face(kind) { var c = C[kind]; return c && NEED_OF[kind] ? { name: FACE_NAME[kind] || c.name, line: FACE[kind] || "", need: NEED_OF[kind] } : null; }
 

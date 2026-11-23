@@ -1,5 +1,5 @@
-// couch-tv Studio's design block: config.json "design" (docs/CONFIG.md, "Design"), made in
-// couch-tv Studio (a poster style editor for this home). It is laid over the normal Night home:
+// Couch TV Studio's design block: config.json "design" (docs/CONFIG.md, "Design"), made in
+// Couch TV Studio (a poster style editor for this home). It is laid over the normal Night home:
 //  - the home's own parts (clock, date, weather, people, quick buttons, Keep watching, the dock):
 //    where each sits, its size and turn, font, colour, weight, shadow, a shade behind it to read it
 //    on a busy photo, the panel behind it, and for the dock its shape (row, column, grid), icon
@@ -345,7 +345,7 @@
     if (!app) { put(out, "name", SAN.w(src.name, 24)); put(out, "on", SAN.b(src.on)); }
     return out;
   }
-  // ---------------- widgets (couch-tv Studio v10, widgets/CATALOGUE.md) ----------------
+  // ---------------- widgets (Couch TV Studio v10, widgets/CATALOGUE.md) ----------------
   // A widget is one box on the designer's grid: a kind (one renderer each, widgets.js), a set size,
   // a style from fixed lists and plain colours, and a few options per kind, each on an allow list.
   // A design never carries a widget's data: the TV reads its own (the clock, its weather, its photos,
@@ -487,7 +487,7 @@
   OPT.turn = function (v) { return SAN.pick(v, [0, 10, 20, 30, 60]); };
   WOPT.picks = "label align mix"; WOPT.nowplaying = "buttons cover"; WOPT.queue = "label align count"; WOPT.stack = "turn";
   // settings that were kept on the TV only, with nothing private in them, now in the design too (0.13.10,
-  // widget-caps.js store "design"), so couch-tv Studio can set them; a TV's own choice still wins:
+  // widget-caps.js store "design"), so Couch TV Studio can set them; a TV's own choice still wins:
   // temperature in, the moon's half of the world, the air quality scale, the surf's units, the
   // soundscape's volume, the doorbell's and energy's heading (label, already kept) and the guest Wi-Fi's
   // password hidden (each named in WOPT above)
@@ -606,7 +606,7 @@
       // depth: a built in scene photo has a cut out of its hills (scene-<name>-fg.webp); drawn between
       // the widgets behind (layer "back") and the ones in front, so a clock can stand behind the hills
       // depth_image: the design's own cut out of its photo (a PNG or WebP with see through sky, made in
-      // couch-tv Studio), drawn in the same place over the clock; checked like the photo itself (only from
+      // Couch TV Studio), drawn in the same place over the clock; checked like the photo itself (only from
       // this TV or inside the design, never a link; the same size limit). With one, depth is on unless
       // the design says false. A design without it is drawn exactly as before.
       var cut = depthImgOk(bg.depth_image);
@@ -617,7 +617,7 @@
       // is drawn on the still only: blurring every frame of a video is too slow for a TV.
       var vid = vidOk(bg.video);
       if (vid) { out.background.video = vid; if (out.background.blur) { delete out.background.blur; note("A video background is not blurred, so the blur was taken off."); } }
-      else if (bg.video !== undefined) note("That video background is not allowed: only a built in loop or a video from couch-tv Studio's store.");
+      else if (bg.video !== undefined) note("That video background is not allowed: only a built in loop or a video from Couch TV Studio's store.");
     } else if (bg.video !== undefined) {
       note("A video background needs its still picture, so it was left out.");
     }
@@ -988,7 +988,7 @@
 
   function css(d) {
     var E = obj(d.elements), out = [], H = "html.cd";
-    // clock.at "scene" (couch-tv Studio's Couch Original): the clock and the date stay where each built in
+    // clock.at "scene" (Couch TV Studio's Couch Original): the clock and the date stay where each built in
     // scene puts them, as on the home with no design: behind the hills, and on the Waterline scene on the
     // water with its reflection under it. Only over the scenes: a design's own background keeps one place.
     var atScene = obj(E.clock).at === "scene" && !d.background;
@@ -2343,7 +2343,7 @@
     var col = document.createElement("div"); col.setAttribute("style", "flex:1;min-width:0");
     var h1 = document.createElement("div"); h1.textContent = "A new home design arrived. Use this design?";
     h1.setAttribute("style", "font-size:3.25rem;line-height:4rem;font-weight:700;letter-spacing:-0.01em");
-    var p = document.createElement("div"); p.textContent = "This design came from couch-tv Studio. Keep my home leaves your TV exactly as it is.";
+    var p = document.createElement("div"); p.textContent = "This design came from Couch TV Studio. Keep my home leaves your TV exactly as it is.";
     p.setAttribute("style", "margin-top:1.25rem;font-size:1.75rem;line-height:2.375rem;color:rgba(255,255,255,0.82);max-width:44rem");
     var row = document.createElement("div"); row.setAttribute("style", "margin-top:2.5rem;display:flex;flex-direction:column;align-items:flex-start;gap:1.25rem");
     var mk = function (label, big) { var b = document.createElement("div"); b.textContent = label; b.setAttribute("style", "padding:" + (big ? "1.375rem 3rem" : "1rem 2.25rem") + ";border-radius:3rem;font-size:" + (big ? "2rem" : "1.625rem") + ";font-weight:700;background:rgba(255,255,255,0.12)"); row.appendChild(b); return b; };
@@ -2416,7 +2416,7 @@
   // the nearest by edge distance plus twice the sideways gap. Going back the opposite way returns to
   // where you came from. Nothing wraps round the screen.
   // the Settings button on a design (html.cd-wmode only, widgets.css .cw-gearchip): top right, small,
-  // never in couch-tv Studio or a preview. OK on it opens Home settings, like the gear tile on the classic home.
+  // never in Couch TV Studio or a preview. OK on it opens Home settings, like the gear tile on the classic home.
   var GEAR = null, GEAR_ID = "__gear", TIP_USED = "couchtv.wtip.used";
   function gearChip() {
     if (DESIGNER || PREVIEW || !document.body) return null;
@@ -2653,7 +2653,7 @@
       if (hooks.act) hooks.act(what, arg);
     }
     // the detail layer (widget-detail.js): the widget grows into a sheet; the remote stays in it until Back.
-    // What it does goes through the same hooks as the widgets' own buttons; in couch-tv Studio nothing is switched.
+    // What it does goes through the same hooks as the widgets' own buttons; in Couch TV Studio nothing is switched.
     function detailApi() {
       return { designer: DESIGNER,
         act: function (what, arg) { if (DESIGNER) { try { window.parent.postMessage({ type: "couchtv:open", name: String(arg || what) }, location.origin); } catch (x) {} return; } if (hooks.act) hooks.act(what, arg); },
@@ -2752,7 +2752,7 @@
           nodes.unshift(mk(need ? nm + ": set up on your phone" : "Edit on your phone", "wphone", known.id + "|" + need)); phoneFirst = 1;
         } else if (mine) {
           nodes.splice(1, 0, mk("Edit on the TV", "wset", mine.key)); after = 1;
-        } else if (known) note = "Nothing to set for this widget on the TV. Change how it looks in couch-tv Studio.";
+        } else if (known) note = "Nothing to set for this widget on the TV. Change how it looks in Couch TV Studio.";
       }
       // a smart stack: its own settings (when it moves on) after the widget showing in it. Where the phone
       // page exists, on the phone like every other widget ("Edit the stack on your phone", right after the

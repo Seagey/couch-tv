@@ -1,4 +1,4 @@
-// The detail layer: what opens when OK is pressed on a widget (couch-tv Studio v10). The widget grows
+// The detail layer: what opens when OK is pressed on a widget (Couch TV Studio v10). The widget grows
 // into a sheet over the home, the way the wall tablet's cards do (home-hub wall/app.js openSheet:
 // the card's own box grows to the sheet with one transform, the words fade in after it, Back shrinks
 // it back into the card). On a TV it is drawn for 3 m away: words 25 px and up, one focus ring, the
@@ -8,7 +8,7 @@
 // Studio, the TV's own data on a TV, or the widget's setup record (widget-caps.js) when the TV has
 // nothing real yet. Never pretend data on a TV. What a layer does goes through design.js (api.act:
 // the app.js hooks, the same ones a widget's own buttons use) or Home Assistant through the
-// launcher (api.ha). In couch-tv Studio nothing is switched: the layer says so.
+// launcher (api.ha). In Couch TV Studio nothing is switched: the layer says so.
 //
 // Built element by element, never from markup. ES5 on purpose: old Android TV WebViews.
 (function () {
@@ -76,8 +76,8 @@
     clearTimeout(S.msgT);
     if (t && !keep) S.msgT = setTimeout(function () { if (S && S.msgEl) S.msgEl.classList.remove("on"); }, 3600);
   }
-  // In couch-tv Studio nothing in the house is switched, and the layer says so (once)
-  function designerSays() { if (S.api.designer && !S.said) { S.said = true; msg("In couch-tv Studio this only shows what OK does. Nothing is switched."); return true; } return S.api.designer; }
+  // In Couch TV Studio nothing in the house is switched, and the layer says so (once)
+  function designerSays() { if (S.api.designer && !S.said) { S.said = true; msg("In Couch TV Studio this only shows what OK does. Nothing is switched."); return true; } return S.api.designer; }
   function btn(iconName, text, cls) { return E("div", "cwd-btn" + (cls ? " " + cls : ""), "", [iconName ? ic(iconName, 34, "currentColor", "solid") : null, text ? E("span", "", "", [text]) : null]); }
   function chip(text, on) { return E("div", "cwd-chip" + (on ? " on" : ""), "", [text]); }
 
@@ -157,7 +157,7 @@
     S.body.appendChild(E("div", "cwd-row cwd-grow", "align-items:center;margin-top:20px", [ringBox, E("div", "cwd-col", "margin-left:90px", [label("Start a timer"), grid, row])]));
     S.start = T.live() ? 8 : 2;
     // Quick start: OK on the widget starts that timer straight away (never over one already running, and
-    // never in couch-tv Studio, which switches nothing)
+    // never in Couch TV Studio, which switches nothing)
     if (mine.minutes && !T.live() && !(env && env.demo)) {
       T.start(mine.minutes, LABELS[0]); drawRing(); msg(LABELS[0] + ": " + kit().minWordsShort(mine.minutes) + ", counting down");
       S.start = 8;
@@ -646,7 +646,7 @@
     })));
   };
 
-  // Control Centre, camera, headlines and scores: couch-tv Studio shows what they will look like; a TV
+  // Control Centre, camera, headlines and scores: Couch TV Studio shows what they will look like; a TV
   // shows their setup record (widgets.js draws them empty there, which opens B.setup)
   // Control Centre: every switch big. OK switches one through the launcher (HomeAssistant.kt "set"),
   // which only switches what config.json names. A lock, alarm, garage door, gate or door never shows at

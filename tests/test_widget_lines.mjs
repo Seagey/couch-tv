@@ -32,11 +32,11 @@ const KEEP = {
   "Slow mornings are the good ones.": "the Quote widget's fallback line; the quotes are English writing (widget-words.js)",
   "Petrichor": "the Word of the day's fallback word: an English word to learn",
   "The smell of rain on dry ground.": "the Word of the day's fallback meaning, with its English word",
-  "Alex": "a name in couch-tv Studio's demo", "Backyard": "a camera's name in couch-tv Studio's demo", "Driveway": "a camera's name in couch-tv Studio's demo",
+  "Alex": "a name in Couch TV Studio's demo", "Backyard": "a camera's name in Couch TV Studio's demo", "Driveway": "a camera's name in Couch TV Studio's demo",
   "Room ": "an aria label with the room's own name",
   "Inter, sans-serif": "a font name in an svg, never words",
-  "Twenty seven minutes past\neleven": "the Word clock in couch-tv Studio's demo: the Word clock writes the time in English words",
-  "Pizza": "a timer's name in couch-tv Studio's demo",
+  "Twenty seven minutes past\neleven": "the Word clock in Couch TV Studio's demo: the Word clock writes the time in English words",
+  "Pizza": "a timer's name in Couch TV Studio's demo",
   "Ask AI": "the feature's own name, kept in every language as i18n.js keeps it (the Play build's Ask AI layer, widget-detail.js)",
   "H:": "the day's high and low as H: and L:, written the way weather apps write them"
 };
@@ -46,9 +46,13 @@ const pieceOf = (s) => keys.some((k) => k.startsWith(s) || k.includes(" " + s.tr
 let missing = [];
 try {
   execFileSync("git", ["-C", ROOT, "rev-parse", "v0.13.8"], { stdio: "ignore" });
-  const seen = new Set();
+  const seen = new Set(), OLD = new Set();
   for (const f of ["tv-home/web/widgets.js", "tv-home/web/widget-detail.js"]) {
     const diff = execFileSync("git", ["-C", ROOT, "diff", "v0.13.8", "-U0", "--", f], { encoding: "utf8", maxBuffer: 1 << 28 });
+    // a line that was in 0.13.8 already, only with the product's old name (couch-tv Studio, Couch TV Studio
+    // from 0.13.10), or on a line changed only for that name, is not a new line
+    const was = execFileSync("git", ["-C", ROOT, "show", "v0.13.8:" + f], { encoding: "utf8", maxBuffer: 1 << 28 });
+    const old = (s) => was.includes(JSON.stringify(s.replace(/Couch TV Studio/g, "couch-tv Studio")));
     for (const line of diff.split("\n")) {
       if (!line.startsWith("+") || line.startsWith("+++") || /^\+\s*\/\//.test(line)) continue;
       // tl("a line with {gaps}"): the pattern itself is the table's line
@@ -57,12 +61,13 @@ try {
         const s = JSON.parse('"' + m[1] + '"');
         if (!/^([A-Z][a-z']*|OK|UV|TV|AI)([ ,.:!?]|$)/.test(s) || /[<>=;#\/]|\.js|https?:|^[A-Z][a-z]+[A-Z]/.test(s) || /^[A-Z]$/.test(s)) continue;
         if (/\{\w+\}/.test(s) && !line.includes('tl("' + m[1])) continue;
+        if (old(s)) OLD.add(s);
         seen.add(s);
       }
     }
   }
   ok(seen.size >= 150, "widget lines looked at: " + seen.size);
-  missing = [...seen].filter((s) => !W[s] && !KEEP[s] && !(s.endsWith(" ") && pieceOf(s)));
+  missing = [...seen].filter((s) => !W[s] && !KEEP[s] && !OLD.has(s) && !(s.endsWith(" ") && pieceOf(s)));
 } catch (e) { if (!/v0\.13\.8|git/.test(String(e))) throw e; console.log("SKIP part 1: no git or no v0.13.8 tag"); }
 if (process.argv.includes("--list")) { console.log(JSON.stringify(missing, null, 1)); process.exit(0); }
 ok(missing.length === 0, missing.length + " new widget lines with no row in widget-lines.js:\n  " + missing.join("\n  "));

@@ -1,10 +1,10 @@
 // Design aware Home settings, on the TV and on the phone, in a real browser (owner's TCL test, 20 Nov 2026):
 //  1. The TV's Home settings with no design: every section, as before.
-//  2. With a couch-tv Studio design (its own background, the dock, people, quick buttons, Keep watching
+//  2. With a Couch TV Studio design (its own background, the dock, people, quick buttons, Keep watching
 //     and the clock hidden; a Welcome, a surf report "North Point", Guest Wi-Fi, a house guide and an app
 //     grid): Apps, People and Quick buttons are gone, Look has no look choices, scenes, video, photos or
 //     Inputs tile; one line at the top says so, and Show all settings brings everything back.
-//  3. Each widget's own settings: couch-tv Studio lists the widgets on the design; the surf report gets its
+//  3. Each widget's own settings: Couch TV Studio lists the widgets on the design; the surf report gets its
 //     own place (kept on the TV), the reading is asked of Open-Meteo for that place and the widget names
 //     it; with no place of its own the label never claims a place the reading is not for. Hold OK on the
 //     surf widget offers Change place, which opens that widget's page.
@@ -152,7 +152,7 @@ let allSecs;
   await goSec(page, "Look and scenes");
   const look = (await rowsText(page)).join(" | ");
   ok(/Night scenes/.test(look) && /Inputs tile/.test(look) && /Video link/.test(look), "no design: Look has the looks, Inputs tile and the video link: " + look);
-  ok(!(await rowsText(page)).some((t) => /couch-tv Studio design/.test(t)), "no design: no design line");
+  ok(!(await rowsText(page)).some((t) => /Couch TV Studio design/.test(t)), "no design: no design line");
   ok(!page.errors.length, "no page errors: " + page.errors.join("; "));
   await page.close();
 }
@@ -166,7 +166,7 @@ TV = tv;
   ok(!s.includes("Apps") && !s.includes("People") && !s.includes("Quick buttons"), "with the design: no Apps, People or Quick buttons (" + s.join(", ") + ")");
   ok(s.includes("Location") && s.includes("Weather") && s.includes("Designs") && s.includes("Language") && s.includes("About"), "the town and weather stay: the surf report reads them");
   const top = (await rowsText(tv)).slice(0, 2).join(" | ");
-  ok(/This home uses a couch-tv Studio design/.test(top) && /Settings for parts it doesn't show are hidden/.test(top) && /Show all settings/.test(top), "one line at the top says so, with Show all settings: " + top);
+  ok(/This home uses a Couch TV Studio design/.test(top) && /Settings for parts it doesn't show are hidden/.test(top) && /Show all settings/.test(top), "one line at the top says so, with Show all settings: " + top);
   await goSec(tv, "Look and scenes");
   const look = (await rowsText(tv)).join(" | ");
   ok(!/Night scenes/.test(look), "Look: no look choices (the design is the look)");
@@ -191,7 +191,7 @@ TV = tv;
   // ---- 3. each widget's own settings, drawn from widget-caps.js settings (pre: true only) ----
   await goSec(tv, "Designs");
   const studio = (await rowsText(tv)).join(" | ");
-  ok(/Surf, middle left/.test(studio) && /Beach: Sydney \(your home's town\)/.test(studio), "couch-tv Studio, Widgets on this home: the surf widget by kind and place, with its beach now: " + studio);
+  ok(/Surf, middle left/.test(studio) && /Beach: Sydney \(your home's town\)/.test(studio), "Couch TV Studio, Widgets on this home: the surf widget by kind and place, with its beach now: " + studio);
   ok(/Headlines, top right/.test(studio) && /News source: ABC News/.test(studio), "and the headlines with the design's source");
   // round 2: the Welcome words, Guest Wi-Fi and House guide have settings of their own now (tests/test_ws2_home.mjs)
   ok(/Welcome words, /.test(studio) && /Guest Wi-Fi, /.test(studio) && /House guide, /.test(studio), "the Welcome words, Guest Wi-Fi and House guide are listed with their own settings");
@@ -331,7 +331,7 @@ await phone.click("#g-more");
       btn: [...document.querySelectorAll(".fold-btn")].every((b) => b.tagName === "BUTTON" && b.hasAttribute("aria-expanded") && b.getAttribute("aria-controls")),
       line: document.getElementById("design-line-text").textContent };
   });
-  ok(/This home uses a couch-tv Studio design\. Settings for parts it doesn't show are hidden\./.test(st.line), "the phone says the home uses a design: " + st.line);
+  ok(/This home uses a Couch TV Studio design\. Settings for parts it doesn't show are hidden\./.test(st.line), "the phone says the home uses a design: " + st.line);
   ok(!st.people && !st.photos && !st.inputs, "the phone hides People, Your photos and Input tiles for this design");
   ok(st.town && st.athome && st.widgets && st.dapps, "and shows the town, At home, the design's widgets and its apps");
   ok(st.open.length === 1 && st.open[0] === "widgets", "every section is shut but the first one shown: " + st.open.join(", "));

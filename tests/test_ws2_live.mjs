@@ -455,7 +455,7 @@ const ESPN_TODAY = LIVE ? null : { nrl: "Roosters", afl: "Sydney Swans", epl: "M
   ok(teamSel, "the phone has Your team for Scores");
   await edit(tvp, "wd|word", { lang: null });
 }
-// a design from couch-tv Studio keeps these widgets' choices, and drops anything else in them
+// a design from Couch TV Studio keeps these widgets' choices, and drops anything else in them
 {
   const kept = await tvp.evaluate(() => {
     const o = (kind, opts) => ({ id: kind, type: "widget", kind, x: 0, y: 0, w: 400, h: 300, opts });

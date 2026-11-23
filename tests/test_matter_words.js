@@ -163,7 +163,7 @@ function described(lang) {
   const flagged = [];
   for (const m of appSec.split("\n").filter((l) => !/^\s*\/\//.test(l)).join("\n").matchAll(/"((?:[^"\\]|\\.)*)"/g)) {
     const s = m[1];
-    if (!/^(couch-tv Studio|[A-Z])[\w']*[ ,.:]/.test(s) || s.split(" ").length < 2 || /[<>{}=]|\.js|\.png|https?:/.test(s)) continue;
+    if (!/^(Couch TV Studio|[A-Z])[\w']*[ ,.:]/.test(s) || s.split(" ").length < 2 || /[<>{}=]|\.js|\.png|https?:/.test(s)) continue;
     if (s === "Smart home") continue;   // the crumb: the Smart home screen's own name, already a tw_ line on nl-remote
     flagged.push(s);
   }

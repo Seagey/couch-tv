@@ -178,7 +178,7 @@ assert.ok(heavy.clean.objects.filter((o) => o.shade).length <= L.glow, "glows ar
 const keys = sandbox.window.CouchDesign.cost({ home: { ambient_weather: true, clock_style: "liquid", glass_amount: 4 }, objects: [{ id: "a", type: "text", text: "x", shade: "glow" }] }).map((i) => i[2]);
 for (const k of ["weatherfx", "liquid", "glassamount", "glow"]) assert.ok(keys.includes(k), "cost counts " + k);
 
-// ---- clock.at "scene" (couch-tv Studio's Couch Original): each scene's own clock place, behind its hills
+// ---- clock.at "scene" (Couch TV Studio's Couch Original): each scene's own clock place, behind its hills
 assert.strictEqual(plain(S({ elements: { clock: { at: "scene", behind: true } } })).elements.clock.at, "scene");
 assert.strictEqual(plain(S({ elements: { clock: { at: "anywhere" } } })).elements, undefined, "only at: scene is kept");
 const cssOf = (d) => sandbox.window.CouchDesign.css(S(d));

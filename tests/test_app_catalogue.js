@@ -1,5 +1,5 @@
 // The app catalogue (tv-home/web/app-catalogue.js) and apps by id in a design: the catalogue's shape
-// (the contract couch-tv Studio builds against), the Australian and Indian apps first, packages that are
+// (the contract Couch TV Studio builds against), the Australian and Indian apps first, packages that are
 // marked verified really are in couch-tv's own tables, a design's apps are sanitised to catalogue ids
 // (an old design's package names become ids, anything else is dropped), and a TV turns each id into
 // the app it has, or a dimmed "Not on this TV" place.

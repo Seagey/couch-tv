@@ -2,7 +2,7 @@
 //  1. OK on each widget opens its layer; the remote moves inside it (Right then Left comes back);
 //     Back closes it, the widget shows again and the home keeps its focus.
 //  2. What the layers do reaches the TV: aircon warmer and fan, a scene, a timer, Hold OK's Open.
-//  3. Every widget kind at every size in widget-caps.js, as couch-tv Studio draws it, as a TV with its
+//  3. Every widget kind at every size in widget-caps.js, as Couch TV Studio draws it, as a TV with its
 //     data draws it, and as a TV with nothing set up draws it: nothing past its box, no words under 23 px.
 // Needs Playwright (Chromium). Without it the test says so and passes:
 //   COUCHTV_PLAYWRIGHT=<a folder whose node_modules has playwright> node tests/test_widget_detail_browser.mjs
@@ -230,7 +230,7 @@ for (const [layer, w, q] of CASES) {
       if (m.items[0] !== "Settings") wrong.push(k.kind + ": Settings is not first (" + m.items.join(", ") + ")");
       if (m.items.indexOf("Edit on your phone") >= 0) wrong.push(k.kind + ": Edit on your phone on a TV the computer runs");
       if (k.has) { withSet++; if (m.items[1] !== "Edit on the TV" || m.note) wrong.push(k.kind + ": has settings, menu " + m.items.join(", ") + " note " + m.note); }
-      else { without++; if (m.items.indexOf("Edit on the TV") >= 0 || m.note !== "Nothing to set for this widget on the TV. Change how it looks in couch-tv Studio.") wrong.push(k.kind + ": no settings, menu " + m.items.join(", ") + " note " + m.note); }
+      else { without++; if (m.items.indexOf("Edit on the TV") >= 0 || m.note !== "Nothing to set for this widget on the TV. Change how it looks in Couch TV Studio.") wrong.push(k.kind + ": no settings, menu " + m.items.join(", ") + " note " + m.note); }
     }
     ok(!page.errors.length, "no page errors: " + page.errors.join("; "));
     await page.close();

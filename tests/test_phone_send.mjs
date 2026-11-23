@@ -1,6 +1,6 @@
 // Fewer presses on the TV (20 Nov 2026): a design sent from the phone, pairing in one scan, and the
 // design inbox for TVs with no server of their own.
-//   remote/src/designSend.js   Send a design and couch-tv Studio's #design= hand off
+//   remote/src/designSend.js   Send a design and Couch TV Studio's #design= hand off
 //   on-tv/web/shim.js          the TV's QR carries #pin=; one scan pairs, the code leaves the address
 //   tv-home/web/design-code.js openInbox / takeInbox (Get a design from your phone)
 // Run: node tests/test_phone_send.mjs

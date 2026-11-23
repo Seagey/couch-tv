@@ -1,5 +1,5 @@
 // App folders, the Dock, App grid and Games in rows (0.13.10), in a real browser at 1920x1080 (the TV home
-// in its ?mock preview with demo apps, the same drawing the TV and couch-tv Studio use):
+// in its ?mock preview with demo apps, the same drawing the TV and Couch TV Studio use):
 //  1. "As many as fit" picks the column count that makes the apps biggest: a wide folder makes one row,
 //     rows stack when that makes them bigger, and on a short (2 high) folder the name gives way to the
 //     apps when it would leave them tiny;

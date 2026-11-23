@@ -1,6 +1,6 @@
 // What a real beginner hit on a TCL Android TV with couch-tv 0.13.3 (19 Nov 2026), checked in a real
 // browser at 1920x1080 (the TV home in its ?mock preview, the same page the TV runs), with the remote's keys:
-//  1. Turn on couch-tv Studio said "couch-tv Studio is on" while the row above still said "Off" and the
+//  1. Turn on Couch TV Studio said "Couch TV Studio is on" while the row above still said "Off" and the
 //     button "Turn on". The rows now follow the choice at once, both ways.
 //  2. The TV's keyboard dropped a letter from a design code typed fast ("rstfd-5een"). The box shows
 //     the code as ABCDE-FGHJK and how many letters are in while typing, and OK shows a big Check page

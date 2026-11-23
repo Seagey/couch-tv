@@ -1,4 +1,4 @@
-// A photo put in a Photo or Art frame widget in couch-tv Studio: the design store sends it to the TV
+// A photo put in a Photo or Art frame widget in Couch TV Studio: the design store sends it to the TV
 // inside the design as a JPEG data: URL (tools/tv-designer server/lib/validate.mjs inlineWidgetPhotos).
 // design.js's gate keeps it (OPT.image), design-code.js accepts the answer, and widgets.js draws that
 // photo, not the TV's own photos and not an empty card, in every size, in a smart stack too, with Fill

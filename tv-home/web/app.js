@@ -57,7 +57,7 @@
   var CFG = {}, HOME = {}, TVCFG = {}, QUICK = [], DESIGN_FROM_CODE = false, GATE = { on: false, design: null };
   // A picture that fails to load falls back to what its data-err names (kids.js uses it too). One
   // listener instead of inline onerror handlers, so the page still works under the strict Content
-  // Security Policy a couch-tv Studio design adds (designer-gate.js lockPage), which allows no inline
+  // Security Policy a Couch TV Studio design adds (designer-gate.js lockPage), which allows no inline
   // script at all. Keep watching pictures use "kwretry" (kwArtRetry, below).
   document.addEventListener("error", function (e) {
     var n = e.target, k = n && n.getAttribute && n.getAttribute("data-err"), p = n && n.parentNode;
@@ -575,7 +575,7 @@
   // this TV (kept by the bridge too when there is one), then ?theme= for a preview. docs/CONFIG.md.
   function readConfig() {
     CFG = window.COUCH_CONFIG || {};
-    // couch-tv Studio is opt in (designer-gate.js): until the person at this TV turns it on, no design
+    // Couch TV Studio is opt in (designer-gate.js): until the person at this TV turns it on, no design
     // reaches design.js at all and the home is exactly as it was. A design got by code at this TV
     // (design-code.js, Home settings, Designs, Get a design) wins over one in config.json; it is
     // always asked about first (CouchDesign.start with fromCode).
@@ -587,7 +587,7 @@
     CFG = Object.assign({}, CFG, { design: GATE.design || undefined });
     if (!GATE.design) delete CFG.design;
     HOME = CFG.home || {};
-    // a design from couch-tv Studio (design.js, docs/CONFIG.md "Design") may carry look settings of
+    // a design from Couch TV Studio (design.js, docs/CONFIG.md "Design") may carry look settings of
     // its own (design.home): they win over home in config.json, Home settings still win over both
     if (typeof CouchDesign !== "undefined" && CFG.design) HOME = CouchDesign.home(HOME, CFG.design, { fromCode: DESIGN_FROM_CODE });
     ON_TV = CFG.mode === "on-tv";
@@ -615,7 +615,7 @@
       .filter(function (q, i, a) { return QUICK_ALL.indexOf(q) >= 0 && a.indexOf(q) === i; });
     THEME = (Q.match(/[?&]theme=([a-z]+)/) || [])[1] || lookSetting();
     if (THEME !== "classic" && THEME !== "oled" && THEME !== "loop") THEME = "night";
-    // couch-tv Studio's own preview (?designer=1) is there to show a design, and no design runs in
+    // Couch TV Studio's own preview (?designer=1) is there to show a design, and no design runs in
     // the Loop look (start()), so the preview takes the Night look the designs are laid out for
     if (THEME === "loop" && GATE.preview) THEME = "night";
     setLook(THEME);
@@ -5407,7 +5407,7 @@
   }
 
   // ---- rows ----
-  // couch-tv Studio is a name, the same in every language
+  // Couch TV Studio is a name, the same in every language
   function secName(id) { return id === "designer" ? "Designs" : t("sec_" + id); }
   function rowsNow() { return SET.sub ? SET.sub.rows() : sectionRows(secsNow()[SET.sec][0]); }
   function focusable(r) { return !!r && r.kind !== "head" && r.kind !== "info" && r.kind !== "code" && r.kind !== "qr"; }
@@ -5418,7 +5418,7 @@
   function info(key, label, value, sub) { return { kind: "info", key: key, label: label, value: value, sub: sub }; }
 
   // ---- design aware Home settings ----
-  // With a couch-tv Studio design on screen, Home settings (and the phone's Home settings page, through
+  // With a Couch TV Studio design on screen, Home settings (and the phone's Home settings page, through
   // atHomeView) shows only the sections and rows that change something the design shows: no dock rows
   // when its dock is hidden, no scenes, video or photos when it has its own background, and so on. One
   // line at the top says so, with Show all settings (until Home settings closes). With no design, or the
@@ -5499,9 +5499,9 @@
     return null;
   }
   function designBanner() {
-    return SET_ALL ? [info("dz-banner", "Every setting is showing", "", "Some are for parts this couch-tv Studio design doesn't show."),
+    return SET_ALL ? [info("dz-banner", "Every setting is showing", "", "Some are for parts this Couch TV Studio design doesn't show."),
       { kind: "action", key: "set-fewer", label: "Show only what this design uses", act: function () { setAll(false); } }]
-      : [info("dz-banner", "This home uses a couch-tv Studio design", "", "Settings for parts it doesn't show are hidden."),
+      : [info("dz-banner", "This home uses a Couch TV Studio design", "", "Settings for parts it doesn't show are hidden."),
         { kind: "action", key: "set-all", label: "Show all settings", sub: "Or go back to the standard home in Designs", act: function () { setAll(true); } }];
   }
   function setAll(on) {
@@ -5527,7 +5527,7 @@
       // a heading with nothing left under it goes too
       rows = rows.filter(function (row, i) { return row.kind !== "head" || (rows[i + 1] && rows[i + 1].kind !== "head"); });
     }
-    // the line that says so, at the top of the first section and of couch-tv Studio
+    // the line that says so, at the top of the first section and of Couch TV Studio
     var first = secsNow()[0] && secsNow()[0][0];
     if (id === first || id === "designer") rows = designBanner().concat(rows);
     return rows;
@@ -5707,15 +5707,15 @@
   }
 
   // ---- look, scenes and the household's own photos ----
-  // Get a design (design-code.js): from config.json's design store, else couch-tv Studio's own. The TV asks
+  // Get a design (design-code.js): from config.json's design store, else Couch TV Studio's own. The TV asks
   // that one server for the code typed here; nothing connects to the TV. English only for now (needs i18n).
   function designCodeRows(rows) {
     if (typeof CouchDesignCode === "undefined" || !CouchDesignCode.base()) return;
-    rows.push({ kind: "input", key: "design-get", label: "Get a design", sub: "Type the code from couch-tv Studio on your phone", act: function () {
+    rows.push({ kind: "input", key: "design-get", label: "Get a design", sub: "Type the code from Couch TV Studio on your phone", act: function () {
       typeDesignCode("");
     } });
     // the fewest presses on the TV: scan, choose on the phone, press Send to my TV (no typing here).
-    // Right under Get a design, so the rows above stay where couch-tv Studio's pictured steps show them.
+    // Right under Get a design, so the rows above stay where Couch TV Studio's pictured steps show them.
     if (CouchDesignCode.openInbox && window.TVQR) rows.push({ kind: "nav", key: "design-phone", label: "Get a design from your phone",
       sub: "Scan a code with your phone and choose a design there. No typing on the TV", act: openPhoneInbox });
   }
@@ -5728,12 +5728,12 @@
       SET.msg = "Removed. The home goes back to how it was when you close Home settings.";
     } });
   }
-  // Get a design from your phone (design-code.js openInbox, takeInbox): a QR of couch-tv Studio with a
+  // Get a design from your phone (design-code.js openInbox, takeInbox): a QR of Couch TV Studio with a
   // one time inbox in it. While this screen is open, and only then, the TV asks the store every few
   // seconds whether the phone put a design code in it; nothing connects to the TV. A code that comes
   // is got exactly as a typed one (getDesignByCode), so "Use this design?" comes first, always.
   var INBOX = null;   // { state: "opening" | "waiting" | "gone" | "error", id, link, expires, every, timer, misses, msg }
-  // (an inbox opened with Open this home in couch-tv Studio is asked while that screen is open instead)
+  // (an inbox opened with Open this home in Couch TV Studio is asked while that screen is open instead)
   function inboxShown() {
     if (INBOX && INBOX.share) return typeof CouchShare !== "undefined" && CouchShare.isOpen();
     return zone === "settings" && !!SET.sub && SET.sub.id === "phone-inbox";
@@ -5796,12 +5796,12 @@
     var b = INBOX || { state: "gone" }, rows = [];
     if (b.state === "waiting" && b.link) {
       rows.push({ kind: "qr", key: "inbox-qr", link: b.link, label: "Scan this with your phone's camera",
-        sub: "On your phone, choose a design in couch-tv Studio and press Send to my TV. This TV then asks you before it changes anything." });
+        sub: "On your phone, choose a design in Couch TV Studio and press Send to my TV. This TV then asks you before it changes anything." });
       rows.push(info("inbox-wait", "Waiting for your phone", "", "This code works once, for 10 minutes, while this screen is open."));
     } else if (b.state === "opening") {
       rows.push(info("inbox-opening", "Making a code for your phone..."));
     } else {
-      rows.push(info("inbox-gone", b.state === "error" ? (b.msg || "Could not reach couch-tv Studio.") : "That code ran out."));
+      rows.push(info("inbox-gone", b.state === "error" ? (b.msg || "Could not reach Couch TV Studio.") : "That code ran out."));
       rows.push({ kind: "action", key: "inbox-new", label: "Show a new code", act: openPhoneInbox });
     }
     rows.push({ kind: "action", key: "inbox-type", label: "Type the code on the TV instead", sub: "If your phone can't scan the code", act: function () {
@@ -5814,7 +5814,7 @@
   // the 10 letters are in; OK then shows it big on a Check page before anything is sent. Case, spaces
   // and the dash do not matter.
   function typeDesignCode(value) {
-    startTyping({ label: "Type the code from couch-tv Studio (like ABCDE-FGHJK). The dash is not needed.", value: value || "", code: true,
+    startTyping({ label: "Type the code from Couch TV Studio (like ABCDE-FGHJK). The dash is not needed.", value: value || "", code: true,
       live: showCodeSoFar, submit: checkDesignCode });
     showCodeSoFar(value || "");
   }
@@ -5847,7 +5847,7 @@
     SET.msg = "Getting the design...";
     renderSettings();
     CouchDesignCode.get(typed).then(function () {
-      setDesigner(true);   // typing a code is asking for couch-tv Studio: it is on from now
+      setDesigner(true);   // typing a code is asking for Couch TV Studio: it is on from now
       // no design runs in the Loop look (start()): asking for one by code is asking to see it, so
       // the home goes back to Night, the look designs are laid out for
       if (LOOP) { ST.look = "night"; keep("tvhome.look", "night"); saveSettings(); }
@@ -5859,7 +5859,7 @@
       if (zone === "settings") renderSettings();
     });
   }
-  // ---- Designs (designer-gate.js, couch-tv Studio designs): opt in, and one step back to the standard home ----
+  // ---- Designs (designer-gate.js, Couch TV Studio designs): opt in, and one step back to the standard home ----
   // English only for now, like the rows above (needs i18n). The section's name is the product's.
   function setDesigner(on) {
     sameSection(function () {
@@ -5931,7 +5931,7 @@
     if (on && has && !held && CFG.design && LOOP) rows.push({ kind: "action", key: "dz-loop", label: "Your design", sub: "Designs show in the Night, Classic and OLED looks. Switch to Night to see it",
       act: function () { ST.look = "night"; keep("tvhome.look", "night"); saveSettings(); restart(); } });
     designCodeRows(rows);
-    rows.push({ kind: "action", key: "dz-share", label: "Open this home in couch-tv Studio", sub: "Change it on your phone or computer. Names, photos, places, keys and calendar links stay on this TV.", act: shareHome });
+    rows.push({ kind: "action", key: "dz-share", label: "Open this home in Couch TV Studio", sub: "Change it on your phone or computer. Names, photos, places, keys and calendar links stay on this TV.", act: shareHome });
     // (the Commute's Where to is its own page now, Widgets on this home; tvhome.commute stays the 0.13.8 fallback)
     if (on && CFG.design) widgetRows(rows);   // each widget on the design with settings of its own
     if ((window.smartHome && window.smartHome.setup && window.smartHome.setup.can()) || (on && AH)) rows.push(head("Smart home and At home"));
@@ -5970,7 +5970,7 @@
     var r = CouchShare.prepare(homeSnapshot(), privateWords(), typeof CouchDesign !== "undefined" ? CouchDesign : null);
     if (r.error) { SET.msg = r.error; renderSettings(); return; }
     var base = typeof CouchDesignCode !== "undefined" ? CouchDesignCode.base() : "";
-    SET.msg = "Getting a code for couch-tv Studio...";
+    SET.msg = "Getting a code for Couch TV Studio...";
     renderSettings();
     // The way back (launch audit 0.13.9): the screen also opens this TV's phone inbox and its QR carries
     // it (#inbox=), so Send to my TV on the phone comes straight back here, asked about with "Use this
@@ -6730,7 +6730,7 @@
     status(t(held ? "home_now" : "home_not_yet"));
   }
   // ---- the first-run welcome (owner's TCL test of 0.13.9, 23 Nov 2026) ----
-  // Most people come from couch-tv Studio's website with a design picked and a short code to type. The
+  // Most people come from Couch TV Studio's website with a design picked and a short code to type. The
   // home used to open on the standard home, and the code was three screens deep (Home settings, Designs,
   // Get a design). Now a TV that was never set up opens on one full screen question: I have a design
   // code (straight to the same Get a design typing box) or Use Couch Original (the standard home, as it
@@ -7779,7 +7779,7 @@
       });
   }
 
-  // ---------------- at home: what couch-tv Studio's home widgets show (athome.js) ----------------
+  // ---------------- at home: what Couch TV Studio's home widgets show (athome.js) ----------------
   // The family note, lists, guest Wi-Fi, house guide, calendar link and screen time goal, typed in Home
   // settings, Designs, At home. Kept on this TV only: the launcher's private store on the
   // Android home (TVOS.keepPrivate: left out of Android's backups), else this page's own storage. Never
@@ -8087,7 +8087,7 @@
 
   // Home settings, Designs, At home: one page with the note, lists, Wi-Fi, guide, calendar and
   // screen time; a list and a guide entry each open their own page. English only for now, like the
-  // rest of the couch-tv Studio section (needs i18n).
+  // rest of the Couch TV Studio section (needs i18n).
   var AH_INTRO = "Words for the widgets on your home. They stay on this TV and never go into a design or Share this home. Typing is quicker with Type on the TV in the phone remote.";
   function ahEdit(fn, msg) { AH.store.edit(fn); ahChanged(); if (msg) SET.msg = msg; }
   function ahType(label, value, submit, url) { startTyping({ label: label, value: value || "", url: !!url, submit: submit }); }
@@ -8348,7 +8348,7 @@
   // The launcher (HomeAssistant.kt) or, on a TV whose home a computer runs, that computer's bridge
   // checks the address and token and lists what Home Assistant has; the person ticks what shows. The
   // token is handed over once and never comes back to this page. English only, like the rest of the
-  // couch-tv Studio section (needs i18n).
+  // Couch TV Studio section (needs i18n).
   var SH = { addr: "http://homeassistant.local:8123", list: null, picks: null, busy: false, err: "" };
   // the groups, their limits and how ticks are kept: ha-picks.js, shared with the phone page
   function HP() { return window.HaPicks; }
@@ -8528,7 +8528,7 @@
           if (i >= 0) DIR.picked.splice(i, 1); else if (DIR.picked.length < 16) DIR.picked.push(l.id); else SET.msg = "That is the most. Untick one first.";
         } });
       });
-      rows.push({ kind: "action", key: "dh-save", label: "Save", act: function () { SET.sub = up; dirAsk({ action: "hue_save", lights: DIR.picked }, function () { SET.msg = "Saved. Add a Control Centre widget in couch-tv Studio to see them."; }); } });
+      rows.push({ kind: "action", key: "dh-save", label: "Save", act: function () { SET.sub = up; dirAsk({ action: "hue_save", lights: DIR.picked }, function () { SET.msg = "Saved. Add a Control Centre widget in Couch TV Studio to see them."; }); } });
       return rows;
     } };
     SET.keyFocus = null; SET.ri = 0;
@@ -8713,7 +8713,7 @@
   function webChanged() { clearTimeout(webTimer); webTimer = setTimeout(function () { if (typeof CouchDesign !== "undefined" && CouchDesign.dataChanged) CouchDesign.dataChanged("web"); }, 150); }
   // The commute's two places, never in a design or on couch-tv servers (a widget's own ride Home settings to the bridge or the TV app; the 0.13.8 one stays on the TV): from
   // the town set in Location (or config.json's weather place), to the place picked in Home settings,
-  // couch-tv Studio, Commute. Both are towns or suburbs from the place search, about a kilometre wide.
+  // Couch TV Studio, Commute. Both are towns or suburbs from the place search, about a kilometre wide.
   // w: one Commute widget (the web loader asks for each: widget-web.js places(w)); none: the first one
   function commutePlaces(w) {
     var pl = ST.place && isFinite(ST.place.lat) && isFinite(ST.place.lon) ? { name: ST.place.name, lat: ST.place.lat, lon: ST.place.lon }
@@ -9148,7 +9148,7 @@
         rows.push(info(id, s.label, "Nothing to pick on this TV yet", sh ? "Set up Smart home first, then pick here." : "Needs Home Assistant set up for this TV in Home settings, Smart home."));
         if (sh) rows.push({ kind: "nav", key: id + ":smart", label: "Smart home", sub: "Set up what this TV shows", act: openSmartSetup });
       } else if (s.type === "image") {
-        return;   // a picture is put in the widget in couch-tv Studio
+        return;   // a picture is put in the widget in Couch TV Studio
       } else {
         // text, a team, a calendar link and anything newer: typed. A list of words (many) is typed with
         // commas between. A calendar link or anything private shows only "Set".
@@ -9278,7 +9278,7 @@
   // design's own). Each value is checked against the widget's settings record; values land in
   // ST.widgets, exactly where the TV's own rows put them.
   function designEdit(e) {
-    if (typeof CouchDesign === "undefined" || !CouchDesign.on || !CouchDesign.on()) return { ok: false, error: "No couch-tv Studio design is on the TV now." };
+    if (typeof CouchDesign === "undefined" || !CouchDesign.on || !CouchDesign.on()) return { ok: false, error: "No Couch TV Studio design is on the TV now." };
     if (e.design_apps && typeof e.design_apps === "object") {
       var r = CouchDesign.setApps(String(e.design_apps.key || ""), e.design_apps.apps === null ? null : e.design_apps.apps);
       if (!r.ok) return r;
@@ -9350,9 +9350,9 @@
     if (!OFFLINE && !MOCK && !PREVIEW && window.smartHome && window.smartHome.useBridge) window.smartHome.useBridge(api);
     // a design got by code: pictures only from here, the store and the hosts this TV already uses
     if (DESIGN_FROM_CODE && CouchDesignCode.lockImages) CouchDesignCode.lockImages((ST.photos || []).map(function (p) { return p && p.url; }), VIDEO_URL);
-    // couch-tv Studio's design block (design.js): nothing happens without one, unless the page is
+    // Couch TV Studio's design block (design.js): nothing happens without one, unless the page is
     // the designer's own preview (?designer=1), which sends designs in as they are made
-    // With couch-tv Studio off (designer-gate.js) design.js is never started: no keys of its own, no
+    // With Couch TV Studio off (designer-gate.js) design.js is never started: no keys of its own, no
     // question, no page policy. On, the page policy a design runs under goes in first.
     var designOn = typeof CouchDesign !== "undefined" && !!(GATE.design || GATE.preview);
     // The Loop look wins: its clip, glass and cut-out are the background, and a design's background,
@@ -9529,7 +9529,7 @@
     setInterval(updateOledShift, 60000);
     setInterval(checkSmartIdle, 10000);
     clipWake();
-    // couch-tv Studio's home widgets: the calendar, photo dates, screen time and a new day
+    // Couch TV Studio's home widgets: the calendar, photo dates, screen time and a new day
     if (AH) { setTimeout(ahTick, 2500); setInterval(ahTick, 60000); }
     setInterval(function () { if (!covered()) { if (!screenOffActive) renderQuick(); refreshBedtimeDim(); } }, 30000);
     // LG: the weekly Developer Mode extend. It asks on screen and stays until answered (this TV's

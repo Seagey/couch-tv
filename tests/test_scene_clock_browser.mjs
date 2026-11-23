@@ -1,4 +1,4 @@
-// couch-tv Studio's Couch Original in a real browser at 1920x1080 (mock.js standing in for the bridge):
+// Couch TV Studio's Couch Original in a real browser at 1920x1080 (mock.js standing in for the bridge):
 // a design with no background and elements.clock.at "scene" draws the Night home as it is with no design.
 //  1. each built in scene keeps its own clock place: Night's clock behind the peak (the cut out in front of
 //     it), Waterline's clock on the water with its blurred reflection under the waterline;
@@ -37,7 +37,7 @@ let n = 0;
 const ok = (c, m) => { assert.ok(c, m); n++; console.log("  ok", m); };
 const browser = await chromium.launch();
 
-// Couch Original, as couch-tv Studio's template writes it
+// Couch Original, as Couch TV Studio's template writes it
 const original = (extra = {}, kwHidden = false) => Object.assign({
   v: 1, home: { dock: "classic" },
   elements: { clock: { at: "scene", behind: true }, ...(kwHidden ? { keep_watching: { hidden: true } } : {}) }

@@ -55,7 +55,7 @@
 //   remoteart=1         the real show posters from JustWatch (otherwise every picture is from this server)
 //   wx=24,2             pretend weather: 24 degrees, Open-Meteo code 2 (partly cloudy)
 //   place=Riverside    weather.place, the name shown beside the weather
-//   design=local        design: couch-tv Studio's current design (tools/tv-designer), read from
+//   design=local        design: Couch TV Studio's current design (tools/tv-designer), read from
 //                       this browser's localStorage ("tvdesigner.design"); designer=1 takes live edits
 (function () {
   var q = location.search;
@@ -76,7 +76,7 @@
       '<circle cx="' + Math.round(w * 0.22) + '" cy="' + Math.round(ht * 0.86) + '" r="' + Math.round(ht * 0.42) + '" fill="#000" opacity=".16"/></svg>';
     return "data:image/svg+xml," + encodeURIComponent(svg);
   };
-  // a query string writes a space as "+" (URLSearchParams, couch-tv Studio's preview: "Your+town", launch audit 0.13.9)
+  // a query string writes a space as "+" (URLSearchParams, Couch TV Studio's preview: "Your+town", launch audit 0.13.9)
   var arg = function (name) { var m = q.match(new RegExp("[?&]" + name + "=([^&]*)")); if (!m) return null; try { return decodeURIComponent(m[1].replace(/\+/g, " ")); } catch (e) { return null; } };
   // the Home settings keys the bridge keeps (bridge/server.py clean_settings); keep the two lists alike
   var BRIDGE_KEYS = ["lang", "place", "wx_show", "wx_unit", "wx_every", "look", "idle_photo_seconds", "keep_photo", "keep_photo_pick", "glass", "glass_icons",

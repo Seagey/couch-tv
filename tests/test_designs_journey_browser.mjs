@@ -1,4 +1,4 @@
-// The couch-tv Studio journeys a beginner walked on 0.13.9 (launch audit, 22 Nov 2026,
+// The Couch TV Studio journeys a beginner walked on 0.13.9 (launch audit, 22 Nov 2026,
 // coord/AUDIT-0139-STUDIO.md), checked in a real browser at 1920x1080 with the remote's keys (the TV
 // home in its ?mock preview, against a pretend design store):
 //  1. A whole typed code goes straight to the TV's "Use this design?" (no second Check page), and that
@@ -10,7 +10,7 @@
 //  3. Designs: one Your design switch and one Delete this design, each row right the moment it is
 //     pressed (the banner too), "Brings back your last design" while off, Delete shown while off, Smart
 //     home and At home under their own heading.
-//  4. Open this home in couch-tv Studio also opens the phone inbox, so the phone's Send to my TV comes
+//  4. Open this home in Couch TV Studio also opens the phone inbox, so the phone's Send to my TV comes
 //     straight back to that screen and on to "Use this design?".
 //  5. The date line never starts a line with the dot.
 // Needs Playwright (Chromium). Without it the test says so and passes:
@@ -103,7 +103,7 @@ try {
     return { words: box.textContent, card: (box.lastElementChild || {}).textContent || "", shapes: box.lastElementChild ? box.lastElementChild.querySelectorAll("div").length : 0,
       clock: [...box.querySelectorAll("div")].some((d) => /^\d{1,2}:\d{2}$/.test(d.textContent) && getComputedStyle(d).color === "rgb(255, 204, 0)") };
   });
-  ok(/This design came from couch-tv Studio\. Keep my home leaves your TV exactly as it is\./.test(ask.words) && !/whoever made it/.test(ask.words), "the question's words");
+  ok(/This design came from Couch TV Studio\. Keep my home leaves your TV exactly as it is\./.test(ask.words) && !/whoever made it/.test(ask.words), "the question's words");
   ok(ask.clock, "the preview draws the design's clock, in its colour");
   ok(ask.shapes >= 20, "and the dock's tiles and the Keep watching cards (" + ask.shapes + " parts)");
   ok(/[A-Z][a-z]+day \d{1,2} [A-Z][a-z]+/.test(ask.card), "and the date (" + ask.card.slice(0, 60) + ")");
@@ -139,12 +139,12 @@ try {
   let rows = await rowsText();
   ok(await rowValue("Your design") === "On", "one Your design switch, On");
   ok(/Delete this design/.test(rows) && !/Back to the standard home/.test(rows) && !/Remove the design I got/.test(rows), "Delete this design, and none of the old ways back");
-  ok(/This home uses a couch-tv Studio design/.test(rows), "the design banner is there");
+  ok(/This home uses a Couch TV Studio design/.test(rows), "the design banner is there");
   ok(await toRow(/^Your design/), "the switch");
   await press("Enter", 300);
   rows = await rowsText();
   ok(await rowValue("Your design") === "Off" && /Brings back your last design/.test(rows), "Off at once, and it says the design comes back");
-  ok(!/This home uses a couch-tv Studio design/.test(rows), "the banner goes at once");
+  ok(!/This home uses a Couch TV Studio design/.test(rows), "the banner goes at once");
   ok(/Delete this design/.test(rows), "Delete is there while designs are off");
   ok(/^Your design/.test(await focused()), "the focus stays on the switch");
   await press("Enter", 300);
@@ -155,10 +155,10 @@ try {
   ok(!/Delete this design/.test(rows) && await rowValue("Designs") === "On" && /No design on this TV yet/.test(rows), "deleted at once: no design kept");
   ok(await page.evaluate(() => !window.CouchDesignCode.kept()), "the kept design is gone");
 
-  // 4. Open this home in couch-tv Studio: the phone's Send comes straight back
+  // 4. Open this home in Couch TV Studio: the phone's Send comes straight back
   rows = await rowsText();
-  ok(!/At home/.test(rows) || rows.indexOf("Smart home and At home") > rows.indexOf("Open this home in couch-tv Studio"), "Smart home and At home sit under their own heading, after the design rows");
-  ok(await toRow(/^Open this home in couch-tv Studio/), "the Open this home row");
+  ok(!/At home/.test(rows) || rows.indexOf("Smart home and At home") > rows.indexOf("Open this home in Couch TV Studio"), "Smart home and At home sit under their own heading, after the design rows");
+  ok(await toRow(/^Open this home in Couch TV Studio/), "the Open this home row");
   fetched.length = 0; inbox.length = 0;
   await press("Enter", 1200);
   ok(await page.evaluate(() => !!document.querySelector(".share-home")), "the Open this home screen");

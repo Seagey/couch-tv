@@ -1,7 +1,7 @@
 // Share this home (Home settings, Designs). Turns the home this TV shows now (made on the TV,
-// from the phone, the scenes or config.json, or a couch-tv Studio design) into a couch-tv Studio design,
+// from the phone, the scenes or config.json, or a Couch TV Studio design) into a Couch TV Studio design,
 // hands it to the design store, and shows a QR code and a short code. On a phone,
-// <store>/design/?from=<code> opens it in couch-tv Studio, to change it and share or sell it.
+// <store>/design/?from=<code> opens it in Couch TV Studio, to change it and share or sell it.
 //
 // What leaves the TV is only what a design is made of: the look settings (scenes from the app's own
 // set, clock, glass, Keep watching and Now playing on or off), the dock's apps by their Android
@@ -119,10 +119,10 @@
   }
 
   var MSG = {
-    offline: "Could not reach couch-tv Studio. Check the TV is online, then try again.",
+    offline: "Could not reach Couch TV Studio. Check the TV is online, then try again.",
     slow: "Too many shares from this home for now. Try again in an hour.",
-    refused: "couch-tv Studio could not take this home. Try again later.",
-    off: "Sharing is not switched on at couch-tv Studio yet. Try again after the next update."
+    refused: "Couch TV Studio could not take this home. Try again later.",
+    off: "Sharing is not switched on at Couch TV Studio yet. Try again after the next update."
   };
   function fail(k) { var e = new Error(MSG[k]); e.kind = k; return e; }
 
@@ -168,7 +168,7 @@
     var col = document.createElement("div");
     col.setAttribute("style", "max-width:46rem");
     var line = function (txt, css) { var n = document.createElement("div"); n.textContent = txt; n.setAttribute("style", css); col.appendChild(n); return n; };
-    line("Open this home in couch-tv Studio", "font-size:3rem;line-height:3.75rem;font-weight:700");
+    line("Open this home in Couch TV Studio", "font-size:3rem;line-height:3.75rem;font-weight:700");
     line("Point your phone's camera at the code. Or go to " + res.page + " and type this code:", "margin-top:1.25rem;font-size:1.75rem;line-height:2.375rem;color:rgba(255,255,255,0.82)");
     line(res.code, "margin-top:1.5rem;font-size:4.5rem;font-weight:700;letter-spacing:0.08em;font-variant-numeric:tabular-nums");
     if (opts && opts.back) line("Change it on your phone, then press Send to my TV there: it comes straight back to this TV, which asks you before it changes anything. Keep this screen open until then.", "margin-top:1.25rem;font-size:1.75rem;line-height:2.375rem;color:#fff;font-weight:600");

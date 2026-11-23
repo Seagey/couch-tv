@@ -1,5 +1,5 @@
 // The widget capability records (tv-home/web/widget-caps.js): every widget kind the TV accepts has
-// one, every field is filled, the platform table names every kind of TV couch-tv Studio knows, the sizes
+// one, every field is filled, the platform table names every kind of TV Couch TV Studio knows, the sizes
 // are real named sizes with the smallest that reads first, and every kind whose OK opens a detail
 // layer (widget-detail.js) is a remote stop (design.js WACT).
 // Run: node tests/test_widget_caps.js
@@ -61,7 +61,7 @@ CAPS.kinds().forEach((k) => {
 const i18n = fs.readFileSync(path.join(web, "i18n.js"), "utf8"), appSrc = fs.readFileSync(path.join(web, "app.js"), "utf8");
 const MENUS = ["Home settings", "Location", "Search for a town or city", "Look and scenes", "Your photos", "Add photos from a USB drive or this TV",
   "Add a photo from a web address", "People", "Add a person", "Apps", "Quick buttons", "Now playing card", "Clock", "More apps", "App Store", "Get a design",
-  // couch-tv Studio, At home (things typed at home)
+  // Couch TV Studio, At home (things typed at home)
   "At home", "Write a note", "From", "Add a list", "Add an item", "Network name", "Password", "Add to the guide", "Add a calendar link", "Allow screen time", "Daily goal"];
 MENUS.forEach((m) => ok(i18n.indexOf('"' + m + '"') >= 0 || appSrc.indexOf('"' + m + '"') >= 0, "the TV has a menu called " + m));
 const SECTIONS = ["Language", "Location", "Weather", "Look and scenes", "Apps", "People", "Quick buttons", "Designs", "About"];
@@ -100,7 +100,7 @@ ok(CAPS.need("agent", "Google TV") === "setup" && CAPS.need("agent", "Fire OS") 
 ["keep", "keeprow", "upnext", "picks", "nowplaying"].forEach((k) => ok(CAPS.get(k).setup.where === "tv" && CAPS.need(k, "Google TV") === "setup" && CAPS.need(k, "Fire OS") === "setup" && !/^Needs /.test(CAPS.steps(k, "Google TV")[0]), k + ": set up on an Android TV, no computer badge"));
 ok(/Continue watching/.test(CAPS.steps("keep", "Android TV")[0]) && CAPS.need("keep", "Tizen") === "computer", "Keep watching: Android's own list on the home, the computer on a Samsung");
 ok(CAPS.need("battery", "Tizen") === "no" && CAPS.need("nowplaying", "webOS") === "no" && CAPS.need("screentime", "Tizen") === "no", "Batteries, Now playing and Screen time stay off a Samsung and LG");
-["Roku OS", "tvOS"].forEach((p) => ["clock", "weather", "welcome"].forEach((k) => { const s = CAPS.steps(k, p); ok(/couch-tv Studio and send the design again/.test(s[s.length - 1]), k + " on " + p + ": says where to change it"); }));
+["Roku OS", "tvOS"].forEach((p) => ["clock", "weather", "welcome"].forEach((k) => { const s = CAPS.steps(k, p); ok(/Couch TV Studio and send the design again/.test(s[s.length - 1]), k + " on " + p + ": says where to change it"); }));
 ok(CAPS.need("clock", "Vega OS") === "no" && /not possible/i.test(CAPS.steps("clock", "Vega OS")[0]), "a Fire TV on Vega OS: not possible, and says so");
 
 // 3. sizes: the shape of tools/tv-designer/app/grid.js W[kind]; named sizes smallest first, none under min

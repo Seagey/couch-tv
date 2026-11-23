@@ -1,4 +1,4 @@
-// Icon styles for designs: couch-tv Studio's icon sets (icon-sets.js, window.TVIcons, a copy of
+// Icon styles for designs: Couch TV Studio's icon sets (icon-sets.js, window.TVIcons, a copy of
 // tools/tv-designer/icons/icon-sets.js) registered with the design code, so a design's smart home
 // widgets and sections can pick a style (design object `icon_style`). A design only names a style;
 // the drawings are this code's own. Without icon-sets.js nothing changes (the built in icons stay).

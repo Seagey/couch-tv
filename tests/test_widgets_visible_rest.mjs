@@ -11,7 +11,7 @@
 //  - a value that is the default here draws the same;
 //  - no empty card with Home Assistant answering, no page error;
 //  - with nothing set up (no Home Assistant, no paired remotes, no town, no bin night) a real TV never shows
-//    the demo readings couch-tv Studio's preview uses: it shows its setup card.
+//    the demo readings Couch TV Studio's preview uses: it shows its setup card.
 // Home Assistant is the stand in shape smarthome.js hands the widgets (as test_ws2_smarthome.mjs uses).
 // Needs Playwright (Chromium). Without it the test says so and passes:
 //   COUCHTV_PLAYWRIGHT=<a folder whose node_modules has playwright> node tests/test_widgets_visible_rest.mjs

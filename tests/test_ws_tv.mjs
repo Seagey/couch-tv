@@ -164,7 +164,7 @@ const HA = {
   has(r.text, "Panels", "energy: a heading typed on this TV");
   // bins: "none" is not set yet, in plain words; a night set on this TV
   r = await draw({ id: "b1", kind: "bins", opts: { weekday: "none" } }, { data: {} });
-  ok(r.empty, "bins none: not set"); has(r.text, "Set your bin night", "bins none"); hasNot(r.text, "couch-tv Studio", "bins: no Studio only promise");
+  ok(r.empty, "bins none: not set"); has(r.text, "Set your bin night", "bins none"); hasNot(r.text, "Couch TV Studio", "bins: no Studio only promise");
   r = await draw({ id: "b1", kind: "bins", opts: { weekday: "none" } }, { data: { wset: { b1: { weekday: new Date().getDay() } } } });
   has(r.text, "Tonight", "bins: the night set on this TV");
   r = await draw({ id: "k1", kind: "controls", opts: { label: "Lights" } }, { data: { ha: HA, wset: { k1: { switches: ["light.c", "light.a"] } } } });
@@ -285,9 +285,9 @@ const ROOMS = [{ entity: "climate.living", name: "Living", unit: "°C", ok: true
   has(r.text, "AFL", "scores: the competition picked on this TV"); hasNot(r.text, "NRL", "scores: a starter's NRL never over the AFL");
   // words that sent people to a Studio control that did not exist
   r = await draw({ id: "mk", kind: "stocks", opts: { tickers: ["BHP.AX"] } }, { data: { web: { stocks: { "BHP.AX": { ok: true, at: now, v: { quotes: {} } } } } } });
-  hasNot(r.text, "couch-tv Studio", "markets: no promise of a Studio box"); has(r.text, "this widget's settings", "markets: where the codes are set");
+  hasNot(r.text, "Couch TV Studio", "markets: no promise of a Studio box"); has(r.text, "this widget's settings", "markets: where the codes are set");
   r = await draw({ id: "cm", kind: "commute", opts: {} }, { data: { commute: { from: { name: "Hillside" }, to: { name: "Riverton" }, key: "k" }, web: { commute: { k: { ok: true, at: now, v: { minutes: 21, km: 18 } } } } } });
-  has(r.text, "Set an arrive by time in this widget's settings", "commute: plain words"); hasNot(r.text, "couch-tv Studio", "commute");
+  has(r.text, "Set an arrive by time in this widget's settings", "commute: plain words"); hasNot(r.text, "Couch TV Studio", "commute");
   r = await draw({ id: "cm", kind: "commute", opts: { arrive_h: "off" } }, { data: { commute: { from: { name: "Hillside" }, to: { name: "Riverton" }, key: "k" }, web: { commute: { k: { ok: true, at: now, v: { minutes: 21, km: 18 } } } } } });
   hasNot(r.text, "NaN", "commute: arrive by off is no time");
   // Up next: game mode off is off; the sport apps named are this TV's
@@ -311,7 +311,7 @@ const ROOMS = [{ entity: "climate.living", name: "Living", unit: "°C", ok: true
   hasNot(r.text, "Headland", "welcome: no sample house"); hasNot(r.text, "Three sleeps", "welcome: no sample line"); hasNot(r.text, "Ella", "welcome: no sample name");
   // the designer still shows the demo
   const d = await draw({ id: "dm", kind: "surf", opts: { label: "North Point" } }, { demo: true, data: {} });
-  has(d.text, "North Point", "couch-tv Studio's demo keeps the design's words");
+  has(d.text, "North Point", "Couch TV Studio's demo keeps the design's words");
 }
 
 // ================= 10. review fixes, bins and each Commute widget's own drive =================

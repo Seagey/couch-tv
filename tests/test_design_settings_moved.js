@@ -1,5 +1,5 @@
 // Widget settings with nothing private in them, kept on the TV only until 0.13.10, now travel in the
-// design so couch-tv Studio can set them (widget audit item 13): Temperature in, Moon seen from, the air
+// design so Couch TV Studio can set them (widget audit item 13): Temperature in, Moon seen from, the air
 // quality Scale, the surf's Wave height in and Wind in, the Soundscape's Volume, the Doorbell's and Energy's
 // Heading, and Guest Wi-Fi's Hide the password. Each is a design setting offered in Studio and on the TV,
 // design.js keeps only its own values, and a choice made on the TV still wins over the design's.

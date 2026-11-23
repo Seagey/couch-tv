@@ -79,7 +79,7 @@ console.log("Running at home browser tests...");
   ok(/Write a note|Add a list|Add your guest Wi-Fi|Write your house guide|Add your calendar|Press OK to set it up|Set up on your phone/.test(await text(page, "w" + ["note", "list", "wifi", "guide", "agenda"].indexOf(k))), k + ": with nothing typed, the widget says what to do, never pretend words");
   await page.evaluate(() => window.tv.settingsKey()); await page.waitForTimeout(300); await press(page, "Enter", 300);   // the gear menu, then Home settings
   await page.waitForTimeout(400);
-  // down the sections to couch-tv Studio, into its rows, down to At home
+  // down the sections to Couch TV Studio, into its rows, down to At home
   for (let i = 0; i < 14 && !(await page.evaluate(() => /Designs/.test((document.querySelector(".ssec.focus") || {}).textContent || ""))); i++) await press(page, "ArrowDown");
   await press(page, "ArrowRight");
   const toRow = async (re) => { for (let i = 0; i < 40; i++) { const t = await page.evaluate(() => (document.querySelector(".srow.focus") || {}).textContent || ""); if (re.test(t)) return true; await press(page, "ArrowDown", 120); } return false; };

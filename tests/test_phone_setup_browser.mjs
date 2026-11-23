@@ -7,7 +7,7 @@
 //  3. The apps card: the TV's own apps with their icons; tap adds, x takes off, drag moves; saved on the TV.
 //  4. Connect your calendar: one question, the short steps, the paste box, Check it, and the TV's answer.
 //  5. #widgets walks through the widgets still waiting; #widget=<id>&connect=<need> opens that step.
-//  6. #town=<name>|<lat>|<lon> from couch-tv Studio: "Use Ballarat for the weather?", saved only on Yes,
+//  6. #town=<name>|<lat>|<lon> from Couch TV Studio: "Use Ballarat for the weather?", saved only on Yes,
 //     taken out of the address, and never in the design.
 // Needs Playwright (Chromium). Without it the test says so and passes:
 //   COUCHTV_PLAYWRIGHT=<a folder whose node_modules has playwright> node tests/test_phone_setup_browser.mjs
@@ -234,7 +234,7 @@ await ph.close();
   await p3.close();
 }
 
-// ---- 6. the town from couch-tv Studio, in the fragment only ----
+// ---- 6. the town from Couch TV Studio, in the fragment only ----
 {
   got.settings.length = 0; got.all.length = 0;
   const p4 = await phone("&town=Ballarat%7C-37.5622%7C143.8503%7CAustralia%2FMelbourne");

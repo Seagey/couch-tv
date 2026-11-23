@@ -159,7 +159,7 @@
   </nav>
 
   <div class="card" id="design-line" style="display:none" role="status">
-    <p class="now" id="design-line-text">This home uses a couch-tv Studio design. Settings for parts it doesn't show are hidden.</p>
+    <p class="now" id="design-line-text">This home uses a Couch TV Studio design. Settings for parts it doesn't show are hidden.</p>
     <button class="quiet" id="design-all" type="button">Show all settings</button>
     <p>To go back to the standard home: on the TV, Home settings, Designs, then turn Your design off.</p>
   </div>
@@ -708,7 +708,7 @@
   })();
   function goTo(id) { var s = $(id); if (!s) return; TOUCHED = true; openFold(s, true); s.scrollIntoView({ block: 'start' }); }
 
-  // ---------------- a couch-tv Studio design on the TV: only what it uses ----------------
+  // ---------------- a Couch TV Studio design on the TV: only what it uses ----------------
   // The TV home says which sections its design leaves out, and which widgets it has with something to
   // set (atHomeView design, from app.js useRules and widget-caps.js SETTINGS). Without that (no design,
   // or the TV home not open), everything shows as before. Show all settings brings the rest back.
@@ -728,7 +728,7 @@
     if (!note) { note = document.createElement('p'); note.id = 'in-design'; $('in-list').parentNode.insertBefore(note, $('in-list')); }
     note.textContent = d && !d.inputs ? 'This design hides the dock, so HDMI tiles show only on the standard home.' : '';
     $('design-line').style.display = d ? '' : 'none';
-    $('design-line-text').textContent = SHOW_ALL ? 'Every setting is showing. Some are for parts this couch-tv Studio design doesn\'t show.' : 'This home uses a couch-tv Studio design. Settings for parts it doesn\'t show are hidden.';
+    $('design-line-text').textContent = SHOW_ALL ? 'Every setting is showing. Some are for parts this Couch TV Studio design doesn\'t show.' : 'This home uses a Couch TV Studio design. Settings for parts it doesn\'t show are hidden.';
     $('design-all').textContent = SHOW_ALL ? 'Show only what this design uses' : 'Show all settings';
     var ws = d && d.widgets && d.widgets.length, as = d && d.apps && d.apps.length;
     $('widgets').style.display = ws ? '' : 'none'; $('jump-widgets').style.display = ws ? '' : 'none';
@@ -1398,7 +1398,7 @@
     }
   });
 
-  // ---- a town from couch-tv Studio, in the link's fragment only (#town=<name>|<lat>|<lon>[|<zone>]) ----
+  // ---- a town from Couch TV Studio, in the link's fragment only (#town=<name>|<lat>|<lon>[|<zone>]) ----
   // Studio's "Set up my widgets" link to this TV may carry the town the person picked there. It never went
   // through a server (a fragment is not sent), it is never kept in a design, and it is only saved after Yes.
   var TOWN_FRAG = (function () {
@@ -1631,7 +1631,7 @@
         if (home === 'roku' || home === 'appletv') {
           var tvw = home === 'roku' ? 'Roku' : 'Apple TV';
           $('widgets').style.display = ''; $('jump-widgets').style.display = ''; $('w-list').innerHTML = '';
-          $('widgets').querySelector('p').textContent = 'Widgets on your ' + tvw + ' are changed in couch-tv Studio: open your design there, change the widget, then tap Send to my TV and type the new code on the ' + tvw + '. The town and the people below reach the ' + tvw + ' from here.';
+          $('widgets').querySelector('p').textContent = 'Widgets on your ' + tvw + ' are changed in Couch TV Studio: open your design there, change the widget, then tap Send to my TV and type the new code on the ' + tvw + '. The town and the people below reach the ' + tvw + ' from here.';
           $('widgets').setAttribute('data-native', home);
         }
       }

@@ -27,7 +27,7 @@
     var b = cleanBase(cfg.design_store);
     // a browser preview (mock.js) may point at a local store: ?designstore=http://127.0.0.1:5490
     if (!b && /[?&]mock\b/.test(Q)) { var m = /[?&]designstore=([^&]*)/.exec(Q); if (m) b = cleanBase(decodeURIComponent(m[1])); }
-    // no design_store in config.json at all: couch-tv Studio's own store (designer-gate.js). It is asked
+    // no design_store in config.json at all: Couch TV Studio's own store (designer-gate.js). It is asked
     // only when the person at the TV types a code or shares the home. "design_store": "" turns both
     // off; a browser preview (?mock) never reaches it.
     else if (!b && !/[?&]mock\b/.test(Q) && !Object.prototype.hasOwnProperty.call(cfg, "design_store") && window.CouchDesigner) b = window.CouchDesigner.DEFAULT_STORE;
@@ -116,7 +116,7 @@
   }
   var MSG = {
     nocode: "That is not a design code. It looks like ABCDE-FGHJK.",
-    notfound: "That code did not work. A code works once, for 30 minutes. Make a new one in couch-tv Studio.",
+    notfound: "That code did not work. A code works once, for 30 minutes. Make a new one in Couch TV Studio.",
     slow: "Too many tries. Wait a few minutes, then try again.",
     paused: "Short codes are paused for a few minutes. Try again soon.",
     offline: "Could not reach the design server. Check the TV is online.",
@@ -197,16 +197,16 @@
     return media;
   }
 
-  // ---- Get a design from your phone: the design inbox (couch-tv Studio's /api/inbox) ----
+  // ---- Get a design from your phone: the design inbox (Couch TV Studio's /api/inbox) ----
   // The TV asks the same store for an inbox (a random id the store makes), shows a QR of
   // <store>/design/#inbox=<id>, and then, only while that screen is open, asks every few seconds
-  // whether a code is in it. The phone puts a design code in it from couch-tv Studio. Only a code
+  // whether a code is in it. The phone puts a design code in it from Couch TV Studio. Only a code
   // ever comes back, and it goes through get() like a typed one: "Use this design?" first, always.
   // The TV pulls; nothing connects to it. Text/plain, so old TV browsers send it without a preflight.
   var INBOX_MSG = {
     gone: "That code ran out. Press OK for a new one.",
-    offline: "Could not reach couch-tv Studio. Check the TV is online, or type the code instead.",
-    busy: "couch-tv Studio is busy. Type the code instead, or try again in a few minutes.",
+    offline: "Could not reach Couch TV Studio. Check the TV is online, or type the code instead.",
+    busy: "Couch TV Studio is busy. Type the code instead, or try again in a few minutes.",
     none: "This design store has no phone inbox. Type the code instead."
   };
   function inboxFail(k) { var e = new Error(INBOX_MSG[k]); e.kind = k; return e; }
@@ -233,7 +233,7 @@
   }
   // { id, link, expires, every }: link is what the QR holds
   function openInbox() {
-    // a store with no inbox (an older couch-tv Studio, or one's own store) answers 404: not "ran out"
+    // a store with no inbox (an older Couch TV Studio, or one's own store) answers 404: not "ran out"
     return inboxCall({ op: "open" }).catch(function (e) { throw e && e.kind === "gone" ? inboxFail("none") : e; }).then(function (j) {
       if (typeof j.id !== "string" || !/^[A-Za-z0-9_-]{22}$/.test(j.id)) throw inboxFail("offline");
       var secs = Math.max(60, Math.min(1800, +j.expires_in || 600)), every = Math.max(3, Math.min(30, +j.poll_every || 4));

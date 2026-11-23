@@ -6,7 +6,7 @@
 //  B. on the real TV page (?mock=1&ha=1, a design put on it in batches): a kind's settings show in Home
 //     settings, Designs, Widgets on this home and in what the phone reads (tv.atHomeRead) only while the
 //     kind is on the design;
-//  C. with nothing set up and not couch-tv Studio's preview, no kind shows the preview's demo readings.
+//  C. with nothing set up and not Couch TV Studio's preview, no kind shows the preview's demo readings.
 // Prints one table: kind | group | real data source | settings (keys) | cases | changed | same by design
 // (reasons) | cut | empty | pass. ALLW_TABLE=<file> also writes the owner's table (plain English).
 // Needs Playwright (Chromium):

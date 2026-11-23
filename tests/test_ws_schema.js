@@ -16,7 +16,7 @@ const isArr = Array.isArray;
 console.log("Running widget settings schema tests...");
 
 // the contract's types, plus the two the spec needs (tvlist: something kept on this TV; image: a photo
-// put in the widget in couch-tv Studio)
+// put in the widget in Couch TV Studio)
 const TYPES = ["place", "choice", "toggle", "text", "number", "app", "apps", "team", "device", "calendar", "tvlist", "image", "zone"];
 const HA_DOMAINS = ["climate", "camera", "sensor", "light", "switch", "fan", "cover", "media_player", "scene", "script", "event", "binary_sensor"];
 const TVLISTS = ["lists", "photos", "people", "calendars", "guide", "cards"];
@@ -196,7 +196,7 @@ Object.keys(LATER).forEach((kind) => {
 });
 // no Home settings and no Hold OK menu there: no step sends the person to them
 ["Roku OS", "tvOS"].forEach((p) => CAPS.kinds().forEach((k) => CAPS.steps(k, p).forEach((s) => {
-  ok(!/hold OK/i.test(s) && s.indexOf("Home settings, couch-tv Studio") < 0 && s.indexOf("Home settings") < 0, k + " on " + p + ": no TV menu it lacks: " + s);
+  ok(!/hold OK/i.test(s) && s.indexOf("Home settings, Couch TV Studio") < 0 && s.indexOf("Home settings") < 0, k + " on " + p + ": no TV menu it lacks: " + s);
 })));
 ok(/star button/.test(CAPS.steps("countdown", "Roku OS").join(" ")) && /Settings, Home design/.test(CAPS.steps("countdown", "tvOS").join(" ")), "a design reaches a Roku and an Apple TV by their own code screens");
 ["photo", "artframe"].forEach((k) => ["Roku OS", "tvOS"].forEach((p) => {

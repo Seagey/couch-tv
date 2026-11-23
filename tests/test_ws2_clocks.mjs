@@ -1,6 +1,6 @@
 // Widget swarm 2, the clocks group: clock, tallclock, glassclock, analog, flipclock, wordclock,
 // worldclock, date, month, week, countdown, timer. In a real browser, on the real TV home (index.html,
-// mock TV, a couch-tv Studio design with all twelve), at a fixed time (Fri 20 Nov 2026 7:42:07pm, Sydney):
+// mock TV, a Couch TV Studio design with all twelve), at a fixed time (Fri 20 Nov 2026 7:42:07pm, Sydney):
 //  1. every one of them lists its own settings in Home settings, Widgets on this home, in Hold OK, Edit
 //     on the TV (its own page, with each setting's row), and on the phone's Widgets on this TV;
 //  2. EVERY setting, changed on the TV the way the phone and the TV's own page save it (atHomeEdit

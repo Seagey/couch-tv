@@ -1,4 +1,4 @@
-// Home group (ws2-home): a photo put in a Photo or Art frame widget in couch-tv Studio (an asset the
+// Home group (ws2-home): a photo put in a Photo or Art frame widget in Couch TV Studio (an asset the
 // design store sends inside the design as a JPEG data: URL, branch nl-photo) still wins over every new
 // setting of these widgets: the photo picked on this TV (Home settings, Your photos), Fill or fit and the
 // frame colour. Every web TV kind (Google TV, Android TV, Fire TV, Samsung, LG, the browser homes) runs

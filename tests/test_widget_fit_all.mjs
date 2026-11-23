@@ -4,7 +4,7 @@
 //
 // 1. Every widget kind in widget-caps.js, at every size it lists (its named sizes, its extra sizes and
 //    its smallest), drawn on a 1920x1080 TV in each of these states:
-//      designer  couch-tv Studio's demo
+//      designer  Couch TV Studio's demo
 //      tv        a TV with real data for every widget
 //      long      the same with very long names, titles and numbers
 //      hindi     the same in Hindi
@@ -19,7 +19,7 @@
 //      - words at 23 px or more;
 //      - the words, icons and marks, taken together, in the middle of the box across and up and
 //        down, unless the design sets opts.align (then against that side);
-//      - drawn the same in a design layer scaled to half (couch-tv Studio's preview, a smaller TV).
+//      - drawn the same in a design layer scaled to half (Couch TV Studio's preview, a smaller TV).
 // 2. The clocks outside the widget grid: a design's free clock (type "clock") at every size the
 //    designer gives it, with and without its date, 12 and 24 hour; and the classic home's glass clock
 //    in every scene: its digits never cut at the bottom (or anywhere).
@@ -289,7 +289,7 @@ const CHECKS = String(function (root, tag, mode) {
         const r = check(el, kind + " " + id + " (" + w + "x" + h + ") " + st, { widget: true, align: STATES[st] ? null : st });
         centred += r.centred;
         r.out.forEach((m) => { out.push(m); byKind[kind] = (byKind[kind] || 0) + 1; });
-        // the same widget in a design layer scaled to half (as couch-tv Studio's preview and a 1280 wide
+        // the same widget in a design layer scaled to half (as Couch TV Studio's preview and a 1280 wide
         // TV draw it) is laid out exactly the same: nothing measured on screen without the scale
         if (st === "tv" || st === "long" || st === "unset") {
           while (half.firstChild) half.removeChild(half.firstChild);

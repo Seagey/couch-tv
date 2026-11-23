@@ -36,7 +36,7 @@ const BASE = "http://127.0.0.1:" + server.address().port + "/tv-home/web/index.h
 let n = 0;
 const ok = (c, m) => { assert.ok(c, m); n++; };
 
-// the Guest Welcome starter's greeting, exactly as couch-tv Studio's template has it
+// the Guest Welcome starter's greeting, exactly as Couch TV Studio's template has it
 const SAMPLE = { kicker: "Headland House, North Point", text: "Welcome, Ella and friends", sub: "Tuesday to Sunday. Night two of five" };
 const browser = await chromium.launch();
 async function home(objects, opts) {

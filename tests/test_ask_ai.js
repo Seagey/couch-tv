@@ -131,7 +131,7 @@ const tick = () => new Promise((r) => setTimeout(r, 5));
     const { A, sb, store } = page("?api=http%3A%2F%2Fbridge%3A5400", {});
     sb.CouchDesignCode = { readCode: (c) => (/^[A-Z0-9]{5}-[A-Z0-9]{5}$/.test(c) ? c : ""), get: (c) => { got.push(c); return Promise.resolve(); } };
     const now = 1800000000000;
-    // couch-tv Studio is opt in: never chosen, or switched off, an agent's design is not used, and the
+    // Couch TV Studio is opt in: never chosen, or switched off, an agent's design is not used, and the
     // choice is left exactly as it was
     A._test.took({ design: { code: "ABCDE-FGHJK", at: now - 450 } }, now);
     ok(got.length === 0 && !("tvhome.designer" in store), "Studio never turned on: the design is not fetched and Studio stays as it was");

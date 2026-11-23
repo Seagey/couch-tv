@@ -6,7 +6,7 @@
 // English pattern with the values (CouchWidgetLines.t("Rain from {time}", { time: "3pm" })); a line with no
 // gap is swapped wherever a widget draws it (widgets.js add()), so most code stays as it is.
 // Never a design's words, a person's names or what a service sends: only the lines below.
-// The language: the TV home's (window.I18N); with none (couch-tv Studio) the English.
+// The language: the TV home's (window.I18N); with none (Couch TV Studio) the English.
 // node tests/test_widget_lines.mjs checks every line has every language and every new widget line is here.
 (function () {
   "use strict";

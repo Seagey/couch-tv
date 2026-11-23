@@ -71,13 +71,17 @@ const left = [];
 let seen = 0;
 for (const f of files) {
   const diff = execFileSync("git", ["-C", ROOT, "diff", "v0.13.8", "-U0", "--", f], { encoding: "utf8", maxBuffer: 1 << 28 });
+  // a line that was in 0.13.8 already, only with the product's old name (couch-tv Studio, Couch TV Studio from
+  // 0.13.10), or on a line changed only for that name, is not a new line
+  const was = execFileSync("git", ["-C", ROOT, "show", "v0.13.8:" + f], { encoding: "utf8", maxBuffer: 1 << 28 });
+  const old = (s) => was.includes('"' + s.replace(/Couch TV Studio/g, "couch-tv Studio") + '"');
   for (const line of diff.split("\n")) {
     if (!line.startsWith("+") || line.startsWith("+++") || /^\+\s*\/\//.test(line)) continue;
     for (const m of line.matchAll(/"((?:[^"\\]|\\.)*)"/g)) {
       const s = m[1];
-      if (!/^(couch-tv Studio|[A-Z])[\w']*[ ,.:]/.test(s) || s.split(" ").length < 2 && !NOT_DRAWN[s] || /[<>{}=]|\.js|\.png|https?:/.test(s)) continue;
+      if (!/^(Couch TV Studio|[A-Z])[\w']*[ ,.:]/.test(s) || s.split(" ").length < 2 && !NOT_DRAWN[s] || /[<>{}=]|\.js|\.png|https?:/.test(s)) continue;
       seen++;
-      if (covered(s) || onPhone(s) || NOT_DRAWN[s] || ENGLISH_ONLY.has(s) || svgPath(s)) continue;
+      if (covered(s) || onPhone(s) || NOT_DRAWN[s] || ENGLISH_ONLY.has(s) || svgPath(s) || old(s)) continue;
       left.push(f + ": " + s);
     }
   }

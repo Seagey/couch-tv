@@ -21,7 +21,7 @@
 // The key: only ever sent to the exact address it was saved with (scheme, host and port). Changing the
 // address without typing a new key deletes it. On a Google TV, Android TV or Fire TV it is kept in the
 // launcher's private store, left out of Android's backups (TVOS.keepPrivate, AtHome.kt); on other TVs
-// in this TV's own browser storage. Never in a design, never in a share, never sent to couch-tv Studio.
+// in this TV's own browser storage. Never in a design, never in a share, never sent to Couch TV Studio.
 //
 // ES5 on purpose: old Android TV WebViews. Also a CommonJS module for tests.
 (function (root) {
@@ -316,7 +316,7 @@
     }
     firstPoll = false;
   }
-  // couch-tv Studio is opt in: an agent's design is used only where the person at this TV turned couch-tv
+  // Couch TV Studio is opt in: an agent's design is used only where the person at this TV turned couch-tv
   // Studio on and designs are not switched off. An agent never turns it on, and never clears an off.
   function studioOff() {
     var v = null, off = null;

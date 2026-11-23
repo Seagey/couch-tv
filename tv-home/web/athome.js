@@ -1,11 +1,11 @@
-// Things typed at home, for couch-tv Studio's widgets: the family note, lists, the guest Wi-Fi, the
-// house guide, a calendar link and a screen time goal. Typed in Home settings (couch-tv Studio, At
+// Things typed at home, for Couch TV Studio's widgets: the family note, lists, the guest Wi-Fi, the
+// house guide, a calendar link and a screen time goal. Typed in Home settings (Couch TV Studio, At
 // home) with the remote or the phone remote's Type on the TV, and kept on this TV only:
 //   - on the Android home in the launcher's own private store (TVOS.keepPrivate, left out of Android's
 //     backups), never in the page's storage;
 //   - on a TV that runs the home as a web page (Samsung, LG, Hisense...), in that page's own storage.
 // Never in a design (design.js drops every option these widgets could carry), never in Share this
-// home, never sent to couch-tv Studio or any server of ours. The calendar link is treated as a
+// home, never sent to Couch TV Studio or any server of ours. The calendar link is treated as a
 // password: it is only ever used to read the calendar, and Home settings shows its host, never the
 // whole link.
 //

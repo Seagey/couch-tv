@@ -53,7 +53,7 @@ ok(!/\d/.test(t), "on the day: no number (It's today!) (" + t + ")");
 t = draw(before, { rule: "date", day: 25, month: 12, unit: "days" });
 ok(/^279\b/.test(t), "the day and month as before: 279 days to Christmas (" + t + ")");
 
-// 5. the design keeps the rule, and only a known one; the setting is there for couch-tv Studio and the TV
+// 5. the design keeps the rule, and only a known one; the setting is there for Couch TV Studio and the TV
 const CD = K.design();
 ok(K.kept(CD, "countdown", { rule: "easter" }).rule === "easter", "design.js keeps rule: easter");
 ok(K.kept(CD, "countdown", { rule: "school_holidays" }).rule === undefined && K.kept(CD, "countdown", { rule: "https://x" }).rule === undefined, "an unknown rule is dropped");

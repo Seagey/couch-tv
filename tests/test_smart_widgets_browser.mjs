@@ -1,7 +1,7 @@
 // The smart home and music widgets (group C: Control Centre, camera, doorbell, energy, sensor, speakers,
 // Up next queue), in a real browser at 1920x1080, against a pretend Home Assistant (mock.js ?ha=1,
 // the launcher's window.TVHA stand in) and a pretend bridge. Nothing real is ever asked.
-//  1. every size of each, as couch-tv Studio draws it (demo), as a TV with readings, long names and big numbers, or align left draws it, and as a
+//  1. every size of each, as Couch TV Studio draws it (demo), as a TV with readings, long names and big numbers, or align left draws it, and as a
 //     TV with nothing set up draws it: words 23 px and up, nothing past its box, the set up card when
 //     nothing is set up, and never a reading on a TV that has none;
 //  2. on a TV: the widgets fill from Home Assistant; OK opens each layer; a switch, a volume and play
@@ -63,7 +63,7 @@ async function openOn(page, id) {
 
 console.log("Running smart home and music widget browser tests...");
 
-// 1. every size, five ways: couch-tv Studio's demo, a TV with readings, a TV with very long names and
+// 1. every size, five ways: Couch TV Studio's demo, a TV with readings, a TV with very long names and
 // big numbers, a TV with the design set to align left, and a TV with nothing set up.
 // seagey, 18 Nov 2026: "Make sure each widget fits in each container correctly things aren't cut off and
 // all icons etc are default centre align unless it's changed in the designer." So, for each widget at

@@ -5,8 +5,8 @@
 //   - "backgrounds/<name>.mp4" or ".webm": a file on this TV (the built in loops below, or the
 //     household's own in backgrounds/mine/);
 //   - "store:<id>": a video kept by the design store this TV already uses (config.json
-//     design_store, else couch-tv Studio's own). The TV asks only that store, by id, never a link;
-//   - "blob:<this page>/<uuid>": only in couch-tv Studio's own preview (?designer=1), for a clip
+//     design_store, else Couch TV Studio's own). The TV asks only that store, by id, never a link;
+//   - "blob:<this page>/<uuid>": only in Couch TV Studio's own preview (?designer=1), for a clip
 //     picked on that computer and not uploaded yet.
 // Anything else (http, https, data:, //host, ../) is dropped, like a photo's link.
 //

@@ -1,4 +1,4 @@
-// Share this home (tv-home/web/share-home.js): the home on the TV becomes a couch-tv Studio design that
+// Share this home (tv-home/web/share-home.js): the home on the TV becomes a Couch TV Studio design that
 // carries the look and the dock's apps and nothing private, it passes design.js's own gate, anything
 // private stops it before it is sent, and only {design} goes to the store.
 // Run: node tests/test_share_home.js
@@ -91,7 +91,7 @@ ok(S.privateHits({ a: "Al" }, ["Al"]).length === 0, "names under three letters a
 r = S.prepare({ builtIn: [], dock: [] }, [], CD);
 ok(r.design || r.error, "an empty home still answers");
 
-// 4b. Open this home in couch-tv Studio (0.13.3): the dock's style and Moving tiles come along, and the
+// 4b. Open this home in Couch TV Studio (0.13.3): the dock's style and Moving tiles come along, and the
 // keys, tokens and calendar links a TV holds never do
 d = plain(S.build(Object.assign({}, snap, { dock_style: "mac", moving_tiles: false })));
 ok(d.home.dock === "mac" && d.home.moving_tiles === false, "the Mac-style dock and Moving tiles come along");

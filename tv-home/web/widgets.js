@@ -1,4 +1,4 @@
-// Widgets for a design (couch-tv Studio v10, tools/tv-designer/widgets/CATALOGUE.md). design.js checks a
+// Widgets for a design (Couch TV Studio v10, tools/tv-designer/widgets/CATALOGUE.md). design.js checks a
 // widget (sanitize) and places it; this file draws its inside: one renderer per kind, built element by
 // element (text is always a text node, never markup from a design). Icons come from icon-sets.js
 // (code that ships with the home), parsed with DOMParser.
@@ -74,7 +74,7 @@
   // the text colour for a tile: white or dark ink, whichever reads better (at least 4.5 : 1 where it can)
   function autoInk(tile) { return !tile ? WHITE : contrast(tile, WHITE) >= 4.5 || contrast(tile, WHITE) >= contrast(tile, INK_DARK) ? WHITE : INK_DARK; }
 
-  // icons: couch-tv Studio's icon sets, drawn by icon-sets.js
+  // icons: Couch TV Studio's icon sets, drawn by icon-sets.js
   var ICACHE = {};
   function ic(name, size, colour, style) {
     var T = window.TVIcons;
@@ -715,7 +715,7 @@
   var R = {};
   var op = function (o) { return o.opts || {}; };
   // A widget's own setting (WIDGET-SETTINGS-CONTRACT.md): what was set for this widget on this TV
-  // (env.wset, kept on the TV only, keyed by the design object's id), else what couch-tv Studio set
+  // (env.wset, kept on the TV only, keyed by the design object's id), else what Couch TV Studio set
   // (o.opts), else the default in its widget-caps.js `settings` record, else dflt.
   function setting(o, env, key, dflt) {
     var ws = wsetOf(o, env);
@@ -1564,7 +1564,7 @@
   };
 
   // apps
-  function noApps(root, b, named) { return empty(root, b, "apps", named ? "These apps are not on this TV" : "No apps yet", named ? "Install them, or pick others in couch-tv Studio" : ""); }
+  function noApps(root, b, named) { return empty(root, b, "apps", named ? "These apps are not on this TV" : "No apps yet", named ? "Install them, or pick others in Couch TV Studio" : ""); }
   // exactly `cols` across (Apps across): a full width break after every `cols` apps in a wrapping row
   function rowBreaks(nodes, cols) {
     var out = [];
@@ -2374,7 +2374,7 @@
 
   // info
   R.card = function (root, o, b, env) {
-    // a card written in couch-tv Studio: a title, a line of words and an icon (words only, like every design)
+    // a card written in Couch TV Studio: a title, a line of words and an icon (words only, like every design)
     // the title and words: changed on this TV (Home settings) over the design's own
     var q = op(o), tvText = String((wsetOf(o, env) || {}).text || "").replace(/[\u0000-\u0009\u000b-\u001f]/g, " ").trim().slice(0, 120);
     if (tvText) { var q0 = {}; for (var k0 in q) if (Object.prototype.hasOwnProperty.call(q, k0)) q0[k0] = q[k0]; q0.text = tvText; q = q0; }
@@ -2424,7 +2424,7 @@
   };
   // ---------------- the web widgets: news, scores, markets, the commute (widget-web.js) ----------------
   // app.js hands in what widget-web.js got (data.web[source][id]); before that, or when it failed, the
-  // widget says so in its own box. In couch-tv Studio, demo data. Never a made up reading on a TV.
+  // widget says so in its own box. In Couch TV Studio, demo data. Never a made up reading on a TV.
   //
   // The owner's rule for every one of them: nothing is ever cut off, and everything is centred unless
   // the design sets opts.align. Words wrap (a long word breaks rather than spills), never end in "...";
@@ -2447,7 +2447,7 @@
   // inside the box's own padding, so words never crowd its edge
   // tall: only whether it runs out of room up and down (too many items, not too wide a word)
   function spills(root, tall) {
-    // on screen the design layer may be scaled (couch-tv Studio's preview, a smaller TV): every length
+    // on screen the design layer may be scaled (Couch TV Studio's preview, a smaller TV): every length
     // here is in the widget's own pixels times that scale, so a design fits the same at any size
     var bb = root.getBoundingClientRect(), sc = root.offsetWidth ? bb.width / root.offsetWidth : 1, cs = window.getComputedStyle(root), all = root.querySelectorAll("*"), p = function (k) { return Math.max(0, (parseFloat(cs[k]) || 0) - 6) * sc; };
     var b = { left: bb.left + p("paddingLeft") - sc + 1, right: bb.right - p("paddingRight") + sc - 1, top: bb.top + p("paddingTop") - sc + 1, bottom: bb.bottom - p("paddingBottom") + sc - 1 };
@@ -2741,7 +2741,7 @@
       if (!webReady(root, b, "location", "commute", rec)) return null;
       v = rec.v;
     }
-    // in couch-tv Studio a design with no arrive by time shows 8:30 as its example
+    // in Couch TV Studio a design with no arrive by time shows 8:30 as its example
     var bufS = setting(o, env, "buffer"), ahS = setting(o, env, "arrive_h"), amS = setting(o, env, "arrive_m"), wdS = setting(o, env, "weekdays");
     var hasAh = ahS !== undefined && ahS !== null && ahS !== "" && ahS !== "off" && isFinite(+ahS);
     var WW = window.CouchWidgetWeb, spare = bufS === undefined || !isFinite(+bufS) ? 10 : +bufS, ah = hasAh ? +ahS : env.demo ? 8 : undefined, am = hasAh ? +amS || 0 : 30;
@@ -2791,12 +2791,12 @@
     lines[0] = m[1] + ", " + name + m[2];
     return lines.join("\n");
   }
-  // couch-tv Studio's sample words in its starter designs (app/templates.js): on a real TV they are a
+  // Couch TV Studio's sample words in its starter designs (app/templates.js): on a real TV they are a
   // stranger's name and a made up house, so they never show there. The greeting stays.
   var WELCOME_SAMPLE = { "Welcome, Ella and friends": "Welcome", "Hi Ruby!": "Hi!" };
   var WELCOME_SAMPLE_LINES = ["Headland House, North Point", "Tuesday to Sunday. Night two of five", "Three sleeps till the beach"];
   // compared loosely (case, spaces, end stops, curly quotes), so a starter line copied with a small
-  // change in couch-tv Studio still never reaches a real TV
+  // change in Couch TV Studio still never reaches a real TV
   function sampleKey(t) { return String(t || "").replace(/[\u2018\u2019]/g, "'").replace(/\s+/g, " ").replace(/[.!\s]+$/, "").trim().toLowerCase(); }
   function isSampleLine(t) { var k = sampleKey(t); if (!k) return false; for (var i = 0; i < WELCOME_SAMPLE_LINES.length; i++) if (sampleKey(WELCOME_SAMPLE_LINES[i]) === k) return true; return false; }
   function sampleGreeting(t) { var k = sampleKey(t); for (var g in WELCOME_SAMPLE) if (Object.prototype.hasOwnProperty.call(WELCOME_SAMPLE, g) && sampleKey(g) === k) return WELCOME_SAMPLE[g]; return null; }
@@ -2892,7 +2892,7 @@
     add(root, E("div", "cw-row", "height:100%", [E("div", "cw-col", "flex:0 1 auto;min-width:0", [label ? lab(iconName, label) : null, subEl]),
       E("div", "cw-big", "white-space:nowrap;margin-left:16px;font-size:" + px(fitPx(value, (b.w - 48) * 0.4, 72)) + (vcol ? ";color:" + vcol : ""), [value])]));
   }
-  // a kind couch-tv cannot fill yet: the setup card on a TV, the sample in couch-tv Studio
+  // a kind couch-tv cannot fill yet: the setup card on a TV, the sample in Couch TV Studio
   function sample(kind, iconName, fn) { return function (root, o, b, env, sh) { if (!env.demo) return soon(root, b, iconName, kind); return fn(root, o, b, env, sh); }; }
   CR.wordclock = function (root, o, b, env) {
     var precise = setting(o, env, "precise") === true;

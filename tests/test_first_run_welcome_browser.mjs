@@ -98,7 +98,7 @@ try {
   const typing = await page.evaluate(() => ({ settings: document.getElementById("settings").classList.contains("on"), box: document.getElementById("set-type").classList.contains("on"),
     label: document.getElementById("set-type-label").textContent, focus: document.activeElement && document.activeElement.id, head: document.getElementById("set-head").textContent }));
   ok(typing.settings && typing.box && typing.focus === "set-input", "Home settings opens with the typing box ready (" + JSON.stringify(typing) + ")");
-  ok(/Type the code from couch-tv Studio/.test(typing.label) && /Designs/.test(typing.head), "the same Get a design box, in Designs");
+  ok(/Type the code from Couch TV Studio/.test(typing.label) && /Designs/.test(typing.head), "the same Get a design box, in Designs");
   await page.fill("#set-input", "k7m2qxr4tp");
   await press("Enter", 400);
   ok(fetched[0] === "K7M2Q-XR4TP", "the code is got as always (" + fetched.join(",") + ")");
