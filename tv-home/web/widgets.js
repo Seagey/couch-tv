@@ -3034,8 +3034,12 @@
         E("div", "cw-t23 cw-ell", "font-weight:680;color:var(--ink);max-width:100%", [m.name.replace(/^Waxing |^Waning /, "")])]));
       return;
     }
-    add(root, E("div", "cw-row", "height:100%", [svg("0 0 100 100", b.h - 48, b.h - 48, [S("circle", { cx: 50, cy: 50, r: r, fill: "#2a2a30" }), lit], flip),
-      E("div", "cw-col", "margin-left:" + (b.w < 460 ? 14 : 20) + "px;min-width:0;flex:1 1 0", [E("div", b.w < 460 ? "cw-t25" : "cw-t29", "font-weight:680;" + TWO, [m.name]), E("div", "cw-t23 cw-ell", "", [m.full])])]));
+    // the moon as tall as the box, but smaller when "Full moon Wed" would not fit beside it (a stack draws its
+    // items 30 px narrower, for its dots)
+    var gapL = b.w < 460 ? 14 : 20, mw = b.h - 48, fam = famOf(root);
+    while (mw > 64 && fitPxText(m.full, b.w - 48 - mw - gapL, 24, 1, 560, fam) < 24) mw -= 4;
+    add(root, E("div", "cw-row", "height:100%", [svg("0 0 100 100", mw, mw, [S("circle", { cx: 50, cy: 50, r: r, fill: "#2a2a30" }), lit], flip),
+      E("div", "cw-col", "margin-left:" + gapL + "px;min-width:0;flex:1 1 0", [E("div", b.w < 460 ? "cw-t25" : "cw-t29", "font-weight:680;" + TWO, [m.name]), E("div", "cw-t23 cw-ell", "", [m.full])])]));
   };
   CR.bins = function (root, o, b, env) {
     var q = op(o), d = now(), wd = binDay(q) === null ? 3 : binDay(q), ahead = (wd - d.getDay() + 7) % 7;
