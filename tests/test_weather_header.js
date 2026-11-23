@@ -22,7 +22,7 @@ function loadI18n() {
   return sandbox.window.I18N;
 }
 
-function render(language) {
+function render(language, place) {
   const I18N = loadI18n();
   I18N.set(language);
   const classes = new Set();
@@ -47,7 +47,7 @@ function render(language) {
     document: { body: { classList: { toggle() {} } } },
     Intl,
     Date: FixedDate,
-    WXCFG: { place: 'Sâmburești, Olt, Romania' },
+    WXCFG: { place: place || 'Sâmburești, Olt, Romania' },
     WX_SHOW: true,
     WX_F: false,
     CLOCK24: true,
@@ -78,17 +78,17 @@ function render(language) {
 const romanian = render('ro');
 assert(romanian.date.innerHTML.includes('Duminică, 15 noiembrie'), 'Romanian date keeps its localized comma');
 assert(
-  romanian.date.innerHTML.includes('Sâmburești, Olt\u00a0· 5°\u00a0· Înnorat'),
-  'Romanian weather line shows the configured locality, live temperature, and localized condition'
+  romanian.date.innerHTML.includes('Sâmburești\u00a0· 5°\u00a0· Înnorat') && !/Olt|Romania/.test(romanian.date.innerHTML),
+  'Romanian weather line shows the town only, live temperature, and localized condition'
 );
 assert(romanian.classes.has('weather-lines'), 'Romanian date and weather render on separate lines');
-assert.strictEqual(romanian.idleWx.textContent, 'Sâmburești, Olt\u00a0· 5°\u00a0· Înnorat');
+assert.strictEqual(romanian.idleWx.textContent, 'Sâmburești\u00a0· 5°\u00a0· Înnorat');
 assert(/^\d{2}:\d{2}$/.test(romanian.time.innerHTML), 'the time remains a separate live clock');
 
 const english = render('en');
 assert(english.date.innerHTML.includes('Sunday 15 November'), 'other locales keep their existing date punctuation');
-assert(english.date.innerHTML.includes('Sâmburești, Olt, Romania'), 'other locales keep the full configured place');
-assert(english.date.innerHTML.includes('Sunday 15 November<span class="wx"><span class="wx-place">\u00a0· Sâmburești, Olt, Romania\u00a0· </span>'),
+assert(english.date.innerHTML.includes('Sâmburești') && !/Olt|Romania/.test(english.date.innerHTML), 'the date line names the town only, never its region or country');
+assert(english.date.innerHTML.includes('Sunday 15 November<span class="wx"><span class="wx-place">\u00a0· <span class="wx-town">Sâmburești</span>\u00a0· </span>'),
   'the one-line header puts the same middle dot between the date and the place as between the other parts');
 // launch audit 0.13.9 (Couch Night): a line that wraps never starts with the dot. Every dot has a no-break
 // space before it (it stays with the word before) and a plain space after (the line may break there)
@@ -96,5 +96,24 @@ assert(!/ ·/.test(english.date.innerHTML) && !/ ·/.test(romanian.date.innerHTM
 assert((english.date.innerHTML.match(/\u00a0· /g) || []).length >= 3, 'each dot is kept with the word before it');
 assert(english.date.innerHTML.includes('<svg class="icon"></svg>'), 'other locales retain the existing weather icon');
 assert(!english.classes.has('weather-lines'), 'the Romanian stacked layout is not applied to other locales');
+
+// a TCL, 23 Nov 2026: a town picked by search (Home settings, Location) is kept as name and area joined,
+// "Ballarat, City of Ballarat, Victoria, Australia", and ran to the right edge. The line names the town alone,
+// in a .wx-town span that ends in "..." when even that is too long (app.css)
+const ball = render('en', 'Ballarat, City of Ballarat, Victoria, Australia');
+assert(ball.date.innerHTML.includes('<span class="wx-town">Ballarat</span>') && !/City of|Victoria|Australia/.test(ball.date.innerHTML), 'a searched town: Ballarat only: ' + ball.date.innerHTML);
+assert(ball.idleWx.textContent.indexOf('Ballarat\u00a0· 5°') === 0 && !/City of/.test(ball.idleWx.textContent), 'the idle line too: ' + ball.idleWx.textContent);
+const one = render('en', 'Riverside');
+assert(one.date.innerHTML.includes('<span class="wx-town">Riverside</span>'), 'a one part name stays as it is');
+const css = fs.readFileSync(path.join(web, 'app.css'), 'utf8');
+assert(/\.wx-town \{[^}]*max-width:[^}]*text-overflow: ellipsis[^}]*white-space: nowrap/.test(css), 'a long town name ends in an ellipsis (app.css .wx-town)');
+// widgets.js and design.js draw the town alone too; Home settings, Location keeps the full name
+const widgets = fs.readFileSync(path.join(web, 'widgets.js'), 'utf8'), design = fs.readFileSync(path.join(web, 'design.js'), 'utf8');
+assert(/place: townOnly\(src\.place && src\.place\.name\)/.test(widgets) && /townOnly\(p\.name\)/.test(widgets), 'widgets.js: the weather and a picked town are drawn as the town alone');
+const ctx = {}; vm.runInNewContext(widgets.match(/function townOnly\(n\) \{[^\n]*\}/)[0] + "; this.t = townOnly;", ctx);
+assert.strictEqual(ctx.t('Ballarat, City of Ballarat, Victoria, Australia'), 'Ballarat');
+assert.strictEqual(ctx.t(''), '');
+assert((design.match(/h\("span", "wx-town", null, \[b\.place\]\)/g) || []).length === 3, 'design.js: the three weather styles draw the town in .wx-town');
+assert(/info\("loc-now", t\("loc_now"\), WXCFG\.place/.test(app), 'Home settings, Location: the full name');
 
 console.log('Weather header tests passed.');

@@ -530,6 +530,9 @@ html.who-gentle.scene-fog .mood:not(.dark) .mood-hi { text-shadow: 0 0 0.5rem rg
 /* the weather place follows the date on the same line, after a middle dot (app.js clock()); the
    icon then needs only a small gap after the place */
 .theme-night .date .wx-place + svg { margin-inline-start: 0.4rem; }
+/* the town is only its own name (app.js weatherPlace); a long one ends in "..." instead of running off the
+   screen, here and in a design's weather that copies this line (#cd-weather) */
+.wx-town { display: inline-block; max-width: 14em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; vertical-align: bottom; }
 .theme-night .date { white-space: nowrap; }
 .theme-night .date.weather-lines { white-space: normal; }
 .theme-night .date.weather-lines .dline {

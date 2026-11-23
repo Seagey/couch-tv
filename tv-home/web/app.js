@@ -976,19 +976,11 @@
   function tempText(c) { return WX_F ? Math.round(c * 9 / 5 + 32) + "°F" : c + "°"; }
   function wxText(w) { var k = WMO_KEY[w.code]; return k ? t(k) : (w.text || ""); }
 
+  // The town as the home draws it: only the place's own name, the part before the first comma
+  // ("Ballarat", never "Ballarat, City of Ballarat, Victoria, Australia": a searched name that long ran to the right edge on
+  // a TCL, 23 Nov 2026). Home settings, Location keeps the full name, so two towns of one name can be told apart.
   function weatherPlace() {
-    var place = String((WXCFG && WXCFG.place) || "").trim();
-    var L = window.I18N, country = L && L.country ? L.country() : "";
-    var parts = place.split(/\s*,\s*/);
-    if (country && parts.length > 1 && typeof Intl !== "undefined" && Intl.DisplayNames) {
-      var names = [
-        new Intl.DisplayNames(["en"], { type: "region" }).of(country),
-        new Intl.DisplayNames([L.locale()], { type: "region" }).of(country)
-      ];
-      var last = parts[parts.length - 1].toLowerCase();
-      if (names.some(function (name) { return name && name.toLowerCase() === last; })) parts.pop();
-    }
-    return parts.join(", ");
+    return String((WXCFG && WXCFG.place) || "").split(",")[0].trim();
   }
 
   // Every 15 s: redraw only on a new minute, and only while the home can be seen. The redraw sets
@@ -1043,6 +1035,8 @@
     if (CD) day = CD.day(d, day, loc);   // a design's date format (design.js)
     var w = NIGHT && WX_SHOW && data.weather && data.weather.temp != null ? data.weather : null;
     var place = w ? weatherPlace() : "";
+    // a long town name ends in "..." (.wx-town, app.css), never pushing the line past the screen
+    var town = function (p) { return '<span class="wx-town">' + esc(p) + "</span>"; };
     var date = $("date");
     if (lang === "ro" && (place || w)) {
       var weatherParts = [place, w && tempText(w.temp), w && wxText(w)].filter(Boolean);
@@ -1053,7 +1047,7 @@
       date.classList.remove("weather-lines");
       var bar = DATE_BARS ? '<i class="vbar"></i>' : "";
       date.innerHTML = '<span class="dline">' + esc(day) + (w ? '<span class="wx">' + bar +
-        (place ? '<span class="wx-place">' + (DATE_BARS ? esc(place) + bar : DOT + esc(place) + DOT) + "</span>" : "") + wxIcon(w) + esc(tempText(w.temp)) +
+        (place ? '<span class="wx-place">' + (DATE_BARS ? town(place) + bar : DOT + town(place) + DOT) + "</span>" : "") + wxIcon(w) + esc(tempText(w.temp)) +
         '<span class="ww">' + (DATE_BARS ? " " : DOT) + esc(wxText(w)) + "</span></span>" : "") +
         // no town yet (never a made up one): say once, in the weather's place, where to pick it
         (!w && NIGHT && WX_SHOW && !CD && !wxPlaceSet() ? '<span class="wx wx-ask">' + bar + (DATE_BARS ? "" : DOT) + esc(t("wx_ask", { home: t("gear_home"), loc: t("sec_location") })) + "</span>" : "") + "</span>";

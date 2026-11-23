@@ -1412,7 +1412,7 @@
     if (!w) return FORCE_DEMO || !document.getElementById("date") ? { place: "Riverside", temp: "24°", words: "Partly cloudy", icon: icon("sun") } : null;
     var c = w.cloneNode(true), place = c.querySelector(".wx-place"), words = c.querySelector(".ww"), svg = c.querySelector("svg");
     var bits = {
-      place: place ? place.textContent.replace(/\s*·\s*$/, "") : "",
+      place: place ? (place.querySelector(".wx-town") || place).textContent.replace(/\s*·\s*$/, "").replace(/^\s*·\s*/, "") : "",
       words: words ? words.textContent.replace(/^\s*·\s*/, "") : "",
       icon: svg ? svg.cloneNode(true) : null   // the home's own icon, copied as a node
     };
@@ -1490,17 +1490,18 @@
     }
     if (t === "weather") {
       var b = weatherBits() || { place: "", words: "", icon: null, temp: "" }, showPlace = o.place !== false;
-      if (o.style === "big") return h("div", "cd-wx cd-wx-big", textStyle(o, true), [h("div", "cd-v", null, [b.temp]), h("div", "cd-s", null, [b.words + (showPlace && b.place ? " · " + b.place : "")])]);
+      if (o.style === "big") return h("div", "cd-wx cd-wx-big", textStyle(o, true), [h("div", "cd-v", null, [b.temp]), h("div", "cd-s", null, [b.words + (showPlace && b.place ? " · " : ""), showPlace && b.place ? h("span", "wx-town", null, [b.place]) : null])]);
       if (o.style === "card") {
         return h("div", "cd-wx " + cardClass(o), withStyle({ "min-width": "300px" }, textStyle(o)), [
-          showPlace ? h("div", "cd-k", null, [b.place]) : null,
+          showPlace ? h("div", "cd-k", null, [h("span", "wx-town", null, [b.place])]) : null,
           h("div", "cd-row", { "margin-top": "8px" }, [b.icon, h("span", "cd-v", null, [b.temp])]),
           h("div", "cd-s", null, [b.words])
         ]);
       }
       if (b.icon) { b.icon.style.width = "32px"; b.icon.style.height = "32px"; }
       return h("div", "cd-wx" + (o.shade === "panel" ? " cd-shade-panel" : ""), withStyle({ "font-size": "30px" }, textStyle(o, true)), [
-        h("span", "cd-row", { gap: "10px" }, [b.icon, (showPlace && b.place ? b.place + " · " : "") + b.temp + (b.words ? " · " + b.words : "")])
+        // the town is the place's own name (app.js weatherPlace), and a long one ends in "..." (.wx-town)
+        h("span", "cd-row", { gap: "10px" }, [b.icon, h("span", null, { "white-space": "nowrap" }, [showPlace && b.place ? h("span", "wx-town", null, [b.place]) : null, (showPlace && b.place ? " · " : "") + b.temp + (b.words ? " · " + b.words : "")])])
       ]);
     }
     if (t === "smart") return smart(o);

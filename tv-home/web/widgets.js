@@ -306,7 +306,7 @@
     if (dataOf(env).wxOff || !w || w.temp === undefined || w.temp === null) return null;
     var cNow = Math.round(w.temp);
     if (wxF(env, o)) w = rawF(w);
-    var out = { place: (src.place && src.place.name) || "", picked: src.picked, temp: Math.round(w.temp), code: w.code, is_day: dayNow(w, d), hi: rnd(w.hi), lo: rnd(w.lo), uv: w.uv, aqi: w.aqi };
+    var out = { place: townOnly(src.place && src.place.name), picked: src.picked, temp: Math.round(w.temp), code: w.code, is_day: dayNow(w, d), hi: rnd(w.hi), lo: rnd(w.lo), uv: w.uv, aqi: w.aqi };
     // each hour is night or day by that day's own sunrise and sunset when the forecast has them
     var sunOf = {};
     (w.daily || []).forEach(function (x) { if (x && x.date) sunOf[x.date] = [new Date(x.sunrise), new Date(x.sunset)]; });
@@ -367,7 +367,10 @@
   // home's town, or its "Show the town name" is off
   // words over two lines at most, broken between words (a long single word breaks where it must)
   var TWO = "font-weight:600;overflow:hidden;overflow-wrap:break-word;line-height:1.1;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;max-width:100%";
-  function ownName(o, env) { var p = pickedPlace(o, env); return p && p.name && op(o).place !== false ? p.name : ""; }
+  // a town as a widget draws it: only the place's own name, before the first comma ("Ballarat", not
+  // "Ballarat, City of Ballarat, Victoria, Australia": a TCL, 23 Nov 2026); Home settings keeps the full name
+  function townOnly(n) { return String(n || "").split(",")[0].trim(); }
+  function ownName(o, env) { var p = pickedPlace(o, env); return p && p.name && op(o).place !== false ? townOnly(p.name) : ""; }
   // how many hours an Hourly widget shows: its "How many hours", never more than fit (at least `min`
   // pixels a column), else as many as fit
   function hoursN(o, env, fit, roomPx, have) {
@@ -910,7 +913,7 @@
     var here = ""; try { here = Intl.DateTimeFormat().resolvedOptions().timeZone; } catch (e) {}
     var set = setting(o, env, "cities"), f = setting(o, env, "format");
     var own = (Object.prototype.toString.call(set) === "[object Array]" ? set : []).filter(function (tz) { return typeof tz === "string" && /^[A-Za-z_]+(\/[A-Za-z_-]+){1,2}$/.test(tz) && !!tzTime(tz); }).slice(0, 4);
-    var town = (dataOf(env || {}).place || {}).name || "";
+    var town = townOnly((dataOf(env || {}).place || {}).name);
     return { here: here, cities: own.length ? own : homeCities(here, n), h24: f === "24h" ? true : f === "12h" ? false : !!(env && env.clock24),
       name: function (tz) { return tz === here && town ? town : CITY[tz] || tz.split("/").pop().replace(/_/g, " "); } };
   }
@@ -1291,7 +1294,7 @@
   function surfPlace(o, env) {
     var lbl = tvSet(o, env, "label") || ((o.__design || op(o)).label || "");
     if (env.demo) return op(o).label || "The point";
-    var p = pickedPlace(o, env), real = p ? p.name : (dataOf(env).place || {}).name || "";
+    var p = pickedPlace(o, env), real = townOnly(p ? p.name : (dataOf(env).place || {}).name);
     if (!real) return "Surf";
     return p && lbl && String(lbl).toLowerCase() !== real.toLowerCase() ? lbl + ", " + real : real;
   }
