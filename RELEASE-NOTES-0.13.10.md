@@ -108,7 +108,7 @@ This release comes from fixing what a person hits when they put Couch TV on a TV
 
 To update a TV that came from Downloader: Home settings, Updates, **Update to**, or type **8180170** in Downloader again and press Install. Your settings stay.
 
-Downloader always installs the plain version of the on-TV app, without the Home button watch. If your TV used the Home button version (you pressed **Make Home open Couch TV**), open Couch TV after the update and press **Make Home open Couch TV** again (Settings, Phone remote, Set it up), so the Home button opens Couch TV again. Update to keeps the version your TV has, so this only follows a Downloader install.
+Downloader always installs the plain version of the on-TV app, without the Home button watch. If your TV used the Home button version (you pressed **Make Home open Couch TV**), open Couch TV after the update, check Couch TV can still press keys (Settings, Phone remote, Set it up: that is the step that lets it press keys), then press **Make Home open Couch TV** again, so the Home button opens Couch TV again. Update to keeps the version your TV has, so this only follows a Downloader install.
 
 ### Next time: a new signing key for the on-TV app
 

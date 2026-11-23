@@ -306,7 +306,7 @@
   var OSRM = "https://router.project-osrm.org/route/v1/driving/";
   function r2(v) { return Math.round(+v * 100) / 100; }
   function placeOk(p) { return !!p && isFinite(+p.lat) && isFinite(+p.lon) && Math.abs(+p.lat) <= 90 && Math.abs(+p.lon) <= 180; }
-  // the id of a drive: both places, rounded ("-28.85,153.56;-28.81,153.28"), or null without both
+  // the id of a drive: both places, rounded ("-37.56,143.85;-37.65,143.88", Ballarat to Buninyong), or null without both
   function routeKey(from, to) { return placeOk(from) && placeOk(to) ? r2(from.lat) + "," + r2(from.lon) + ";" + r2(to.lat) + "," + r2(to.lon) : null; }
   function routeUrl(key) {
     var p = String(key || "").split(";").map(function (x) { return x.split(","); });

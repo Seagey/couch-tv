@@ -9141,7 +9141,13 @@
           if (keys.length) set(keys[(i + 1) % keys.length]);
         } });
       } else if (s.type === "apps") {
-        rows.push(info(id, s.label, wsWords(s, cur), "On the home, hold OK on an app in it: Change app, Move, Remove or Add app. Or use Home settings on your phone."));
+        rows.push(info(id, s.label, wsWords(s, cur), "On the home, hold OK on an app in it: Change app, Move, Remove or Add apps. Or use Home settings on your phone."));
+        // Add apps (0.13.11): every app on this TV in one sheet over Home settings; Back there saves and
+        // comes back to this page. Not for a one app tile (Change app on the home does that).
+        var awk = typeof CouchDesign !== "undefined" && CouchDesign.appWidgets ? CouchDesign.appWidgets().filter(function (x) { return x.key === w.key; })[0] : null;
+        if (awk && awk.max > 1 && CouchDesign.appSheet) rows.push({ kind: "nav", key: id + ":sheet", label: "Add apps", sub: awk.apps.length + " of " + awk.max + " picked", act: function () {
+          if (!CouchDesign.appSheet(w.key, function () { if (zone === "settings") renderSettings(); })) SET.msg = "No apps found on this TV yet.";
+        } });
       } else if (s.type === "device") {
         // nothing from Home Assistant on this TV yet: where to set it up
         var sh = window.smartHome && window.smartHome.setup && window.smartHome.setup.can();

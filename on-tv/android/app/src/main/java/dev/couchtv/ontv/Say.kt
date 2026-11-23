@@ -52,7 +52,7 @@ object Say {
     @Synchronized
     fun design(code: String?, now: Long = System.currentTimeMillis(), from: String? = null): JSONObject {
         val c = readCode(code)
-        if (c.isEmpty()) throw IllegalArgumentException("code must be a couch-tv Studio design code, like ABCDE-FGHJK or CTV1-...")
+        if (c.isEmpty()) throw IllegalArgumentException("code must be a Couch TV Studio design code, like ABCDE-FGHJK or CTV1-...")
         val d = JSONObject().put("id", nextId++).put("code", c).put("at", now).put("from", if (from == "phone") "phone" else "ai")
         design = d
         return d

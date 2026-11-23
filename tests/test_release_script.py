@@ -483,6 +483,30 @@ class ReleaseScript(unittest.TestCase):
         self.assertEqual(self.pushes(), [])
         self.assertFalse(any("--untracked-files" in l for l in self.log()))
 
+    def test_publish_refuses_the_debug_key_alone_from_0_13_11(self):
+        # 0.13.10 was the last debug-key-only release: ONTV_SIGN=0 stops publish for 0.13.11 and later on couch-tv
+        self.built()
+        for v in ("0.13.11", "0.13.12", "0.14", "1.0.0"):
+            (self.r / f"RELEASE-NOTES-{v}.md").write_text("notes\n")
+            rc, out = self.publish(version=v, ONTV_SIGN="0")
+            self.assertEqual(rc, 2, f"{v}: {out}")
+            self.assertIn("ONTV_SIGN=0 is refused", out)
+        self.assertEqual(self.log(), [])
+        # also when only the git remote says couch-tv
+        rc, out = self.publish(version="0.13.11", ONTV_SIGN="0", REPO="someone/couch-tv", FAKE_REMOTE_URL="https://github.com/Seagey/couch-tv")
+        self.assertEqual(rc, 2, out)
+        self.assertEqual(self.pushes(), [])
+        # 0.13.10 itself, the rotated build (ONTV_SIGN unset or 1), and a fork's own release still go ahead
+        (self.r / "RELEASE-NOTES-0.13.10.md").write_text("notes\n")
+        self.assertEqual(self.publish(version="0.13.10", ONTV_SIGN="0")[0], 0)
+        self.assertEqual(self.publish(version="0.13.11")[0], 0)
+        self.assertEqual(self.publish(version="0.13.11", ONTV_SIGN="1")[0], 0)
+        rc, out = self.publish(version="0.13.11", ONTV_SIGN="0", REPO="someone/couch-tv", FAKE_REMOTE_URL="https://github.com/someone/couch-tv")
+        self.assertEqual(rc, 0, out)
+        # build and sums are not publishing: a test build with the debug key alone still works
+        rc, out = self.run_step("sums", "--previous", str(self.prev), "--version", "0.13.11", ONTV_SIGN="0")
+        self.assertEqual(rc, 0, out)
+
     def test_publish_needs_a_version_and_notes(self):
         self.built()
         rc, out = self.run_step("publish", "--previous", str(self.prev))
