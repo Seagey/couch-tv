@@ -414,7 +414,7 @@ Everything else: [docs/](docs/README.md).
 - The streaming app logos in `remote/src/app-logos/` belong to their owners.
 - Fonts: Inter and Antonio (both SIL Open Font Licence).
 - Show data and posters: JustWatch (credit them if you publish anything built on this).
-- Weather: Open-Meteo.
+- Weather data by [Open-Meteo.com](https://open-meteo.com/) (CC BY 4.0); the TV says "Weather data by Open-Meteo.com" under the forecast, air quality and surf it opens. Town search: Open-Meteo's place search, location data based on [GeoNames](https://www.geonames.org/) (CC BY 4.0), credited under Home settings, Location.
 - The doorbell card and Home Assistant scenes on the TV started in the
   [roliusz fork](https://github.com/roliusz/couch-tv).
 - The no-computer install for option A came from

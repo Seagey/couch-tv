@@ -204,6 +204,8 @@ html.lighter .cwd-panel { background: rgb(24, 26, 34); -webkit-backdrop-filter: 
 .cwd-in { position: relative; z-index: 1; display: -webkit-flex; display: flex; -webkit-flex-direction: column; flex-direction: column; width: 100%; height: 100%; padding: 56px 64px;
   opacity: 0; -webkit-transition: opacity 0.26s ease 0.16s; transition: opacity 0.26s ease 0.16s; }
 .cwd-panel.on .cwd-in { opacity: 1; }
+/* the data credit (Open-Meteo, CC BY 4.0): quiet, in the bottom corner, never moving the layer above it */
+.cwd-credit { position: absolute; right: 64px; bottom: 22px; font-size: 20px; font-weight: 500; color: rgba(255, 255, 255, 0.42); pointer-events: none; }
 .cwd-panel.closing .cwd-in { opacity: 0; -webkit-transition: opacity 0.1s ease; transition: opacity 0.1s ease; }
 
 /* the header: an icon, the title and a line, and how to get out */

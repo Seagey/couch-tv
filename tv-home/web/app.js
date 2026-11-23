@@ -5896,6 +5896,7 @@
       } });
     }
     rows.push(info("loc-note", t("loc_note")));
+    rows.push(info("loc-credit", t("loc_credit")));   // Open-Meteo's place search is built on GeoNames (CC BY 4.0)
     return rows;
   }
   // In the home's language. A language with a country of its own (Italian: Italy) asks there too and

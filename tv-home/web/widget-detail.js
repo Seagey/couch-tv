@@ -69,6 +69,8 @@
     return E("div", "cwd-head", "", [icon, E("div", "cwd-htext", "", [E("div", "cwd-title", "", [title]), S.subEl]), E("div", "cwd-back", "", [ic("back", 28, "currentColor"), "Back to close"])]);
   }
   function label(t) { return E("div", "cwd-label", "", [t]); }
+  // Open-Meteo's data is CC BY 4.0: a quiet credit, plain text (a TV cannot follow a link), under the layers it fills
+  function credit() { return E("div", "cwd-credit", "", ["Weather data by Open-Meteo.com"]); }
   function msg(t, keep) {
     if (!S || !S.msgEl) return;
     S.msgEl.textContent = t ? wl(t) : "";
@@ -170,7 +172,7 @@
     if (!w) return B.setup(o, env);
     S.body.appendChild(head(kit().wxIcon(w.code, w.is_day), w.place || "Forecast", w.temp + "° now, " + kit().wxWords(w.code).toLowerCase() + (w.hi !== undefined ? ". High " + w.hi + "°, low " + w.lo + "°" : ""), "#1b64b5"));
     var hours = w.hours || [], days = w.days || [];
-    if (!hours.length && !days.length) { S.body.appendChild(E("div", "cwd-text", "margin-top:40px", ["The full forecast comes with the next weather update."])); return; }
+    if (!hours.length && !days.length) { S.body.appendChild(E("div", "cwd-text", "margin-top:40px", ["The full forecast comes with the next weather update."])); S.body.appendChild(credit()); return; }
     if (hours.length) {
       var track = E("div", "cwd-track");
       hours.forEach(function (h, i) {
@@ -195,6 +197,7 @@
           d.rise ? E("div", "cwd-small", "", ["Sunrise " + d.rise]) : null, d.set ? E("div", "cwd-small", "", ["Sunset " + d.set]) : null]), null, d.d);
       })));
     }
+    S.body.appendChild(credit());
   };
 
   // world clocks: every city big
@@ -430,6 +433,7 @@
     S.body.appendChild(E("div", "cwd-row cwd-grow", "align-items:center", [E("div", "cwd-col", "width:560px", [E("div", "cwd-huge", "color:" + band[1], [String(v)]), E("div", "cwd-big", "", [band[0]]), E("div", "cwd-small", "margin-top:12px", [tl("{index}, from Open-Meteo", { index: wl(q.name) })])]),
       hs.length ? E("div", "cwd-col cwd-grow", "", [label("Next 12 hours"), E("div", "cwd-bars", "", hs.slice(0, 12).map(function (x) { return E("i", "", "height:" + Math.round(clamp(x / top, 0.06, 1) * 100) + "%;background:" + q.bandOf(x)[1]); })),
         E("div", "cwd-row cwd-small", "justify-content:space-between;margin-top:10px", [E("span", "", "", ["Now"]), E("span", "", "", ["+6h"]), E("span", "", "", ["+12h"])])]) : null]));
+    S.body.appendChild(credit());
   };
   B.surf = function (o, env) {
     var m = kit().surfOf(env, o);
@@ -440,6 +444,7 @@
     S.body.appendChild(E("div", "cwd-row cwd-grow", "align-items:center", [E("div", "cwd-col", "width:560px", [E("div", "cwd-huge", "", [kit().waveIn(m.wave, u), E("span", "", "font-size:.36em", [u.h === "ft" ? " ft" : " m"])]), E("div", "cwd-big", "", ["Swell now"])]),
       hs.length ? E("div", "cwd-col cwd-grow", "", [label("Swell, the next 12 hours"), E("div", "cwd-bars", "", hs.slice(0, 12).map(function (x) { return E("i", "", "height:" + Math.round(clamp(x / top, 0.06, 1) * 100) + "%;background:#64d2ff"); })),
         E("div", "cwd-row cwd-small", "justify-content:space-between;margin-top:10px", [E("span", "", "", ["Now"]), E("span", "", "", ["+6h"]), E("span", "", "", ["+12h"])])]) : null]));
+    S.body.appendChild(credit());
   };
 
   // photos: full screen, Left and Right flick, OK pauses

@@ -74,6 +74,14 @@ for (const [layer, w, q] of CASES) {
   ok(c && c.name === layer, label + ": OK opens " + layer + " (got " + (c && c.name) + ")");
   ok(await page.evaluate(() => { const p = document.querySelector(".cwd-panel"); const r = p.getBoundingClientRect(); return r.width >= 1700 && r.height >= 900; }), label + ": the layer fills the screen");
   ok(await page.evaluate(() => getComputedStyle(document.querySelector('.cw-o[data-obj="w0"] .cw')).visibility === "hidden"), label + ": the widget has grown into the layer");
+  // 0.13.12: Open-Meteo's data is CC BY 4.0, so the layers it fills credit it, quietly, in plain text, inside the panel
+  const credit = await page.evaluate(() => { const c = document.querySelector(".cwd-panel .cwd-credit"), p = document.querySelector(".cwd-panel");
+    if (!c) return null; const r = c.getBoundingClientRect(), q = p.getBoundingClientRect();
+    return { text: c.textContent, link: !!c.querySelector("a"), inside: r.bottom <= q.bottom && r.right <= q.right && r.width > 0, size: parseFloat(getComputedStyle(c).fontSize) }; });
+  if (["forecast", "air", "surf"].indexOf(layer) >= 0) {
+    ok(credit && credit.text === "Weather data by Open-Meteo.com" && !credit.link && credit.inside && credit.size <= 24,
+      label + ": the quiet Open-Meteo credit (" + JSON.stringify(credit) + ")");
+  } else ok(!credit, label + ": no weather credit on a layer that shows no weather");
   if (c.stops > 1 && layer !== "photos") {
     const before = c.focusName;
     await press(page, "ArrowRight"); const r1 = await cur(page);

@@ -15,6 +15,12 @@ When you get a design by code on an Android TV, the TV now tells Couch TV Studio
 - Couch TV Studio uses them for "Will it play on your TV?" on a TV in My TVs. An older store ignores them.
 - docs/PRIVACY.md and docs/CONFIG.md say the same.
 
+### Credits for the weather and places
+
+- **The forecast, air quality and surf** a weather widget opens now say "Weather data by Open-Meteo.com" in a quiet line at the bottom, as Open-Meteo's licence (CC BY 4.0) asks.
+- **Home settings, Location** says "Location data based on GeoNames": the town search is Open-Meteo's, built on GeoNames.
+- In all 16 languages. The README's credits and docs/PRIVACY.md name both.
+
 ### Now playing: every music app, and Spotify fixes
 
 - **Since 0.13.11 the Now playing card's new look reaches every music app, not only Spotify:** the wider card in the Night look, the progress bar with the time, and long titles that scroll. The 0.13.11 notes only spoke of Spotify.

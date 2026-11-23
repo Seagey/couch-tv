@@ -167,6 +167,10 @@ Privacy clean is about the TV's own apps. For couch-tv's own apps, the README ha
   version and memory size (so Couch TV Studio can say whether a design will play on it; no ids, no model,
   no location), and your
   watch history, people, things typed at home and a Home Assistant token never go to it.
+- Weather: the home asks Open-Meteo for the weather of the town you set, with no account.
+  Weather data by Open-Meteo.com (CC BY 4.0); the TV credits it under the forecast, air quality and
+  surf it opens. Town search uses Open-Meteo's place search: location data based on GeoNames
+  (CC BY 4.0), credited under Home settings, Location.
 
 ## Sources
 
