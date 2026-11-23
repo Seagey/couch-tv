@@ -904,13 +904,42 @@
     if (target < today) target = new Date(y + 1, month - 1, day);
     return Math.round((target - today) / 86400000);
   }
+  // Days that move each year (the countdown's rule, 0.13.10), worked out by the TV for the year it is:
+  // Easter Sunday (the Western church's date, Meeus, Jones and Butcher), Mother's Day (the second Sunday
+  // in May: Australia, New Zealand, the United States, Canada) and Father's Day (the first Sunday in
+  // September in Australia and New Zealand, or the third Sunday in June: the United States, the United
+  // Kingdom, Canada). Each answers [month, day] for year y.
+  function easterOf(y) {
+    var a = y % 19, b = Math.floor(y / 100), c = y % 100, d = Math.floor(b / 4), e = b % 4, f = Math.floor((b + 8) / 25), g = Math.floor((b - f + 1) / 3);
+    var h = (19 * a + b - d - g + 15) % 30, i = Math.floor(c / 4), k = c % 4, l = (32 + 2 * e + 2 * i - h - k) % 7, m = Math.floor((a + 11 * h + 22 * l) / 451);
+    var mo = Math.floor((h + l - 7 * m + 114) / 31);
+    return [mo, ((h + l - 7 * m + 114) % 31) + 1];
+  }
+  function nthSunday(y, month, nth) { var first = new Date(y, month - 1, 1).getDay(); return [month, 1 + (7 - first) % 7 + (nth - 1) * 7]; }
+  var RULES = {
+    easter: { name: "Easter", at: easterOf },
+    mothers_day: { name: "Mother's Day", at: function (y) { return nthSunday(y, 5, 2); } },
+    fathers_day: { name: "Father's Day", at: function (y) { return nthSunday(y, 9, 1); } },
+    fathers_day_june: { name: "Father's Day", at: function (y) { return nthSunday(y, 6, 3); } }
+  };
+  // the next one from today (today itself counts): { month, day, year }
+  function ruleDay(rule) {
+    var r = Object.prototype.hasOwnProperty.call(RULES, rule) ? RULES[rule] : null; if (!r) return null;
+    var t = now(), today = new Date(t.getFullYear(), t.getMonth(), t.getDate()), y = t.getFullYear(), md = r.at(y);
+    if (new Date(y, md[0] - 1, md[1]) < today) { y++; md = r.at(y); }
+    return { month: md[0], day: md[1], year: y };
+  }
   var STARTER_DAYS = { christmas: "12/25", "christmas day": "12/25", "new year": "1/1", "new year's day": "1/1", "new years day": "1/1", "australia day": "1/26", halloween: "10/31", "valentine's day": "2/14" };
   R.countdown = function (root, o, b) {
-    var q = op(o), month = +q.month || 12, day = +q.day || 25, yr = q.year === undefined || q.year === "every" ? NaN : +q.year, n = daysTo(month, day, yr), unit = q.unit || "sleeps";
-    // no name: Christmas on 25 December, else the date itself (25 January), which says what it counts to
-    var label = q.label || (month === 12 && day === 25 ? "Christmas" : day + " " + MONTHS[month - 1]);
+    var q = op(o), month = +q.month || 12, day = +q.day || 25, yr = q.year === undefined || q.year === "every" ? NaN : +q.year, unit = q.unit || "sleeps";
+    // a day that moves each year (Easter, Mother's Day, Father's Day): this year's, or next year's once gone
+    var rd = ruleDay(q.rule);   // null for "date" or anything else
+    if (rd) { month = rd.month; day = rd.day; yr = rd.year; }
+    var n = daysTo(month, day, yr);
+    // no name: Christmas on 25 December, the rule's own day, else the date itself (25 January)
+    var label = q.label || (rd ? RULES[q.rule].name : month === 12 && day === 25 ? "Christmas" : day + " " + MONTHS[month - 1]);
     // a starter name kept after the date changed: the date itself, never "Christmas" over 3 March
-    if ((tvSet(o, null, "day") !== undefined || tvSet(o, null, "month") !== undefined) && tvSet(o, null, "label") === undefined && STARTER_DAYS[String(label).toLowerCase()] && STARTER_DAYS[String(label).toLowerCase()] !== month + "/" + day) label = day + " " + MONTHS[month - 1];
+    if (!rd && (tvSet(o, null, "day") !== undefined || tvSet(o, null, "month") !== undefined) && tvSet(o, null, "label") === undefined && STARTER_DAYS[String(label).toLowerCase()] && STARTER_DAYS[String(label).toLowerCase()] !== month + "/" + day) label = day + " " + MONTHS[month - 1];
     var num = unit === "weeks" ? Math.round(n / 7) : n;
     var gone = n < 0;
     if (gone) n = -n;
@@ -3386,7 +3415,7 @@
     autoInk: function (hex) { var c = autoInk(rgbOf(hex)); return c === WHITE ? "#ffffff" : "#1d1b18"; },
     contrast: function (a, b) { return contrast(rgbOf(a) || WHITE, rgbOf(b) || WHITE); },
     tileColour: function (kind) { return TILE[kind] || null; },
-    timeWords: timeWords, moon: moon, sunTimes: sunTimes, daysTo: daysTo,
+    timeWords: timeWords, moon: moon, sunTimes: sunTimes, daysTo: daysTo, easter: easterOf, ruleDay: ruleDay,
     // a clock's time zone setting checked: the IANA id when this TV knows it, else ""
     zoneOk: zoneOk,
     timer: Timer,

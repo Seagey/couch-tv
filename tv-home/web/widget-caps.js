@@ -578,6 +578,10 @@
       st("day", "Day", "number", 25, "The day of the month.", "design", ALL, true, { min: 1, max: 31, step: 1 }),
       st("month", "Month", "choice", 12, "The month of the day you are counting to.", "design", ALL, true, { options: MONTHS }),
       st("year", "Year", "choice", "every", "Pick a year for a one off day, like a wedding. Every year counts to the same day each year.", "design", ALL, true, { options: YEARS }),
+      // a day that moves each year, worked out by the TV each year (widgets.js RULES); Day, Month and Year
+      // are not used then
+      st("rule", "Counts to", "choice", "date", "Easter, Mother's Day and Father's Day move each year. The TV works out the next one by itself.", "design", ALL, true,
+        { options: [["date", "The day and month"], ["easter", "Easter Sunday"], ["mothers_day", "Mother's Day, second Sunday in May"], ["fathers_day", "Father's Day, first Sunday in September"], ["fathers_day_june", "Father's Day, third Sunday in June"]] }),
       st("unit", "Count in", "choice", "sleeps", "Sleeps suit children. Weeks suit a day far away. The two smallest sizes show only the number.", "design", ALL, true, { options: [["sleeps", "Sleeps"], ["days", "Days"], ["weeks", "Weeks"]] })
     ],
     // the weather widgets (WIDGET-SETTINGS-SPEC.md section 2, Weather): each one's own place, read for

@@ -138,5 +138,13 @@ try {
   await press(p3, "Escape");
   ok(p3.errors.length === 0, "no errors: " + p3.errors.slice(0, 2).join(" | "));
   await p3.close();
+
+  // a countdown to a day that moves each year (0.13.10): the rule's own name on the widget
+  const p4 = await home([W("easter", "countdown", [0, 0, 8, 4], { rule: "easter", day: 25, month: 12 }), W("dad", "countdown", [8, 0, 8, 4], { rule: "fathers_day" })]);
+  const cd = await p4.evaluate(() => ["easter", "dad"].map((i) => document.querySelector('.cw-o[data-obj="' + i + '"] .cw').textContent));
+  ok(/Easter/.test(cd[0]) && !/Christmas/.test(cd[0]) && /to go/.test(cd[0]), "Counts to Easter: its name and how long to go (" + cd[0] + ")");
+  ok(/Father's Day/.test(cd[1]), "Counts to Father's Day: its name (" + cd[1] + ")");
+  ok(p4.errors.length === 0, "no errors: " + p4.errors.slice(0, 2).join(" | "));
+  await p4.close();
 } finally { await browser.close(); server.close(); }
 console.log("OK: " + n + " folder rows checks");

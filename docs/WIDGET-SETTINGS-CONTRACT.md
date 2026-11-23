@@ -71,6 +71,33 @@ And, where they apply:
 `CouchWidgetCaps.settings(kind)` returns a kind's list (`[]` for none). `tests/test_ws_schema.js`
 checks every record.
 
+### Settings moved from the TV into the design (0.13.10)
+
+These held nothing private, so since 0.13.10 they are `store: "design"` and offered in Studio, on the
+TV and on the phone. `design.js` keeps them (`OPT` checks the value, `WOPT` names the kind), and a
+value set on the TV still wins over the design's. A TV older than 0.13.10 drops them from a design and
+keeps its own. `tests/test_design_settings_moved.js` checks each one.
+
+| Kind | Key | Label | Values the design keeps |
+|---|---|---|---|
+| `weather`, `bigtemp`, `hourly` | `degrees` | Temperature in | `"auto"`, `"c"`, `"f"` |
+| `moon` | `hemi` | Moon seen from | `"auto"`, `"south"`, `"north"` |
+| `air` | `scale` | Scale | `"auto"`, `"eu"`, `"us"` |
+| `surf` | `units` | Wave height in | `"auto"`, `"m"`, `"ft"` |
+| `surf` | `wind` | Wind in | `"auto"`, `"kmh"`, `"kn"`, `"mph"` |
+| `soundscape` | `volume` | Volume | 10 to 100 |
+| `doorbell`, `energy` | `label` | Heading | up to 40 letters |
+| `wifi` | `hidepass` | Hide the password | `true`, `false` |
+
+Still kept on the TV only, because they are private: every town and beach (`town`, surf `place`), the
+Home Assistant pickers, calendars, lists, people, photos and the commute's places.
+
+Also new in 0.13.10: the countdown's `rule` (Counts to: `"date"`, `"easter"`, `"mothers_day"`,
+`"fathers_day"` for the first Sunday in September, `"fathers_day_june"` for the third Sunday in June).
+With a rule the TV works out the next date itself each year, and `day`, `month` and `year` are not used.
+Up next's `sport` keeps its values (`false`, `true`, `"auto"`) under plainer words: What it shows,
+Your next show, Your last game, Last game when Scores is on.
+
 ## How a widget reads its settings
 
 In `tv-home/web/widgets.js` a renderer reads a setting with

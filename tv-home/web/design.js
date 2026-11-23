@@ -446,7 +446,7 @@
   var WEB_FEEDS = ["abc", "abc-justin", "abc-sport", "abc-business", "sbs", "guardian", "bbc", "rnz"];
   var WOPT = {
     clock: "format ampm seconds date align zone", tallclock: "format align zone", glassclock: "format scene zone", analog: "seconds numbers zone", flipclock: "format zone",
-    wordclock: "precise dayline zone", solar: "", worldclock: "label cities format", countdown: "label month day year unit icon", date: "show dfmt align place", month: "wstart", timer: "label minutes",
+    wordclock: "precise dayline zone", solar: "", worldclock: "label cities format", countdown: "label month day year unit icon rule", date: "show dfmt align place", month: "wstart", timer: "label minutes",
     weather: "place hilo night degrees", bigtemp: "place degrees", hourly: "place hours degrees", week: "place", rain: "label", uv: "label", sun: "label", moon: "hemi", air: "label scale", surf: "label units wind",
     photo: "image fit caption sub", slideshow: "seconds_each caption sub shuffle", mosaic: "count", artframe: "image mat caption sub", memory: "align range ago",
     keep: "", keeprow: "label shows", upnext: "apps sport", picks: "label align",
@@ -498,6 +498,8 @@
   OPT.wind = function (v) { return SAN.pick(v, ["auto", "kmh", "kn", "mph"]); };
   OPT.volume = function (v) { return SAN.n(v, 10, 100, true); };
   OPT.hidepass = SAN.b;
+  // a countdown to a day that moves each year: the TV works the date out (widgets.js RULES); "date" is the day and month
+  OPT.rule = function (v) { return SAN.pick(v, ["date", "easter", "mothers_day", "fathers_day", "fathers_day_june"]); };
   function sanWStyle(src) {
     src = obj(src);
     var out = {};
