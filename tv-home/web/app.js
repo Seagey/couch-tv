@@ -552,8 +552,97 @@
   }, true);
   document.addEventListener("touchstart", function (e) { idlePhotoInput(e); }, { capture: true, passive: false });
 
+  // ---- Your home: people and the town from a Couch TV Studio account (design-code.js readHome,
+  // HOME-DETAILS-PAYLOAD.md). What the last pack left is kept on this TV (tvhome.home.account, page
+  // storage and the launcher's own store); the people go into the same list Home settings, People keeps
+  // (tvhome.people.list, handed to the bridge or the on-TV app like any change made here) and the town
+  // into Home settings, Location (ST.place). Photos stay only in tvhome.home.account: never sent to a
+  // bridge, never in a design, never in Share this home.
+  // The record (with the photos) goes in the launcher's private store when there is one (TVOS.keepPrivate,
+  // left out of Android's backups, as the things typed at home are), else this page's own storage.
+  var ACCOUNT_KEY = "tvhome.home.account", ACCOUNT = null;
+  function keptAccount() {
+    var v = null;
+    try { if (TV && TV.keptPrivate) v = TV.keptPrivate(PFX + ACCOUNT_KEY); } catch (e) {}
+    if (v == null || v === "") try { v = localStorage.getItem(PFX + ACCOUNT_KEY); } catch (e) {}
+    try { v = v ? JSON.parse(v) : null; } catch (e) { v = null; }
+    return v && typeof v === "object" && !Array.isArray(v) ? v : null;
+  }
+  function keepAccount(rec) {
+    var j = JSON.stringify(rec);
+    if (TV && TV.keepPrivate) {
+      try { TV.keepPrivate(PFX + ACCOUNT_KEY, j); try { localStorage.removeItem(PFX + ACCOUNT_KEY); } catch (e) {} return; } catch (e) {}
+    }
+    try { localStorage.setItem(PFX + ACCOUNT_KEY, j); } catch (e) {}
+  }
+  function accountPerson(id) {
+    var l = ACCOUNT && Array.isArray(ACCOUNT.people) ? ACCOUNT.people : [];
+    for (var i = 0; i < l.length; i++) if (l[i] && l[i].id === id) return l[i];
+    return null;
+  }
+  // the list as it is now: the one on screen, else what this TV kept, else config.json's
+  function peopleNow() {
+    if (PEOPLE.length && !NOBODY) return PEOPLE.map(function (p) { return Object.assign({}, p); });
+    var lst = kept("tvhome.people.list");
+    if (lst && Array.isArray(lst.people)) return lst.people;
+    return Array.isArray(CFG.people) ? CFG.people : [];
+  }
+  // the guest Wi-Fi as the At home store keeps it (athome.js), or null
+  function ahWifiNow() { try { return AH ? AH.store.get().wifi || null : null; } catch (e) { return null; } }
+  function homeNow() { return { people: peopleNow(), place: ST.place || null, wifi: ahWifiNow(), account: ACCOUNT }; }
+  // what mergeHome worked out, kept: the record (with the photos), the town in Location, the guest Wi-Fi
+  // in At home. The people are the caller's (the list on screen changes differently at start and later).
+  function keepHome(r) {
+    ACCOUNT = r.account;
+    keepAccount(ACCOUNT);
+    if (r.place) ST.place = r.place; else if (ST.place) { delete ST.place; WXCFG = CFG.weather || WX_DEFAULT; }
+    saveSettings();
+    if ("wifi" in r && AH) {
+      AH.store.edit(function (x) { if (r.wifi) x.wifi = r.wifi; else delete x.wifi; });
+      ahChanged();
+    }
+  }
+  // A pack that arrived with a design (held by design-code.js until now). The account wins: its people
+  // first, then the ones added on this TV; the town and the guest Wi-Fi too. A wipe takes out only what
+  // came from it.
+  // base: the people list to merge into. With a bridge (or the on-TV app) that list lives there, so the
+  // pack waits for its answer (bridgePeople); with none it is the one this TV keeps (readConfig).
+  function takeAccountHome(base) {
+    if (typeof CouchDesignCode === "undefined" || !CouchDesignCode.takeHome || PREVIEW || /[?&]designer=1\b/.test(Q)) return false;
+    var pack = CouchDesignCode.takeHome();
+    if (!pack) return false;
+    var now = homeNow();
+    if (base) now.people = base;
+    var r = CouchDesignCode.mergeHome(now, pack);
+    if (!r) return false;
+    // pending: the bridge (or the on-TV app) is handed it on the next look, as with a change made here
+    keep("tvhome.people.list", { people: r.people, pending: true });
+    keep("tvhome.people.order", { ids: r.people.map(function (p) { return p.id; }), pending: false });
+    keepHome(r);
+    return true;
+  }
+  // Home settings, People: take everything the account sent off this TV now (as a wipe from the account
+  // does): its people, their photos, its town and its guest Wi-Fi. What was added here stays. The next
+  // send to this TV brings them back.
+  function clearAccountHome() {
+    if (typeof CouchDesignCode === "undefined" || !CouchDesignCode.mergeHome) return;
+    var r = CouchDesignCode.mergeHome(homeNow(), { v: 1, rev: ACCOUNT && ACCOUNT.rev || 0, wipe: true });
+    if (!r) return;
+    keepHome(r);
+    setPeople(r.people);
+    savePeopleList();
+    SET.keyFocus = "people-add";
+  }
+
   function setPeople(list) {
-    PEOPLE = (list || []).filter(function (p) { return p && p.id && p.name; });
+    PEOPLE = (list || []).filter(function (p) { return p && p.id && p.name; }).map(function (p) {
+      // a person from the account keeps its mark and kids flag even when a bridge's copy dropped them
+      var a = accountPerson(p.id);
+      if (!a) return p;
+      var o = Object.assign({}, p, { src: "account" });
+      if (a.kids) o.kid = true; else delete o.kid;
+      return o;
+    });
     NOBODY = !PEOPLE.length;
     if (NOBODY) PEOPLE = [{ id: "both", name: t("everyone") }];
     PEOPLE.forEach(function (p) { if (!data.showsBy[p.id]) data.showsBy[p.id] = []; if (!data.videosBy[p.id]) data.videosBy[p.id] = []; });
@@ -590,6 +679,8 @@
     if (typeof CouchDesign !== "undefined" && CFG.design) HOME = CouchDesign.home(HOME, CFG.design, { fromCode: DESIGN_FROM_CODE });
     ON_TV = CFG.mode === "on-tv";
     ST = loadSettings();
+    ACCOUNT = keptAccount();
+    if (OFFLINE || ALONE) takeAccountHome();
     KEEP_PHOTO = typeof ST.keep_photo === "boolean" ? ST.keep_photo : HOME.keep_photo === true;
     var savedIdle = ST.idle_photo_seconds;
     var configuredIdle = HOME.idle_photo_seconds;
@@ -3724,8 +3815,16 @@
     for (var h = 0, i = 0; i < p.id.length; i++) h = (h * 31 + p.id.charCodeAt(i)) >>> 0;
     return PALETTE[h % PALETTE.length];
   }
+  // a person's photo from the account (a checked JPEG data URL, design-code.js photoOf), or ""
+  function photoOfPerson(p) {
+    return p && typeof CouchDesignCode !== "undefined" && CouchDesignCode.photoOf ? CouchDesignCode.photoOf(ACCOUNT, p.id) : "";
+  }
+  // the photo in a circle when the account sent one; the initial on its colour stays underneath, so a
+  // photo that does not load still shows the person (data-err="remove" takes the picture away)
   function avatarHTML(p) {
-    return '<span class="avatar" style="background:' + esc(colourOf(p)) + '">' + esc((p.name || "?").trim().charAt(0).toUpperCase()) + "</span>";
+    var ph = photoOfPerson(p);
+    return '<span class="avatar' + (ph ? " has-photo" : "") + '" style="background:' + esc(colourOf(p)) + '">' + esc((p.name || "?").trim().charAt(0).toUpperCase()) +
+      (ph ? '<img class="avatar-photo" src="' + esc(ph) + '" alt="" decoding="async" data-err="remove">' : "") + "</span>";
   }
   function whoIndex() { return Math.max(0, PEOPLE.map(function (p) { return p.id; }).indexOf(who)); }
 
@@ -5879,6 +5978,7 @@
   function locationRows() {
     var geo = SET.geo;
     var rows = [info("loc-now", t("loc_now"), WXCFG.place || t("loc_unset"), WXCFG.timezone && WXCFG.timezone !== "auto" ? WXCFG.timezone : "")];
+    if (ST.place && ST.place.src === "account") rows.push(info("loc-account", t("from_account"), "", t("loc_account_note")));
     rows.push({ kind: "input", key: "loc-search", label: t("loc_search"), value: geo.q, act: function () {
       startTyping({ label: t("loc_type"), value: geo.q, search: true,
         live: function (q) { findPlaces(q, false); }, submit: function (q) { findPlaces(q, true); } });
@@ -6871,9 +6971,16 @@
     var list = NOBODY ? [] : PEOPLE, rows = [];
     if (!list.length) rows.push(info("people-none", t("people_none")));
     list.forEach(function (p) {
-      rows.push({ kind: "nav", key: "person:" + p.id, label: p.name, avatar: p, sub: p.id === who && list.length > 1 ? t("person_on") : "",
+      var subs = [];
+      if (p.id === who && list.length > 1) subs.push(t("person_on"));
+      if (p.src === "account") subs.push(t("from_account"));
+      rows.push({ kind: "nav", key: "person:" + p.id, label: p.name, avatar: p, sub: subs.join(". "),
         act: function () { openPerson(p.id); }, move: function (d) { movePerson(p.id, d); } });
     });
+    if (list.some(function (p) { return p.src === "account"; })) {
+      rows.push(info("people-account", t("people_account_note")));
+      rows.push({ kind: "action", key: "people-account-clear", label: t("people_account_clear"), danger: true, act: clearAccountHome });
+    }
     if (list.length < 12) {
       rows.push({ kind: "input", key: "people-add", label: t("people_add"), act: function () {
         startTyping({ label: t("people_type"), value: "", submit: addPerson });
@@ -6912,7 +7019,7 @@
   function savePeopleList() {
     var list = NOBODY ? [] : PEOPLE.map(function (p) {
       var o = { id: p.id, name: p.name };
-      ["colour", "kid", "guest"].forEach(function (k) { if (p[k] != null) o[k] = p[k]; });
+      ["colour", "kid", "guest", "src"].forEach(function (k) { if (p[k] != null) o[k] = p[k]; });
       return o;
     });
     keep("tvhome.people.list", { people: list, pending: true });
@@ -8104,6 +8211,10 @@
   function bridgePeople(j) {
     var list = j.people || [];
     var lo = kept("tvhome.people.order"), lst = kept("tvhome.people.list");
+    // Your home: a pack that came with a design is merged into the list the bridge keeps (or this TV's
+    // own change still waiting for it), then the home starts again with it, as after any new design
+    if (typeof CouchDesignCode !== "undefined" && CouchDesignCode.takeHome && CouchDesignCode.takeHome(true) &&
+      takeAccountHome(lst && lst.pending && Array.isArray(lst.people) ? lst.people : list)) { restart(); return; }
     if (lst && lst.pending && Array.isArray(lst.people)) {
       // people added, renamed or removed in Home settings while the computer was off
       list = lst.people;
@@ -8590,6 +8701,9 @@
     // guest Wi-Fi
     rows.push(head("Guest Wi-Fi"));
     var w = r.wifi;
+    // sent from the Couch TV Studio account (Your home): said so; a change here makes it this TV's own
+    if (w && typeof CouchDesignCode !== "undefined" && CouchDesignCode.wifiFromAccount && CouchDesignCode.wifiFromAccount(ACCOUNT, w))
+      rows.push(info("ah-wifi-account", t("from_account"), "", t("wifi_account_note")));
     rows.push({ kind: "input", key: "ah-wifi-name", label: "Network name", value: w ? w.ssid : "Not set", act: function () {
       ahType("Type the guest network's name, exactly as it shows on a phone", w && w.ssid, function (v) { ahEdit(function (x) { if (!String(v || "").trim()) { delete x.wifi; return; } x.wifi = x.wifi || { sec: "WPA", pass: "" }; x.wifi.ssid = v; }); });
     } });
@@ -9861,7 +9975,8 @@
         return { weather: WX_SHOW ? data.weather : null, wxOff: !WX_SHOW, place: { name: String((WXCFG && WXCFG.place) || "").split(",")[0], lat: WXCFG && WXCFG.lat, lon: WXCFG && WXCFG.lon },
           shows: data.shows || [], music: music, apps: (function () { try { return arrangeItems().items.map(function (it) { return { package: it.package, name: it.name }; }); } catch (e) { return []; } })(),
           photos: (Array.isArray(ST.photos) ? ST.photos : []).filter(function (p) { return p && (p.file || p.url); }).map(photoSrc),
-          people: NOBODY ? [] : PEOPLE.map(function (p) { return { id: p.id, name: p.name }; }), who: who, quick: quickVisible(), quickCan: QUICK_ALL.filter(quickCan), cards: CARDS.slice(0, 8), iconUrl: iconUrl,
+          // with the account's photo (Your home) when there is one: drawn on this TV only
+          people: NOBODY ? [] : PEOPLE.map(function (p) { var o = { id: p.id, name: p.name }, ph = photoOfPerson(p); if (ph) o.photo = ph; return o; }), who: who, quick: quickVisible(), quickCan: QUICK_ALL.filter(quickCan), cards: CARDS.slice(0, 8), iconUrl: iconUrl,
           // no bridge at all (option A, or the standalone home): widgets that need one say so
           bridge: !OFFLINE,
           // the scenes the launcher's Home Assistant allows (names and entities only, never its address)
