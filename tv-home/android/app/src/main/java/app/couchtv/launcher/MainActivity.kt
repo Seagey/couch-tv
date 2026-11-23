@@ -905,6 +905,10 @@ class MainActivity : Activity() {
         @JavascriptInterface
         fun version(): String = BuildConfig.VERSION_NAME
 
+        /** Total memory in MB (0 if unknown), sent with a design fetch only (design-code.js, TvReport.kt). */
+        @JavascriptInterface
+        fun memoryMb(): Int = TvReport.memoryMb(this@MainActivity)
+
         /** Home settings, About, Restart home: what a force-stop and Home would do, from the remote. */
         @JavascriptInterface
         fun restartHome() {
