@@ -164,13 +164,17 @@
   }
 
   // ---------------------------------------------------------------- what this TV should show
-  // env: { lighter, powerSave, saveData, reducedMotion, memory (GB, navigator.deviceMemory),
+  // env: { stillChosen, lighter, powerSave, saveData, reducedMotion, memory (GB, navigator.deviceMemory),
   //        screenPx (screen width in device pixels), slow (this TV dropped frames last week), designer }
   // "still": the still picture only; "720" or "1080": the copy to ask the store for.
   function tier(env) {
     env = env || {};
     if (env.designer) return "1080";
-    if (env.lighter) return { tier: "still", why: "Lighter home is on" };
+    // the person chose the still picture on this TV (Home settings, Designs): kept until they turn it off
+    if (env.stillChosen) return { tier: "still", why: "the still picture was chosen on this TV" };
+    // Lighter home turns itself on at 1 GB, where a video design still plays (a 939 MB TCL played the
+    // Aquarium video at about 27 frames a second, 0.13.10): there it keeps its other savings only
+    if (env.lighter && !(env.memory >= 1 && env.memory < 2)) return { tier: "still", why: "Lighter home is on" };
     if (env.powerSave) return { tier: "still", why: "the TV is saving power" };
     if (env.saveData) return { tier: "still", why: "the TV is saving data" };
     if (env.reducedMotion) return { tier: "still", why: "the TV asks for less motion" };

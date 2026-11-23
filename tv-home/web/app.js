@@ -5911,6 +5911,12 @@
       rows.push({ kind: "toggle", key: "dz-switch", label: "Your design", value: "On", sub: "Turns designs off in one step. Your design is kept for later." + (note ? " " + note.replace(/^\. /, "") : ""), act: function () {
         setDesigner(false); SET.msg = "Designs are off. The standard home comes back when you close Home settings.";
       } });
+      // a design with a video background: the still picture instead, by choice, kept on this TV
+      if (cd && cd.hasVideo && cd.hasVideo() && cd.videoStill) {
+        var still = cd.videoStill();
+        rows.push({ kind: "toggle", key: "dz-still", label: "Show the still picture instead", value: still ? t("on") : t("off"),
+          sub: "The design's video background stops and its still picture stays.", act: function () { cd.videoStill(!cd.videoStill()); } });
+      }
     } else if (has) {
       // a design kept here comes straight back when designs are on again, so the row says so
       rows.push({ kind: "toggle", key: "dz-switch", label: "Your design", value: "Off", sub: "Brings back your last design", act: function () {

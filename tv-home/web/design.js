@@ -1986,23 +1986,23 @@
   // It plays only once its still picture has loaded, while the design is on and the home is on
   // screen: app.js holds it ("away" while an app is in front or the screen saver is up, "idle" under
   // the ambient clock, "off" with the screen off), and a hidden page holds it too.
-  var VP = null, HOLD = {};
+  var VP = null, HOLD = {}, STILL_KEY = "couchtv.video.still";
   function vidRef(d) { var bg = obj(d && d.background); return imgOk(bg.image) && bg.video ? bg.video : ""; }
   function vidEnv() {
     var e = hooks.videoEnv ? obj(hooks.videoEnv()) : {}, nav = window.navigator || {}, calm = false;
     try { calm = !!(window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches); } catch (x) {}
     return { designer: DESIGNER, lighter: !!e.lighter, powerSave: !!e.powerSave, saveData: !!(nav.connection && nav.connection.saveData), reducedMotion: calm,
       memory: Number(nav.deviceMemory) || 0, screenPx: ((window.screen && window.screen.width) || innerWidth) * (window.devicePixelRatio || 1),
-      slow: !DESIGNER && window.CouchVideo.slowMarked() };
+      slow: !DESIGNER && window.CouchVideo.slowMarked(), stillChosen: !DESIGNER && store(STILL_KEY) === "1" };
   }
   // Home settings, Designs: why the video shows only its still picture, or, on a 1 GB TV, that it plays
   // the smaller copy and how to get the still picture instead ("" otherwise)
   function videoNote() {
     var vs = VP ? VP.state() : null;
-    if (!vs) return "";
+    if (!vs || store(STILL_KEY) === "1") return "";   // the still picture chosen: the Designs row says so itself
     if (vs.why && (vs.state === "still" || vs.state === "failed")) return ". Video background: its still picture shows, " + vs.why;
     var mem = Number((window.navigator || {}).deviceMemory) || 0;
-    if (vs.ref && mem >= 1 && mem < 2 && !DESIGNER && vs.state !== "off") return ". Video background: plays a smaller copy, as this TV has 1 GB of memory. Turn on Lighter home to show the still picture instead";
+    if (vs.ref && mem >= 1 && mem < 2 && !DESIGNER && vs.state !== "off") return ". Video background: plays a smaller copy, as this TV has 1 GB of memory";
     return "";
   }
   function vidWanted() { return ON && BG.ok && !document.hidden && !Object.keys(HOLD).some(function (k) { return HOLD[k]; }); }
@@ -3112,6 +3112,10 @@
     resume: function () { setOff(false); if (PENDING && store("couchtv.design.no") === hashOf(PENDING)) { store("couchtv.design.ok", hashOf(PENDING)); store("couchtv.design.no", null); } },
     // an honest line when the design's video shows only its still picture, and why ("" when it plays)
     videoNote: videoNote,
+    // Home settings, Designs, Show the still picture instead: kept on this TV (on: true or false), and
+    // whether the design has a video background at all
+    videoStill: function (on) { if (on === undefined) return store(STILL_KEY) === "1"; store(STILL_KEY, on ? "1" : null); if (VP) VP.update(); return !!on; },
+    hasVideo: function () { return !!(VP && VP.state().ref); },
     settingsRow: function (restart) {
       var off = offNow() || (PENDING && store("couchtv.design.no") === hashOf(PENDING));
       // an honest line when the design's video shows only its still picture, and why
