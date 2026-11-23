@@ -127,6 +127,58 @@ class AdbKnownDown(unittest.TestCase):
             t._dev = None
 
 
+    def test_a_failed_connect_closes_its_socket_and_waits_for_allow(self):
+        t = self.t
+        t.adb_only, t.adb_ok, t._adb_lost_at = False, False, None
+        saved = (t.paired, t.ip, t._signer)
+        t.paired, t.ip, t._signer = True, "192.0.2.10", object()
+        made = []
+
+        class Dev:
+            result = "raise"
+
+            def __init__(self, *a, **kw):
+                self.closed = 0
+                self.kw = None
+                made.append(self)
+
+            async def connect(self, **kw):
+                self.kw = kw
+                if Dev.result == "raise":
+                    raise TimeoutError("timed out (9 seconds)")
+                return Dev.result
+
+            async def close(self):
+                self.closed += 1
+
+        import tv as tvmod
+        waits = []
+        real_wait_for = asyncio.wait_for
+
+        async def wait_for(aw, timeout):
+            waits.append(timeout)
+            return await real_wait_for(aw, timeout)
+
+        try:
+            with patch.object(tvmod, "AdbDeviceTcpAsync", Dev), patch.object(tvmod.asyncio, "wait_for", wait_for):
+                self.assertFalse(asyncio.run(t._adb_connect()))
+                self.assertEqual(made[-1].closed, 1, "a connect that raised is closed")
+                self.assertEqual(made[-1].kw["auth_timeout_s"], 60, "a person has 60 s to press Allow")
+                self.assertEqual(waits[-1], 75)
+                self.assertIsNone(t._dev)
+                Dev.result = False
+                self.assertFalse(asyncio.run(t._adb_connect()))
+                self.assertEqual(made[-1].closed, 1, "a refused connect is closed")
+                self.assertIsNone(t._dev)
+                Dev.result = True
+                self.assertTrue(asyncio.run(t._adb_connect()))
+                self.assertEqual(made[-1].closed, 0, "a good connect stays open")
+                self.assertIs(t._dev, made[-1])
+        finally:
+            t.paired, t.ip, t._signer = saved
+            t._dev = None
+
+
 class ContinueWithAdbDown(unittest.IsolatedAsyncioTestCase):
     def setUp(self):
         self.t = server.TVS[next(iter(server.TVS))]

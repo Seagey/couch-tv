@@ -359,6 +359,9 @@ html.still .tile.focus .face, html.still .tile.focus .face::after { animation: n
 .s-night .gclock .fill { filter: brightness(1.15) saturate(1.2); opacity: 0.9; }
 .s-night .gclock .rim { color: rgba(255, 200, 215, 0.06); -webkit-text-stroke-color: rgba(255, 215, 225, 0.5); }
 /* 1 Golden hour: a little smaller, low enough for the volcano's tip to rise into the digits */
+/* fitDate() in app.js: when the date line has no room in the top bar it moves down under it, and the
+   scene's clock moves down with it by the same amount, so the two stay together */
+.theme-night .scene .gclock { margin-top: var(--date-drop, 0px); }
 .s-golden .gclock { top: 9.5rem; font-size: 24.375rem; }
 /* 2 Waterline: the clock sits on the water (app.js water: the underside of the surface); the part
    under it is blurred like a reflection, lined up with the sharp part above (no sideways shift) */

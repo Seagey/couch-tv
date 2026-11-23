@@ -530,7 +530,14 @@ class TV:
                 self._signer = PythonRSASigner(pub, priv)
             await self._adb_close()
             dev = AdbDeviceTcpAsync(self.ip, self.adb_port, default_transport_timeout_s=9)
-            ok = await asyncio.wait_for(dev.connect(rsa_keys=[self._signer], auth_timeout_s=10), 25)
+            # Held on self._dev from the start, so a failed connect is closed below and its socket
+            # does not stay open on the TV (left open, they piled up and kept the TV's "Allow" from going through).
+            self._dev = dev
+            # 60 s for the person to press Allow on the TV: if the link closes first, the TV drops the
+            # answer ("Always allow" is not saved) and asks again on the next try.
+            ok = await asyncio.wait_for(dev.connect(rsa_keys=[self._signer], auth_timeout_s=60), 75)
+            if not ok:
+                await self._adb_close()
             self._dev = dev if ok else None
             self.adb_ok = bool(ok)
             self._adb_lost_at = None if ok else time.monotonic()
