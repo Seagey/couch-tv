@@ -3,7 +3,9 @@ base64 encoded, for apply.sh to hand to the app on the TV. The app keeps them an
 copy of the home it carries inside it (option A, or when the computer is off).
 
 Usage: .venv/bin/python tv-home/tools/home-config.py [--json]     (COUCH_CONFIG picks another file)
-Never contains secrets: only people, weather, the home's look and each TV's quick buttons.
+Never contains secrets: only people, weather, the home's look and each TV's quick buttons. A kids
+profile's parent PIN goes as a salted hash only. Each kids shelf show is looked up on JustWatch here
+(the TV has no computer to ask later) for its poster and the link that opens it; --no-lookup skips that.
 
        .venv/bin/python tv-home/tools/home-config.py --ha [--check]
 The smart home section ("home_assistant" in config.json, docs/CONFIG.md), base64 encoded, for
@@ -28,7 +30,19 @@ ENTITY = {
     "scenes": re.compile(r"^(scene|script)\.[a-z0-9_]{1,64}$"),
     "doorbell": re.compile(r"^(binary_sensor|input_boolean|event)\.[a-z0-9_]{1,64}$"),
     "camera": re.compile(r"^camera\.[a-z0-9_]{1,64}$"),
+    # the smart home widgets (Control Centre, camera, sensor, energy, speakers). Never lock.*,
+    # alarm_control_panel.* or anything else that opens the house: those are refused here and on the TV
+    "controls": re.compile(r"^(light|switch|fan|cover)\.[a-z0-9_]{1,64}$"),
+    "cameras": re.compile(r"^camera\.[a-z0-9_]{1,64}$"),
+    "sensors": re.compile(r"^sensor\.[a-z0-9_]{1,64}$"),
+    "speakers": re.compile(r"^media_player\.[a-z0-9_]{1,64}$"),
 }
+# a garage door, gate, front door, lock or alarm as a switch, blind, script or scene: refused by its name
+# too, the same test as the TV's (HomeAssistant.kt and bridge/smarthome.py OPENS_HOUSE); the TV also
+# refuses a blind Home Assistant calls a garage door, gate or door, whatever its name
+# joined words count (frontgate, backdoor, smartlock, unlock), harmless ones do not (gateway, doorbell,
+# indoor, outdoor, clock, block); tests/fixtures/opens_house_ids.json holds the ids every copy is tested with
+OPENS_THE_HOUSE = re.compile(r"^(cover|switch|script|scene)\.[a-z0-9_]*(garage|gate(?!way)|(?<![._]in)(?<![._]out)door(?!bell)|(?<![._]c)(?<![._]b)lock|alarm|disarm)[a-z0-9_]*$")
 
 
 def smart_home():
@@ -56,6 +70,9 @@ def smart_home():
             if not ENTITY[key].match(ent):
                 print(f"home-config: skipping {key} entry {ent or '(empty)'!r}: not a {key} entity id", file=sys.stderr)
                 continue
+            if key in ("controls", "scenes") and OPENS_THE_HOUSE.search(ent):
+                print(f"home-config: skipping {ent!r}: nothing that opens the house goes on the TV", file=sys.stderr)
+                continue
             out.append({"entity": ent, "name": str(x.get("name") or "").strip()[:40]})
         return out[:most]
 
@@ -68,17 +85,47 @@ def smart_home():
                   "camera must be camera.", file=sys.stderr)
         else:
             out["doorbell"] = {"entity": ent, "camera": cam, "name": str(bell.get("name") or "").strip()[:40]}
-    if not out["climate"] and not out["scenes"] and "doorbell" not in out:
+    for key, most in (("controls", 16), ("cameras", 4), ("sensors", 8), ("speakers", 6)):
+        found = named(key, most)
+        if found:
+            out[key] = found
+    energy = ha.get("energy")
+    if isinstance(energy, dict) and energy.get("entity"):
+        ent, bat = str(energy.get("entity")).strip(), str(energy.get("battery") or "").strip()
+        if not ENTITY["sensors"].match(ent) or (bat and not ENTITY["sensors"].match(bat)):
+            print("home-config: skipping energy: entity and battery must be sensor.", file=sys.stderr)
+        else:
+            out["energy"] = {"entity": ent, "name": str(energy.get("name") or "").strip()[:40]}
+            if bat:
+                out["energy"]["battery"] = bat
+    if not out["climate"] and not out["scenes"] and not any(k in out for k in ("doorbell", "controls", "cameras", "sensors", "speakers", "energy")):
         return None
     return out
+
+
+def summary(ha):
+    """The one line apply.sh prints: what is set up, never the address or the token."""
+    parts = [f"{len(ha['climate'])} climate", f"{len(ha['scenes'])} scenes"]
+    for key, word in (("controls", "controls"), ("cameras", "cameras"), ("sensors", "sensors"), ("speakers", "speakers")):
+        if ha.get(key):
+            parts.append(f"{len(ha[key])} {word}")
+    if "energy" in ha:
+        parts.append("energy")
+    if "doorbell" in ha:
+        parts.append("doorbell")
+    return "smart home: " + ", ".join(parts)
+
+
+if "--key" in sys.argv:
+    print(config.PAIRING_KEY)
+    sys.exit(0)
 
 
 if "--ha" in sys.argv:
     ha = smart_home()
     if "--check" in sys.argv:
         if ha:
-            print(f"smart home: {len(ha['climate'])} climate, {len(ha['scenes'])} scenes"
-                  + (", doorbell" if "doorbell" in ha else ""))
+            print(summary(ha))
             if "doorbell" in ha:
                 print("doorbell")
         else:
@@ -87,7 +134,42 @@ if "--ha" in sys.argv:
         print(base64.b64encode(json.dumps(ha, separators=(",", ":")).encode()).decode() if ha else "none")
     sys.exit(0)
 
+async def bake_kids(people):
+    """Kids mode with no computer (option A): look each shelf show up now, on this computer, and
+    hand the TV the app and link that open it, and its poster. A show that is not found still goes
+    on the shelf; it opens its app (or says it cannot) instead of the show."""
+    import asyncio
+    import finder
+    import kids
+    for p in people:
+        for show in (p.get("kids_mode") or {}).get("shows") or []:
+            try:
+                best, _ = await asyncio.wait_for(finder.find(show["title"]), 20)
+                if not best or finder._norm(best["title"]) != finder._norm(show["title"]):
+                    print(f"home-config: kids shelf: {show['title']!r} not found, it will open its app only",
+                          file=sys.stderr)
+                    continue
+                show.setdefault("poster", best.get("poster"))
+                show.setdefault("backdrop", best.get("backdrop"))
+                ep = None
+                if show.get("season") and best.get("type") == "tv":
+                    ep = await finder.episode_providers(best["jw_id"], show["season"], show.get("episode"))
+                got = kids.link_for(best, show, ep)
+                if got and not show.get("link"):
+                    show.update({k: v for k, v in got.items() if v})
+                    app = kids.apps.BY_ID.get(got["service"])
+                    if app:
+                        show["app"] = {"id": app["id"], "name": app["name"], "package": app["package"]}
+            except Exception as e:
+                print(f"home-config: kids shelf: could not look up {show['title']!r} ({e})", file=sys.stderr)
+    if finder._session and not finder._session.closed:
+        await finder._session.close()
+
+
 pub = config.public()
 pub["ask"] = {"enabled": False}
+if "--no-lookup" not in sys.argv and any(p.get("kids_mode") for p in pub["people"]):
+    import asyncio
+    asyncio.run(bake_kids(pub["people"]))
 text = json.dumps(pub, separators=(",", ":"))
 print(text if "--json" in sys.argv else base64.b64encode(text.encode()).decode())

@@ -5,3 +5,8 @@
   -webkit-backdrop-filter: none;
   backdrop-filter: none;
 }
+
+/* A 2018 TV (Tizen 4.0) stops clipping a tile's picture to the face's rounded corners while the
+   tile scales or fades, so the logo shows square for about a second. Rounding the picture and the
+   glint themselves keeps the corners; a mask on the face would also cut its shadow. */
+.face img, .face::after { border-radius: inherit; }

@@ -8,7 +8,7 @@
      macOS asks once for Local Network access the first time it talks to the TV. Say yes.
      If the log shows "No route to host" while a hand-started bridge works, it is Local Network
      privacy: use a python.org or Homebrew Python for the venv, or wrap an ad-hoc signed
-     interpreter in a small app bundle with its own identity (README, issue #42).
+     interpreter in a small app bundle with its own identity (docs/SETUP.md step 5, issue #42).
      A laptop must not sleep: sudo pmset -c sleep 0 (or the Battery setting).
      launchd starts programs with a bare PATH, so the Claude ask (optional) needs CLAUDE_BIN set
      to where `claude` is (run `command -v claude` to see it). Leave it as it is if you do not use

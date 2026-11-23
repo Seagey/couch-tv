@@ -1,0 +1,250 @@
+<!doctype html>
+<!-- Smart home set up on a phone: the page the QR code on the TV opens (Home settings, Designs,
+     Smart home). The TV serves it at /ha (app.couchtv.ha.HaPhone, the launcher's HaServer.kt or the
+     on-TV app's Server.kt). It picks Home Assistant, sends the phone to Home Assistant's own sign in,
+     then ticks what shows. The TV keeps the tokens; this page never sees one. -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="referrer" content="no-referrer">
+<meta name="color-scheme" content="light dark">
+<title>Smart home for your TV</title>
+<style>
+  :root { --bg: #f4f6f5; --card: #fff; --ink: #14201b; --dim: #5b6a63; --line: #dde3e0; --accent: #0b7a5a; --accent-ink: #fff; --bad: #b3261e; }
+  @media (prefers-color-scheme: dark) { :root { --bg: #0d1e19; --card: #15291f; --ink: #eef4f1; --dim: #9fb3aa; --line: #27402f; --accent: #4fd1a5; --accent-ink: #062418; --bad: #ff8a80; } }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 17px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  main { max-width: 560px; margin: 0 auto; padding: 24px 16px 96px; }
+  h1 { font-size: 26px; line-height: 1.2; margin: 8px 0 4px; }
+  h2 { font-size: 19px; margin: 0 0 8px; }
+  p { margin: 0 0 12px; }
+  .dim { color: var(--dim); }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 16px; margin: 16px 0; }
+  .pick { display: flex; align-items: center; gap: 12px; padding: 12px 0; border-top: 1px solid var(--line); cursor: pointer; }
+  .pick:first-of-type { border-top: 0; }
+  .pick input { width: 22px; height: 22px; flex: none; accent-color: var(--accent); }
+  .pick span { flex: 1; min-width: 0; }
+  .pick small { display: block; color: var(--dim); font-size: 13px; overflow-wrap: anywhere; }
+  input[type=text], input[type=search], input[type=url] { width: 100%; font: inherit; padding: 12px 14px; border-radius: 12px; border: 1px solid var(--line); background: var(--bg); color: var(--ink); }
+  button { font: inherit; font-weight: 600; border: 0; border-radius: 999px; padding: 14px 20px; cursor: pointer; }
+  .go { background: var(--accent); color: var(--accent-ink); width: 100%; }
+  .plain { background: transparent; color: var(--accent); padding: 10px 0; }
+  .danger { background: transparent; color: var(--bad); padding: 10px 0; }
+  .bar { position: fixed; left: 0; right: 0; bottom: 0; padding: 12px 16px calc(12px + env(safe-area-inset-bottom)); background: var(--bg); border-top: 1px solid var(--line); }
+  .bar div { max-width: 560px; margin: 0 auto; }
+  .msg { padding: 12px 14px; border-radius: 12px; background: var(--card); border: 1px solid var(--line); margin: 12px 0; }
+  .msg.bad { border-color: var(--bad); color: var(--bad); }
+  details { border-top: 1px solid var(--line); padding: 10px 0; }
+  details:first-of-type { border-top: 0; }
+  summary { font-weight: 600; cursor: pointer; }
+  .count { color: var(--dim); font-weight: 400; font-size: 15px; }
+  [hidden] { display: none !important; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Smart home for your TV</h1>
+  <p class="dim" id="lede">Show your aircon, lights, cameras and more on the TV, through Home Assistant.</p>
+  <div class="msg" id="msg" hidden></div>
+
+  <!-- 1. which Home Assistant, then sign in -->
+  <section id="signin" hidden>
+    <div class="card">
+      <h2>Your Home Assistant</h2>
+      <div id="found"><p class="dim">Looking on your Wi-Fi...</p></div>
+      <label class="pick" id="typed-row"><input type="radio" name="ha" value="typed"><span>Another address</span></label>
+      <input type="url" id="typed" placeholder="homeassistant.local:8123" autocomplete="off" autocapitalize="off" spellcheck="false" hidden>
+    </div>
+    <button class="go" id="go">Sign in to Home Assistant</button>
+    <p class="dim" style="margin-top:12px">Best as a Home Assistant user just for the TV, not an administrator. You can sign the TV out any time.</p>
+  </section>
+
+  <!-- 2. what shows on the TV -->
+  <section id="devices" hidden>
+    <p id="who" class="dim"></p>
+    <input type="search" id="find" placeholder="Search" autocomplete="off">
+    <div id="groups"></div>
+    <div class="card">
+      <h2>A device we don't list</h2>
+      <p class="dim">Add it to Home Assistant first (Settings, Devices and services, Add integration, then search for the brand). Then come back here: it is in the list.</p>
+      <div id="help"></div>
+    </div>
+    <button class="plain" id="again">Use a different Home Assistant</button><br>
+    <button class="danger" id="forget">Disconnect the TV from Home Assistant</button>
+  </section>
+
+  <section id="gone" hidden>
+    <div class="card"><p>This link has run out. On the TV, open Smart home again and scan the new code.</p></div>
+  </section>
+</main>
+<div class="bar" id="savebar" hidden><div><button class="go" id="save">Save</button></div></div>
+
+<script src="ha-picks.js"></script>
+<script src="caps-words.js"></script>
+<script src="phone-words.js"></script>
+<script>
+(function () {
+  "use strict";
+  var $ = function (id) { return document.getElementById(id); };
+  // the set up key: from the QR code's address, or kept in this tab while Home Assistant's sign in page
+  // was open (a failed sign in comes back with no key, so a stranger's link never carries it)
+  var K = new URLSearchParams(location.search).get("k") || "";
+  function keep(k) { try { sessionStorage.setItem("ha-k", k); } catch (e) {} }
+  function kept() { try { return sessionStorage.getItem("ha-k") || ""; } catch (e) { return ""; } }
+  if (K) keep(K); else K = kept();
+  var E = new URLSearchParams(location.search).get("e") || "";
+  var ERR = {
+    address: "That is not an address. It looks like http://homeassistant.local:8123 or http://192.168.1.20:8123.",
+    unreachable: "The TV could not reach Home Assistant there. Check it is on and on the same Wi-Fi as the TV.",
+    not_ha: "Something answered there, but it is not Home Assistant. Check the address and the port (usually 8123).",
+    not_ready: "Home Assistant is still being set up. Finish that first, then try again.",
+    network: "The TV is not on your Wi-Fi.",
+    expired: "That took too long. Try again.",
+    denied: "Sign in was cancelled.",
+    signin: "Home Assistant did not let the TV in. Sign in again.",
+    again: "Home Assistant signed the TV out. Sign in again.",
+    picks: "That could not be saved. Try again.",
+    net: "The TV did not answer. Check the phone is on the same Wi-Fi as the TV."
+  };
+  // the brands people ask about, each with the way into Home Assistant (moved here from the TV)
+  var HELP = [
+    ["Tuya, Smart Life, Arlec Grid Connect, Deta", "Add integration, Tuya. Home Assistant shows a QR code: scan it with the Smart Life or Tuya app."],
+    ["Google Home and Nest", "Nest thermostats, cameras and doorbells: Add integration, Google Nest. Other Google Home devices: share them to Home Assistant with Matter (below)."],
+    ["Amazon Alexa", "Alexa itself has no way in, but the plugs and lights in it do: add each by its own brand (often Tuya, TP-Link, Hue or Matter)."],
+    ["Apple Home", "In the Home app, open the device, Turn On Pairing Mode, and copy the code. Then in the Home Assistant app: Add device, Matter."],
+    ["Matter or Thread devices", "In the Home Assistant app: Settings, Devices and services, Add device, Add Matter device, then scan the code on the device."],
+    ["Philips Hue", "Add integration, Philips Hue, then press the round button on the Hue bridge."],
+    ["Aircon", "Add integration and search for the brand: Daikin, Mitsubishi (MELCloud), Fujitsu, Panasonic, LG, Sensibo, AirTouch 5."],
+    ["Solar and batteries", "Add integration: Fronius, Enphase, SolarEdge, SMA, GoodWe or Tesla Powerwall. Then pick its today total under Solar or power meter."],
+    ["Plugs, cameras and speakers", "TP-Link Kasa and Tapo, Shelly, LIFX, Reolink, Ring, Eufy, Sonos, Google Cast: Add integration and search for the brand."],
+    ["Anything with a web address or MQTT", "A home made sensor, a Raspberry Pi or a router: the RESTful, MQTT or Webhook integrations make it a sensor or a switch."],
+    ["Still not there?", "Search the brand at home-assistant.io/integrations. If it is listed there, it works here."]
+  ];
+  var list = [], picks = null, chosen = "";
+
+  function say(text, bad) { var m = $("msg"); m.textContent = text || ""; m.hidden = !text; m.className = "msg" + (bad ? " bad" : ""); }
+  function show(id) { ["signin", "devices", "gone"].forEach(function (s) { $(s).hidden = s !== id; }); $("savebar").hidden = id !== "devices"; }
+  function call(method, path, body) {
+    var url = "/ha/api/" + path + (method === "GET" ? "?k=" + encodeURIComponent(K) : "");
+    var opt = { method: method, cache: "no-store", headers: {} };
+    if (method !== "GET") { opt.headers["Content-Type"] = "application/json"; opt.body = JSON.stringify(Object.assign({ k: K }, body || {})); }
+    return fetch(url, opt).then(function (r) { return r.json().catch(function () { return { ok: false, error: "net" }; }); }, function () { return { ok: false, error: "net" }; });
+  }
+  function el(tag, attrs, text) { var e = document.createElement(tag); Object.keys(attrs || {}).forEach(function (k) { e.setAttribute(k, attrs[k]); }); if (text != null) e.textContent = text; return e; }
+
+  // ---- 1. which Home Assistant ----
+  function drawFound(st) {
+    var box = $("found"); box.innerHTML = "";
+    var found = st.found || [];
+    if (!found.length) box.appendChild(el("p", { "class": "dim" }, st.scanning ? "Looking on your Wi-Fi..." : "None found on the Wi-Fi. Type its address below."));
+    found.forEach(function (f, i) {
+      var row = el("label", { "class": "pick" });
+      var r = el("input", { type: "radio", name: "ha", value: f.url });
+      if (!chosen && i === 0) chosen = f.url;
+      r.checked = chosen === f.url;
+      var s = el("span", {}, f.name); s.appendChild(el("small", {}, f.url));
+      row.appendChild(r); row.appendChild(s); box.appendChild(row);
+    });
+    var typed = document.querySelector("input[value=typed]");
+    if (!found.length && !st.scanning && !chosen) chosen = "typed";
+    typed.checked = chosen === "typed";
+    $("typed").hidden = chosen !== "typed";
+  }
+  document.addEventListener("change", function (e) {
+    if (e.target && e.target.name === "ha") { chosen = e.target.value; $("typed").hidden = chosen !== "typed"; if (chosen === "typed") $("typed").focus(); }
+  });
+  function startSignIn(st) {
+    show("signin");
+    drawFound(st);
+    if (st.scanning) setTimeout(function () { call("GET", "state").then(function (s) { if (s.ok && !$("signin").hidden) drawFound(s); if (s.ok && s.scanning) startSignIn(s); }); }, 1500);
+  }
+  $("go").addEventListener("click", function () {
+    var url = chosen === "typed" ? $("typed").value.trim() : chosen;
+    if (!url) { say("Pick your Home Assistant, or type its address.", true); return; }
+    $("go").disabled = true; say("Asking Home Assistant...");
+    call("POST", "signin", { url: url }).then(function (r) {
+      $("go").disabled = false;
+      if (r.ok && r.go) { say("Opening Home Assistant..."); keep(K); location.href = r.go; return; }
+      if (r.error === "expired") { show("gone"); say(""); return; }
+      say(ERR[r.error] || ERR.unreachable, true);
+    });
+  });
+
+  // ---- 2. what shows ----
+  function drawGroups() {
+    var box = $("groups"), q = $("find").value.trim().toLowerCase();
+    box.innerHTML = "";
+    var any = false;
+    HaPicks.GROUPS.forEach(function (g) {
+      var have = HaPicks.have(list, g).filter(function (e) { return !q || (e.name + " " + e.entity).toLowerCase().indexOf(q) >= 0; });
+      if (!have.length) return;
+      any = true;
+      var card = el("div", { "class": "card" });
+      var cur = picks[g[0]] || [];
+      var h = el("h2", {}, g[1] + " "); h.appendChild(el("span", { "class": "count" }, g[3] === 1 ? "pick one" : cur.length + " of up to " + g[3]));
+      card.appendChild(h);
+      have.forEach(function (e) {
+        var row = el("label", { "class": "pick" });
+        var box2 = el("input", { type: g[3] === 1 ? "radio" : "checkbox", name: "g-" + g[0] });
+        box2.checked = cur.indexOf(e.entity) >= 0;
+        box2.addEventListener("click", function (ev) {
+          if (g[3] === 1 && cur.indexOf(e.entity) >= 0) { picks[g[0]] = []; drawGroups(); return; }   // a one only group can be emptied again
+          if (!HaPicks.toggle(picks, g, e.entity)) { ev.preventDefault(); say("That is the most for " + g[1].toLowerCase() + ". Untick one first.", true); return; }
+          say(""); drawGroups();
+        });
+        var s = el("span", {}, e.name); s.appendChild(el("small", {}, e.entity + (e.unit ? ", " + e.unit : "")));
+        row.appendChild(box2); row.appendChild(s); card.appendChild(row);
+      });
+      box.appendChild(card);
+    });
+    if (!any) box.appendChild(el("p", { "class": "dim" }, q ? "Nothing matches that." : "Home Assistant has nothing the TV can show yet."));
+  }
+  $("find").addEventListener("input", drawGroups);
+  function loadDevices(host) {
+    show("devices"); say("Reading your home...");
+    $("who").textContent = host ? "Connected to " + host + ". Tick what shows on the TV." : "";
+    call("GET", "devices").then(function (r) {
+      if (!r.ok) {
+        if (r.error === "expired") { show("gone"); say(""); return; }
+        if (r.error === "signin") { say(ERR.signin, true); call("GET", "state").then(startSignIn); return; }
+        say(ERR[r.error] || ERR.unreachable, true); return;
+      }
+      list = r.entities || []; picks = HaPicks.fromStatus(r.picked || {});
+      say(""); drawGroups();
+    });
+  }
+  $("save").addEventListener("click", function () {
+    if (!picks) return;
+    $("save").disabled = true; say("Saving...");
+    call("POST", "save", { picks: HaPicks.section(picks) }).then(function (r) {
+      $("save").disabled = false;
+      if (r.ok) say(r.count ? "Saved. " + r.count + (r.count === 1 ? " thing shows" : " things show") + " on the TV now." : "Saved. Nothing is ticked, so nothing shows on the TV.");
+      else if (r.error === "expired") { show("gone"); say(""); }
+      else say(ERR[r.error] || ERR.picks, true);
+    });
+  });
+  $("again").addEventListener("click", function () { say(""); call("GET", "state").then(function (s) { if (s.ok) startSignIn(s); else show("gone"); }); });
+  $("forget").addEventListener("click", function () {
+    if (!confirm("Disconnect the TV from Home Assistant? Smart home goes off on the TV.")) return;
+    call("POST", "forget").then(function (r) {
+      if (r.ok) { say("Disconnected. Smart home is off on the TV."); call("GET", "state").then(function (s) { if (s.ok) startSignIn(s); }); }
+      else if (r.error === "expired") show("gone");
+    });
+  });
+
+  HELP.forEach(function (h) { var d = el("details"); d.appendChild(el("summary", {}, h[0])); d.appendChild(el("p", { "class": "dim" }, h[1])); $("help").appendChild(d); });
+
+  // ---- start ----
+  if (!K) { show("gone"); return; }
+  if (E && ERR[E]) say(ERR[E], true);
+  call("GET", "state").then(function (st) {
+    if (!st.ok) { show("gone"); return; }
+    if (st.signin_again) { say(ERR.again, true); startSignIn(st); return; }
+    if (st.signed_in && (location.hash === "#devices" || !E)) { if (location.hash === "#devices") say(""); loadDevices(st.host); }
+    else startSignIn(st);
+  });
+})();
+</script>
+</body>
+</html>

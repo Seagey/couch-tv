@@ -1,0 +1,10 @@
+{
+  "name": "couch-tv-matter",
+  "private": true,
+  "description": "The Matter controller the couch-tv bridge runs as its own service (bridge/matter.py, docs/MATTER.md)",
+  "license": "Apache-2.0",
+  "engines": { "node": ">=22.13.0" },
+  "dependencies": {
+    "matter-server": "1.6.0"
+  }
+}

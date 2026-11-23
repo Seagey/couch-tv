@@ -1,7 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Window changes only: no content reading, no input, no feedback. -->
+<!-- Window changes only: no content reading, no feedback. On a Xiaomi TV only, the code also switches
+     on key filtering at run time (the Home and Mi keys, see FireWatch.onKeyEvent); other TVs never get it. -->
+<!-- canRetrieveWindowContent is declared only so the TV delivers the events: some builds (a TCL
+     Smart TV Pro on Android 12) hand window-change events only to services with this capability.
+     The code reads nothing but the event's package and class names, never the screen. -->
 <accessibility-service xmlns:android="http://schemas.android.com/apk/res/android"
     android:accessibilityEventTypes="typeWindowStateChanged"
     android:accessibilityFeedbackType="feedbackGeneric"
+    android:canRequestFilterKeyEvents="true"
+    android:canRetrieveWindowContent="true"
     android:notificationTimeout="0"
     android:description="@string/fire_watch_desc" />

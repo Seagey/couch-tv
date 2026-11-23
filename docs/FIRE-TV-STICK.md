@@ -4,7 +4,7 @@ Written by [killy10o10](https://github.com/killy10o10/couch-tv), who runs couch-
 (`dev.couchtv.ontv`, option C) as the home screen of a
 **Fire TV Stick 4K (2nd gen, model AFTKM) on Fire OS 8.1.8.5 (Android 11)**. Everything below was
 done on that stick. Other Fire OS 7 and 8 sticks should behave the same; sticks on **Vega OS**
-cannot sideload apps at all.
+have no APKs or ADB: they use a different path ([FIRE-VEGA.md](FIRE-VEGA.md)).
 
 ![couch-tv on the Fire TV Stick](screens/firestick-home.jpg)
 
@@ -24,9 +24,16 @@ cannot sideload apps at all.
 | Survives a restart | Yes (the accessibility watcher stays on) |
 | Bluetooth button | Yes. If parental controls are on, Fire OS asks for the Prime Video PIN first |
 | Network button | Yes |
-| Phone remote | Opening apps works without ADB. Keys, typing and "what's playing" need the TV's own ADB (Connect ADB in the app) |
+| Phone remote | Opening apps works without ADB. Keys, typing and "what's playing" need the TV's own ADB (Connect ADB in the app), which current Fire OS blocks: `scripts/check-tv.py <tv address> --adb` says whether yours does, and points to option B (the computer bridge) for the full remote |
 | Keep watching | Only fills from shows started from the phone remote |
 | Amazon's YouTube app | Yes, shown and sorted as YouTube |
+
+**Keep watching with no computer (option A)** is Android's own Watch Next list, which couch-tv reads
+and nothing else. It shows only what the apps themselves put there. On Fire OS that has been seen
+to be Hotstar and not Netflix or Prime Video ([#183](https://github.com/Seagey/couch-tv/issues/183)):
+those apps may keep their "continue watching" for Amazon's home instead. That is not confirmed, and
+couch-tv has no other source for them without the bridge. With the bridge (option B), shows you
+start through couch-tv are remembered by the bridge itself.
 
 ## Install
 
@@ -42,9 +49,10 @@ network as the stick.
    ```sh
    adb connect <stick-ip>:5555
    ```
-4. **Install** `couch-tv-ontv.apk` from [the Releases page](https://github.com/Seagey/couch-tv/releases):
+4. **Install** `couch-tv-ontv-watch.apk` from [the Releases page](https://github.com/Seagey/couch-tv/releases)
+   (the on-TV app with the home watch a Fire TV needs; the plain `couch-tv-ontv.apk` leaves it out):
    ```sh
-   adb -s <stick-ip>:5555 install couch-tv-ontv.apk
+   adb -s <stick-ip>:5555 install couch-tv-ontv-watch.apk
    ```
 5. **Open Couch TV** on the stick and press **Use as home screen**. Skip Connect ADB unless you
    want the phone remote's keys.

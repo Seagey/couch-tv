@@ -35,6 +35,7 @@ import aiohttp
 
 import apps
 import config
+import messages
 from tv import TVUnavailable
 
 # The couch-tv app's id on the TV (samsung/app/config.xml). "app_id" on the TV in config.json wins.
@@ -61,6 +62,10 @@ KEYS = {
     "guide": "KEY_GUIDE", "input": "KEY_SOURCE", "captions": "KEY_CAPTION",
     "channel_up": "KEY_CHUP", "channel_down": "KEY_CHDOWN",
     **{str(n): f"KEY_{n}" for n in range(10)},
+    # the phone remote's More keys sheet (g32: a Samsung smart monitor's owner wanted Esc and the other
+    # keys of the monitor's own remote); "exit" above is the Esc of a monitor
+    "return": "KEY_RETURN", "tools": "KEY_TOOLS", "source": "KEY_SOURCE", "channel_list": "KEY_CH_LIST",
+    "red": "KEY_RED", "green": "KEY_GREEN", "yellow": "KEY_YELLOW", "blue": "KEY_CYAN",
 }
 
 
@@ -176,7 +181,11 @@ class SamsungTV:
 
     def require(self):
         if not self.connected:
-            raise TVUnavailable(f"the {self.name.lower()} TV is not answering on the network")
+            raise TVUnavailable(
+                f"the {self.name.lower()} TV is not answering on the network",
+                key="err_driver_not_answering",
+                vars={"name": self.name.lower()},
+            )
 
     def can_deeplink(self, app):
         return app.get("id") in ("netflix", "youtube")
@@ -400,15 +409,34 @@ class SamsungTV:
         if front:
             self._note(f"TV came on in {self._package_of(front)}, left alone")
             return
-        try:
-            how = await self._launch_tizen(self.app_id)
-            await asyncio.sleep(3)
-            if await self._front() == self.app_id:
-                self._note(f"TV came on, opened couch-tv ({how})")
-            else:
-                self._note(f"TV came on, asked it to open couch-tv ({how}) but it is not on screen")
-        except Exception as e:
-            self._note(f"TV came on, could not open couch-tv: {e}")
+        await self._open_couch()
+
+    async def _open_couch(self):
+        """The hook's last step: nothing else is on screen, so open couch-tv. Just after a TV
+        wakes or a Frame leaves Art Mode it can refuse the launch, or drop off the network for a
+        moment. Seen on a 2021 Frame on 20 Nov 2026: one try failed with "not answering on the
+        network" and the hook gave up, leaving Samsung's screen. So it tries three times."""
+        last = None
+        for attempt in range(3):
+            if attempt:
+                await asyncio.sleep(3)
+                front = await self._front()
+                if front == self.app_id:
+                    self._note(f"TV came on, opened couch-tv (on screen after try {attempt})")
+                    return
+                if front:
+                    self._note(f"TV came on in {self._package_of(front)}, left alone")
+                    return
+            try:
+                how = await self._launch_tizen(self.app_id)
+                await asyncio.sleep(3)
+                if await self._front() == self.app_id:
+                    self._note(f"TV came on, opened couch-tv ({how}{', try %d' % (attempt + 1) if attempt else ''})")
+                    return
+                last = f"asked it to open couch-tv ({how}) but it is not on screen"
+            except Exception as e:
+                last = f"could not open couch-tv: {e}"
+        self._note(f"TV came on, {last}")
 
     async def _art_loop(self):
         """Frame TVs: keep the art channel open and follow Art Mode on and off."""
@@ -481,7 +509,7 @@ class SamsungTV:
             while True:
                 msg = await asyncio.wait_for(ws.receive(), pairing_wait)
                 if msg.type != aiohttp.WSMsgType.TEXT:
-                    raise TVUnavailable("the TV closed the remote connection")
+                    raise TVUnavailable("the TV closed the remote connection", key="err_tv_closed_remote")
                 j = json.loads(msg.data)
                 if j.get("event") == "ms.channel.connect":
                     new = (j.get("data") or {}).get("token")
@@ -493,11 +521,17 @@ class SamsungTV:
                         self.log.info("the TV allowed the remote (token kept)")
                     break
                 if j.get("event") == "ms.channel.unauthorized":
-                    raise TVUnavailable("the TV said no to the remote: press Allow on the TV when it asks "
-                                        "(Settings, General, External Device Manager, Device Connection Manager)")
+                    raise TVUnavailable(
+                        "the TV said no to the remote: press Allow on the TV when it asks "
+                        "(Settings, General, External Device Manager, Device Connection Manager)",
+                        key="err_samsung_remote_refused",
+                    )
         except asyncio.TimeoutError:
             await ws.close()
-            raise TVUnavailable("the TV is waiting for someone to press Allow on its screen")
+            raise TVUnavailable(
+                "the TV is waiting for someone to press Allow on its screen",
+                key="err_samsung_remote_waiting_allow",
+            )
         except Exception:
             await ws.close()
             raise
@@ -533,7 +567,7 @@ class SamsungTV:
     async def key(self, name, hold=False):
         # A power press from the phone should land on couch-tv, like one from the TV's own remote
         # (29 Oct: off and on from the phone left the Frame on Samsung's home).
-        power = isinstance(name, str) and resolve_key(name) == "KEY_POWER" and not hold
+        power = isinstance(name, str) and resolve_key(name) == "KEY_POWER"
         self.quiet_until = 0.0 if power else time.monotonic() + 20
         if isinstance(name, str) and name.strip().lower() == "home":
             # couch-tv's Home is our app; Samsung's own menu is "smart_hub".
@@ -541,11 +575,12 @@ class SamsungTV:
             return "couch-tv"
         code = resolve_key(name)
         if not code:
-            raise ValueError(f"unknown key: {name}")
-        if hold:
-            # A Frame: holding power switches it fully off (a press only goes to Art Mode).
+            raise messages.with_key(ValueError(f"unknown key: {name}"), "err_unknown_key", key=name)
+        # Power is never held (docs/SAMSUNG.md): on a Frame a held power switches it fully off, so a
+        # held power from the phone or the MCP tool is one press, which goes to Art Mode on a Frame.
+        if hold and code != "KEY_POWER":
             await self._key(code, "Press")
-            await asyncio.sleep(3.0 if code == "KEY_POWER" else 0.8)
+            await asyncio.sleep(0.8)
             await self._key(code, "Release")
         else:
             await self._key(code)
@@ -597,7 +632,11 @@ class SamsungTV:
         self.require()
         ids = self._candidates(package)
         if not ids:
-            raise ValueError(f"no Samsung app id known for {package}")
+            raise messages.with_key(
+                ValueError(f"no Samsung app id known for {package}"),
+                "err_samsung_no_app_id",
+                package=package,
+            )
         await self.refresh_installed()
         installed = [i for i in ids if i in self.ids or i == self.app_id]
         await self._launch_tizen((installed or ids)[0])
@@ -619,8 +658,17 @@ class SamsungTV:
         if app and app["id"] == "youtube" and youtube_id(uri):
             await self._dial("YouTube", f"v={youtube_id(uri)}")
             return "dial"
+        if "://" in uri and not pkg:
+            import custom_cards
+            link = custom_cards.web_url(uri)
+            if link:
+                await self._launch_tizen("org.tizen.browser", meta=link)
+                return "browser"
         if not pkg:
-            raise ValueError("Samsung TVs only open links for Netflix and YouTube")
+            raise messages.with_key(
+                ValueError("Samsung TVs only open links for Netflix and YouTube"),
+                "err_samsung_only_netflix_youtube",
+            )
         await self.launch_package(pkg)
         return "app"
 
@@ -661,7 +709,11 @@ class SamsungTV:
             return await asyncio.wait_for(fut, timeout)
         except asyncio.TimeoutError:
             self._tv_answers.pop(job["id"], None)
-            return {"ok": False, "error": "the couch-tv app on the TV did not answer"}
+            return {
+                "ok": False,
+                "error": "the couch-tv app on the TV did not answer",
+                **messages.error_fields("err_samsung_tv_app_timeout"),
+            }
 
     async def _installed_id(self, app, given):
         await self.refresh_installed()
@@ -755,10 +807,10 @@ class SamsungTV:
         return False
 
     async def adb(self, *args, **kw):
-        raise TVUnavailable("this is a Samsung TV: ADB tools are Android only")
+        raise TVUnavailable("this is a Samsung TV: ADB tools are Android only", key="err_samsung_adb_android_only")
 
     async def screenshot(self):
-        raise TVUnavailable("Samsung TVs do not give screenshots over the network")
+        raise TVUnavailable("Samsung TVs do not give screenshots over the network", key="err_samsung_no_screenshots")
 
     # ---------- power ----------
     async def port_open(self, port=8001, timeout=1.0):

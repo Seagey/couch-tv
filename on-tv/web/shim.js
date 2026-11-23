@@ -4,9 +4,20 @@
 (function () {
   'use strict';
   var KEY = 'couchtv.token';
-  var token = null;
-  try { token = localStorage.getItem(KEY); } catch (e) { /* private mode: the cookie still works */ }
-  if (!token) { var m = document.cookie.match(/(?:^|; )couchtv_token=([^;]+)/); if (m) token = decodeURIComponent(m[1]); }
+  var token = null, autoPairing = false;
+  // the home computer's own phone remote keeps its pairing key as couchtv.key: a phone that paired the remote
+  // there opens the Home settings page (/setup on the same computer) already paired
+  try { token = localStorage.getItem(KEY) || localStorage.getItem('couchtv.key'); } catch (e) { }
+  // no cookie any more: a cookie is sent to every web service on the same computer, whatever its port (on a
+  // home computer the token is its pairing key). An older page's cookie is moved into storage and taken off.
+  // The page fetches its photos with the header instead (setup.html photoUrl).
+  var m = document.cookie.match(/(?:^|; )couchtv_token=([^;]+)/);
+  if (m) {
+    if (!token) { token = decodeURIComponent(m[1]); try { localStorage.setItem(KEY, token); } catch (e) { } }
+    document.cookie = 'couchtv_token=; path=/; max-age=0; SameSite=Strict';
+  }
+  // the TV this page is for, where a home computer runs more than one (setup.html TVQ, the same rule)
+  var TVQ = (/[?&]tv=([A-Za-z0-9_-]{1,40})(?:&|$)/.exec(location.search) || [])[1] || '';
 
   function isApi(url) {
     try { var u = new URL(url, location.href); return u.origin === location.origin && u.pathname.indexOf('/api/') === 0; } catch (e) { return false; }
@@ -23,7 +34,7 @@
       init.headers = h;
     }
     return realFetch(input, init).then(function (r) {
-      if (r.status === 401 && isApi(url) && !isPair(url)) showPairing('This phone needs to pair with the TV again.');
+      if (r.status === 401 && isApi(url) && !isPair(url) && !autoPairing) showPairing('This phone needs to pair with the TV again.');
       return r;
     });
   };
@@ -41,8 +52,24 @@
   function save(t) {
     token = t;
     try { localStorage.setItem(KEY, t); } catch (e) { }
-    document.cookie = 'couchtv_token=' + encodeURIComponent(t) + '; path=/; max-age=31536000; SameSite=Strict';
   }
+
+  // The pairing box's words and the TV's answers in this phone's language (tv-home/web/phone-words.js).
+  // On the phone remote, Server.kt adds phone-words.js with data-manual: the language is the remote's own
+  // choice (its menu, Language: tv.lang, or the TV's, tv.lang.tv), else this phone's. On Home settings on
+  // the phone (setup.html) phone-words.js follows the TV and swaps the box itself.
+  function remoteLang() {
+    var l = null;
+    try { l = localStorage.getItem('tv.lang'); if (!l || l === 'auto') l = localStorage.getItem('tv.lang.tv'); } catch (e) { l = null; }
+    return l || (navigator.languages && navigator.languages[0]) || navigator.language || 'en';
+  }
+  function w(s) {
+    var P = window.PhoneWords;
+    if (!P || s == null) return s;
+    var t = P.manual && P.inLang ? P.inLang(remoteLang(), s) : P.words(s);
+    return t == null ? s : t;
+  }
+  function esc(s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
 
   var shown = false;
   function showPairing(why) {
@@ -56,31 +83,72 @@
     document.head.appendChild(css);
     var d = document.createElement('div');
     d.id = 'ctv-pair';
-    d.innerHTML = '<div class="box"><h1>Pair this phone</h1><p>' + (why || 'Type the 6 digit code shown on the TV.') + '</p>' +
-      '<input id="ctv-pin" inputmode="numeric" autocomplete="one-time-code" maxlength="7" placeholder="000000" aria-label="Code from the TV">' +
-      '<button class="go" id="ctv-go">Pair</button><button class="ask" id="ctv-ask">Show a code on the TV</button><div class="msg" id="ctv-msg" role="status"></div></div>';
+    d.innerHTML = '<div class="box"><h1>' + esc(w('Pair this phone')) + '</h1><p>' + esc(w(why || 'Type the 6 digit code shown on the TV.')) + '</p>' +
+      '<input id="ctv-pin" inputmode="numeric" autocomplete="one-time-code" maxlength="7" placeholder="000000" aria-label="' + esc(w('Code from the TV')) + '">' +
+      '<button class="go" id="ctv-go">' + esc(w('Pair')) + '</button><button class="ask" id="ctv-ask">' + esc(w('Show a code on the TV')) + '</button><div class="msg" id="ctv-msg" role="status"></div></div>';
     (document.body ? Promise.resolve() : new Promise(function (r) { document.addEventListener('DOMContentLoaded', r); })).then(function () {
       document.body.appendChild(d);
       var pin = document.getElementById('ctv-pin'), msg = document.getElementById('ctv-msg');
       document.getElementById('ctv-ask').onclick = function () {
-        msg.textContent = 'Asking the TV…';
-        realFetch('/api/pair/start', { method: 'POST' }).then(function (r) { return r.json(); })
-          .then(function (j) { msg.textContent = j.ok ? 'The code is on the TV now.' : (j.error || 'The TV did not answer.'); })
-          .catch(function () { msg.textContent = 'Can’t reach the TV.'; });
+        msg.textContent = w('Asking the TV…');
+        realFetch('/api/pair/start' + (TVQ ? '?tv=' + TVQ : ''), { method: 'POST' }).then(function (r) { return r.json(); })
+          .then(function (j) { msg.textContent = w(j.ok ? 'The code is on the TV now.' : (j.error || 'The TV did not answer.')); })
+          .catch(function () { msg.textContent = w('Can’t reach the TV.'); });
       };
       document.getElementById('ctv-go').onclick = function () {
         var code = (pin.value || '').replace(/\D/g, '');
-        if (code.length !== 6) { msg.textContent = 'The code has 6 digits.'; return; }
-        msg.textContent = 'Pairing…';
+        if (code.length !== 6) { msg.textContent = w('The code has 6 digits.'); return; }
+        msg.textContent = w('Pairing…');
         realFetch('/api/pair', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ pin: code, name: (navigator.platform || 'Phone') }) })
           .then(function (r) { return r.json(); })
-          .then(function (j) { if (j.ok && j.token) { save(j.token); msg.textContent = 'Paired.'; location.reload(); } else msg.textContent = j.error || 'That did not work.'; })
-          .catch(function () { msg.textContent = 'Can’t reach the TV.'; });
+          .then(function (j) { if (j.ok && j.token) { save(j.token); msg.textContent = w('Paired.'); location.reload(); } else msg.textContent = w(j.error || 'That did not work.'); })
+          .catch(function () { msg.textContent = w('Can’t reach the TV.'); });
       };
       pin.addEventListener('keydown', function (e) { if (e.key === 'Enter') document.getElementById('ctv-go').click(); });
     });
   }
 
+  // One scan pairs: the TV's QR is http://<tv>:5400/#pin=123456 (SetupWords.qrLink). The code is
+  // taken out of the address at once (so it is not kept in the history or a bookmark), then used
+  // once, exactly as if it had been typed. It only ever travels in the request body of /api/pair.
+  // The rest of the fragment (a #design=<code> from couch-tv Studio) is left for the remote.
+  var pinFromQr = null;
+  try {
+    var hm = /(^|[#&])pin=(\d{6})(?=&|$)/.exec(location.hash || '');
+    if (hm) {
+      pinFromQr = hm[2];
+      var rest = (location.hash || '').replace(/^#/, '').split('&').filter(function (p) { return p && p.indexOf('pin=') !== 0; }).join('&');
+      history.replaceState(history.state, '', location.pathname + location.search + (rest ? '#' + rest : ''));
+    }
+  } catch (e) { pinFromQr = null; }
+  function pairWith(code, then) {
+    return realFetch('/api/pair', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ pin: code, name: (navigator.platform || 'Phone') }) })
+      .then(function (r) { return r.json(); }).then(then);
+  }
+  // while the scanned code is on its way, the page's own calls may answer 401: no "pair again" box
+  // over it (the 401 guard above); cleared before any box this shows
+  function pairFromQr() {
+    autoPairing = true;
+    pairWith(pinFromQr, function (j) {
+      if (j.ok && j.token) { save(j.token); location.reload(); }
+      else { autoPairing = false; showPairing(j.error || 'That code from the TV has run out. Scan the code on the TV again, or type the 6 digit code shown there.'); }
+    }).catch(function () { autoPairing = false; showPairing('Can’t reach the TV. Check this phone is on the same Wi-Fi as the TV.'); });
+  }
+
   window.couchTv = { token: function () { return token; }, pair: showPairing };
-  if (!token) showPairing();
+  if (pinFromQr) {
+    // already paired with a token the TV still knows: nothing to do. Otherwise pair with the scanned code.
+    if (!token) pairFromQr();
+    else {
+      autoPairing = true;   // a stale token: the page's first calls may 401 before the check below says so
+      realFetch('/api/health', { headers: { Authorization: 'Bearer ' + token } }).then(function (r) { return r.json(); })
+        .then(function (j) { if (!j || j.auth !== 'ok') pairFromQr(); else autoPairing = false; }).catch(function () { pairFromQr(); });
+    }
+  } else if (!token) {
+    // a home computer with no pairing key set answers every call already (auth "ok"): nothing to pair.
+    // Anything else (the on-TV app, a computer with a key) shows the pairing screen as before.
+    realFetch('/api/health').then(function (r) { return r.json(); })
+      .then(function (j) { if (j && j.auth === 'ok' && j.mode !== 'on-tv') { save('open'); location.reload(); } else showPairing(); })
+      .catch(function () { showPairing(); });
+  }
 })();

@@ -40,7 +40,18 @@
         send("dom", "<!-- " + location.href + " -->\n" + document.documentElement.outerHTML);
       }, 9000);
     });
-    document.addEventListener("keydown", function (e) { send("log", "key " + e.keyCode + " " + e.key); }, true);
+    // and how long from each key press until the next frame is on screen, with the page's classes,
+    // to see what a slow TV stalls on (an LG 43SQ700S froze when Home settings opened)
+    document.addEventListener("keydown", function (e) {
+      var t0 = performance.now(), k = e.keyCode, key = e.key;
+      setTimeout(function () {
+        var js = performance.now() - t0;
+        requestAnimationFrame(function () { requestAnimationFrame(function () {
+          send("log", "key " + k + " " + key + ": js " + Math.round(js) + " ms, on screen " + Math.round(performance.now() - t0)
+            + " ms, " + document.documentElement.className);
+        }); });
+      }, 0);
+    }, true);
   }
 
   // ---------- webOS service calls ----------
@@ -70,15 +81,17 @@
     (m.ids || []).forEach(function (id) { byLg[id] = pkg; });
     [m.name].concat(m.names || []).forEach(function (n) { if (n) byName[plain(n)] = pkg; });
   });
-  // LG's own parts (live TV, inputs, settings, the store, Developer Mode) are not shown on the home.
+  // LG's own parts (live TV, inputs, settings, Developer Mode) are not shown on the home,
   var SYSTEM = /^(com\.webos\.|com\.palm\.|com\.lge\.|com\.palmdts\.)/;
+  // except LG's store ("Apps"), which takes the home's App Store tile, the Play Store's place on Android
+  var STORE = { "com.webos.app.discovery": "com.android.vending" };
   var byPkg = {}, shown = [];
   lgApps.forEach(function (a) {
-    if (a.id === SELF) return;
-    var pkg = byLg[a.id] || byName[plain(a.title)];
+    if (a.id === SELF || a.id === "app.couchtv.helper") return;   // lg/helper has no window
+    var pkg = STORE[a.id] || byLg[a.id] || byName[plain(a.title)];
     if (pkg && !byPkg[pkg]) {
       byPkg[pkg] = a;
-      shown.push({ package: pkg, label: MAP[pkg].name || a.title });
+      shown.push({ package: pkg, label: (MAP[pkg] || {}).name || a.title });
     } else if (!pkg && !SYSTEM.test(a.id || "") && !byPkg[a.id]) {
       byPkg[a.id] = a;
       shown.push({ package: a.id, label: a.title });
@@ -91,6 +104,7 @@
     var x = new XMLHttpRequest();
     x.open("POST", BRIDGE + "/api/launch");
     x.setRequestHeader("Content-Type", "application/json");
+    if (S.key) x.setRequestHeader("Authorization", "Bearer " + S.key);
     x.send(JSON.stringify(TV_ID ? { app: pkg, tv: TV_ID } : { app: pkg }));
   }
 
@@ -115,8 +129,36 @@
     var m = MAP[pkg];
     if ((m && m.logo) || LOGOS[pkg]) return "logos/" + pkg + ".png";
     var a = byPkg[pkg];
-    if (a && a.icon) return /^[a-z]+:/.test(a.icon) ? a.icon : "file://" + a.icon;
-    return null;
+    if (!a || !a.icon) return null;
+    // the TV gives most icons on its self-signed port 3001, which this page refuses: the bridge fetches them
+    if (BRIDGE && /^https:/.test(a.icon)) {
+      var q = [];
+      if (TV_ID) q.push("tv=" + TV_ID);
+      if (S.key) q.push("key=" + encodeURIComponent(S.key));
+      return BRIDGE + "/api/webos/icon/" + encodeURIComponent(a.id) + (q.length ? "?" + q.join("&") : "");
+    }
+    return /^[a-z]+:/.test(a.icon) ? a.icon : "file://" + a.icon;
+  }
+
+  // ---------- Developer Mode: press its own Extend ----------
+  // LG removes apps installed in Developer Mode when the session runs out. The Extend button is inside
+  // LG's Developer Mode app; the app is opened with {"extend": true} (the same as
+  // `ares-launch com.palmdts.devmode -p '{"extend":true}'`), which presses it on the way in. The
+  // Developer Mode app takes the screen; the home is opened again from the TV (Home, then couch-tv).
+  var DEVMODE = "com.palmdts.devmode";
+  var extendAt = 0;
+  // The Developer Mode app takes the screen and sends the Extend itself. webOS freezes this page's
+  // timers while another app is in front, so the home cannot bring itself back; app.js says the
+  // Extend is done when the home is opened again (devResume there, which reads its own note).
+  function extendDevMode(done) {
+    if (Date.now() - extendAt < 60000) return false;   // one press at a time
+    extendAt = Date.now();
+    luna("luna://com.webos.applicationManager/launch", { id: DEVMODE, params: { extend: true } }, function (r) {
+      var ok = !!(r && r.returnValue);
+      send("log", "devmode extend: " + (ok ? "launched" : (r ? r.errorText || r.errorCode : "no answer")));
+      if (!ok) { extendAt = 0; if (done) done(false); }
+    });
+    return true;
   }
 
   window.TVOS = {
@@ -124,11 +166,25 @@
     launch: launch,
     iconUrl: iconUrl,
     bannerUrl: function () { return null; },
+    extendDevMode: extendDevMode,
     kept: function (k) { try { return localStorage.getItem("tvos." + k); } catch (e) { return null; } },
     keep: function (k, v) { try { localStorage.setItem("tvos." + k, v); } catch (e) {} },
     // the input button goes through the bridge; a web app cannot open LG's input list
     canOpenInputs: function () { return false; },
-    openInputs: function () { return false; }
+    openInputs: function () { return false; },
+    // a pinned input tile (home.inputs): switch straight to it. LG opens each input as an app,
+    // com.webos.app.hdmi<N>; "HDMI_<N>" (a tile with only a port) maps to the same.
+    openInput: function (id) {
+      var m = /^HDMI_(\d+)$/i.exec(id || "");
+      var lg = m ? "com.webos.app.hdmi" + m[1] : /^com\.webos\.app\.(hdmi\d+|externalinput\.[A-Za-z0-9_]+)$/.test(id || "") ? id : null;
+      if (!lg) return false;
+      luna("luna://com.webos.applicationManager/launch", { id: lg }, function (r) {
+        if (r && r.returnValue) { send("log", "input " + lg); return; }
+        send("log", "input " + lg + ": " + (r ? r.errorText || r.errorCode : "no answer") + ", asking the bridge");
+        bridgeLaunch(lg);
+      });
+      return true;
+    }
   };
 
   // ---------- the remote ----------
@@ -142,8 +198,18 @@
     }
   }, true);
 
+  // ---------- coming back to the app ----------
+  // appinfo.json sets handlesRelaunch, so opening the app again does not restart it (that restart
+  // was the black flash: the TV threw the page away and started a new one) and webOS sends
+  // webOSRelaunch instead. It does not bring the app forward by itself, though: on webOS 6.5.3 the
+  // home stayed behind whatever was on screen, and after the Developer Mode Extend the TV sat on
+  // the Developer Mode app. PalmSystem.activate() is LG's own call for that. On a TV without it the
+  // try/catch leaves everything as it was.
+  function activate() {
+    try { if (window.PalmSystem && PalmSystem.activate) PalmSystem.activate(); } catch (e) {}
+  }
   // coming back to the app (after Netflix, say, or the bridge opening it again): read the lists again
   function resume() { if (!document.hidden && window.tv && window.tv.resume) window.tv.resume(); }
+  document.addEventListener("webOSRelaunch", function () { activate(); resume(); });
   document.addEventListener("visibilitychange", resume);
-  document.addEventListener("webOSRelaunch", resume);
 })();

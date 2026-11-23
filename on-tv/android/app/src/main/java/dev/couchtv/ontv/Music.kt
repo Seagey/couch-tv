@@ -20,7 +20,7 @@ object Music {
     private var item: JSONObject? = null
     private var last: Pair<String, Long>? = null          // package, when it was last seen playing
     private val art = ConcurrentHashMap<String, String>()  // "artist\ntitle" -> picture url, or "" for none
-    private val pending = ConcurrentHashMap.newKeySet<String>()
+    private val pending = java.util.Collections.newSetFromMap(ConcurrentHashMap<String, Boolean>())
     private val pool = Executors.newSingleThreadExecutor()
 
     @Synchronized
@@ -36,7 +36,11 @@ object Music {
         val l = last
         if (pick == null && l != null && System.currentTimeMillis() - l.second < PAUSE_KEEP_MS)
             pick = found.firstOrNull { it.pkg == l.first && (it.state == "PAUSED" || it.state == "STOPPED") }
-        if (pick == null || Tv.genericTitle(pick.title, pick.pkg)) return item
+        // A title made only of digits ("911", "1999") is a real song when the app names the artist
+        // too; genericTitle alone would drop it as a placeholder (seen with Damso's "911" on Spotify).
+        val t = pick?.title?.trim().orEmpty()
+        val numericSong = pick != null && !pick.subtitle.isNullOrBlank() && t.isNotEmpty() && t.all { it.isDigit() }
+        if (pick == null || (!numericSong && Tv.genericTitle(pick.title, pick.pkg))) return item
         if (pick.state == "PLAYING") last = pick.pkg to System.currentTimeMillis()
         val key = "${(pick.subtitle ?: "").lowercase()}\n${pick.title!!.lowercase()}"
         if (!art.containsKey(key) && pending.add(key)) {
@@ -47,6 +51,8 @@ object Music {
             .put("album", pick.album ?: JSONObject.NULL).put("state", Tv.STATES[pick.state] ?: "stopped")
             .put("app", Apps.describe(pick.pkg)?.let { JSONObject(it) } ?: JSONObject().put("name", pick.pkg).put("package", pick.pkg))
             .put("art", art[key]?.takeIf { it.isNotEmpty() } ?: JSONObject.NULL)
+        if (pick.pos_s != null) item!!.put("position", pick.pos_s)
+        if (pick.dur_s != null) item!!.put("duration", pick.dur_s)
         return item
     }
 

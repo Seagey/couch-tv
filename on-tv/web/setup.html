@@ -3,119 +3,1719 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>TV setup</title>
+<meta name="referrer" content="no-referrer">
+<title>Home settings</title>
 <script src="/ontv/shim.js"></script>
+<!-- the page in the TV's language (tv-home/web/phone-words.js, with the widget settings words in caps-words.js) -->
+<script src="/tv/caps-words.js"></script>
+<script src="/tv/phone-words.js"></script>
+<script src="/ontv/connect-check.js"></script>
 <style>
-  :root { color-scheme: dark; --bg:#0b0b0d; --card:#16161a; --line:#2c2c33; --ink:#f2ead8; --dim:#bdb6a7; --amber:#ffb52e; --bad:#ff7a6b; }
+  :root { color-scheme: dark; --bg:#0b0b0d; --card:#16161a; --line:#2c2c33; --ink:#f2ead8; --dim:#bdb6a7; --amber:#ffb52e; --bad:#ff7a6b; --good:#7ddc8a; }
   * { box-sizing: border-box; }
-  body { margin: 0; background: var(--bg); color: var(--ink); font: 16px/1.45 -apple-system, system-ui, sans-serif; padding: 20px 16px 60px; }
-  main { max-width: 520px; margin: 0 auto; }
-  h1 { font-size: 26px; margin: 0 0 4px; } h2 { font-size: 18px; margin: 0 0 8px; }
-  p, li { color: var(--dim); } .card { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 16px; margin: 16px 0; }
-  label { display: block; font-size: 14px; color: var(--dim); margin: 10px 0 4px; }
-  input { width: 100%; padding: 12px; border-radius: 10px; border: 1px solid var(--line); background: #0f0f12; color: var(--ink); font-size: 16px; }
-  button { margin-top: 12px; padding: 12px 16px; border-radius: 12px; border: 0; background: #26262d; color: var(--ink); font-size: 16px; font-weight: 600; }
-  button.go { background: var(--amber); color: #111; }
-  .row { display: flex; gap: 10px; } .row > * { flex: 1; }
-  .status { font-weight: 600; } .ok { color: #7ddc8a; } .bad { color: var(--bad); }
+  html { -webkit-text-size-adjust: 100%; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 16px/1.45 -apple-system, system-ui, sans-serif; padding: 20px 16px 80px; padding-bottom: calc(80px + env(safe-area-inset-bottom)); }
+  main { max-width: 560px; margin: 0 auto; }
+  h1 { font-size: 28px; margin: 0 0 4px; } h2 { font-size: 20px; margin: 0 0 6px; } h3 { font-size: 16px; margin: 16px 0 6px; }
+  p, li { color: var(--dim); margin: 6px 0; } .card { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 16px; margin: 16px 0; scroll-margin-top: 64px; }
+  label { display: block; font-size: 14px; color: var(--dim); margin: 12px 0 4px; }
+  input, select, textarea { width: 100%; padding: 12px; border-radius: 10px; border: 1px solid var(--line); background: #0f0f12; color: var(--ink); font: inherit; font-size: 16px; }
+  textarea { min-height: 88px; resize: vertical; }
+  button, .btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; margin-top: 12px; min-height: 46px; padding: 12px 16px; border-radius: 12px; border: 0; background: #26262d; color: var(--ink); font: inherit; font-weight: 600; text-decoration: none; cursor: pointer; }
+  button.go, .btn.go { background: var(--amber); color: #111; }
+  button.quiet { background: transparent; border: 1px solid var(--line); }
+  button.danger { background: transparent; border: 1px solid #5a2b27; color: var(--bad); }
+  button:disabled { opacity: .5; }
+  .row { display: flex; gap: 10px; } .row > * { flex: 1; min-width: 0; }
+  .status { font-weight: 600; } .ok { color: var(--good); } .bad { color: var(--bad); }
   .msg { min-height: 20px; margin-top: 8px; color: var(--amber); font-size: 14px; }
-  a { color: var(--amber); } .check { display: flex; gap: 10px; align-items: center; margin-top: 12px; } .check input { width: auto; }
+  a { color: var(--amber); } .check { display: flex; gap: 10px; align-items: center; margin-top: 12px; color: var(--ink); font-size: 16px; } .check input { width: auto; }
+  .jump { position: sticky; top: 0; z-index: 5; display: flex; gap: 8px; overflow-x: auto; padding: 10px 0; margin: 0 -16px; padding-left: 16px; padding-right: 16px; background: linear-gradient(var(--bg) 80%, transparent); scrollbar-width: none; }
+  .jump::-webkit-scrollbar { display: none; }
+  .jump a { flex: none; padding: 8px 14px; border-radius: 999px; background: #1d1d22; border: 1px solid var(--line); color: var(--ink); text-decoration: none; font-size: 15px; }
+  .places { display: flex; flex-direction: column; gap: 6px; margin-top: 8px; }
+  .places button { margin: 0; justify-content: flex-start; text-align: left; flex-direction: column; align-items: flex-start; gap: 0; background: #1d1d22; }
+  .places small { color: var(--dim); font-weight: 400; }
+  .now { color: var(--ink); font-weight: 600; }
+  .photos { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 8px; margin-top: 10px; }
+  .photo { position: relative; aspect-ratio: 16 / 9; border-radius: 10px; overflow: hidden; background: #0f0f12; }
+  .photo img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .photo button { position: absolute; top: 4px; right: 4px; margin: 0; min-height: 32px; width: 32px; padding: 0; border-radius: 999px; background: rgba(0,0,0,.7); font-size: 18px; line-height: 1; }
+  .pick { position: relative; overflow: hidden; }
+  .pick input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+  .sub { border-top: 1px solid var(--line); margin-top: 16px; padding-top: 4px; }
+  .entry { background: #111115; border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px 12px; margin-top: 10px; }
+  .entry label:first-child { margin-top: 0; }
+  .links { display: flex; flex-wrap: wrap; gap: 8px; } .links .btn { margin-top: 8px; }
+  .names { color: var(--ink); }
+  :focus-visible { outline: 3px solid var(--amber); outline-offset: 2px; }
+  .pick:focus-within { outline: 3px solid var(--amber); outline-offset: 2px; }
+  #photos.over { border-color: var(--amber); background: #1f1b12; }
+  .drop-hint { display: none; }
+  @media (hover: hover) and (pointer: fine) { .drop-hint { display: block; } }
+  @media (min-width: 720px) { body { padding-top: 32px; } h1 { font-size: 32px; } .jump { margin: 0; padding-left: 0; padding-right: 0; flex-wrap: wrap; } }
+  /* each section a titled box: tap the title to open it */
+  .card.fold { padding: 0; }
+  .fold-head { margin: 0; }
+  .fold-btn { display: flex; width: 100%; margin: 0; min-height: 56px; padding: 14px 16px; justify-content: space-between; align-items: center; gap: 12px; background: transparent; border-radius: 16px; color: var(--ink); font-size: 20px; font-weight: 700; text-align: left; }
+  .fold-btn::after { content: ""; flex: none; width: 10px; height: 10px; border-right: 2px solid var(--dim); border-bottom: 2px solid var(--dim); transform: rotate(45deg); margin-top: -4px; transition: transform .15s; }
+  .fold-btn[aria-expanded="true"]::after { transform: rotate(-135deg); margin-top: 4px; }
+  .fold-body { padding: 0 16px 16px; }
+  .card.fold.shut .fold-body { display: none; }
+  .hidden-by-design { display: none !important; }
+  #design-line { border-color: #4a3d1c; background: #1c1810; }
+  .wbox { background: #111115; border: 1px solid var(--line); border-radius: 12px; margin-top: 10px; }
+  .wbox > summary { cursor: pointer; padding: 12px; font-weight: 600; color: var(--ink); min-height: 46px; }
+  .wbox > div { padding: 0 12px 12px; }
+  .wbox.hi { border-color: var(--amber); box-shadow: 0 0 0 2px var(--amber); }
+  .alist { list-style: none; padding: 0; margin: 8px 0 0; }
+  .alist li { display: flex; align-items: center; gap: 6px; padding: 6px 0; border-top: 1px solid var(--line); color: var(--ink); }
+  .alist li span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+  .alist li button { margin: 0; min-height: 40px; padding: 8px 10px; }
+  .miss { color: var(--dim); font-size: 14px; }
+  /* Widgets on your screen: one real widget at a time, swipe to the next (the rest under More settings) */
+  body.gal:not(.more) main > *:not(#screen):not(#town-ask) { display: none !important; }
+  #screen h1 { margin: 0; font-size: 26px; }
+  .g-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 10px; }
+  .g-count { color: var(--dim); font-size: 15px; flex: none; }
+  .g-map { position: relative; width: 100%; aspect-ratio: 16 / 9; max-height: 120px; max-width: 214px; margin: 4px auto 12px; border-radius: 8px; background: #121216; border: 1px solid var(--line); }
+  .g-map i { position: absolute; border-radius: 3px; background: #2a2a31; }
+  .g-map i.on { background: var(--amber); }
+  .g-track { display: flex; align-items: flex-start; overflow-x: auto; scroll-snap-type: x mandatory; gap: 12px; margin: 0 -16px; padding: 0 16px 4px; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
+  .g-track::-webkit-scrollbar { display: none; }
+  .g-card { flex: 0 0 100%; scroll-snap-align: center; background: var(--card); border: 1px solid var(--line); border-radius: 18px; padding: 14px; box-sizing: border-box; min-width: 0; }
+  .g-stage { position: relative; margin: 0 auto; overflow: hidden; border-radius: 14px; background: linear-gradient(160deg, #26303f, #151a22); }
+  .g-stage > .cd-layer { position: absolute; left: 0; top: 0; transform-origin: 0 0; }
+  .g-name { font-size: 19px; font-weight: 700; margin: 12px 0 2px; color: var(--ink); }
+  .g-state { font-size: 15px; color: var(--dim); margin: 0; }
+  .g-state.need { color: var(--amber); }
+  .g-card button { width: 100%; }
+  .g-nav { display: flex; align-items: center; gap: 10px; margin-top: 10px; }
+  .g-nav button { margin: 0; flex: none; min-width: 84px; }
+  .g-dots { flex: 1; display: flex; justify-content: center; gap: 6px; flex-wrap: wrap; }
+  .g-dots i { width: 7px; height: 7px; border-radius: 50%; background: #3a3a42; }
+  .g-dots i.on { background: var(--ink); }
+  .g-more { width: 100%; margin-top: 22px; }
+  .g-done { text-align: center; }
+  .g-done h2 { margin: 6px 0; }
+  .sheet-back { position: fixed; inset: 0; background: rgba(0, 0, 0, .55); z-index: 40; }
+  .sheet { position: fixed; left: 0; right: 0; bottom: 0; z-index: 41; max-height: 88vh; overflow-y: auto; background: #141418; border-top: 1px solid var(--line); border-radius: 20px 20px 0 0; padding: 8px 16px calc(20px + env(safe-area-inset-bottom)); }
+  .sheet[hidden], .sheet-back[hidden] { display: none; }
+  .sheet-in { max-width: 560px; margin: 0 auto; }
+  .sheet-grab { width: 40px; height: 5px; border-radius: 3px; background: #3a3a42; margin: 4px auto 8px; }
+  .sheet-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+  .sheet-head h2 { margin: 0; font-size: 20px; }
+  .sheet-head button { margin: 0; flex: none; }
+  .sheet .q { font-size: 16px; font-weight: 600; color: var(--ink); margin: 16px 0 6px; }
+  .sheet .help { font-size: 14px; color: var(--dim); margin: 4px 0 0; }
+  .seg { display: flex; gap: 6px; flex-wrap: wrap; }
+  .seg button { flex: 1 1 0; margin: 0; min-width: 0; padding: 10px 8px; background: #1d1d22; border: 1px solid var(--line); }
+  .seg button[aria-pressed="true"] { background: var(--amber); color: #111; border-color: var(--amber); }
+  .picks { display: flex; flex-direction: column; gap: 6px; }
+  .picks button { margin: 0; justify-content: space-between; background: #1d1d22; border: 1px solid var(--line); font-weight: 500; }
+  .picks button[aria-pressed="true"] { border-color: var(--amber); color: var(--amber); font-weight: 700; }
+  .sw { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 46px; }
+  .sw input { appearance: none; -webkit-appearance: none; width: 52px; height: 30px; border-radius: 15px; background: #3a3a42; position: relative; flex: none; margin: 0; padding: 0; border: 0; cursor: pointer; }
+  .sw input::after { content: ""; position: absolute; left: 3px; top: 3px; width: 24px; height: 24px; border-radius: 50%; background: #fff; transition: left .15s; }
+  .sw input:checked { background: var(--good); }
+  .sw input:checked::after { left: 25px; }
+  .step { display: flex; align-items: center; gap: 12px; }
+  .step button { margin: 0; width: 52px; flex: none; font-size: 22px; }
+  .step output { flex: 1; text-align: center; font-size: 20px; font-weight: 700; }
+  .steps { margin: 8px 0; padding-left: 22px; } .steps li { color: var(--ink); margin: 6px 0; }
+  .note { font-size: 14px; color: var(--dim); background: #1b1810; border: 1px solid #3a3220; border-radius: 10px; padding: 8px 10px; margin-top: 10px; }
+  .apps { display: grid; grid-template-columns: repeat(auto-fill, minmax(72px, 1fr)); gap: 10px; margin-top: 8px; }
+  .gapp { position: relative; display: flex; flex-direction: column; align-items: center; gap: 4px; background: none; border: 0; padding: 0; margin: 0; min-height: 0; color: var(--ink); font-size: 12px; font-weight: 500; touch-action: none; }
+  .gapp .ic { width: 64px; height: 64px; border-radius: 14px; overflow: hidden; background: #2a2a31; display: flex; align-items: center; justify-content: center; font-size: 26px; font-weight: 700; color: #fff; }
+  .gapp .ic img { width: 100%; height: 100%; object-fit: cover; display: block; -webkit-user-drag: none; user-select: none; pointer-events: none; }
+  .gapp span { max-width: 72px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .gapp .x { position: absolute; top: -6px; right: 0; width: 24px; height: 24px; border-radius: 50%; background: #000; border: 1px solid var(--line); font-size: 15px; line-height: 22px; text-align: center; }
+  .gapp.drag { opacity: .4; }
+  .gapp.on .ic { outline: 3px solid var(--amber); }
 </style>
 </head>
 <body>
 <main>
-  <h1>TV setup</h1>
-  <p>On-TV mode: this page is served by the TV itself. <a href="/">Back to the remote</a></p>
+  <div class="card" id="town-ask" style="display:none" role="status">
+    <p class="now" id="town-ask-q"></p>
+    <div class="row"><button class="go" id="town-ask-yes" type="button">Yes</button><button class="quiet" id="town-ask-no" type="button">Not now</button></div>
+    <div class="msg" id="town-ask-msg" role="status"></div>
+  </div>
 
-  <section class="card">
-    <h2>ADB on the TV</h2>
-    <p>Keys, typing, power off and "what's playing" need the TV's own debugging switched on. Opening apps and volume work without it.</p>
-    <p class="status" id="adb-status">Checking…</p>
-    <p id="adb-advice"></p>
-    <div id="routes">
-    <div id="route-wd">
-    <h2 style="margin-top:14px">Wireless debugging pairing (Android 11 and newer, best for Google TV)</h2>
-    <ol>
-      <li>On the TV: Settings, System, About, press Build seven times to unlock Developer options.</li>
-      <li>Settings, System, Developer options, <b>Wireless debugging</b>, switch it on, and on "Allow wireless debugging on this network?" tick <b>Always allow on this network</b> and choose Allow. The TV must be on Wi-Fi.</li>
-      <li>Careful: <b>Revoke USB debugging authorizations</b> sits right next to Wireless debugging in that list. Never press OK on it.</li>
-      <li>In Wireless debugging choose <b>Pair device with pairing code</b>. Leave that screen open on the TV.</li>
-      <li>Type the 6 digit code here. The port is optional (it is found on its own).</li>
-    </ol>
-    <div class="row"><div><label for="wd-code">Pairing code</label><input id="wd-code" inputmode="numeric" maxlength="6"></div>
-      <div><label for="wd-port">Port (optional)</label><input id="wd-port" inputmode="numeric" maxlength="5"></div></div>
-    <button class="go" id="wd-pair">Pair</button>
-    </div>
-    <div id="route-tcp">
-    <h2 style="margin-top:14px">Network debugging on port 5555 (older Android TV, Fire TV, Shield)</h2>
-    <p>Switch on Developer options and Network (or USB) debugging, press Connect, then on the TV tick <b>Always allow</b> and press Allow. Some newer Google TVs never show that question: use pairing above instead.</p>
-    <button class="go" id="adb-connect">Connect</button>
-    </div>
-    </div>
-    <div class="msg" id="adb-msg" role="status"></div>
+  <section id="screen" style="display:none">
+    <div class="g-head"><h1>Widgets on your screen</h1><span class="g-count" id="g-count"></span></div>
+    <div class="g-map" id="g-map" aria-hidden="true"></div>
+    <div class="g-track" id="g-track"></div>
+    <div class="g-nav"><button class="quiet" id="g-prev" type="button">Back</button><div class="g-dots" id="g-dots" aria-hidden="true"></div><button class="quiet" id="g-next" type="button">Next</button></div>
+    <div class="card g-done" id="g-done" style="display:none" role="status"><h2>All set. Look at your TV.</h2></div>
+    <button class="quiet g-more" id="g-more" type="button">More settings</button>
   </section>
 
-  <section class="card">
-    <h2>Household</h2>
-    <label for="tv-name">TV name</label><input id="tv-name" maxlength="30">
-    <label for="people">People (comma separated)</label><input id="people" maxlength="200">
-    <label for="place">Weather place name</label><input id="place" maxlength="40">
-    <div class="row"><div><label for="lat">Latitude</label><input id="lat" inputmode="decimal"></div><div><label for="lon">Longitude</label><input id="lon" inputmode="decimal"></div></div>
-    <div class="row"><div><label for="tz">Time zone</label><input id="tz" placeholder="Australia/Sydney"></div><div><label for="country">Country (2 letters)</label><input id="country" maxlength="2"></div></div>
-    <button class="go" id="save">Save</button>
-    <div class="msg" id="save-msg" role="status"></div>
+  <h1>Home settings</h1>
+  <p><span id="intro-from">This page comes from your TV, over your home Wi-Fi.</span> What you change here shows on the TV in a moment, and everything here can still be changed on the TV too. Nothing typed here goes to Couch TV or anyone else. <a href="/" id="to-remote">Back to the remote</a></p>
+
+  <nav class="jump" aria-label="Sections">
+    <a href="#widgets" id="jump-widgets" style="display:none">Widgets</a><a href="#dapps" id="jump-dapps" style="display:none">Apps</a><a href="#town">Town</a><a href="#people">People</a><a href="#photos">Photos</a><a href="#athome">At home</a><a href="#ask">Ask AI</a><a href="#home">Home button</a><a href="#smart" id="jump-smart" style="display:none">Smart home</a><a href="#matter" id="jump-matter" style="display:none" data-mw="brand_matter"></a><a href="#tv">This TV</a>
+  </nav>
+
+  <div class="card" id="design-line" style="display:none" role="status">
+    <p class="now" id="design-line-text">This home uses a Couch TV Studio design. Settings for parts it doesn't show are hidden.</p>
+    <button class="quiet" id="design-all" type="button">Show all settings</button>
+    <p>To go back to the standard home: on the TV, Home settings, Designs, then turn Your design off.</p>
+  </div>
+
+  <section class="card" id="widgets" style="display:none">
+    <h2>Widgets on this TV</h2>
+    <p>Each widget on the TV's design with something to set, named by where it sits on the screen. What you choose is kept in the TV's Home settings (and the home computer, if it has one). Never in a design, never sent to Couch TV.</p>
+    <div id="w-list"></div>
+    <div class="msg" id="w-msg" role="status"></div>
   </section>
 
-  <section class="card">
-    <h2>Ask (optional, off by default)</h2>
-    <p>On-TV mode has no Claude unless you add your own Anthropic API key. Each ask uses Claude Haiku 5.5 and costs about a fifth of a US cent. Use a key made only for this TV, with a monthly spend limit set in the Anthropic Console: the key is stored on the TV, and anyone with ADB access to the TV could read it.</p>
-    <label for="ask-key">Anthropic API key (leave empty to keep the current one)</label><input id="ask-key" type="password" autocomplete="off">
+  <section class="card" id="dapps" style="display:none">
+    <h2>Apps on this design</h2>
+    <p>The apps in each app row or folder on the design. The same as holding OK on an app on the TV.</p>
+    <div id="da-list"></div>
+    <div class="msg" id="da-msg" role="status"></div>
+  </section>
+
+  <section class="card" id="town">
+    <h2>Town for the weather</h2>
+    <p>Now: <span class="now" id="town-now">Checking…</span></p>
+    <label for="town-q">Search for your town or suburb</label>
+    <input id="town-q" type="search" autocomplete="off" enterkeyhint="search" placeholder="Type at least 2 letters">
+    <div class="places" id="town-list" role="list"></div>
+    <div class="msg" id="town-msg" role="status"></div>
+    <p>Only the town name you type goes to Open-Meteo, the free weather service the TV already uses. The TV keeps the town, never a street.</p>
+  </section>
+
+  <section class="card" id="people">
+    <h2>People</h2>
+    <p class="names" id="people-now">Checking…</p>
+    <p id="people-how">Add, rename, remove and reorder people in the phone remote. Each person gets their own Keep watching.</p>
+    <div class="links" id="people-links">
+      <a class="btn go" href="/#sheet=people">Change people</a>
+      <a class="btn" href="/#sheet=arrange">Arrange apps</a>
+      <a class="btn" href="/#sheet=kids">Kids mode</a>
+    </div>
+  </section>
+
+  <section class="card" id="photos">
+    <h2>Your photos</h2>
+    <p>Photos you add take turns with the scenes behind the clock. <span id="photos-where">They go straight from this phone to the TV, which makes them screen size and keeps them.</span> They never go to Couch TV or any other server.</p>
+    <p class="drop-hint">On a computer you can also drag photos from a folder onto this box.</p>
+    <p id="photo-count"></p>
+    <div class="photos" id="photo-list"></div>
+    <label class="btn go pick" id="photo-pick">Add photos<input id="photo-file" type="file" accept="image/*" multiple aria-label="Add photos"></label>
+    <div class="msg" id="photo-msg" role="status"></div>
+  </section>
+
+  <section class="card" id="athome">
+    <h2>At home</h2>
+    <p>Words for the widgets on your home: a family note, lists, the guest Wi-Fi, a house guide and your calendars. They stay on this TV. They are never put in a design or in Share this home.</p>
+    <p class="status" id="ah-state"></p>
+
+    <div class="sub">
+      <h3>Family note</h3>
+      <label for="ah-note">Note</label><textarea id="ah-note" maxlength="280"></textarea>
+      <label for="ah-from">From (a name, or leave it empty)</label><input id="ah-from" maxlength="24">
+      <div class="row"><button class="go" id="ah-note-save">Save the note</button><button class="danger" id="ah-note-clear">Clear it</button></div>
+      <div class="msg" id="ah-note-msg" role="status"></div>
+    </div>
+
+    <div class="sub">
+      <h3>Lists</h3>
+      <p>Up to 3 lists, like Shopping or To do. One item on each line. Ticked items stay ticked.</p>
+      <div id="ah-lists"></div>
+      <div class="row"><button class="quiet" id="ah-list-add">Add a list</button><button class="go" id="ah-lists-save">Save the lists</button></div>
+      <div class="msg" id="ah-lists-msg" role="status"></div>
+    </div>
+
+    <div class="sub">
+      <h3>Guest Wi-Fi</h3>
+      <p>The Guest Wi-Fi widget shows these with a code guests scan to join.</p>
+      <label for="ah-ssid">Network name, exactly as a phone shows it</label><input id="ah-ssid" maxlength="32" autocomplete="off" autocapitalize="off" spellcheck="false">
+      <label for="ah-sec">Security</label>
+      <select id="ah-sec"><option value="WPA">WPA, WPA2 or WPA3 (most)</option><option value="WEP">WEP (old)</option><option value="nopass">No password</option></select>
+      <label for="ah-pass">Password</label><input id="ah-pass" maxlength="63" autocomplete="off" autocapitalize="off" spellcheck="false">
+      <label class="check"><input type="checkbox" id="ah-hidden"> Hidden network</label>
+      <div class="row"><button class="go" id="ah-wifi-save">Save the Wi-Fi</button><button class="danger" id="ah-wifi-clear">Remove it</button></div>
+      <div class="msg" id="ah-wifi-msg" role="status"></div>
+    </div>
+
+    <div class="sub">
+      <h3>House guide</h3>
+      <p>Up to 8 entries, like Check out, Bins or Around here.</p>
+      <div id="ah-guide"></div>
+      <div class="row"><button class="quiet" id="ah-guide-add">Add an entry</button><button class="go" id="ah-guide-save">Save the guide</button></div>
+      <div class="msg" id="ah-guide-msg" role="status"></div>
+    </div>
+
+    <div class="sub">
+      <h3>Calendar</h3>
+      <p>The private address of a Google, Apple or Outlook calendar, for the Agenda widget. Keep it private: it opens your calendar. Once saved, only its first part shows here.</p>
+      <p>Now: <span class="now" id="ah-cal-now">None</span></p>
+      <label for="ah-cal">Paste the calendar's private address (starts with https)</label><input id="ah-cal" type="url" autocomplete="off" autocapitalize="off" spellcheck="false">
+      <div class="row"><button class="go" id="ah-cal-save">Save the link</button><button class="danger" id="ah-cal-clear">Remove it</button></div>
+      <div class="msg" id="ah-cal-msg" role="status"></div>
+    </div>
+
+    <div class="sub">
+      <h3>Guests</h3>
+      <label for="ah-guest">Guest's name, for the Welcome widget (empty: just Welcome)</label><input id="ah-guest" maxlength="38">
+      <button class="go" id="ah-guest-save">Save the name</button>
+      <div class="msg" id="ah-guest-msg" role="status"></div>
+      <p>Bookings calendar: the link Airbnb, Booking.com or VRBO gives you (export or sync calendar). The Welcome widget then greets each guest and shows check out.</p>
+      <p>Now: <span class="now" id="ah-stay-now">None</span></p>
+      <label for="ah-stay">Paste the bookings calendar link</label><input id="ah-stay" type="url" autocomplete="off" autocapitalize="off" spellcheck="false">
+      <div class="row"><div><label for="ah-in">Check in from</label><select id="ah-in"></select></div><div><label for="ah-out">Check out by</label><select id="ah-out"></select></div></div>
+      <div class="row"><button class="go" id="ah-stay-save">Save bookings</button><button class="danger" id="ah-stay-clear">Remove the link</button></div>
+      <div class="msg" id="ah-stay-msg" role="status"></div>
+    </div>
+  </section>
+
+  <section class="card" id="ask">
+    <h2>Ask AI</h2>
+    <p class="status">Off until you set it up</p>
+    <p>Say "put on Bluey" and an AI finds it and presses the buttons for you. Ask AI is off until you pick an AI service and add its key: Claude, OpenAI, Google Gemini, OpenRouter, Groq, Mistral, or a model running on a home computer. The key is kept on this TV, so use one made only for it, with a monthly spending limit set at the service. Each ask costs a little: on Claude Haiku 5.5 about a fifth of a US cent; other services and models price differently.</p>
+    <label for="ask-service">AI service</label>
+    <select id="ask-service"></select>
+    <label for="ask-base">Web address</label><input id="ask-base" type="text" autocomplete="off" spellcheck="false">
+    <label for="ask-model">Model name</label><input id="ask-model" type="text" autocomplete="off" spellcheck="false">
+    <p id="ask-hint"></p>
+    <label for="ask-key">Key from the AI service (API key). Leave it empty to keep the one saved.</label><input id="ask-key" type="password" autocomplete="off">
     <label class="check"><input type="checkbox" id="ask-on"> Switch ask on</label>
     <p id="ask-state"></p>
     <div class="row"><button class="go" id="ask-save">Save ask</button><button id="ask-clear">Remove key</button></div>
     <div class="msg" id="ask-msg" role="status"></div>
   </section>
 
-  <section class="card">
+  <section class="card" id="home">
+    <h2>Home button</h2>
+    <p class="status" id="home-state">Checking…</p>
+    <p id="home-note"></p>
+    <button class="go" id="home-on">Make the Home button open Couch TV</button>
+    <button class="quiet" id="home-off" style="display:none">Make the Home button open the TV's own home again</button>
+    <div class="msg" id="home-msg" role="status"></div>
+    <div id="hk" style="display:none">
+      <h3>Home button</h3>
+      <p class="status" id="hk-line"></p>
+      <button class="go" id="hk-go" style="display:none">Make Home open Couch TV</button>
+      <div class="msg" id="hk-msg" role="status"></div>
+      <ol id="hk-steps" style="display:none"></ol>
+    </div>
+  </section>
+
+  <section class="card" id="smart" style="display:none">
+    <h2>Smart home</h2>
+    <p>Show your air conditioning, lights and doorbell camera from Home Assistant on the TV. You sign in to your own Home Assistant on this phone; the TV keeps the sign in.</p>
+    <button class="go" id="smart-go">Set up smart home</button>
+    <div class="msg" id="smart-msg" role="status"></div>
+  </section>
+
+  <section class="card" id="matter" style="display:none">
+    <!-- every line from tv-home/web/matter-words.js in the TV's language (data-mw: the key), filled by fillMatterWords() -->
+    <h2 data-mw="title"></h2>
+    <p data-mw="intro"></p>
+    <p class="now" id="matter-note" style="display:none"></p>
+    <ul class="alist" id="matter-list" data-mw-aria="list_label"></ul>
+    <h3 data-mw="add"></h3>
+    <p data-mw="step1"></p>
+    <details class="wbox"><summary data-mw="brand_google"></summary><div><p data-mw="app_google"></p></div></details>
+    <details class="wbox"><summary data-mw="brand_apple"></summary><div><p data-mw="app_apple"></p></div></details>
+    <details class="wbox"><summary data-mw="brand_smartthings"></summary><div><p data-mw="app_smartthings"></p></div></details>
+    <details class="wbox"><summary data-mw="brand_alexa"></summary><div><p data-mw="app_alexa"></p></div></details>
+    <label for="matter-code" data-mw="step2"></label>
+    <input id="matter-code" inputmode="numeric" autocomplete="off" autocapitalize="characters" spellcheck="false" data-mw-hint="placeholder">
+    <button class="go" id="matter-add" type="button" data-mw="add_btn"></button>
+    <label class="btn quiet pick" id="matter-scan" style="display:none"><span data-mw="photo"></span><input type="file" accept="image/*" capture="environment" id="matter-photo"></label>
+    <div class="msg" id="matter-msg" role="status"></div>
+  </section>
+
+  <h2 id="tv" style="margin-top:28px">This TV</h2>
+
+  <section class="card" id="tvname">
+    <h2>Name and country</h2>
+    <label for="tv-name">TV name</label><input id="tv-name" maxlength="30">
+    <label for="country">Country, for where shows stream (2 letters, like AU, US or GB)</label><input id="country" maxlength="2" autocapitalize="characters">
+    <button class="go" id="save">Save</button>
+    <div class="msg" id="save-msg" role="status"></div>
+  </section>
+
+  <section class="card" id="keys">
+    <h2>Let the phone press keys</h2>
+    <p>The arrow keys, typing, turning the TV off and showing what's playing need one TV setting switched on, once. Opening apps and the volume work without it.</p>
+    <p class="status" id="adb-status">Checking…</p>
+    <p id="adb-advice"></p>
+    <div id="routes">
+    <div id="route-wd">
+    <h3>Newer TVs (Google TV, Android 11 or newer)</h3>
+    <ol>
+      <li>On the TV: Settings, System, About. Press OK on Android TV OS build (on some TVs, Build) seven times. This shows a hidden menu called Developer options. (Older Android TV: Settings, Device Preferences, About.)</li>
+      <li>In Developer options, switch on <b>Wireless debugging</b>. This lets Couch TV press keys on this TV. When the TV asks "Allow wireless debugging on this network?", tick <b>Always allow on this network</b> and choose Allow. The TV must be on Wi-Fi.</li>
+      <li>Careful: <b>Revoke USB debugging authorizations</b> sits right next to Wireless debugging in that list. Never press OK on it: it would undo this setup.</li>
+      <li>In Wireless debugging choose <b>Pair device with pairing code</b>. Leave that screen open on the TV.</li>
+      <li>Type the 6 digit code from that screen here. You can leave the port number empty: Couch TV finds it.</li>
+    </ol>
+    <div class="row"><div><label for="wd-code">Code on the TV</label><input id="wd-code" inputmode="numeric" maxlength="6"></div>
+      <div><label for="wd-port">Port number (you can leave this empty)</label><input id="wd-port" inputmode="numeric" maxlength="5"></div></div>
+    <button class="go" id="wd-pair">Send the code</button>
+    </div>
+    <div id="route-tcp">
+    <h3>Older TVs (Fire TV, Shield, older Android TV)</h3>
+    <p>In Developer options, switch on <b>Network debugging</b> (on some TVs, <b>USB debugging</b>). This lets Couch TV press keys on this TV. Then press Let the phone press keys. On the TV, tick <b>Always allow</b> and press Allow. Some newer Google TVs never ask: use the newer TVs steps instead.</p>
+    <button class="go" id="adb-connect">Let the phone press keys</button>
+    </div>
+    </div>
+    <div class="msg" id="adb-msg" role="status"></div>
+    <div id="cc" class="cc"></div>
+  </section>
+
+  <section class="card" id="kids-first">
+    <h2>Kids mode (optional, off unless you say yes)</h2>
+    <p>Any young kids who should only see shows you've picked? Their TV home then shows only the shows you add, and leaving it needs a PIN. Skip this and nothing changes. Once it is on, change it in the phone remote: <a href="/#sheet=kids">Kids mode</a>.</p>
+    <label class="check"><input type="checkbox" id="kids-yes"> Yes, set up kids mode</label>
+    <div id="kids-form" style="display:none">
+      <label for="kids-who">Whose home</label><select id="kids-who"></select>
+      <label for="kids-pin">Parent PIN, 4 to 8 digits</label><input id="kids-pin" type="password" inputmode="numeric" maxlength="8" autocomplete="off">
+      <button class="go" id="kids-save">Turn on kids mode</button>
+    </div>
+    <div class="msg" id="kids-msg" role="status"></div>
+  </section>
+
+  <section class="card" id="xiaomi" style="display:none">
+    <h2>Xiaomi: Couch TV in PatchWall's place (optional, off by default)</h2>
+    <p>The remote's PatchWall button opens Couch TV, PatchWall opens Couch TV instead, and Couch TV opens when the TV is switched on, unless the TV is going back to an HDMI input. The Home button is not changed. It needs the Home button version of Couch TV (couch-tv-ontv-watch.apk), put on from a computer (the steps are on the help page: couchtv.joshuaseage.com/help/home-button), switched on in the TV's Settings, Accessibility, Couch TV home watch; with this on, that watch also checks each remote key for the PatchWall button and passes every other key on.</p>
+    <label class="check"><input type="checkbox" id="pw-on"> Couch TV in PatchWall's place</label>
+    <p id="pw-state"></p>
+    <div class="row"><button class="go" id="pw-save">Save</button></div>
+    <div class="msg" id="pw-msg" role="status"></div>
+  </section>
+
+  <section class="card" id="inputs" style="display:none">
+    <h2>HDMI tiles on the home</h2>
+    <p>A set-top box, camera or games console plugged into the TV (HDMI 1, HDMI 2 and so on) can have its own tile in the apps row, next to Settings. OK on the tile switches the TV to it. Tick the ones you use and name them. Up to 6. Each one takes an app's place, so your last apps move to More apps.</p>
+    <div id="in-list"></div>
+    <div class="row"><button class="go" id="in-save">Save</button></div>
+    <div class="msg" id="in-msg" role="status"></div>
+  </section>
+
+  <section class="card" id="upd">
+    <h2>Couch TV version</h2>
+    <p class="status" id="upd-line">Checking…</p>
+    <button class="go" id="upd-install" style="display:none"></button>
+    <button id="upd-check">Check for updates now</button>
+    <div class="msg" id="upd-msg" role="status"></div>
+    <ol id="upd-steps" style="display:none"></ol>
+  </section>
+
+  <section class="card" id="phones-card">
     <h2>Phones</h2>
     <p id="phones"></p>
     <button id="forget">Forget every phone</button>
   </section>
 </main>
+<div class="sheet-back" id="sheet-back" hidden></div>
+<div class="sheet" id="sheet" role="dialog" aria-modal="true" aria-labelledby="sheet-title" hidden>
+  <div class="sheet-in">
+    <div class="sheet-grab"></div>
+    <div class="sheet-head"><h2 id="sheet-title"></h2><button class="quiet" id="sheet-close" type="button">Done</button></div>
+    <div id="sheet-body"></div>
+    <div class="msg" id="sheet-msg" role="status"></div>
+  </div>
+</div>
+<!-- the Matter card's words in the TV's language (tv-home/web/matter-words.js) -->
+<script src="/tv/matter-words.js"></script>
 <script>
   var $ = function (id) { return document.getElementById(id); };
+  // words shown in the page: escaped, so "Fish & chips" stays "Fish & chips"
+  var esc = function (s) { return String(s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); };
+  // an id the page looks up again with a selector (data-id, data-name): no quotes, markup characters or spaces
+  var idOf = function (s) { return String(s).replace(/[&<>"'\\\s]/g, ''); };   // as before: TV input ids (com.maker.tvinput/.HdmiService/HW2) keep everything else
+  // the TV this page is for, where a home computer runs more than one (its QR adds ?tv=)
+  var TVQ = (/[?&]tv=([A-Za-z0-9_-]{1,40})(?:&|$)/.exec(location.search) || [])[1] || '';
+  function withTv(path) { return TVQ ? path + (path.indexOf('?') < 0 ? '?' : '&') + 'tv=' + TVQ : path; }
   function api(method, path, body) {
-    return fetch(path, { method: method, headers: body ? { 'content-type': 'application/json' } : undefined, body: body ? JSON.stringify(body) : undefined })
-      .then(function (r) { return r.json().then(function (j) { if (!r.ok || j.ok === false) throw new Error(j.error || ('error ' + r.status)); return j; }); });
+    return fetch(withTv(path), { method: method, headers: body ? { 'content-type': 'application/json' } : undefined, body: body ? JSON.stringify(body) : undefined })
+      .then(function (r) { return r.json().then(function (j) { if (!r.ok || j.ok === false) { var e = new Error(j.error || ('error ' + r.status)); e.status = r.status; e.reply = j; throw e; } return j; }); });
   }
+  function say(id, text) { $(id).textContent = text || ''; }
+  var SETTINGS = null;
+
+  // ---------------- town: the same Open-Meteo place search the TV's Home settings, Location uses ----------------
+  function placeLabel(pl) { return pl ? [pl.name, pl.area].filter(Boolean).join(', ') : ''; }
+  function placeArea(r) {
+    var out = [];
+    [r.admin3, r.admin2, r.admin1].forEach(function (a) { a = String(a || '').trim(); if (a && a.replace(/^Comune di /, '') !== r.name && out.indexOf(a) < 0) out.push(a); });
+    if (r.country) out.push(r.country);
+    return out.join(', ');
+  }
+  var townTimer = 0, townTicket = 0, PLACES = [];
+  function findTown(q) {
+    q = q.trim();
+    clearTimeout(townTimer);
+    if (q.length < 2) { $('town-list').innerHTML = ''; say('town-msg', ''); return; }
+    townTimer = setTimeout(function () {
+      var ticket = ++townTicket, lang = ((SETTINGS && SETTINGS.settings && SETTINGS.settings.lang) || navigator.language || 'en').slice(0, 2);
+      say('town-msg', 'Searching…');
+      fetch('https://geocoding-api.open-meteo.com/v1/search?count=8&format=json&language=' + encodeURIComponent(lang) + '&name=' + encodeURIComponent(q), { referrerPolicy: 'no-referrer' })
+        .then(function (r) { if (!r.ok) throw new Error('search'); return r.json(); })
+        .then(function (j) {
+          if (ticket !== townTicket) return;
+          PLACES = (j.results || []).filter(function (r) { return isFinite(r.latitude) && isFinite(r.longitude); }).slice(0, 8).map(function (r) {
+            // two decimals is about a kilometre: the town, never the house (the same rounding as the TV)
+            return { name: r.name, area: placeArea(r), lat: Math.round(r.latitude * 100) / 100, lon: Math.round(r.longitude * 100) / 100, timezone: r.timezone || 'auto' };
+          });
+          $('town-list').innerHTML = PLACES.map(function (p, i) { return '<button type="button" data-i="' + i + '" role="listitem"><span>' + esc(p.name) + '</span><small>' + esc(p.area) + '</small></button>'; }).join('');
+          say('town-msg', PLACES.length ? 'Tap your town.' : 'Nothing found for "' + q + '". Try the nearest bigger town.');
+        })
+        .catch(function () { if (ticket === townTicket) say('town-msg', 'The place search did not answer. Check this phone has internet, then try again.'); });
+    }, 400);
+  }
+  $('town-q').addEventListener('input', function () { findTown(this.value); });
+  $('town-list').addEventListener('click', function (e) {
+    var b = e.target.closest('button[data-i]'); if (!b) return;
+    var p = PLACES[+b.getAttribute('data-i')]; if (!p) return;
+    say('town-msg', 'Saving…');
+    // the same shape the TV's own Home settings saves (app.js choosePlace: ST.place)
+    api('POST', '/api/settings', { settings_patch: { place: { name: p.name, area: p.area, lat: p.lat, lon: p.lon, timezone: p.timezone } } })
+      .then(function (j) { SETTINGS = j; showTown(); $('town-list').innerHTML = ''; $('town-q').value = ''; say('town-msg', 'Saved. The TV shows the weather for ' + p.name + ' now.'); })
+      .catch(function (e) { say('town-msg', e.message); });
+  });
+  function showTown() {
+    var s = SETTINGS || {}, pl = s.settings && s.settings.place;
+    $('town-now').textContent = pl && pl.name ? placeLabel(pl) : (s.weather && s.weather.place) || 'Not set yet';
+  }
+
+  // ---------------- people: shown here, changed in the phone remote's People sheet ----------------
+  function showPeople() {
+    var list = (SETTINGS && SETTINGS.people) || [];
+    $('people-now').textContent = list.length ? list.map(function (p) { return p.name; }).join(', ') : 'No one yet.';
+    $('kids-who').innerHTML = list.map(function (p) {
+      return '<option value="' + String(p.id).replace(/[^A-Za-z0-9_-]/g, '') + '">' + esc(p.name) + '</option>';
+    }).join('');
+  }
+
+  // ---------------- photos: sent to the TV, which makes them screen size (Photos.kt) ----------------
+  var MAX_PHOTOS = 50;
+  function photoList() { var s = SETTINGS && SETTINGS.settings; return (s && Array.isArray(s.photos) ? s.photos : []).filter(function (p) { return p && p.id && (p.file || p.url); }); }
+  function showPhotos() {
+    var list = photoList();
+    $('photo-count').textContent = list.length ? list.length + ' of ' + MAX_PHOTOS + ' photos on the TV.' : 'No photos yet.';
+    $('photo-list').innerHTML = list.map(function (p) {
+      var src = p.file ? '' : /^https:\/\//.test(p.url) ? p.url : '';
+      return '<div class="photo">' + (src || p.file ? '<img alt="" loading="lazy" referrerpolicy="no-referrer"' + (src ? ' src="' + esc(src) + '"' : ' data-file="' + esc(p.file) + '"') + '>' : '') +
+        '<button type="button" aria-label="Remove this photo" data-id="' + idOf(p.id) + '">×</button></div>';
+    }).join('');
+    // a photo kept on the TV or the home computer: fetched with the pairing token in the header (shim.js), never
+    // through a cookie, and shown from this phone's memory
+    Array.prototype.forEach.call($('photo-list').querySelectorAll('img[data-file]'), function (img) {
+      var f = img.getAttribute('data-file');
+      if (PHOTO_URLS[f]) { img.src = PHOTO_URLS[f]; return; }
+      fetch(withTv('/api/photo/' + encodeURIComponent(f))).then(function (r) { if (!r.ok) throw new Error(); return r.blob(); })
+        .then(function (b) { PHOTO_URLS[f] = URL.createObjectURL(b); img.src = PHOTO_URLS[f]; }, function () {});
+    });
+  }
+  var PHOTO_URLS = {};
+  $('photo-list').addEventListener('click', function (e) {
+    var b = e.target.closest('button[data-id]'); if (!b) return;
+    if (!confirm('Take this photo off the TV?')) return;
+    api('POST', '/api/photos/remove', { id: b.getAttribute('data-id') }).then(function () { say('photo-msg', 'Removed.'); return loadSettings(); })
+      .catch(function (e) { say('photo-msg', e.message); });
+  });
+  function sendPhotos(list, done0) {
+    var files = Array.prototype.filter.call(list || [], function (f) { return /^image\//.test(f.type || '') || /\.(jpe?g|png|webp|heic|heif|gif)$/i.test(f.name || ''); });
+    var done = 0, bad = 0, i = 0, lastErr = '';
+    if (!files.length) { say('photo-msg', 'That is not a photo. Pick a JPEG or PNG.'); return; }
+    var next = function () {
+      if (i >= files.length) {
+        if (done0) done0();
+        say('photo-msg', done ? (done === 1 ? 'One photo is on the TV now.' : done + ' photos are on the TV now.') + (bad ? ' ' + bad + ' could not be added.' : '') : 'No photos were added.' + (lastErr ? ' ' + lastErr : ''));
+        loadSettings();
+        return;
+      }
+      var f = files[i++];
+      say('photo-msg', 'Sending photo ' + i + ' of ' + files.length + '…');
+      fetch(withTv('/api/photos'), { method: 'POST', headers: { 'content-type': f.type || 'application/octet-stream' }, body: f })
+        .then(function (r) { return r.json().then(function (j) { if (!r.ok || j.ok === false) throw new Error(j.error || ('error ' + r.status)); return j; }); })
+        .then(function () { done++; }, function (e) { bad++; lastErr = e.message; })
+        .then(next);
+    };
+    next();
+  }
+  $('photo-file').addEventListener('change', function () { var input = this; sendPhotos(input.files, function () { input.value = ''; }); });
+  // on a computer: drag photos from a folder onto the Your photos card
+  var drop = $('photos'), dragDepth = 0;
+  drop.addEventListener('dragenter', function (e) { if (e.dataTransfer && Array.prototype.indexOf.call(e.dataTransfer.types || [], 'Files') >= 0) { e.preventDefault(); dragDepth++; drop.classList.add('over'); } });
+  drop.addEventListener('dragover', function (e) { if (e.dataTransfer && Array.prototype.indexOf.call(e.dataTransfer.types || [], 'Files') >= 0) { e.preventDefault(); e.dataTransfer.dropEffect = 'copy'; } });
+  drop.addEventListener('dragleave', function () { if (--dragDepth <= 0) { dragDepth = 0; drop.classList.remove('over'); } });
+  drop.addEventListener('drop', function (e) { e.preventDefault(); dragDepth = 0; drop.classList.remove('over'); sendPhotos(e.dataTransfer && e.dataTransfer.files); });
+  // the rest of the window ignores a dropped file, so a missed drop never opens the photo in place of this page
+  window.addEventListener('dragover', function (e) { e.preventDefault(); });
+  window.addEventListener('drop', function (e) { e.preventDefault(); });
+
+  // ---------------- At home: handed to the TV home's own store (HomeActivity.atHome) ----------------
+  var AH = null, AH_LIM = { lists: 3, items: 40, guide: 8 };
+  function ahSend(edit, msgId, okText) {
+    say(msgId, 'Saving…');
+    return api('POST', '/api/athome', { edit: edit }).then(function (j) {
+      if (j.live) { AH = j.athome; showAtHome(); say(msgId, okText); takeDesign(AH && AH.design); }
+      else say(msgId, 'Sent. The TV takes it as soon as the Couch TV home is open on it.');
+    }).catch(function (e) { say(msgId, e.message); });
+  }
+  function listRow(l, i) {
+    var items = (l.items || []).map(function (it) { return it.t; }).join('\n');
+    return '<div class="entry" data-list="' + i + '"><label>List name</label><input class="l-name" maxlength="24" value="' + esc(l.name || '') + '">' +
+      '<label>Items, one on each line</label><textarea class="l-items" rows="5">' + esc(items) + '</textarea>' +
+      '<button type="button" class="danger l-rm">Remove this list</button></div>';
+  }
+  function guideRow(g, i) {
+    return '<div class="entry" data-guide="' + i + '"><label>Heading</label><input class="g-title" maxlength="30" value="' + esc(g.title || '') + '">' +
+      '<label>Words</label><textarea class="g-text" maxlength="240">' + esc(g.text || '') + '</textarea>' +
+      '<button type="button" class="danger g-rm">Remove this entry</button></div>';
+  }
+  function showAtHome() {
+    var a = AH || {};
+    if (a.lim) AH_LIM = a.lim;
+    $('ah-note').value = a.note ? a.note.text : ''; $('ah-from').value = a.note ? a.note.from : '';
+    $('ah-lists').innerHTML = (a.lists || []).map(listRow).join('');
+    var w = a.wifi || {};
+    $('ah-ssid').value = w.ssid || ''; $('ah-sec').value = w.sec || 'WPA'; $('ah-pass').value = w.pass || ''; $('ah-hidden').checked = !!w.hidden;
+    $('ah-guide').innerHTML = (a.guide || []).map(guideRow).join('');
+    $('ah-cal-now').textContent = a.cal && a.cal.host ? a.cal.host : 'None';
+    var st = a.stay || {};
+    $('ah-stay-now').textContent = st.host || 'None';
+    var opts = function (list, cur) { return list.map(function (t) { return '<option' + (t === cur ? ' selected' : '') + '>' + t + '</option>'; }).join(''); };
+    $('ah-in').innerHTML = opts(a.times_in || ['12:00', '13:00', '14:00', '15:00', '16:00', '17:00', '18:00'], st.checkin || '15:00');
+    $('ah-out').innerHTML = opts(a.times_out || ['08:00', '09:00', '10:00', '11:00', '12:00'], st.checkout || '10:00');
+    if (a.guest != null) $('ah-guest').value = a.guest;
+    $('ah-list-add').disabled = !AH || (a.lists || []).length >= (AH_LIM.lists || 3);
+  }
+  function wholeLists(live) {
+    ['ah-list-add', 'ah-lists-save', 'ah-guide-add', 'ah-guide-save'].forEach(function (id) { $(id).disabled = !live; });
+    say('ah-lists-msg', live ? '' : 'Lists can be changed once the Couch TV home is open on the TV.');
+    say('ah-guide-msg', live ? '' : 'The guide can be changed once the Couch TV home is open on the TV.');
+  }
+  function loadAtHome() {
+    return api('GET', '/api/athome').then(function (j) {
+      if (j.live) { AH = j.athome; showAtHome(); wholeLists(true); $('ah-state').className = 'status'; say('ah-state', ''); takeDesign(AH && AH.design); }
+      else { wholeLists(false); $('ah-state').className = 'status bad'; say('ah-state', 'Open the Couch TV home on the TV, then reload this page, to see what is saved there. A note, the Wi-Fi, calendar links and the guest\'s name saved here wait on the TV until its home opens.'); }
+    }).catch(function (e) { say('ah-state', e.status === 404 ? 'This TV app needs an update for At home from the phone.' : e.message); });
+  }
+  $('ah-note-save').onclick = function () { ahSend({ note: { text: $('ah-note').value, from: $('ah-from').value } }, 'ah-note-msg', $('ah-note').value.trim() ? 'The note is on the TV.' : 'The note is cleared.'); };
+  $('ah-note-clear').onclick = function () { ahSend({ note: null }, 'ah-note-msg', 'The note is cleared.'); };
+  function readLists() {
+    return Array.prototype.map.call(document.querySelectorAll('#ah-lists .entry'), function (el) {
+      var i = +el.getAttribute('data-list'), old = (AH && AH.lists && AH.lists[i]) || { items: [] };
+      var done = {}; (old.items || []).forEach(function (it) { if (it.done) done[it.t] = true; });
+      return { name: el.querySelector('.l-name').value, items: el.querySelector('.l-items').value.split('\n').map(function (t) { return t.trim(); }).filter(Boolean)
+        .slice(0, AH_LIM.items || 40).map(function (t) { return { t: t, done: !!done[t] }; }) };
+    });
+  }
+  $('ah-list-add').onclick = function () {
+    var n = document.querySelectorAll('#ah-lists .entry').length;
+    if (n >= (AH_LIM.lists || 3)) return;
+    $('ah-lists').insertAdjacentHTML('beforeend', listRow({ name: '', items: [] }, n));
+    $('ah-lists').lastElementChild.querySelector('.l-name').focus();
+    this.disabled = n + 1 >= (AH_LIM.lists || 3);
+  };
+  $('ah-lists').addEventListener('click', function (e) { if (e.target.classList.contains('l-rm')) { e.target.closest('.entry').remove(); $('ah-list-add').disabled = false; } });
+  $('ah-lists-save').onclick = function () {
+    var lists = readLists().filter(function (l) { return l.name.trim(); });
+    ahSend({ lists: lists }, 'ah-lists-msg', lists.length ? 'The lists are on the TV.' : 'No lists now.');
+  };
+  $('ah-wifi-save').onclick = function () {
+    var ssid = $('ah-ssid').value;
+    if (!ssid.trim()) { say('ah-wifi-msg', 'Type the network name first.'); return; }
+    ahSend({ wifi: { ssid: ssid, sec: $('ah-sec').value, pass: $('ah-sec').value === 'nopass' ? '' : $('ah-pass').value, hidden: $('ah-hidden').checked } }, 'ah-wifi-msg', 'The Wi-Fi details are on the TV.');
+  };
+  $('ah-wifi-clear').onclick = function () { if (confirm('Remove the guest Wi-Fi details from the TV?')) ahSend({ wifi: null }, 'ah-wifi-msg', 'The Wi-Fi details are removed.'); };
+  $('ah-guide-add').onclick = function () {
+    var n = document.querySelectorAll('#ah-guide .entry').length;
+    if (n >= (AH_LIM.guide || 8)) { say('ah-guide-msg', 'The guide holds 8 entries.'); return; }
+    $('ah-guide').insertAdjacentHTML('beforeend', guideRow({ title: '', text: '' }, n));
+    $('ah-guide').lastElementChild.querySelector('.g-title').focus();
+  };
+  $('ah-guide').addEventListener('click', function (e) { if (e.target.classList.contains('g-rm')) e.target.closest('.entry').remove(); });
+  $('ah-guide-save').onclick = function () {
+    var guide = Array.prototype.map.call(document.querySelectorAll('#ah-guide .entry'), function (el) {
+      return { title: el.querySelector('.g-title').value, text: el.querySelector('.g-text').value };
+    }).filter(function (g) { return g.title.trim(); });
+    ahSend({ guide: guide }, 'ah-guide-msg', guide.length ? 'The guide is on the TV.' : 'The guide is empty now.');
+  };
+  // a calendar link is a password: sent once, then only its host comes back
+  var calOk = function (u) { return /^(https|[a-z]+cals?):\/\/[^\s@\/]+/i.test(u.trim()); };
+  $('ah-cal-save').onclick = function () {
+    var u = $('ah-cal').value.trim();
+    if (!calOk(u)) { say('ah-cal-msg', 'That is not a calendar link. It starts with https://, or is a calendar app\'s own link.'); return; }
+    ahSend({ cal_url: u }, 'ah-cal-msg', 'Got it. The TV reads the calendar now.').then(function () { $('ah-cal').value = ''; });
+  };
+  $('ah-cal-clear').onclick = function () { if (confirm('Remove the calendar link from the TV?')) ahSend({ cal_url: '' }, 'ah-cal-msg', 'The calendar link is removed from the TV.'); };
+  $('ah-stay-save').onclick = function () {
+    var u = $('ah-stay').value.trim(), e = { checkin: $('ah-in').value, checkout: $('ah-out').value };
+    if (u) { if (!calOk(u)) { say('ah-stay-msg', 'That is not a calendar link. It starts with https://, or is a calendar app\'s own link.'); return; } e.stay_url = u; }
+    ahSend(e, 'ah-stay-msg', u ? 'Got it. The TV reads the bookings calendar now.' : 'The times are saved.').then(function () { $('ah-stay').value = ''; });
+  };
+  $('ah-stay-clear').onclick = function () { if (confirm('Remove the bookings link from the TV?')) ahSend({ stay_url: '' }, 'ah-stay-msg', 'The bookings link is removed from the TV.'); };
+  $('ah-guest-save').onclick = function () {
+    say('ah-guest-msg', 'Saving…');
+    api('POST', '/api/guest', { name: $('ah-guest').value }).then(function (j) {
+      var n = (j.guest && j.guest.name) || ''; $('ah-guest').value = n;
+      say('ah-guest-msg', n ? 'The Welcome widget greets ' + n + ' now.' : 'The Welcome widget says just Welcome now.');
+    }).catch(function (e) { say('ah-guest-msg', e.message); });
+  };
+
+  // ---------------- each section a titled box: tap the title to open it ----------------
+  // Collapsed by default, so the whole page can be scrolled quickly. The first section shown is open,
+  // or the one the address names (#photos, or #section=photos). A chip at the top opens its section.
+  var TOUCHED = false;
+  function openFold(sec, open) {
+    if (!sec || !sec.classList.contains('fold')) return;
+    sec.classList.toggle('shut', !open);
+    var b = sec.querySelector('.fold-btn'); if (b) b.setAttribute('aria-expanded', open ? 'true' : 'false');
+  }
+  function shownSec(sec) { return sec.style.display !== 'none' && !sec.classList.contains('hidden-by-design'); }
+  // #widget=<id>: the TV's Hold OK, Edit on your phone. Opens Widgets on this TV at that widget (WANT_WIDGET).
+  function hashWidget() { var m = /(?:^#|&)widget=([^&]+)/.exec(location.hash || ''); try { return m ? decodeURIComponent(m[1]) : ''; } catch (e) { return ''; } }
+  var WANT_WIDGET = hashWidget();
+  function hashSection() { if (WANT_WIDGET) return 'widgets'; var m = /^#(?:section=)?([a-z][a-z0-9-]*)$/.exec(location.hash || ''); return m && $(m[1]) && $(m[1]).classList.contains('fold') ? m[1] : ''; }
+  function openFirst() {
+    var want = hashSection(), target = want && $(want);
+    if (target && shownSec(target)) { openFold(target, true); return; }
+    var first = Array.prototype.filter.call(document.querySelectorAll('main > section.fold'), shownSec)[0];
+    if (first) openFold(first, true);
+  }
+  (function foldSetup() {
+    Array.prototype.forEach.call(document.querySelectorAll('main > section.card'), function (sec, i) {
+      var h = sec.querySelector('h2');
+      if (!h || h.parentNode !== sec) return;
+      if (!sec.id) sec.id = 'sec-' + i;
+      var body = document.createElement('div'); body.className = 'fold-body'; body.id = sec.id + '-body';
+      while (h.nextSibling) body.appendChild(h.nextSibling);
+      var b = document.createElement('button');
+      b.type = 'button'; b.className = 'fold-btn'; b.setAttribute('aria-controls', body.id); b.setAttribute('aria-expanded', 'false');
+      b.textContent = h.textContent; h.textContent = ''; h.className = 'fold-head'; h.appendChild(b);
+      sec.appendChild(body); sec.classList.add('fold', 'shut');
+      b.addEventListener('click', function () { TOUCHED = true; openFold(sec, sec.classList.contains('shut')); });
+    });
+    // a chip opens its section, then the page goes to it as before
+    document.querySelector('.jump').addEventListener('click', function (e) {
+      var a = e.target.closest('a[href^="#"]'); if (!a) return;
+      TOUCHED = true; openFold($(a.getAttribute('href').slice(1)), true);
+    });
+    openFirst();
+    // someone already typing or ticking somewhere: never shut that box under them
+    document.addEventListener('focusin', function (e) { if (/^(INPUT|SELECT|TEXTAREA)$/.test(e.target.tagName)) TOUCHED = true; });
+  })();
+  function goTo(id) { var s = $(id); if (!s) return; TOUCHED = true; openFold(s, true); s.scrollIntoView({ block: 'start' }); }
+
+  // ---------------- a Couch TV Studio design on the TV: only what it uses ----------------
+  // The TV home says which sections its design leaves out, and which widgets it has with something to
+  // set (atHomeView design, from app.js useRules and widget-caps.js SETTINGS). Without that (no design,
+  // or the TV home not open), everything shows as before. Show all settings brings the rest back.
+  var DESIGN = null, SHOW_ALL = false, INPUTS_OK = false, WPLACES = {}, wTimer = 0, wTicket = 0;
+  function takeDesign(d) { DESIGN = d && d.on ? d : null; applyDesign(); }
+  function applyDesign() {
+    var d = DESIGN, hide = d && !SHOW_ALL ? d.hide || [] : [];
+    ['town', 'people', 'photos', 'athome'].forEach(function (id) {
+      var off = hide.indexOf(id) >= 0;
+      $(id).classList.toggle('hidden-by-design', off);
+      var chip = document.querySelector('.jump a[href="#' + id + '"]'); if (chip) chip.classList.toggle('hidden-by-design', off);
+    });
+    // input tiles: only where the TV lists inputs, and only when the design has an app row for them
+    var inOk = INPUTS_OK && (!d || d.inputs || SHOW_ALL);
+    $('inputs').style.display = inOk ? '' : 'none';
+    var note = $('in-design');
+    if (!note) { note = document.createElement('p'); note.id = 'in-design'; $('in-list').parentNode.insertBefore(note, $('in-list')); }
+    note.textContent = d && !d.inputs ? 'This design hides the dock, so HDMI tiles show only on the standard home.' : '';
+    $('design-line').style.display = d ? '' : 'none';
+    $('design-line-text').textContent = SHOW_ALL ? 'Every setting is showing. Some are for parts this Couch TV Studio design doesn\'t show.' : 'This home uses a Couch TV Studio design. Settings for parts it doesn\'t show are hidden.';
+    $('design-all').textContent = SHOW_ALL ? 'Show only what this design uses' : 'Show all settings';
+    var ws = d && d.widgets && d.widgets.length, as = d && d.apps && d.apps.length;
+    $('widgets').style.display = ws ? '' : 'none'; $('jump-widgets').style.display = ws ? '' : 'none';
+    $('dapps').style.display = as ? '' : 'none'; $('jump-dapps').style.display = as ? '' : 'none';
+    if (ws) showWidgets(); if (as) showDesignApps();
+    if (ws && WANT_WIDGET && !(d && d.screen && d.screen.widgets && d.screen.widgets.length)) openWanted();
+    showScreen();
+    // the first section shown may have changed: open it, unless someone has opened or shut one already
+    if (!TOUCHED) { Array.prototype.forEach.call(document.querySelectorAll('main > section.fold'), function (s) { openFold(s, false); }); openFirst(); }
+  }
+  $('design-all').onclick = function () { SHOW_ALL = !SHOW_ALL; TOUCHED = true; applyDesign(); };
+  function designSend(edit, msgId, okText) {
+    say(msgId, 'Saving…');
+    return api('POST', '/api/athome', { edit: edit }).then(function (j) {
+      if (j.live) { AH = j.athome; takeDesign(AH && AH.design); say(msgId, okText); }
+      else say(msgId, 'Sent. The TV takes it as soon as the Couch TV home is open on it.');
+    }).catch(function (e) { say(msgId, e.message); });
+  }
+  // Widgets on this TV: each widget on the design with settings of its own, drawn from its settings
+  // records (widget-caps.js, handed over by the TV in atHomeView design.widgets), one box each, named
+  // like the TV names it ("Surf, top right"). What is changed here goes to the TV the same way the TV's
+  // own Widgets on this home page saves it (Home settings, ST.widgets): never into a design, never to
+  // couch-tv. A private setting (a calendar link) only ever says "Set" here.
+  function optHtml(o, cur) { return '<option value="' + esc(String(o[0])) + '"' + (String(o[0]) === String(cur) ? ' selected' : '') + '>' + esc(String(o[1])) + '</option>'; }
+  function wsHtml(w, s) {
+    var id = 'ws-' + idOf(w.key) + '-' + idOf(s.key), data = ' data-wk="' + esc(w.key) + '" data-ws="' + esc(s.key) + '"';
+    var help = s.help ? '<p>' + esc(s.help) + '</p>' : '';
+    var back = s.own ? '<button type="button" class="quiet" data-wclear="1"' + data + '>' + (s.type === 'place' ? (s.key === 'to' ? 'Forget where you drive to' : 'Use your home\'s town instead') : s.store === 'design' ? 'Use the design\'s own' : 'Clear it') + '</button>' : '';
+    if (s.type === 'place') {
+      return '<p>' + esc(s.label) + ': <span class="now">' + esc(s.words) + '</span></p>' +
+        '<label for="' + id + '">Search for ' + (s.coast ? 'a beach, or the town by it' : 'a town or suburb') + '</label><input id="' + id + '" type="search" autocomplete="off" enterkeyhint="search" data-wq="1"' + data + ' placeholder="Type at least 2 letters">' +
+        '<div class="places" data-wl="' + esc(w.key) + '" role="list"></div>' + back +
+        '<p>Only the name you type goes to Open-Meteo, the free weather service the TV already uses. The TV keeps the place, never a street.</p>';
+    }
+    // a device (an aircon room, a camera, the switches) picks from what the TV already shows from Home
+    // Assistant, handed over with the setting; with nothing there yet, where to set it up
+    var pick = s.type === 'choice' || s.type === 'tvlist' || (s.type === 'device' && s.options && s.options.length);
+    if (s.type === 'device' && !pick) return '<p>' + esc(s.label) + ': <span class="now">' + esc(s.words) + '</span></p><p>Nothing to pick yet. Set up Smart home on this page first.</p>';
+    if (pick && s.many) {
+      var picked = (Array.isArray(s.value) ? s.value : []).map(String), most = isFinite(s.max) && +s.max > 0 ? +s.max : 0;
+      // a setting with a most (Up next: 6 apps) takes no more ticks than that
+      var full = most && s.options.filter(function (o) { return picked.indexOf(String(o[0])) >= 0; }).length >= most;
+      return '<fieldset style="border:0;padding:0;margin:12px 0 0"' + (most ? ' data-wmost="' + most + '"' : '') + '><legend class="now">' + esc(s.label) + '</legend>' + (s.options.length ? s.options.map(function (o, i) {
+        var on = picked.indexOf(String(o[0])) >= 0;
+        return '<label class="check"><input type="checkbox" data-wmany="' + i + '"' + data + (on ? ' checked' : full ? ' disabled' : '') + '> ' + esc(String(o[1])) + '</label>';
+      }).join('') + (most ? '<p class="wmost">Pick up to ' + most + '.</p>' : '') : '<p>Nothing to pick on this TV yet.</p>') + '</fieldset>' + help + back;
+    }
+    if (pick) {
+      if (!s.options.length) return '<p>' + esc(s.label) + ': nothing to pick on this TV yet.</p>' + help;
+      return '<label for="' + id + '">' + esc(s.label) + '</label><select id="' + id + '" data-wpick="1"' + data + '>' +
+        (s.value === null || s.value === undefined ? '<option value="" selected disabled>Pick one</option>' : '') + s.options.map(function (o) { return optHtml(o, s.value); }).join('') + '</select>' + help + back;
+    }
+    if (s.type === 'toggle') return '<label class="check"><input type="checkbox" id="' + id + '" data-wtog="1"' + data + (s.value ? ' checked' : '') + '> ' + esc(s.label) + '</label>' + help + back;
+    if (s.type === 'apps') {
+      return '<p>' + esc(s.label) + ': <span class="now">' + esc(s.words) + '</span></p><p>Change its apps under Apps on this design, or on the TV: hold OK on an app in it.</p>';
+    }
+    // text, a number, a team, a calendar link and anything newer: a box and Save
+    var val = s.value === true || s.value === null || s.value === undefined ? '' : Array.isArray(s.value) ? s.value.join(', ') : String(s.value);
+    var kind = s.type === 'number' ? ' type="number" inputmode="numeric"' + (isFinite(s.min) ? ' min="' + s.min + '"' : '') + (isFinite(s.max) ? ' max="' + s.max + '"' : '') + (isFinite(s.step) ? ' step="' + s.step + '"' : '')
+      : s.type === 'calendar' ? ' type="url" autocomplete="off" autocapitalize="off" spellcheck="false"' : ' maxlength="' + (s.many ? 200 : 80) + '"';
+    return '<label for="' + id + '">' + esc(s.label) + (s.many ? ', with commas between' : '') + '</label><div class="row"><input id="' + id + '"' + kind + data + ' value="' + esc(s.type === 'calendar' ? '' : val) + '"' +
+      (s.type === 'calendar' && s.value ? ' placeholder="Set. Paste a new link to change it"' : '') + '><button type="button" class="go" data-wsave="1"' + data + ' style="flex:none">Save</button></div>' + help + back;
+  }
+  function showWidgets() {
+    var open = {};
+    Array.prototype.forEach.call(document.querySelectorAll('#w-list details[open]'), function (x) { open[x.getAttribute('data-key')] = 1; });
+    $('w-list').innerHTML = DESIGN.widgets.map(function (w) {
+      var body = (w.settings || []).filter(function (s) { return s.shown !== false; }).map(function (s) { return '<div class="sub">' + wsHtml(w, s) + '</div>'; }).join('');
+      if (!body) return '';
+      return '<details class="wbox" data-key="' + esc(w.key) + '"' + (open[w.key] ? ' open' : '') + '><summary>' + esc(w.title || w.name) + '</summary><div>' + body + '</div></details>';
+    }).join('');
+  }
+  // the widget the TV's QR named: its box open, scrolled to and marked, once (a later redraw leaves it be)
+  function openWanted() {
+    var id = WANT_WIDGET; WANT_WIDGET = '';
+    var box = Array.prototype.filter.call(document.querySelectorAll('#w-list details.wbox'), function (d) { var k = d.getAttribute('data-key') || ''; return k.slice(0, k.lastIndexOf('|')) === id; })[0];
+    Array.prototype.forEach.call(document.querySelectorAll('main > section.fold'), function (s) { openFold(s, s.id === 'widgets'); }); TOUCHED = true;
+    if (!box) { say('w-msg', 'That widget has nothing to set here.'); return; }
+    box.open = true; box.classList.add('hi');
+    setTimeout(function () { try { box.scrollIntoView({ block: 'start', behavior: 'smooth' }); } catch (e) { box.scrollIntoView(); } }, 50);
+  }
+  function wsSend(key, k, v, words) { var vals = {}; vals[k] = v; return designSend({ widget_set: { key: key, values: vals } }, 'w-msg', words || 'Saved. The TV shows it now.'); }
+  function wsSetting(key, k) { var w = (DESIGN.widgets || []).filter(function (x) { return x.key === key; })[0]; return w && (w.settings || []).filter(function (s) { return s.key === k; })[0]; }
+  $('w-list').addEventListener('click', function (e) {
+    var b = e.target.closest('button[data-wk]'); if (!b) return;
+    var key = b.getAttribute('data-wk'), k = b.getAttribute('data-ws');
+    if (b.hasAttribute('data-wclear')) { wsSend(key, k, null, 'Changed back.'); return; }
+    if (b.hasAttribute('data-wsave')) {
+      var s = wsSetting(key, k), box = b.parentNode.querySelector('input'), v = box.value.trim();
+      if (s && s.type === 'number') v = v === '' ? null : +v;
+      else if (s && s.many) v = v ? v.split(',').map(function (x) { return x.trim(); }).filter(Boolean) : null;
+      else if (!v) v = null;
+      wsSend(key, k, v);
+      return;
+    }
+    if (b.hasAttribute('data-wp')) { var p = (WPLACES[key + '|' + k] || [])[+b.getAttribute('data-wp')]; if (p) wsSend(key, k, p, 'Saved. The TV shows ' + p.name + ' now.'); }
+  });
+  $('w-list').addEventListener('change', function (e) {
+    var t = e.target, key = t.getAttribute('data-wk'), k = t.getAttribute('data-ws'); if (!key) return;
+    if (t.hasAttribute('data-wpick')) { var s = wsSetting(key, k), o = s && s.options.filter(function (x) { return String(x[0]) === t.value; })[0]; if (o) wsSend(key, k, o[0]); }
+    else if (t.hasAttribute('data-wtog')) wsSend(key, k, t.checked);
+    else if (t.hasAttribute('data-wmany')) {
+      var fs = t.closest('fieldset'), most = +fs.getAttribute('data-wmost') || 0, boxes = Array.prototype.slice.call(fs.querySelectorAll('input[data-wmany]'));
+      if (most && t.checked && boxes.filter(function (c) { return c.checked; }).length > most) t.checked = false;
+      if (most) { var n = boxes.filter(function (c) { return c.checked; }).length; boxes.forEach(function (c) { c.disabled = !c.checked && n >= most; }); }
+      var sm = wsSetting(key, k), list = boxes.filter(function (c) { return c.checked; })
+        .map(function (c) { return sm.options[+c.getAttribute('data-wmany')][0]; });
+      if (most) list = list.slice(0, most);
+      wsSend(key, k, list.length ? list : null);
+    }
+  });
+  $('w-list').addEventListener('keydown', function (e) {
+    var t = e.target; if (e.key !== 'Enter' || e.isComposing || !t.matches('input[data-ws]:not([type=checkbox])') || t.hasAttribute('data-wq')) return;
+    e.preventDefault(); var b = t.parentNode.querySelector('button[data-wsave]'); if (b) b.click();
+  });
+  $('w-list').addEventListener('input', function (e) {
+    var q = e.target.closest('input[data-wq]'); if (!q) return;
+    var key = q.getAttribute('data-wk'), k = q.getAttribute('data-ws'), list = q.parentNode.querySelector('[data-wl]'), text = q.value.trim();
+    clearTimeout(wTimer);
+    if (text.length < 2) { list.innerHTML = ''; return; }
+    wTimer = setTimeout(function () {
+      var ticket = ++wTicket, lang = ((SETTINGS && SETTINGS.settings && SETTINGS.settings.lang) || navigator.language || 'en').slice(0, 2);
+      say('w-msg', 'Searching…');
+      fetch('https://geocoding-api.open-meteo.com/v1/search?count=8&format=json&language=' + encodeURIComponent(lang) + '&name=' + encodeURIComponent(text), { referrerPolicy: 'no-referrer' })
+        .then(function (r) { if (!r.ok) throw new Error('search'); return r.json(); })
+        .then(function (j) {
+          if (ticket !== wTicket) return;
+          // two decimals is about a kilometre: the town, never the house (the same as the Town search)
+          var found = WPLACES[key + '|' + k] = (j.results || []).filter(function (r) { return isFinite(r.latitude) && isFinite(r.longitude); }).slice(0, 8).map(function (r) {
+            return { name: r.name, area: placeArea(r), lat: Math.round(r.latitude * 100) / 100, lon: Math.round(r.longitude * 100) / 100, timezone: r.timezone || 'auto' };
+          });
+          list.innerHTML = found.map(function (p, i) { return '<button type="button" data-wk="' + esc(key) + '" data-ws="' + esc(k) + '" data-wp="' + i + '" role="listitem"><span>' + esc(p.name) + '</span><small>' + esc(p.area) + '</small></button>'; }).join('');
+          say('w-msg', found.length ? 'Tap the place.' : 'Nothing found for "' + text + '". Try the nearest bigger town.');
+        })
+        .catch(function () { if (ticket === wTicket) say('w-msg', 'The place search did not answer. Check this phone has internet, then try again.'); });
+    }, 400);
+  });
+  // the design's app rows: the same changes Hold OK makes on the TV (design.js setApps)
+  function showDesignApps() {
+    $('da-list').innerHTML = DESIGN.apps.map(function (a, ai) {
+      var title = a.name + (a.label ? ': ' + a.label : ''), have = a.apps.map(function (x) { return x.key; });
+      var add = (DESIGN.installed || []).filter(function (x) { return have.indexOf(x.key) < 0; });
+      return '<div class="entry" data-ai="' + ai + '"><h3>' + esc(title) + '</h3>' +
+        (a.apps.length ? '<ul class="alist">' + a.apps.map(function (x, i) {
+          return '<li><span>' + esc(x.name) + (x.missing ? ' <span class="miss">(not on this TV)</span>' : '') + '</span>' +
+            '<button type="button" class="quiet" data-op="up" data-i="' + i + '" aria-label="Move ' + esc(x.name) + ' up"' + (i ? '' : ' disabled') + '>Up</button>' +
+            '<button type="button" class="quiet" data-op="down" data-i="' + i + '" aria-label="Move ' + esc(x.name) + ' down"' + (i < a.apps.length - 1 ? '' : ' disabled') + '>Down</button>' +
+            '<button type="button" class="danger" data-op="remove" data-i="' + i + '" aria-label="Remove ' + esc(x.name) + '">Remove</button></li>';
+        }).join('') + '</ul>' : '<p>No apps in it.</p>') +
+        (a.apps.length < a.max && add.length ? '<label for="da-add-' + ai + '">Add an app</label><div class="row"><select id="da-add-' + ai + '">' +
+          add.map(function (x) { return '<option value="' + esc(x.key) + '">' + esc(x.name) + '</option>'; }).join('') + '</select><button type="button" class="go" data-op="add">Add</button></div>'
+          : a.apps.length >= a.max ? '<p>It holds ' + a.max + (a.max === 1 ? ' app' : ' apps') + '. Remove one to add another.</p>' : '') +
+        (a.edited ? '<button type="button" class="quiet" data-op="reset">Use the design\'s own apps</button>' : '') + '</div>';
+    }).join('');
+  }
+  $('da-list').addEventListener('click', function (e) {
+    var b = e.target.closest('button[data-op]'); if (!b || b.disabled) return;
+    var ai = +b.closest('[data-ai]').getAttribute('data-ai'), a = DESIGN.apps[ai]; if (!a) return;
+    var keys = a.apps.map(function (x) { return x.key; }), i = +b.getAttribute('data-i'), op = b.getAttribute('data-op'), msg = 'Saved. The TV shows it now.';
+    if (op === 'up' && i > 0) { keys.splice(i - 1, 0, keys.splice(i, 1)[0]); msg = 'Moved up.'; }
+    else if (op === 'down' && i < keys.length - 1) { keys.splice(i + 1, 0, keys.splice(i, 1)[0]); msg = 'Moved down.'; }
+    else if (op === 'remove') { var gone = a.apps[i] && a.apps[i].name; keys.splice(i, 1); msg = (gone || 'The app') + ' is off it.'; }
+    else if (op === 'add') { var sel = $('da-add-' + ai), v = sel && sel.value; if (!v) return; keys.push(v); msg = (sel.options[sel.selectedIndex].text) + ' is on it now.'; }
+    else if (op === 'reset') { designSend({ design_apps: { key: a.key, apps: null } }, 'da-msg', 'It has the design\'s own apps again.'); return; }
+    else return;
+    designSend({ design_apps: { key: a.key, apps: keys } }, 'da-msg', msg);
+  });
+
+  // ---------------- Widgets on your screen (owner, 23 Nov 2026) ----------------
+  // The design's widgets one at a time, each drawn with the TV's own widgets.js, widgets.css and
+  // widget-caps.js (served by the TV under /tv/) and demo data, so the card looks like the TV but shows
+  // nothing private. Swipe (or Back and Next) to the next; Edit opens a sheet with that widget's settings as
+  // plain controls, each saved at once (widget_set, the same as Widgets on this TV below). A widget that
+  // needs something private (a town, photos, a calendar) has one button for it instead. The rest of this
+  // page is under More settings. The TV's code can open a widget (#widget=<id>), its step (&connect=) or
+  // walk through every widget still to set up (#widgets).
+  function hashWord(k) { var m = new RegExp('(?:^#|&)' + k + '=([^&]*)').exec(location.hash || ''); try { return m ? decodeURIComponent(m[1]) : ''; } catch (e) { return ''; } }
+  var G = { list: [], i: 0, kit: null, ready: false, sheet: null, walk: /(?:^#|&)widgets(?:&|$)/.test(location.hash || ''), connect: hashWord('connect'), more: false, done: false, seen: '' };
+  var NEEDS = ['town', 'photos', 'calendar', 'spotify', 'wifi', 'text', 'team', 'ha'];
+  if (NEEDS.indexOf(G.connect) < 0) G.connect = '';
+  var CONNECT_WORDS = { calendar: 'Connect your calendar', photos: 'Add photos', town: 'Set your town', spotify: 'Connect Spotify', wifi: 'Add your WiFi', text: 'Write it', team: 'Pick your team', ha: 'Connect Home Assistant' };
+  var APP_KINDS = ['app', 'folder', 'dock', 'appgrid', 'games'];
+  function gw(s, vars) { s = String(s); return vars ? s.replace(/\{(\w+)\}/g, function (m, k) { return vars[k] != null ? String(vars[k]) : m; }) : s; }
+  // the TV's widget kit, loaded once, only when there is a design to show
+  function loadKit() {
+    if (G.kit) return G.kit;
+    window.I18N = window.I18N || { lang: function () { return (window.PhoneWords && window.PhoneWords.lang && window.PhoneWords.lang()) || 'en'; } };
+    var css = document.createElement('link'); css.rel = 'stylesheet'; css.href = '/tv/widgets.css'; document.head.appendChild(css);
+    var files = ['icon-sets.js', 'app-catalogue.js', 'widget-words.js', 'widget-lines.js', 'widgets.js', 'widget-caps.js', 'qr.js'];
+    G.kit = files.reduce(function (p, f) {
+      return p.then(function () { return new Promise(function (ok) { var s = document.createElement('script'); s.src = '/tv/' + f; s.onload = ok; s.onerror = ok; document.head.appendChild(s); }); });
+    }, Promise.resolve()).then(function () {
+      if (window.CouchWidgets && window.CouchWidgets.config) window.CouchWidgets.config.base = '/tv/';
+      G.ready = !!window.CouchWidgets;
+    });
+    return G.kit;
+  }
+  function screenOf() { return DESIGN && DESIGN.screen && Array.isArray(DESIGN.screen.widgets) ? DESIGN.screen : null; }
+  function settingsOf(w) { return ((DESIGN && DESIGN.widgets) || []).filter(function (x) { return x.key === w.key; })[0] || null; }
+  function appsOf(w) { return ((DESIGN && DESIGN.apps) || []).filter(function (a) { return a.key === w.key; })[0] || null; }
+  function waiting(w) { return !!(w.need && !w.ready); }
+  function shownSettings(w) {
+    var s = settingsOf(w);
+    return s ? (s.settings || []).filter(function (x) { return x.shown !== false && (x.type !== 'place' || x.key === 'to') && x.type !== 'calendar' && x.type !== 'apps' && x.type !== 'image'; }) : [];
+  }
+  function editable(w) { return !!(w.need || shownSettings(w).length || (APP_KINDS.indexOf(w.kind) >= 0 && appsOf(w))); }
+  // the widgets waiting for something first, then in reading order (top to bottom, left to right)
+  function order(list) { return list.slice().sort(function (a, b) { return (waiting(b) ? 1 : 0) - (waiting(a) ? 1 : 0) || (a.y - b.y) || (a.x - b.x); }); }
+  function showScreen() {
+    var sc = screenOf(), on = !!(sc && sc.widgets.length) && !SHOW_ALL_PAGE();
+    document.body.classList.toggle('gal', on);
+    $('screen').style.display = on ? '' : 'none';
+    if (!on) return;
+    var keep = G.list[G.i] && G.list[G.i].key;
+    G.list = order(sc.widgets);
+    var want = WANT_WIDGET || '';
+    if (want) { G.i = Math.max(0, G.list.map(function (w) { return w.id; }).indexOf(want)); }
+    else if (G.walk && !G.seen) { var first = G.list.map(waiting).indexOf(true); G.i = first >= 0 ? first : 0; }
+    else if (keep) { var k = G.list.map(function (w) { return w.key; }).indexOf(keep); G.i = k >= 0 ? k : Math.min(G.i, G.list.length - 1); }
+    var sig = G.list.map(function (w) { return w.key + (w.ready ? 1 : 0); }).join(',') + JSON.stringify(sc.look || {});
+    loadKit().then(function () {
+      if (sig !== G.seen) { G.seen = sig; drawCards(); }
+      goCard(G.i, false);
+      // the TV's code named a widget, and maybe its step: open it once
+      if (want) { WANT_WIDGET = ''; var w = G.list[G.i]; if (w && w.id === want) { if (G.connect && w.need) openConnect(w, G.connect); else if (editable(w)) openEdit(w); } G.connect = ''; }
+      else if (G.walk && !G.sheet && !G.started) { G.started = true; var w2 = G.list[G.i]; if (w2 && waiting(w2)) openConnect(w2, w2.need); }
+      walkDone();
+    });
+  }
+  function SHOW_ALL_PAGE() { return false; }
+  function placeWords(w) { var n = w.name + ', ' + w.where; return n; }
+  function drawCards() {
+    $('g-track').innerHTML = G.list.map(function (w, i) {
+      var need = waiting(w), btn = need ? CONNECT_WORDS[w.need] : editable(w) ? 'Edit' : '';
+      return '<div class="g-card" data-i="' + i + '"><div class="g-stage" data-stage="' + i + '"></div><div class="g-name">' + esc(placeWords(w)) + '</div>' +
+        '<p class="g-state' + (need ? ' need' : '') + '">' + (need ? 'Not set up yet.' : editable(w) ? 'Tap Edit to change it.' : 'Nothing to set here.') + '</p>' +
+        (btn ? '<button type="button" class="' + (need ? 'go' : '') + '" data-g="' + i + '">' + esc(btn) + '</button>' : '') + '</div>';
+    }).join('');
+    G.list.forEach(function (w, i) { drawWidget(w, $('g-track').querySelector('[data-stage="' + i + '"]')); });
+    $('g-dots').innerHTML = G.list.map(function (w, i) { return '<i data-d="' + i + '"></i>'; }).join('');
+    $('g-map').innerHTML = G.list.map(function (w, i) { return '<i data-m="' + i + '" style="left:' + (w.x / 19.2) + '%;top:' + (w.y / 10.8) + '%;width:' + Math.max(2, w.w / 19.2) + '%;height:' + Math.max(3, w.h / 10.8) + '%"></i>'; }).join('');
+  }
+  // the TV's own values for this widget (what Edit set), never a private one
+  function wsetOf(w) {
+    var s = settingsOf(w), out = {};
+    (s ? s.settings || [] : []).forEach(function (x) { if (x.own && x.value !== null && x.value !== undefined && !(x.value === true && x.type !== 'toggle')) out[x.key] = x.value; });
+    var all = {}; all[w.id] = out; return all;
+  }
+  function drawWidget(w, stage) {
+    if (!stage || !window.CouchWidgets) return;
+    var box = stage.parentNode.clientWidth - 28 || 300, k = Math.min(box / Math.max(40, w.w), 320 / Math.max(40, w.h));
+    stage.style.width = Math.round(w.w * k) + 'px'; stage.style.height = Math.round(w.h * k) + 'px';
+    var layer = document.createElement('div'); layer.className = 'cd-layer'; layer.style.width = w.w + 'px'; layer.style.height = w.h + 'px'; layer.style.transform = 'scale(' + k + ')';
+    var o = { id: w.id, kind: w.kind, w: w.w, h: w.h, opts: w.opts || {}, style: w.style || {} };
+    if (w.items) o.items = w.items.map(function (it, j) { return { id: w.id + '/' + j, kind: it.kind, opts: it.opts || {}, style: it.style || {} }; });
+    try { layer.appendChild(window.CouchWidgets.render(o, { demo: true, look: (screenOf() || {}).look || {}, wset: wsetOf(w), data: {} })); } catch (e) {}
+    stage.innerHTML = ''; stage.appendChild(layer);
+  }
+  function goCard(i, smooth) {
+    if (!G.list.length) return;
+    G.i = Math.max(0, Math.min(G.list.length - 1, i));
+    var card = $('g-track').children[G.i];
+    if (card) { var x = card.offsetLeft - $('g-track').offsetLeft - 16; try { $('g-track').scrollTo({ left: x, behavior: smooth ? 'smooth' : 'auto' }); } catch (e) { $('g-track').scrollLeft = x; } }
+    markCard();
+  }
+  function markCard() {
+    $('g-count').textContent = gw('{n} of {total}', { n: G.i + 1, total: G.list.length });
+    Array.prototype.forEach.call($('g-dots').children, function (d, j) { d.classList.toggle('on', j === G.i); });
+    Array.prototype.forEach.call($('g-map').children, function (d, j) { d.classList.toggle('on', j === G.i); });
+    $('g-prev').disabled = G.i <= 0; $('g-next').disabled = G.i >= G.list.length - 1;
+  }
+  var gScrollT = 0;
+  $('g-track').addEventListener('scroll', function () {
+    clearTimeout(gScrollT);
+    gScrollT = setTimeout(function () { var t = $('g-track'), w = t.clientWidth || 1; var i = Math.round(t.scrollLeft / (w + 12 - 32 + 32)); if (i !== G.i && i >= 0 && i < G.list.length) { G.i = i; markCard(); } }, 80);
+  });
+  $('g-prev').onclick = function () { goCard(G.i - 1, true); };
+  $('g-next').onclick = function () { goCard(G.i + 1, true); };
+  $('g-dots').addEventListener('click', function (e) { var d = e.target.closest('[data-d]'); if (d) goCard(+d.getAttribute('data-d'), true); });
+  $('g-track').addEventListener('click', function (e) {
+    var b = e.target.closest('button[data-g]'); if (!b) return;
+    var w = G.list[+b.getAttribute('data-g')]; if (!w) return;
+    if (waiting(w)) openConnect(w, w.need); else openEdit(w);
+  });
+  $('g-more').onclick = function () { G.more = !G.more; document.body.classList.toggle('more', G.more); this.textContent = G.more ? 'Fewer settings' : 'More settings'; if (G.more) { TOUCHED = false; openFirst(); } };
+  // walking through (#widgets): when nothing is left to set up, say so once
+  function walkDone() {
+    var left = G.list.filter(waiting).length;
+    $('g-done').style.display = G.walk && G.list.length && !left ? '' : 'none';
+  }
+
+  // ---- the sheet: one widget's settings, or one step to connect something ----
+  function openSheet(title, html, w) {
+    G.sheet = { w: w };
+    $('sheet-title').textContent = title;
+    $('sheet-body').innerHTML = html;
+    say('sheet-msg', '');
+    $('sheet').hidden = false; $('sheet-back').hidden = false;
+    document.body.style.overflow = 'hidden';
+  }
+  function closeSheet() {
+    var w = G.sheet && G.sheet.w;
+    G.sheet = null; $('sheet').hidden = true; $('sheet-back').hidden = true; document.body.style.overflow = '';
+    // walking through: the next widget still to set up, or "All set"
+    if (G.walk && w) refreshSoon(function () {
+      var next = G.list.map(waiting).indexOf(true);
+      if (next >= 0) { goCard(next, true); openConnect(G.list[next], G.list[next].need); }
+      walkDone();
+    });
+  }
+  $('sheet-close').onclick = closeSheet;
+  $('sheet-back').onclick = closeSheet;
+  // the TV draws the widget again a moment after a change: read the design view once more, then again
+  function refreshSoon(then) {
+    setTimeout(function () {
+      api('GET', '/api/athome').then(function (j) { if (j.live) { AH = j.athome; showAtHome(); takeDesign(AH && AH.design); } if (then) then(); }, function () { if (then) then(); });
+    }, 1500);
+  }
+  function saved(text) { say('sheet-msg', text || 'Saved.'); }
+  function gSet(w, k, v) {
+    say('sheet-msg', 'Saving…');
+    var vals = {}; vals[k] = v;
+    return api('POST', '/api/athome', { edit: { widget_set: { key: w.key, values: vals } } }).then(function (j) {
+      if (j.live) { AH = j.athome; takeDesign(AH && AH.design); saved(); var i = G.list.map(function (x) { return x.key; }).indexOf(w.key); if (i >= 0) { G.list[i] = Object.assign(G.list[i], screenOf().widgets.filter(function (x) { return x.key === w.key; })[0] || {}); drawWidget(G.list[i], $('g-track').querySelector('[data-stage="' + i + '"]')); } }
+      else say('sheet-msg', 'Sent. The TV takes it as soon as the Couch TV home is open on it.');
+    }).catch(function (e) { say('sheet-msg', e.message); });
+  }
+
+  // Edit: the widget's own settings as plain controls (4 choices or fewer side by side, more as a list, a
+  // switch, a stepper), then what it needs (the town for weather, photos, the apps in it)
+  function ctl(w, s, i) {
+    var d = ' data-s="' + i + '"', opts = (s.options || []).slice();
+    // a clock's 12 or 24 hour: the phone sets one, never "Follow this TV"
+    if (s.key === 'format' && /clock/.test(w.kind)) opts = opts.filter(function (o) { return o[0] !== 'auto'; });
+    var help = s.help && s.type !== 'choice' ? '<p class="help">' + esc(s.help) + '</p>' : '';
+    if ((s.type === 'choice' || s.type === 'tvlist' || s.type === 'device') && s.many) {
+      var picked = (Array.isArray(s.value) ? s.value : []).map(String);
+      return '<div class="q">' + esc(s.label) + '</div><div class="picks">' + opts.map(function (o, j) { return '<button type="button" data-many="' + j + '"' + d + ' aria-pressed="' + (picked.indexOf(String(o[0])) >= 0) + '">' + esc(String(o[1])) + '</button>'; }).join('') + '</div>' +
+        (isFinite(s.max) && +s.max > 0 ? '<p class="help">' + esc(gw('Pick up to {n}.', { n: s.max })) + '</p>' : '');
+    }
+    if (s.type === 'choice' || s.type === 'tvlist' || s.type === 'device') {
+      if (!opts.length) return '<div class="q">' + esc(s.label) + '</div><p class="help">Nothing to pick on this TV yet.</p>';
+      var cls = opts.length <= 4 && opts.every(function (o) { return String(o[1]).length <= 14; }) ? 'seg' : 'picks';
+      return '<div class="q">' + esc(s.label) + '</div><div class="' + cls + '">' + opts.map(function (o, j) { return '<button type="button" data-one="' + j + '"' + d + ' aria-pressed="' + (String(s.value) === String(o[0])) + '">' + esc(String(o[1])) + '</button>'; }).join('') + '</div>';
+    }
+    if (s.type === 'toggle') return '<label class="sw q"><span>' + esc(s.label) + '</span><input type="checkbox" data-tog="1"' + d + (s.value ? ' checked' : '') + '></label>' + help;
+    if (s.type === 'number') {
+      var v = isFinite(s.value) && s.value !== null ? +s.value : isFinite(s.min) ? +s.min : 0;
+      return '<div class="q">' + esc(s.label) + '</div><div class="step"><button type="button" class="quiet" data-step="-1"' + d + ' aria-label="Less">−</button><output data-out="' + i + '">' + esc(String(v)) + '</output><button type="button" class="quiet" data-step="1"' + d + ' aria-label="More">+</button></div>' + help;
+    }
+    if (s.type === 'place') {
+      return '<div class="q"><label for="gs-' + i + '">' + esc(s.label) + '</label></div><p class="help">' + esc(s.words || '') + '</p><input id="gs-' + i + '" type="search" autocomplete="off" enterkeyhint="search" data-wq="1"' + d + ' placeholder="Type at least 2 letters"><div class="places" data-wl="' + i + '" role="list"></div>';
+    }
+    if (s.type === 'zone') {
+      var zones = []; try { zones = Intl.supportedValuesOf('timeZone'); } catch (e) { zones = []; }
+      return '<div class="q">' + esc(s.label) + '</div><select data-zone="1"' + d + '><option value="">This TV\'s own time zone</option>' + zones.map(function (z) { return '<option' + (z === s.value ? ' selected' : '') + '>' + esc(z) + '</option>'; }).join('') + '</select>' + help;
+    }
+    var val = s.value === true || s.value === null || s.value === undefined ? '' : Array.isArray(s.value) ? s.value.join(', ') : String(s.value);
+    return '<div class="q"><label for="gs-' + i + '">' + esc(s.label) + '</label></div><input id="gs-' + i + '" data-text="1"' + d + ' maxlength="' + (s.many ? 200 : 80) + '" value="' + esc(val) + '">' + help;
+  }
+  function openEdit(w) {
+    var list = shownSettings(w), html = '';
+    if (w.need) html += needBlock(w, w.need);
+    html += list.map(function (s, i) { return ctl(w, s, i); }).join('');
+    if (APP_KINDS.indexOf(w.kind) >= 0 && appsOf(w)) html += '<div id="g-apps"></div>';
+    if (/^(keep|keeprow|people|picks)$/.test(w.kind) && MODE !== 'launcher') html += '<a class="btn" href="/#sheet=people">Change people</a>';
+    openSheet(w.name, html || '<p>Nothing to set here.</p>', w);
+    G.sheet.list = list;
+    if ($('g-apps')) drawApps(w);
+    wireNeed(w, w.need);
+  }
+  function sheetSetting(el) { var i = +el.getAttribute('data-s'); return G.sheet && G.sheet.list ? G.sheet.list[i] : null; }
+  var stepT = 0;
+  $('sheet-body').addEventListener('click', function (e) {
+    var b = e.target.closest('button'); if (!b || !G.sheet) return;
+    var w = G.sheet.w, s = b.hasAttribute('data-s') ? sheetSetting(b) : null;
+    if (s && b.hasAttribute('data-one')) {
+      var o = (s.key === 'format' && /clock/.test(w.kind) ? s.options.filter(function (x) { return x[0] !== 'auto'; }) : s.options)[+b.getAttribute('data-one')];
+      Array.prototype.forEach.call(b.parentNode.children, function (x) { x.setAttribute('aria-pressed', x === b ? 'true' : 'false'); });
+      s.value = o[0]; gSet(w, s.key, o[0]);
+    } else if (s && b.hasAttribute('data-many')) {
+      var on = b.getAttribute('aria-pressed') !== 'true', most = isFinite(s.max) && +s.max > 0 ? +s.max : 0;
+      var now = Array.prototype.filter.call(b.parentNode.children, function (x) { return x.getAttribute('aria-pressed') === 'true'; }).length;
+      if (on && most && now >= most) { say('sheet-msg', gw('Pick up to {n}.', { n: most })); return; }
+      b.setAttribute('aria-pressed', on ? 'true' : 'false');
+      var vals = Array.prototype.map.call(b.parentNode.children, function (x, j) { return x.getAttribute('aria-pressed') === 'true' ? s.options[j][0] : null; }).filter(function (x) { return x !== null; });
+      s.value = vals; gSet(w, s.key, vals.length ? vals : null);
+    } else if (s && b.hasAttribute('data-step')) {
+      var out = $('sheet-body').querySelector('[data-out="' + b.getAttribute('data-s') + '"]'), st = isFinite(s.step) && +s.step > 0 ? +s.step : 1;
+      var v = +out.textContent + st * +b.getAttribute('data-step');
+      if (isFinite(s.min) && v < +s.min) v = +s.min; if (isFinite(s.max) && v > +s.max) v = +s.max;
+      out.textContent = String(Math.round(v * 1000) / 1000);
+      clearTimeout(stepT); stepT = setTimeout(function () { gSet(w, s.key, v); }, 400);
+    }
+  });
+  $('sheet-body').addEventListener('change', function (e) {
+    var t = e.target; if (!G.sheet || !t.hasAttribute('data-s')) return;
+    var w = G.sheet.w, s = sheetSetting(t); if (!s) return;
+    if (t.hasAttribute('data-tog')) gSet(w, s.key, t.checked);
+    else if (t.hasAttribute('data-zone')) gSet(w, s.key, t.value || null);
+    else if (t.hasAttribute('data-text')) { var v = t.value.trim(); gSet(w, s.key, s.many ? (v ? v.split(',').map(function (x) { return x.trim(); }).filter(Boolean) : null) : v || null); }
+  });
+
+  // ---- the apps in an app row, folder or grid: the TV's own apps with their icons ----
+  var ICONS = {};
+  function appIcon(a) {
+    var x = ((DESIGN && DESIGN.installed) || []).filter(function (y) { return y.key === a.key; })[0] || a, c = window.CouchApps && window.CouchApps.get(a.key);
+    var icon = x.icon || (c && c.icon) || '', colour = x.colour || (c && c.colour) || '#3a3a42';
+    if (icon && /^app-icons\/[a-z0-9_.-]+$/i.test(icon)) return '<span class="ic"><img alt="" src="/tv/' + esc(icon) + '"></span>';
+    var letter = String(a.name || '?').trim().charAt(0).toUpperCase();
+    return '<span class="ic" style="background:' + esc(/^#[0-9a-f]{3,8}$/i.test(colour) ? colour : '#3a3a42') + '"' + (x.pkg ? ' data-pkg="' + esc(x.pkg) + '"' : '') + '>' + esc(letter) + '</span>';
+  }
+  // an app with no picture of its own: the TV's icon for it, asked with the pairing key (never a cookie)
+  function fillIcons(root) {
+    Array.prototype.forEach.call(root.querySelectorAll('.ic[data-pkg]'), function (el) {
+      var p = el.getAttribute('data-pkg');
+      var put = function (u) { if (u) el.innerHTML = '<img alt="" src="' + u + '">'; };
+      if (ICONS[p] !== undefined) { put(ICONS[p]); return; }
+      ICONS[p] = '';
+      fetch(withTv('/api/appicon/' + encodeURIComponent(p))).then(function (r) { if (!r.ok || !/^image\//.test(r.headers.get('content-type') || '')) throw new Error(); return r.blob(); })
+        .then(function (b) { ICONS[p] = URL.createObjectURL(b); put(ICONS[p]); }, function () {});
+    });
+  }
+  function drawApps(w) {
+    var a = appsOf(w), box = $('g-apps'); if (!a || !box) return;
+    var have = a.apps.map(function (x) { return x.key; }), add = ((DESIGN && DESIGN.installed) || []).filter(function (x) { return have.indexOf(x.key) < 0; });
+    box.innerHTML = '<div class="q">Apps in it</div>' + (a.apps.length ? '<p class="help">Drag to move. Tap × to take one off.</p><div class="apps" id="g-have">' + a.apps.map(function (x, i) {
+      return '<button type="button" class="gapp" data-have="' + i + '">' + appIcon(x) + '<span>' + esc(x.name) + '</span><b class="x" data-rm="' + i + '" aria-label="' + esc(gw('Take {name} off', { name: x.name })) + '">×</b></button>';
+    }).join('') + '</div>' : '<p class="help">No apps in it.</p>') +
+      (a.apps.length < a.max ? '<div class="q">Add an app</div><p class="help">These are the apps on your TV.</p><div class="apps">' + add.map(function (x) {
+        return '<button type="button" class="gapp" data-add="' + esc(x.key) + '">' + appIcon(x) + '<span>' + esc(x.name) + '</span></button>';
+      }).join('') + '</div>' : '<p class="help">' + esc(gw(a.max === 1 ? 'It holds 1 app. Take it off to pick another.' : 'It holds {n} apps. Take one off to add another.', { n: a.max })) + '</p>') +
+      (a.edited ? '<button type="button" class="quiet" data-reset="1">Use the design\'s own apps</button>' : '');
+    fillIcons(box);
+  }
+  function saveApps(w, keys, words) {
+    var a = appsOf(w); if (!a) return;
+    say('sheet-msg', 'Saving…');
+    api('POST', '/api/athome', { edit: { design_apps: { key: a.key, apps: keys } } }).then(function (j) {
+      if (j.live) { AH = j.athome; takeDesign(AH && AH.design); drawApps(w); saved(words); } else say('sheet-msg', 'Sent. The TV takes it as soon as the Couch TV home is open on it.');
+    }).catch(function (e) { say('sheet-msg', e.message); });
+  }
+  $('sheet-body').addEventListener('click', function (e) {
+    if (!G.sheet || !$('g-apps') || !$('g-apps').contains(e.target)) return;
+    var w = G.sheet.w, a = appsOf(w); if (!a) return;
+    var keys = a.apps.map(function (x) { return x.key; }), rm = e.target.closest('[data-rm]'), ad = e.target.closest('[data-add]'), rs = e.target.closest('[data-reset]');
+    if (rm) { var gone = a.apps[+rm.getAttribute('data-rm')]; keys.splice(+rm.getAttribute('data-rm'), 1); saveApps(w, keys, gw('{name} is off it.', { name: gone ? gone.name : '' })); }
+    else if (ad) { keys.push(ad.getAttribute('data-add')); saveApps(w, keys.slice(0, a.max), gw('{name} is on it now.', { name: (ad.querySelector('span:last-child') || {}).textContent || '' })); }
+    else if (rs) saveApps(w, null, 'It has the design\'s own apps again.');
+  });
+  // drag to move: hold an app, slide it over another, let go
+  var DRAG = null;
+  $('sheet-body').addEventListener('pointerdown', function (e) {
+    var el = e.target.closest('[data-have]'); if (!el || e.target.closest('[data-rm]')) return;
+    DRAG = { from: +el.getAttribute('data-have'), el: el, x: e.clientX, y: e.clientY, moved: false };
+    e.preventDefault();
+  });
+  document.addEventListener('pointermove', function (e) {
+    if (!DRAG) return;
+    if (!DRAG.moved && Math.abs(e.clientX - DRAG.x) + Math.abs(e.clientY - DRAG.y) < 10) return;
+    DRAG.moved = true; DRAG.el.classList.add('drag');
+    var over = document.elementFromPoint(e.clientX, e.clientY), t = over && over.closest && over.closest('[data-have]');
+    Array.prototype.forEach.call(document.querySelectorAll('#g-have .gapp'), function (x) { x.classList.toggle('on', x === t && x !== DRAG.el); });
+    DRAG.to = t ? +t.getAttribute('data-have') : DRAG.to;
+    e.preventDefault();
+  }, { passive: false });
+  document.addEventListener('pointerup', function () {
+    var d = DRAG; DRAG = null; if (!d || !d.moved || !G.sheet) { if (d) d.el.classList.remove('drag'); return; }
+    var a = appsOf(G.sheet.w); if (!a || d.to === undefined || d.to === d.from) { drawApps(G.sheet.w); return; }
+    var keys = a.apps.map(function (x) { return x.key; }); keys.splice(d.to, 0, keys.splice(d.from, 1)[0]);
+    saveApps(G.sheet.w, keys, 'Moved.');
+  });
+
+  // ---- connect: one question at a time, one button each ----
+  var CAL = {
+    google: { name: 'Google', steps: ['Open Google Calendar settings.', 'Tap your calendar, then Integrate calendar.', 'Copy Secret address in iCal format.', 'Paste it below.'],
+      link: ['Open Google Calendar', 'https://calendar.google.com/calendar/r/settings'], note: 'On a phone, use Desktop site in your browser, or a computer. Work accounts may not have this.' },
+    apple: { name: 'Apple', steps: ['Open the Calendar app.', 'Tap Calendars, then the i next to your calendar.', 'Turn on Public Calendar, tap Share Link, then Copy.', 'Paste it below.'],
+      note: 'Anyone with this link can see the calendar. Keep it to yourself.' },
+    outlook: { name: 'Outlook', steps: ['Under Publish a calendar, pick your calendar and Can view all details.', 'Tap Publish, then copy the ICS link.', 'Paste it below.'],
+      link: ['Open Outlook calendar settings', 'https://outlook.live.com/calendar/0/options/calendar/SharedCalendars'], link2: ['Work or school account', 'https://outlook.office.com/calendar/options/calendar/SharedCalendars'] },
+    bookings: { name: 'Airbnb or bookings', steps: ['Airbnb: Calendar, Availability, Export calendar.', 'Booking.com: Rates and availability, Sync calendars, Export.', 'VRBO: Calendar, Import and export, Export.', 'Paste the link below.'], stay: true },
+    other: { name: 'Something else', steps: [] }
+  };
+  function needBlock(w, need) {
+    var a = AH || {}, s = SETTINGS || {};
+    if (need === 'calendar') {
+      var c = a.cal;
+      return '<div class="q">Your calendar</div><p class="help">' + esc(c && c.host ? gw('Connected: {host}', { host: c.host }) : 'Not connected yet.') + '</p><button type="button" class="go" data-cal="1">' + esc(c && c.host ? 'Change calendar' : 'Connect your calendar') + '</button>';
+    }
+    if (need === 'town') {
+      var pl = s.settings && s.settings.place;
+      return '<div class="q">Town (all weather widgets)</div><p class="help">' + esc(pl && pl.name ? gw('Now: {town}', { town: placeLabel(pl) }) : 'Not set yet.') + '</p>' +
+        '<input id="g-town" type="search" autocomplete="off" enterkeyhint="search" placeholder="Type at least 2 letters" aria-label="Search for your town or suburb"><div class="places" id="g-places" role="list"></div>';
+    }
+    if (need === 'photos') {
+      var n = photoList().length;
+      return '<div class="q">Your photos</div><p class="help" id="g-pcount">' + esc(n ? gw(n === 1 ? '1 photo on your TV.' : '{n} photos on your TV.', { n: n }) : 'No photos yet.') + '</p>' +
+        '<label class="btn go pick">Add photos<input id="g-pfile" type="file" accept="image/*" multiple aria-label="Add photos"></label>';
+    }
+    if (need === 'wifi') {
+      var f = a.wifi || {};
+      return '<div class="q"><label for="g-ssid">Network name, exactly as a phone shows it</label></div><input id="g-ssid" maxlength="32" autocomplete="off" autocapitalize="off" spellcheck="false" value="' + esc(f.ssid || '') + '">' +
+        '<div class="q"><label for="g-pass">Password</label></div><input id="g-pass" maxlength="63" autocomplete="off" autocapitalize="off" spellcheck="false" value="' + esc(f.pass || '') + '">' +
+        '<details class="wbox"><summary>More</summary><div><label class="check"><input type="checkbox" id="g-hidden"' + (f.hidden ? ' checked' : '') + '> Hidden network</label>' +
+        '<label for="g-sec">Security</label><select id="g-sec"><option value="WPA">WPA, WPA2 or WPA3 (most)</option><option value="WEP">WEP (old)</option><option value="nopass">No password</option></select></div></details>' +
+        '<button type="button" class="go" data-wifi="1">Save</button>';
+    }
+    if (need === 'text') {
+      if (w.kind === 'note') return '<div class="q"><label for="g-note">Note</label></div><textarea id="g-note" maxlength="280">' + esc(a.note ? a.note.text : '') + '</textarea><button type="button" class="go" data-note="1">Save</button>';
+      if (w.kind === 'list') { var l = (a.lists || [])[0] || { name: '', items: [] }; return '<div class="q"><label for="g-lname">List name</label></div><input id="g-lname" maxlength="24" value="' + esc(l.name || 'Shopping') + '"><div class="q"><label for="g-litems">Items, one on each line</label></div><textarea id="g-litems" rows="5">' + esc((l.items || []).map(function (x) { return x.t; }).join('\n')) + '</textarea><button type="button" class="go" data-list="1">Save</button>'; }
+      var g = (a.guide || [])[0] || { title: '', text: '' };
+      return '<div class="q"><label for="g-gtitle">Heading</label></div><input id="g-gtitle" maxlength="30" value="' + esc(g.title || '') + '"><div class="q"><label for="g-gtext">Words</label></div><textarea id="g-gtext" maxlength="240">' + esc(g.text || '') + '</textarea><button type="button" class="go" data-guide="1">Save</button>';
+    }
+    if (need === 'ha') return '<div class="q">Home Assistant</div><p class="help">Sign in to your own Home Assistant on this phone. The TV keeps the sign in.</p><button type="button" class="go" data-ha="1">Connect Home Assistant</button>';
+    if (need === 'spotify') return '<div class="q">Is a home computer running Couch TV?</div><div class="seg"><button type="button" data-sp="yes">Yes</button><button type="button" data-sp="no">No</button></div><div id="g-sp"></div>';
+    return '';
+  }
+  function openConnect(w, need) {
+    if (need === 'calendar') { calStart(w); return; }
+    if (need === 'team') { openEdit(w); return; }
+    openSheet(w.name, needBlock(w, need), w);
+    wireNeed(w, need);
+  }
+  var gTownT = 0, gTownTicket = 0, gPlaces = [];
+  function wireNeed(w, need) {
+    if (need === 'town' && $('g-town')) {
+      $('g-town').addEventListener('input', function () {
+        var q = this.value.trim(); clearTimeout(gTownT);
+        if (q.length < 2) { $('g-places').innerHTML = ''; return; }
+        gTownT = setTimeout(function () {
+          var ticket = ++gTownTicket, lang = ((SETTINGS && SETTINGS.settings && SETTINGS.settings.lang) || navigator.language || 'en').slice(0, 2);
+          say('sheet-msg', 'Searching…');
+          fetch('https://geocoding-api.open-meteo.com/v1/search?count=8&format=json&language=' + encodeURIComponent(lang) + '&name=' + encodeURIComponent(q), { referrerPolicy: 'no-referrer' })
+            .then(function (r) { if (!r.ok) throw new Error('search'); return r.json(); })
+            .then(function (j) {
+              if (ticket !== gTownTicket) return;
+              gPlaces = (j.results || []).filter(function (r) { return isFinite(r.latitude) && isFinite(r.longitude); }).slice(0, 8).map(function (r) {
+                return { name: r.name, area: placeArea(r), lat: Math.round(r.latitude * 100) / 100, lon: Math.round(r.longitude * 100) / 100, timezone: r.timezone || 'auto' };
+              });
+              $('g-places').innerHTML = gPlaces.map(function (p, i) { return '<button type="button" data-place="' + i + '" role="listitem"><span>' + esc(p.name) + '</span><small>' + esc(p.area) + '</small></button>'; }).join('');
+              say('sheet-msg', gPlaces.length ? 'Tap your town.' : gw('Nothing found for "{q}". Try the nearest bigger town.', { q: q }));
+            }).catch(function () { if (ticket === gTownTicket) say('sheet-msg', 'The place search did not answer. Check this phone has internet, then try again.'); });
+        }, 400);
+      });
+    }
+    if (need === 'photos' && $('g-pfile')) $('g-pfile').addEventListener('change', function () { var input = this; gPhotos(input.files, function () { input.value = ''; }); });
+  }
+  $('sheet-body').addEventListener('input', function (e) {
+    var q = e.target.closest('input[data-wq]'); if (!q) return;
+    var i = q.getAttribute('data-s'), list = $('sheet-body').querySelector('[data-wl="' + i + '"]'), text = q.value.trim();
+    clearTimeout(gTownT);
+    if (text.length < 2) { list.innerHTML = ''; return; }
+    gTownT = setTimeout(function () {
+      var ticket = ++gTownTicket, lang = ((SETTINGS && SETTINGS.settings && SETTINGS.settings.lang) || navigator.language || 'en').slice(0, 2);
+      fetch('https://geocoding-api.open-meteo.com/v1/search?count=8&format=json&language=' + encodeURIComponent(lang) + '&name=' + encodeURIComponent(text), { referrerPolicy: 'no-referrer' })
+        .then(function (r) { if (!r.ok) throw new Error('search'); return r.json(); })
+        .then(function (j) {
+          if (ticket !== gTownTicket) return;
+          gPlaces = (j.results || []).filter(function (r) { return isFinite(r.latitude) && isFinite(r.longitude); }).slice(0, 8).map(function (r) {
+            return { name: r.name, area: placeArea(r), lat: Math.round(r.latitude * 100) / 100, lon: Math.round(r.longitude * 100) / 100, timezone: r.timezone || 'auto' };
+          });
+          list.innerHTML = gPlaces.map(function (p, k) { return '<button type="button" data-wpick="' + k + '" data-s="' + i + '" role="listitem"><span>' + esc(p.name) + '</span><small>' + esc(p.area) + '</small></button>'; }).join('');
+          say('sheet-msg', gPlaces.length ? 'Tap the place.' : gw('Nothing found for "{q}". Try the nearest bigger town.', { q: text }));
+        }).catch(function () { if (ticket === gTownTicket) say('sheet-msg', 'The place search did not answer. Check this phone has internet, then try again.'); });
+    }, 400);
+  });
+  function setPlace(p, msgTo) {
+    say(msgTo || 'sheet-msg', 'Saving…');
+    return api('POST', '/api/settings', { settings_patch: { place: { name: p.name, area: p.area || '', lat: p.lat, lon: p.lon, timezone: p.timezone || 'auto' } } })
+      .then(function (j) { SETTINGS = j; showTown(); say(msgTo || 'sheet-msg', gw('Saved. The TV shows the weather for {town} now.', { town: p.name })); refreshSoon(); return true; })
+      .catch(function (e) { say(msgTo || 'sheet-msg', e.message); return false; });
+  }
+  function gPhotos(list, done0) {
+    var files = Array.prototype.filter.call(list || [], function (f) { return /^image\//.test(f.type || '') || /\.(jpe?g|png|webp|heic|heif|gif)$/i.test(f.name || ''); });
+    var done = 0, i = 0;
+    if (!files.length) { say('sheet-msg', 'That is not a photo. Pick a JPEG or PNG.'); return; }
+    var next = function () {
+      if (i >= files.length) {
+        if (done0) done0();
+        loadSettings().then(function () { var n = photoList().length; if ($('g-pcount')) $('g-pcount').textContent = gw(n === 1 ? '1 photo on your TV.' : '{n} photos on your TV.', { n: n }); say('sheet-msg', done ? gw(n === 1 ? '1 photo on your TV.' : '{n} photos on your TV.', { n: n }) : 'No photos were added.'); refreshSoon(); });
+        return;
+      }
+      var f = files[i++];
+      say('sheet-msg', gw('Sending photo {n} of {total}…', { n: i, total: files.length }));
+      fetch(withTv('/api/photos'), { method: 'POST', headers: { 'content-type': f.type || 'application/octet-stream' }, body: f })
+        .then(function (r) { return r.json().then(function (j) { if (!r.ok || j.ok === false) throw new Error(j.error || ('error ' + r.status)); return j; }); })
+        .then(function () { done++; }, function () {}).then(next);
+    };
+    next();
+  }
+  function gAh(edit, words) {
+    say('sheet-msg', 'Saving…');
+    return api('POST', '/api/athome', { edit: edit }).then(function (j) {
+      if (j.live) { AH = j.athome; showAtHome(); takeDesign(AH && AH.design); say('sheet-msg', words); refreshSoon(); return j; }
+      say('sheet-msg', 'Sent. The TV takes it as soon as the Couch TV home is open on it.'); return j;
+    }).catch(function (e) { say('sheet-msg', e.message); });
+  }
+  $('sheet-body').addEventListener('click', function (e) {
+    var b = e.target.closest('button'); if (!b || !G.sheet) return;
+    var w = G.sheet.w;
+    if (b.hasAttribute('data-wpick')) { var sp = sheetSetting(b), wp = gPlaces[+b.getAttribute('data-wpick')]; if (sp && wp) { gSet(w, sp.key, wp); b.parentNode.innerHTML = ''; } return; }
+    if (b.hasAttribute('data-place')) { var p = gPlaces[+b.getAttribute('data-place')]; if (p) setPlace(p).then(function (okd) { if (okd && $('g-places')) { $('g-places').innerHTML = ''; $('g-town').value = ''; } }); }
+    else if (b.hasAttribute('data-cal')) calStart(w);
+    else if (b.hasAttribute('data-wifi')) {
+      var ssid = $('g-ssid').value; if (!ssid.trim()) { say('sheet-msg', 'Type the network name first.'); return; }
+      gAh({ wifi: { ssid: ssid, sec: $('g-sec').value, pass: $('g-sec').value === 'nopass' ? '' : $('g-pass').value, hidden: $('g-hidden').checked } }, 'Saved. The TV shows it now.');
+    }
+    else if (b.hasAttribute('data-note')) gAh({ note: { text: $('g-note').value, from: (AH && AH.note && AH.note.from) || '' } }, $('g-note').value.trim() ? 'Saved. The TV shows it now.' : 'The note is cleared.');
+    else if (b.hasAttribute('data-list')) {
+      var lists = ((AH && AH.lists) || []).slice(), old = lists[0] || { items: [] }, ticked = {};
+      (old.items || []).forEach(function (it) { if (it.done) ticked[it.t] = true; });
+      lists[0] = { name: $('g-lname').value.trim() || 'Shopping', items: $('g-litems').value.split('\n').map(function (t) { return t.trim(); }).filter(Boolean).slice(0, AH_LIM.items || 40).map(function (t) { return { t: t, done: !!ticked[t] }; }) };
+      gAh({ lists: lists }, 'Saved. The TV shows it now.');
+    }
+    else if (b.hasAttribute('data-guide')) {
+      var guide = ((AH && AH.guide) || []).slice(); guide[0] = { title: $('g-gtitle').value.trim(), text: $('g-gtext').value };
+      gAh({ guide: guide.filter(function (x) { return x && String(x.title || '').trim(); }) }, 'Saved. The TV shows it now.');
+    }
+    else if (b.hasAttribute('data-ha')) { $('smart-go').click(); say('sheet-msg', 'Opening…'); }
+    else if (b.hasAttribute('data-sp')) {
+      Array.prototype.forEach.call(b.parentNode.children, function (x) { x.setAttribute('aria-pressed', x === b ? 'true' : 'false'); });
+      $('g-sp').innerHTML = b.getAttribute('data-sp') === 'no' ? '<p class="note">Up next needs a home computer. Pick another widget in Studio.</p>'
+        : MODE === 'bridge' ? '<a class="btn go" href="/api/spotify/login" target="_blank" rel="noopener">Sign in to Spotify</a>'
+        : '<p class="help">On that computer, open Couch TV\'s Spotify page and sign in.</p>';
+    }
+  });
+
+  // the calendar: "Which calendar do you use?", then a few short steps and the paste box
+  function calStart(w) {
+    openSheet('Connect your calendar', '<div class="q">Which calendar do you use?</div><div class="picks">' +
+      Object.keys(CAL).map(function (k) { return '<button type="button" data-prov="' + k + '">' + esc(CAL[k].name) + '</button>'; }).join('') + '</div>', w);
+  }
+  function calSteps(w, k) {
+    var c = CAL[k];
+    openSheet(c.name, (c.steps.length ? '<ol class="steps">' + c.steps.map(function (s) { return '<li>' + esc(s) + '</li>'; }).join('') + '</ol>' : '') +
+      (c.link ? '<a class="btn" href="' + esc(c.link[1]) + '" target="_blank" rel="noopener">' + esc(c.link[0]) + '</a> ' : '') +
+      (c.link2 ? '<a class="btn quiet" href="' + esc(c.link2[1]) + '" target="_blank" rel="noopener">' + esc(c.link2[0]) + '</a>' : '') +
+      (c.note ? '<p class="note">' + esc(c.note) + '</p>' : '') +
+      '<div class="q"><label for="g-cal">Paste the link here</label></div><input id="g-cal" type="url" autocomplete="off" autocapitalize="off" spellcheck="false" inputmode="url">' +
+      '<button type="button" class="go" data-check="' + k + '">Check it</button><p class="help" id="g-calres" role="status"></p>', w);
+  }
+  $('sheet-body').addEventListener('click', function (e) {
+    var b = e.target.closest('button'); if (!b || !G.sheet) return;
+    var w = G.sheet.w;
+    if (b.hasAttribute('data-prov')) calSteps(w, b.getAttribute('data-prov'));
+    if (b.hasAttribute('data-check')) {
+      var stay = CAL[b.getAttribute('data-check')].stay, u = $('g-cal').value.trim();
+      if (!calOk(u)) { say('sheet-msg', 'That is not a calendar link. It starts with https://, or is a calendar app\'s own link.'); return; }
+      say('sheet-msg', ''); $('g-calres').className = 'help'; $('g-calres').textContent = 'Checking…';
+      api('POST', '/api/athome', { edit: stay ? { stay_url: u } : { cal_url: u } }).then(function (j) {
+        if (!j.live) { $('g-calres').textContent = 'Sent. The TV takes it as soon as the Couch TV home is open on it.'; return; }
+        $('g-cal').value = '';
+        var tries = 0;
+        (function look() {
+          api('GET', '/api/athome').then(function (r) {
+            var c = r.athome && (stay ? r.athome.stay : r.athome.cal);
+            if (c && !c.busy && (c.error || c.count !== null && c.count !== undefined)) {
+              $('g-calres').className = c.error ? 'status bad' : 'status ok'; $('g-calres').textContent = c.error ? c.error : gw(c.count === 1 ? 'Found 1 event this week.' : 'Found {n} events this week.', { n: c.count });
+              AH = r.athome; takeDesign(AH && AH.design);
+              return;
+            }
+            if (++tries < 16) setTimeout(look, 1500); else $('g-calres').textContent = 'The TV is still reading it. Look at the TV in a minute.';
+          }, function (e2) { $('g-calres').textContent = e2.message; });
+        })();
+      }).catch(function (e) { $('g-calres').textContent = e.message; });
+    }
+  });
+
+  // ---- a town from Couch TV Studio, in the link's fragment only (#town=<name>|<lat>|<lon>[|<zone>]) ----
+  // Studio's "Set up my widgets" link to this TV may carry the town the person picked there. It never went
+  // through a server (a fragment is not sent), it is never kept in a design, and it is only saved after Yes.
+  var TOWN_FRAG = (function () {
+    var raw = hashWord('town'); if (!raw) return null;
+    var p = raw.split('|'), name = String(p[0] || '').replace(/[\u0000-\u001f<>]/g, '').trim().slice(0, 60), lat = +p[1], lon = +p[2], zone = /^[A-Za-z_]+(?:\/[A-Za-z0-9_+-]+){0,2}$/.test(p[3] || '') ? p[3] : 'auto';
+    if (!name || !isFinite(lat) || !isFinite(lon) || Math.abs(lat) > 90 || Math.abs(lon) > 180) return null;
+    return { name: name, area: '', lat: Math.round(lat * 100) / 100, lon: Math.round(lon * 100) / 100, timezone: zone };
+  })();
+  // taken out of the address at once (never kept in the history or a bookmark)
+  try { if (/(?:^#|&)town=/.test(location.hash)) { var restH = location.hash.replace(/^#/, '').split('&').filter(function (x) { return x && x.indexOf('town=') !== 0; }).join('&'); history.replaceState(history.state, '', location.pathname + location.search + (restH ? '#' + restH : '')); } } catch (e) {}
+  if (TOWN_FRAG) {
+    $('town-ask').style.display = '';
+    $('town-ask-q').textContent = gw('Use {town} for the weather?', { town: TOWN_FRAG.name });
+    $('town-ask-yes').onclick = function () { setPlace(TOWN_FRAG, 'town-ask-msg').then(function (okd) { if (okd) { $('town-ask-yes').style.display = 'none'; $('town-ask-no').style.display = 'none'; } }); };
+    $('town-ask-no').onclick = function () { $('town-ask').style.display = 'none'; };
+  }
+
+  // ---------------- use as home screen (/api/home) ----------------
+  function showHome(h) {
+    var on = !!h.on, held = !!h.held;
+    $('home-state').className = 'status ' + (on && (held || h.fire_tv) ? 'ok' : '');
+    $('home-state').textContent = !on ? 'Home opens the TV\'s own home.' : held ? 'The Home button opens Couch TV.' : h.fire_tv ? (h.watch ? 'The Home button opens Couch TV.' : 'The Home button opens Couch TV, but Keep Couch TV on Home is off.') : 'Switched on. One step left on the TV.';
+    $('home-note').textContent = !on ? 'The TV keeps its own home until you choose. Everything else on this page works either way.'
+      : held || (h.fire_tv && h.watch) ? 'Press Home on the TV remote to check.'
+      : h.fire_tv ? 'On a Fire TV, Keep Couch TV on Home brings it back. It is in the Home button version of Couch TV: switch on Couch TV home watch in the TV\'s Settings, Accessibility.'
+      : 'Press Home on the TV remote. If the TV asks which app to use, pick Couch TV with the TV remote, then Always (or Set as default). The TV asks that itself; a phone cannot answer it.';
+    $('home-on').style.display = on ? 'none' : '';
+    $('home-off').style.display = on && MODE !== 'launcher' ? '' : 'none';
+  }
+  function loadHome() { return api('GET', '/api/home').then(showHome).catch(function (e) { say('home-state', e.message); }); }
+  function setHome(on) {
+    say('home-msg', 'Saving…');
+    api('POST', '/api/home', { on: on }).then(function (h) { showHome(h); say('home-msg', ''); }).catch(function (e) { say('home-msg', e.message); });
+  }
+  $('home-on').onclick = function () { setHome(true); };
+  $('home-off').onclick = function () { if (confirm('Home on the TV remote goes back to the TV\'s own home. Couch TV stays installed.')) setHome(false); };
+
+  // ---------------- smart home: Home Assistant's sign in, on this phone (served by the TV under /ha) ----------------
+  function loadSmart() {
+    api('GET', '/api/ha/info').then(function () { $('smart').style.display = ''; $('jump-smart').style.display = ''; }, function () {});
+  }
+  $('smart-go').onclick = function () {
+    say('smart-msg', 'Opening…');
+    api('POST', '/api/ha/phone', {}).then(function (j) {
+      var u = j.result && j.result.url;
+      // the same server as this page: stay on the address the phone already uses (it is the TV's
+      // client id for Home Assistant); a launcher's own small set up server (another port): go there
+      var m = u && /^http:\/\/[^\/]+:(\d+)\/ha\//.exec(u);
+      if (m) location.href = m[1] === (location.port || '80') ? u.replace(/^http:\/\/[^\/]+/, '') : u;
+      else say('smart-msg', 'This TV is not on a network yet.');
+    }).catch(function (e) { say('smart-msg', e.message); });
+  };
+
+  // ---------------- Matter devices: shared from Google Home, Apple Home, SmartThings or Alexa ----------------
+  // The TV (or the home computer) is one more Matter controller (/api/matter/*, the Matter contract).
+  // Shown only where one answers. The code is checked here first (11 or 21 numbers, the last one
+  // checks the rest), so a typo is caught before the app's code runs out.
+  // every line in the TV's language: mw(key) reads tv-home/web/matter-words.js (the TV uses the same table)
+  function mw(key, vars) { var W = window.CouchMatterWords; return W ? W.t(key, vars) : key; }
+  var MT_ERR = { short: 1, typo: 1, code: 1, expired: 1, wrong_code: 1, unreachable: 1, thread: 1, already: 1, not_allowed: 1, unavailable: 1, name_hides: 1, refused: 1, unsupported: 1, busy: 1, failed: 1 };
+  // a controller's reason key (contract change 14): why Matter is not ready, or why a device was not
+  // added, moved, renamed or fully removed; worded before the error key
+  var MT_WHY = { off: 1, not_installed: 1, node_missing: 1, node_old: 1, starting: 1, stopped: 1, android_old: 1, processor: 1, not_started: 1, busy: 1,
+    blocked: 1, unsupported: 1, address: 1, port: 1, link_local: 1, offline: 1, not_answering: 1, opens_house: 1,
+    not_found: 1, not_allowed: 1, bad_request: 1, bad_name: 1, not_ready: 1, device_refused: 1, failed: 1, not_certified: 1, local_network: 1 };
+  // a name that would open the house (the same token test as tv-home/web/matter.js and ws2-smarthome's opensHouse)
+  function mtHides(name) {
+    var e = '.' + String(name || '').toLowerCase().replace(/[^a-z0-9]+/g, '_');
+    var re = /garage|gate|door|lock|alarm|disarm/g, m, w, i, after;
+    while ((m = re.exec(e))) {
+      w = m[0]; i = m.index; after = e.slice(i + w.length); re.lastIndex = i + 1;
+      if (w === 'gate' && after.slice(0, 3) === 'way') continue;
+      if (w === 'door' && (after.slice(0, 4) === 'bell' || /[._](in|out)$/.test(e.slice(0, i)))) continue;
+      if (w === 'lock' && /[._][cb]$/.test(e.slice(0, i))) continue;
+      return true;
+    }
+    return false;
+  }
+  var MT_KIND = { light: 1, switch: 1, fan: 1, cover: 1, climate: 1, sensor: 1 };
+  var VD = [[0,1,2,3,4,5,6,7,8,9],[1,2,3,4,0,6,7,8,9,5],[2,3,4,0,1,7,8,9,5,6],[3,4,0,1,2,8,9,5,6,7],[4,0,1,2,3,9,5,6,7,8],[5,9,8,7,6,0,4,3,2,1],[6,5,9,8,7,1,0,4,3,2],[7,6,5,9,8,2,1,0,4,3],[8,7,6,5,9,3,2,1,0,4],[9,8,7,6,5,4,3,2,1,0]];
+  var VP = [[0,1,2,3,4,5,6,7,8,9],[1,5,7,6,2,8,3,0,9,4],[5,8,0,3,7,9,6,1,4,2],[8,9,1,6,0,4,3,5,2,7],[9,4,5,3,1,2,6,8,7,0],[4,2,8,6,5,7,3,9,0,1],[2,7,9,3,8,0,6,4,1,5],[7,0,4,6,9,1,3,2,5,8]];
+  function matterCode(text) {
+    text = String(text == null ? '' : text).trim();
+    var qr = /MT:[0-9A-Z.\-]{19,512}/.exec(text.toUpperCase());
+    if (qr) return { ok: true, code: qr[0] };
+    var d = text.replace(/[\s\-.]/g, '');
+    if (!/^\d+$/.test(d)) return { ok: false, error: 'code' };
+    if (d.length !== 11 && d.length !== 21) return { ok: false, error: d.length < 11 ? 'short' : 'code' };
+    var c = 0; for (var i = 0; i < d.length; i++) c = VD[c][VP[i % 8][+d.charAt(d.length - 1 - i)]];
+    if (+d.charAt(0) > 7 || c !== 0) return { ok: false, error: 'typo' };
+    return { ok: true, code: d };
+  }
+  // the server's answer, bare or wrapped in { result } (the bridge wraps some answers)
+  function mtOf(j) { return j && !Array.isArray(j.devices) && j.result && typeof j.result === 'object' ? j.result : j || {}; }
+  // an error in words: the home computer's reason first (Matter not running there), then the key, then
+  // the controller's own sentence
+  function mtErr(e) {
+    var k = e && e.message, rep = (e && e.reply) || {};
+    if (typeof rep.reason === 'string' && MT_WHY.hasOwnProperty(rep.reason)) return mw('why_' + rep.reason);
+    if (k && k !== 'failed' && MT_ERR.hasOwnProperty(k)) return mw('err_' + k);
+    if (typeof rep.note === 'string' && rep.note) return rep.note;
+    return k && !/^[a-z_]+$/.test(k) ? k : mw('err_failed');
+  }
+  var MT_OK = ['light', 'switch', 'fan', 'cover', 'climate', 'sensor'];
+  // what the card lists: never a lock or an alarm (not these kinds), a garage door, gate or door blind, nor a
+  // blind or plug named as one (the same rule as matter.js)
+  function mtShows(d) {
+    return !!d && typeof d.id === 'string' && MT_OK.indexOf(d.domain) >= 0 && !(d.domain === 'cover' && /^(garage|gate|door)$/.test((d.attributes || {}).device_class || '')) &&
+      !((d.domain === 'cover' || d.domain === 'switch') && mtHides(d.name));
+  }
+  // the card's own lines (data-mw keys) in the language, drawn again when the language changes
+  var mtLang = null;
+  function fillMatterWords() {
+    var l = window.CouchMatterWords ? window.CouchMatterWords.lang() : 'en';
+    if (l === mtLang) return;
+    mtLang = l;
+    // the heading became the card's fold button (foldSetup): its words go on the button, never over it
+    Array.prototype.forEach.call(document.querySelectorAll('[data-mw]'), function (e) { (e.querySelector('.fold-btn') || e).textContent = mw(e.getAttribute('data-mw')); });
+    Array.prototype.forEach.call(document.querySelectorAll('[data-mw-hint]'), function (e) { e.setAttribute('placeholder', mw(e.getAttribute('data-mw-hint'))); });
+    Array.prototype.forEach.call(document.querySelectorAll('[data-mw-aria]'), function (e) { e.setAttribute('aria-label', mw(e.getAttribute('data-mw-aria'))); });
+  }
+  fillMatterWords();
+  function showMatter(j) {
+    j = mtOf(j);
+    fillMatterWords();
+    $('matter').style.display = ''; $('jump-matter').style.display = '';
+    var why = typeof j.reason === 'string' && MT_WHY.hasOwnProperty(j.reason) ? mw('why_' + j.reason) : '';
+    var note = j.ready === false ? (why || j.note || mw('getting_ready')) : (j.note || '');
+    $('matter-note').style.display = note ? '' : 'none'; $('matter-note').textContent = note;
+    var list = (Array.isArray(j.devices) ? j.devices : []).filter(function (d) {
+      return mtShows(d);
+    });
+    // the name and kind ride on the row (data-name, data-domain), so a name in another language never
+    // changes what Rename and Remove send
+    $('matter-list').innerHTML = list.length ? list.map(function (d) {
+      var down = d.state === 'unavailable' || d.state === 'unknown', kind = mw('kind_' + d.domain), name = String(d.name || kind);
+      return '<li data-id="' + esc(d.id) + '" data-name="' + esc(name) + '" data-domain="' + esc(d.domain) + '"><span><bdi>' + esc(name) + '</bdi> <small class="miss">' + esc(kind + (down ? ', ' + mw('st_down') : '')) + '</small></span>' +
+        '<button class="quiet" type="button" data-mt="rename">' + esc(mw('rename')) + '</button><button class="danger" type="button" data-mt="remove">' + esc(mw('remove')) + '</button></li>';
+    }).join('') : '<li class="miss">' + esc(mw('none')) + '</li>';
+  }
+  function loadMatter() { return api('GET', '/api/matter/devices').then(showMatter, function () {}); }
+  $('matter-add').onclick = function () {
+    var c = matterCode($('matter-code').value);
+    if (!c.ok) { say('matter-msg', mw('err_' + c.error)); return; }
+    $('matter-add').disabled = true;
+    say('matter-msg', mw('adding'));
+    api('POST', '/api/matter/commission', { code: c.code }).then(function (j) {
+      j = mtOf(j);
+      if (j.ok === false) { var x = new Error(j.error || 'failed'); x.reply = j; throw x; }
+      $('matter-code').value = '';
+      // the TV joined a lock, an alarm or a garage door and left it again (ok, no ids, a note)
+      if (!(j.device_ids || []).length && j.note) { say('matter-msg', mw('err_not_allowed')); return loadMatter(); }
+      say('matter-msg', (j.device_ids || []).length ? mw('added_phone') : mw('added_later'));
+      return loadMatter();
+    }).catch(function (e) { say('matter-msg', mtErr(e)); }).then(function () { $('matter-add').disabled = false; });
+  };
+  $('matter-list').onclick = function (ev) {
+    var b = ev.target.closest && ev.target.closest('button[data-mt]'), li = b && b.closest('li');
+    if (!li) return;
+    var id = li.getAttribute('data-id'), name = li.getAttribute('data-name') || '', domain = li.getAttribute('data-domain') || '';
+    if (b.getAttribute('data-mt') === 'remove') {
+      if (!confirm(mw('confirm_remove', { name: name }))) return;
+      say('matter-msg', mw('removing'));
+      api('POST', '/api/matter/remove', { id: id }).then(function (j) {
+        var rj = mtOf(j);
+        say('matter-msg', mw('off_tv', { name: name }) + (MT_WHY.hasOwnProperty(rj.reason) ? ' ' + mw('why_' + rj.reason) : rj.note ? ' ' + mw('no_answer') : ''));
+        return loadMatter();
+      }).catch(function (e) { say('matter-msg', mtErr(e)); });
+    } else {
+      var v = prompt(mw('name_for', { name: name }), name);
+      v = String(v == null ? '' : v).trim().slice(0, 40);
+      if (!v || v === name) return;
+      // a light, plug or blind named as a garage door, gate, door or lock is hidden by the TV
+      if (mtHides(v) && domain !== 'climate' && domain !== 'sensor') { say('matter-msg', mw('err_name_hides')); return; }
+      say('matter-msg', mw('saving'));
+      api('POST', '/api/matter/rename', { id: id, name: v }).then(function () { say('matter-msg', mw('renamed')); return loadMatter(); })
+        .catch(function (e) { say('matter-msg', mtErr(e)); });   // a name that would hide it: the reason opens_house
+    }
+  };
+  // a photo of a QR code, read on this phone where the browser can (Chrome on Android); the code is
+  // only put in the box, nothing is sent until Add
+  if ('BarcodeDetector' in window) {
+    $('matter-scan').style.display = '';
+    $('matter-photo').onchange = function () {
+      var f = this.files && this.files[0];
+      if (!f) return;
+      say('matter-msg', mw('reading'));
+      createImageBitmap(f).then(function (img) { return new window.BarcodeDetector({ formats: ['qr_code'] }).detect(img); }).then(function (found) {
+        var t = (found || []).map(function (x) { return x.rawValue; }).filter(function (v) { return /^MT:/.test(v); })[0];
+        if (t) { $('matter-code').value = t; say('matter-msg', mw('got')); }
+        else say('matter-msg', mw('no_qr'));
+      }).catch(function () { say('matter-msg', mw('bad_photo')); });
+      this.value = '';
+    };
+  }
+
+  // ---------------- this TV ----------------
   function showAdb(a) {
     var s = $('adb-status');
-    if (a.connected) { s.className = 'status ok'; s.textContent = 'Connected (' + (a.route === 'tls' ? 'wireless debugging' : 'port 5555') + ').'; }
-    else if (a.state === 'waiting_for_allow' || a.state === 'connecting') { s.className = 'status'; s.textContent = 'Waiting. Accept "Allow debugging?" on the TV.'; }
-    else { s.className = 'status bad'; s.textContent = 'Not connected.' + (a.error ? ' (' + a.error + ')' : ''); }
+    if (a.connected) { s.className = 'status ok'; s.textContent = 'The phone can press keys.'; }
+    else if (a.state === 'waiting_for_allow' || a.state === 'connecting') { s.className = 'status'; s.textContent = 'Look at the TV. If it asks "Allow debugging?", tick Always allow and press OK.'; }
+    else if (a.unanswered) { s.className = 'status bad'; s.textContent = 'No answer from the TV. If it did not show its Allow debugging question, restart the TV, then try again.'; }
+    else { s.className = 'status bad'; s.textContent = 'The phone can\'t press keys yet.' + (a.error ? ' ' + a.error : ''); }
   }
-  function load() {
-    api('GET', '/api/settings').then(function (j) {
-      $('tv-name').value = j.tv_name || '';
-      $('people').value = (j.people || []).map(function (p) { return p.name; }).join(', ');
-      $('place').value = j.weather.place || ''; $('lat').value = j.weather.lat; $('lon').value = j.weather.lon;
-      $('tz').value = j.weather.timezone || ''; $('country').value = j.country || '';
+  // Who serves this page. The on-TV app (no mode): everything. A home computer ("bridge", for a Samsung,
+  // LG, Roku or any TV it runs): the TV's own name, Ask AI, the TV's keys, updates and phones are set up on
+  // that computer, so they are left out. The Couch TV home app with no computer ("launcher"): there is no
+  // phone remote, so people are changed on the TV.
+  var MODE = 'on-tv';
+  var NO_ATHOME = false;
+  function applyMode(m, home) {
+    MODE = m === 'bridge' || m === 'launcher' ? m : 'on-tv';
+    if (MODE === 'on-tv') return;
+    // phones: the home computer's phones pair with its key (set up on that computer); the Couch TV home app
+    // with no computer keeps its own list of paired phones, which can be forgotten here
+    var gone = ['ask', 'smart', 'tvname', 'keys', 'xiaomi', 'upd'].concat(MODE === 'bridge' ? ['home', 'phones-card'] : ['kids-first']);
+    gone.forEach(function (id) { var el = $(id); if (el) el.style.display = 'none'; var c = document.querySelector('.jump a[href="#' + id + '"]'); if (c) c.style.display = 'none'; });
+    clearInterval(updPoll);
+    if (MODE === 'bridge') {
+      $('intro-from').textContent = 'This page comes from your home computer, over your home Wi-Fi.';
+      // a Roku, an Apple TV or a VIZIO: their Couch TV takes the town and the people from here; At home, your
+      // photos and a design's widgets are parts of the couch-tv home on a TV that shows web pages. A VIZIO shows
+      // its own home and nothing of couch-tv's asks for the weather there, so only the people
+      if (home && home !== 'web') {
+        ['photos', 'athome', 'widgets', 'dapps'].concat(home === 'none' ? ['town'] : []).forEach(function (id) { $(id).style.display = 'none'; var c = document.querySelector('.jump a[href="#' + id + '"]'); if (c) c.style.display = 'none'; });
+        $('jump-widgets').style.display = 'none'; $('jump-dapps').style.display = 'none'; NO_ATHOME = true;
+        $('intro-from').textContent = 'This page comes from your home computer, over your home Wi-Fi. ' + (home === 'none' ? 'This TV shows its own home, so only the people are here.' : 'Couch TV on this TV takes the town and the people from here.');
+        // a Roku or an Apple TV keeps the design it got by code on the TV itself, so the home computer cannot
+        // change a widget there: say where it is changed instead of leaving widgets out without a word
+        if (home === 'roku' || home === 'appletv') {
+          var tvw = home === 'roku' ? 'Roku' : 'Apple TV';
+          $('widgets').style.display = ''; $('jump-widgets').style.display = ''; $('w-list').innerHTML = '';
+          $('widgets').querySelector('p').textContent = 'Widgets on your ' + tvw + ' are changed in Couch TV Studio: open your design there, change the widget, then tap Send to my TV and type the new code on the ' + tvw + '. The town and the people below reach the ' + tvw + ' from here.';
+          $('widgets').setAttribute('data-native', home);
+        }
+      }
+      $('photos-where').textContent = 'They go straight from this phone to your home computer, which makes them screen size and keeps them for the TV.';
+    } else {
+      $('to-remote').style.display = 'none';
+      $('people-how').textContent = 'Add, rename, remove and reorder people on the TV: Home settings, People. Each person gets their own Keep watching.';
+      $('people-links').style.display = 'none';
+      $('home-off').style.display = 'none';
+      $('tv').style.display = 'none';
+    }
+  }
+  function showPhones(j) {
+    var n = +(j && j.phones) || 0;
+    $('phones').textContent = n + (n === 1 ? ' phone is' : ' phones are') + ' paired with this TV.';
+  }
+  function loadSettings() {
+    return api('GET', '/api/settings').then(function (j) {
+      SETTINGS = j;
+      if (window.PhoneWords) window.PhoneWords.set(j.settings && j.settings.lang);   // the TV's language, when it has one
+      applyMode(j.mode, j.home);
+      showTown(); showPeople(); showPhotos();
+      if (MODE === 'launcher') api('GET', '/api/phones').then(showPhones, function () {});
+      if (MODE !== 'on-tv') return;
+      $('tv-name').value = j.tv_name || ''; $('country').value = j.country || '';
       $('ask-on').checked = !!j.ask.enabled;
-      $('ask-state').textContent = j.ask.has_key ? 'A key is saved. Model: ' + j.ask.model + '.' : 'No key saved.';
-      $('phones').textContent = j.phones + (j.phones === 1 ? ' phone is' : ' phones are') + ' paired with this TV.';
+      if (j.xiaomi) {
+        $('xiaomi').style.display = '';
+        $('pw-on').checked = !!j.patchwall_replace;
+        $('pw-state').textContent = j.watch ? '' : j.watch_apk
+          ? 'Keep Couch TV on Home is off: switch on Couch TV home watch in the TV\'s Settings, Accessibility.'
+          : 'This version of Couch TV can\'t keep the Home button: Google Play Protect blocks that part in apps put on from a phone. To get it, put the Home button version (couch-tv-ontv-watch.apk) on from a computer (the steps are on the help page: couchtv.joshuaseage.com/help/home-button), then switch on Couch TV home watch in the TV\'s Settings, Accessibility.';
+      }
+      showAsk(j.ask);
+      showPhones(j);
       showAdb(j.adb);
       // Android 13+ (most Google TVs): pairing first, 5555 second. Older TVs: the other way round.
       if (j.adb.sdk < 30) { $('route-wd').style.display = 'none'; }
       else if (j.adb.sdk < 33) { $('routes').insertBefore($('route-tcp'), $('route-wd')); }
-      $('adb-advice').textContent = j.adb.sdk >= 33 ? 'This TV runs Android 13 or newer: use wireless debugging pairing.' : '';
-    }).catch(function (e) { $('adb-status').textContent = e.message; });
+      $('adb-advice').textContent = j.adb.sdk >= 33 ? 'This TV is Android 13 or newer: use the newer TVs steps.' : '';
+    }).catch(function (e) { $('town-now').textContent = e.message; });
   }
+  // ---------------- Make Home open Couch TV (/api/homekey, HomeKey.kt) ----------------
+  // One press: the Home button version from GitHub, checked and put on over its own link to the TV, then its
+  // Home button watch switched on. Without that link: the computer steps, and the help page for them.
+  var hkPoll = null, hkWaiting = false;
+  function showHk(h) {
+    var v = h.view;
+    $('hk').style.display = v === 'hidden' ? 'none' : '';
+    $('hk-line').className = 'status' + (v === 'done' ? ' ok' : '');
+    $('hk-line').textContent = h.words_phone || h.words || '';
+    var b = $('hk-go');
+    b.style.display = v === 'ready' || v === 'busy' ? '' : 'none';
+    b.textContent = h.button || 'Make Home open Couch TV';
+    b.disabled = v !== 'ready';
+    $('hk-msg').textContent = h.error_words || '';
+    var st = $('hk-steps');
+    st.style.display = v === 'steps' ? '' : 'none';
+    st.innerHTML = v === 'steps' ? (h.steps || []).map(function (s) { return '<li>' + esc(s) + '</li>'; }).join('') +
+      (h.help_url ? '<li style="list-style:none"><a href="' + esc(h.help_url) + '" target="_blank" rel="noopener">The same steps on the help page</a></li>' : '') : '';
+    if (h.phase === 'installing') hkWaiting = true;
+    clearInterval(hkPoll);
+    if (v === 'busy' || hkWaiting) hkPoll = setInterval(loadHk, 1500);
+    if (v !== 'busy') { hkWaiting = false; loadHome(); }
+  }
+  function loadHk() {
+    return api('GET', '/api/homekey').then(showHk).catch(function (e) {
+      // Android stops the app while it puts the new version on: keep asking until it answers again
+      if (hkWaiting) $('hk-msg').textContent = 'Installing. Couch TV closes and opens again by itself, then this page comes back.';
+      else if (e.status !== 404) $('hk-msg').textContent = e.message;
+    });
+  }
+  $('hk-go').onclick = function () {
+    $('hk-go').disabled = true;
+    api('POST', '/api/homekey/start', {}).then(showHk).catch(function (e) { $('hk-msg').textContent = e.message; });
+  };
+  // the settings first: they say who serves the page (applyMode), so a part it leaves out never flashes up
+  function load() { loadSettings().then(function () { loadInputs(); if (!NO_ATHOME) loadAtHome(); if (MODE !== 'bridge') loadHome(); if (MODE === 'on-tv') { loadHk(); loadSmart(); } loadMatter(); }); }
   var poll = null;
   $('adb-connect').onclick = function () {
     $('adb-msg').textContent = 'Connecting. Look at the TV.';
     api('POST', '/api/adb/connect', {}).then(function () {
       clearInterval(poll); var n = 0;
-      poll = setInterval(function () { n++; api('GET', '/api/adb').then(function (a) { showAdb(a); if (a.connected || n > 30) { clearInterval(poll); $('adb-msg').textContent = a.connected ? 'Done.' : ''; } }); }, 1500);
+      poll = setInterval(function () { n++; api('GET', '/api/adb').then(function (a) { showAdb(a); if (a.connected || n > 200 || (n > 2 && a.state !== 'waiting_for_allow' && a.state !== 'connecting')) { clearInterval(poll); $('adb-msg').textContent = a.connected ? 'Done.' : ''; } }); }, 1500);
     }).catch(function (e) { $('adb-msg').textContent = e.message; });
   };
   $('wd-pair').onclick = function () {
@@ -127,25 +1727,173 @@
       .catch(function (e) { $('adb-msg').textContent = e.message; });
   };
   $('save').onclick = function () {
-    var people = $('people').value.split(',').map(function (s) { return s.trim(); }).filter(Boolean).map(function (n, i) { return { id: 'person' + (i + 1), name: n }; });
-    var body = { tv_name: $('tv-name').value, people: people, country: $('country').value.toUpperCase() };
-    var lat = parseFloat($('lat').value), lon = parseFloat($('lon').value);
-    if (!isNaN(lat) && !isNaN(lon)) body.weather = { lat: lat, lon: lon, place: $('place').value, timezone: $('tz').value || 'UTC' };
-    api('POST', '/api/settings', body).then(function () { $('save-msg').textContent = 'Saved.'; load(); }).catch(function (e) { $('save-msg').textContent = e.message; });
+    var body = { tv_name: $('tv-name').value, country: $('country').value.toUpperCase() };
+    api('POST', '/api/settings', body).then(function () { $('save-msg').textContent = 'Saved.'; loadSettings(); }).catch(function (e) { $('save-msg').textContent = e.message; });
   };
+  // kids mode: only when they tick yes; the PIN goes to the TV once and is kept there as a hash
+  $('kids-yes').onchange = function () { $('kids-form').style.display = this.checked ? '' : 'none'; };
+  $('kids-save').onclick = function () {
+    var pin = $('kids-pin').value.replace(/\D/g, ''), sel = $('kids-who');
+    if (pin.length < 4 || pin.length > 8) { $('kids-msg').textContent = 'The PIN must be 4 to 8 digits.'; return; }
+    var name = sel.options[sel.selectedIndex] ? sel.options[sel.selectedIndex].text : '';
+    api('POST', '/api/kids', { who: sel.value, action: 'on', new_pin: pin }).then(function () {
+      $('kids-pin').value = '';
+      $('kids-msg').textContent = 'Kids mode is on for ' + name + '. Add their shows in the phone remote: TV, Kids mode.';
+    }).catch(function (e) { $('kids-msg').textContent = e.message; });
+  };
+  // Ask: which AI service. "provider" is the wire format the TV speaks: anthropic, or openai (OpenAI and every service that copies it).
+  var ASK = [
+    { id: 'anthropic', name: 'Claude (Anthropic)', provider: 'anthropic', base: 'https://api.anthropic.com', model: 'claude-haiku-5-5', hint: 'Get a key in the Anthropic Console. Claude Haiku 5.5 is the tested default.' },
+    { id: 'openai', name: 'OpenAI', provider: 'openai', base: 'https://api.openai.com/v1', model: '', hint: 'Get a key at platform.openai.com. Type a model name that can call tools.' },
+    { id: 'gemini', name: 'Google Gemini', provider: 'openai', base: 'https://generativelanguage.googleapis.com/v1beta/openai', model: '', hint: 'Get a key in Google AI Studio. This is Gemini\'s OpenAI compatible address.' },
+    { id: 'openrouter', name: 'OpenRouter (many models, one key)', provider: 'openai', base: 'https://openrouter.ai/api/v1', model: '', hint: 'Model names look like provider/model.' },
+    { id: 'groq', name: 'Groq', provider: 'openai', base: 'https://api.groq.com/openai/v1', model: '', hint: 'Pick a model that supports tool use.' },
+    { id: 'mistral', name: 'Mistral', provider: 'openai', base: 'https://api.mistral.ai/v1', model: '', hint: 'Get a key at console.mistral.ai.' },
+    { id: 'local', name: 'A model at home (Ollama, LM Studio, llama.cpp)', provider: 'openai', base: 'http://my-computer.local:11434/v1', model: '', hint: 'Change the address to your computer\'s. It needs no key, but only a model that supports tool calling will work. It must be on your home network.' },
+    { id: 'custom', name: 'Another service that copies OpenAI\'s API', provider: 'openai', base: '', model: '', hint: 'Type its web address, the one that ends in /v1, and its model name.' }
+  ];
+  function askById(id) { for (var i = 0; i < ASK.length; i++) if (ASK[i].id === id) return ASK[i]; return ASK[ASK.length - 1]; }
+  function askFor(a) {
+    if (a.provider === 'anthropic') return ASK[0];
+    for (var i = 1; i < ASK.length - 1; i++) if (ASK[i].base === a.base) return ASK[i];
+    return /^http:\/\//.test(a.base) ? askById('local') : askById('custom');
+  }
+  $('ask-service').innerHTML = ASK.map(function (p) { return '<option value="' + p.id + '">' + p.name.replace(/[&<>"]/g, '') + '</option>'; }).join('');
+  $('ask-service').onchange = function () {
+    var p = askById(this.value);
+    $('ask-base').value = p.base; $('ask-model').value = p.model; $('ask-hint').textContent = p.hint;
+    $('ask-model').placeholder = p.model ? '' : 'the model name your service gives you';
+  };
+  function showAsk(a) {
+    // the Google Play build has no Ask AI (PlayRules.askAi): no card, no jump link
+    if (a.available === false) { $('ask').style.display = 'none'; var j = document.querySelector('.jump a[href="#ask"]'); if (j) j.style.display = 'none'; return; }
+    var p = askFor(a);
+    $('ask-service').value = p.id; $('ask-base').value = a.base || p.base; $('ask-model').value = a.model || ''; $('ask-hint').textContent = p.hint;
+    $('ask-model').placeholder = p.model ? '' : 'the model name your service gives you';
+    $('ask-state').textContent = (a.has_key ? 'A key is saved.' : (a.keyless_ok ? 'This server needs no key.' : 'No key saved.')) +
+      (a.ready ? ' Ready.' : (a.model ? '' : ' Type a model name.'));
+  }
   $('ask-save').onclick = function () {
-    var body = { ask_enabled: $('ask-on').checked };
+    var p = askById($('ask-service').value);
+    var body = { ask_enabled: $('ask-on').checked, ask_provider: p.provider, ask_base: p.provider === 'anthropic' && $('ask-base').value.trim() === p.base ? '' : $('ask-base').value.trim(), ask_model: $('ask-model').value.trim() };
     if ($('ask-key').value.trim()) body.ask_key = $('ask-key').value.trim();
-    api('POST', '/api/settings', body).then(function () { $('ask-key').value = ''; $('ask-msg').textContent = 'Saved.'; load(); }).catch(function (e) { $('ask-msg').textContent = e.message; });
+    api('POST', '/api/settings', body).then(function () {
+      $('ask-key').value = ''; $('ask-msg').textContent = 'Saved. If you changed the service, type its key too: a key is never sent to a different service.'; loadSettings();
+    }).catch(function (e) { $('ask-msg').textContent = e.message; });
+  };
+  $('pw-save').onclick = function () {
+    api('POST', '/api/settings', { patchwall_replace: $('pw-on').checked }).then(function () { $('pw-msg').textContent = 'Saved.'; loadSettings(); }).catch(function (e) { $('pw-msg').textContent = e.message; });
+  };
+  // Input tiles: one row per input the TV lists (GET /api/inputs), ticked when pinned already.
+  // Saved by input id, the TV's own name for the port, so it opens that port and no other.
+  function loadInputs() {
+    api('GET', '/api/inputs').then(function (j) {
+      if (!j.inputs.length) return;
+      var pinned = {};
+      j.pinned.forEach(function (p) { if (p.id) pinned[p.id] = p.label; });
+      $('in-list').innerHTML = j.inputs.map(function (x, i) {
+        var name = x.label || ('Input ' + (i + 1)), on = pinned[x.id] !== undefined;
+        return '<label class="check"><input type="checkbox" data-id="' + idOf(x.id) + '"' + (on ? ' checked' : '') + '> ' + esc(name) +
+          (x.devices.length ? ' (' + esc(x.devices.join(', ')) + ')' : '') + '</label>' +
+          '<input maxlength="30" placeholder="Name on the tile, for example Set-top box" data-name="' + idOf(x.id) + '" value="' + esc(on ? pinned[x.id] : '') + '">';
+      }).join('');
+      INPUTS_OK = true;
+      applyDesign();
+    }).catch(function () {});
+  }
+  $('in-save').onclick = function () {
+    var list = [];
+    Array.prototype.forEach.call(document.querySelectorAll('#in-list input[type=checkbox]'), function (c) {
+      if (!c.checked) return;
+      var n = document.querySelector('#in-list input[data-name="' + c.getAttribute('data-id') + '"]');
+      list.push({ id: c.getAttribute('data-id'), label: n.value.trim() || c.parentNode.textContent.trim() });
+    });
+    // honest about a design with no row for them: never "the home shows them" when it will not
+    var noRow = DESIGN && DESIGN.on && !DESIGN.inputs;
+    api('POST', '/api/settings', { inputs: list }).then(function () {
+      $('in-msg').textContent = !list.length ? 'Saved. No HDMI tiles.' : noRow ? 'Saved. This design hides the dock, so they show only on the standard home.' : 'Saved. The home shows them now.';
+      loadSettings();
+    })
+      .catch(function (e) { $('in-msg').textContent = e.message; });
   };
   $('ask-clear').onclick = function () {
-    api('POST', '/api/settings', { ask_key: '', ask_enabled: false }).then(function () { $('ask-msg').textContent = 'Key removed.'; load(); });
+    api('POST', '/api/settings', { ask_key: '', ask_enabled: false }).then(function () { $('ask-msg').textContent = 'Key removed.'; loadSettings(); });
   };
+  // Couch TV version: the same update as the TV's Home settings, Updates (Update.kt). With the TV's own
+  // ADB connected, Update to installs it; otherwise the steps, and the help page for them.
+  var UPD_ERR = {
+    net: "Can't reach GitHub. Check the TV's Wi-Fi and try again.",
+    bad: 'The download did not check out, so nothing was installed.',
+    other_key: 'This copy of Couch TV was built on another computer, so it cannot take this update.',
+    space: 'Not installed: the TV is short of space. Free some space on the TV, then try again.',
+    adb: 'Couch TV lost its connection to this TV, so nothing was installed. Try again, or use the steps below.',
+    failed: 'Android did not install the update. Nothing changed.'
+  };
+  var updPoll = null, updFrom = '', updWaiting = false;
+  function showUpd(u) {
+    // the Google Play build: Play updates it, so only the version and that line (PlayRules.UPDATES)
+    if (u.supported === false) {
+      $('upd-line').textContent = 'Version ' + u.current + '. ' + (u.how || '');
+      $('upd-install').style.display = 'none'; $('upd-check').style.display = 'none'; $('upd-steps').style.display = 'none';
+      return;
+    }
+    var newer = u.available && u.latest;
+    $('upd-line').textContent = newer ? 'Version ' + u.latest + ' is out (this TV has ' + u.current + ').'
+      : 'Version ' + u.current + '. ' + (u.checked ? 'This is the latest version.' : 'Not checked yet.');
+    var b = $('upd-install');
+    b.style.display = newer && u.can_install ? '' : 'none';
+    b.textContent = 'Update to ' + u.latest;
+    b.disabled = !!u.busy;
+    $('upd-msg').textContent = u.busy === 'checking' ? 'Checking…' : u.busy === 'downloading' ? 'Downloading… ' + (u.progress || 0) + '%'
+      : u.busy === 'installing' ? 'Installing. Couch TV restarts by itself.' : u.error ? (UPD_ERR[u.error] || UPD_ERR.failed) : '';
+    var st = $('upd-steps');
+    st.style.display = newer && !u.can_install ? '' : 'none';
+    st.innerHTML = newer && !u.can_install ? (u.steps || []).map(function (s) { return '<li>' + esc(s) + '</li>'; }).join('') +
+      (u.help_url ? '<li style="list-style:none"><a href="' + esc(u.help_url) + '" target="_blank" rel="noopener">The same steps on the help page</a></li>' : '') : '';
+    clearInterval(updPoll);
+    if (u.busy) updPoll = setInterval(loadUpd, 1500);
+  }
+  function loadUpd() {
+    api('GET', '/api/update').then(function (u) {
+      var done = updWaiting && u.current !== updFrom;
+      if (done) updWaiting = false;
+      if (u.busy === 'installing') { updWaiting = true; updFrom = u.current; }
+      showUpd(u);
+      if (done) $('upd-msg').textContent = 'Updated to ' + u.current + '. Your settings stay.';
+      if (updWaiting && !u.busy) updWaiting = false;
+    }).catch(function () {
+      // Android stops the app while it replaces it: keep asking until the new one answers
+      if (updWaiting) $('upd-msg').textContent = 'Installing. Couch TV restarts by itself, then this page comes back.';
+    });
+  }
+  $('upd-install').onclick = function () {
+    $('upd-install').disabled = true;
+    api('POST', '/api/update/install', {}).then(showUpd).catch(function (e) { $('upd-msg').textContent = e.message; });
+  };
+  $('upd-check').onclick = function () {
+    api('POST', '/api/update/check', {}).then(showUpd).catch(function (e) { $('upd-msg').textContent = e.message; });
+  };
+  loadUpd();
   $('forget').onclick = function () {
     if (!confirm('Every phone, including this one, will need the code from the TV again.')) return;
     api('POST', '/api/phones/forget', {}).then(function () { location.reload(); });
   };
-  load();
+  var ENTER = { 'ah-from': 'ah-note-save', 'ah-ssid': 'ah-wifi-save', 'ah-pass': 'ah-wifi-save', 'ah-cal': 'ah-cal-save', 'ah-guest': 'ah-guest-save',
+    'ah-stay': 'ah-stay-save', 'tv-name': 'save', 'country': 'save', 'ask-key': 'ask-save', 'ask-model': 'ask-save', 'kids-pin': 'kids-save', 'wd-code': 'wd-pair', 'wd-port': 'wd-pair' };
+  Object.keys(ENTER).forEach(function (id) {
+    $(id).addEventListener('keydown', function (e) { if (e.key === 'Enter' && !e.isComposing) { e.preventDefault(); $(ENTER[id]).click(); } });
+  });
+  // Enter in the town search: the first place found
+  $('town-q').addEventListener('keydown', function (e) {
+    if (e.key !== 'Enter' || e.isComposing) return;
+    e.preventDefault();
+    var b = $('town-list').querySelector('button[data-i]');
+    if (b) b.click(); else findTown(this.value);
+  });
+  // Can't connect? (connect-check.js): what is in the way of pressing keys, and Copy a report
+  if (window.ConnectCheck) ConnectCheck.mount($('cc'), { api: api, auto: !!(window.couchTv && window.couchTv.token()) });
+  // only once paired: the pairing screen (shim.js) covers the page until then
+  if (window.couchTv && window.couchTv.token()) load();
 </script>
 </body>
 </html>

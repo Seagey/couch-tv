@@ -1,0 +1,119 @@
+couch-tv for Samsung TVs, version {VERSION}
+==========================================
+
+This puts couch-tv on a Samsung TV (2018 or newer) from a Mac or a Windows computer.
+It takes about 30 minutes. It is free. You do not need an AI agent or any paid plan.
+
+You need:
+- the Samsung TV and a computer on the same Wi-Fi
+- a Samsung account (free; the one on your TV is fine)
+- the TV's remote, or the free SmartThings app on your phone
+
+What you get: couch-tv as an app on the TV, with couch-tv Studio (designs from your phone).
+It is an app, not a new home screen: Samsung's Home button still opens Samsung's menu.
+
+
+STEP 1. Unzip this folder
+-------------------------
+Mac: double-click the zip. Windows: right-click the zip, Extract All, Extract.
+Use the unzipped folder, not the zip.
+
+
+STEP 2. Start the setup on the computer
+------------------------------------
+Mac: double-click "Install on Mac.command".
+     If the Mac says it "cannot be opened" or "not verified": click Done, open System Settings,
+     Privacy & Security, scroll down, click Open Anyway next to "Install on Mac", then Open.
+     If the Mac asks to let Terminal find devices on your local network: click Allow.
+Windows: double-click "Install on Windows.cmd".
+     If Windows says "Windows protected your PC": click More info, then Run anyway.
+     If Windows Firewall asks about apps2samsung-cli: tick Private networks and click Allow.
+
+It shows "This computer's address is", like 192.0.2.20. Leave the window open: you type that
+address on the TV in step 3.
+(No address shown? Mac: System Settings, Wi-Fi, Details next to your network, TCP/IP, "IP address".
+Windows: Settings, Network & internet, Wi-Fi, your network's Properties, "IPv4 address".)
+
+
+STEP 3. Developer mode on the TV
+--------------------------------
+1. On the TV remote press Home, then open Apps.
+2. On the Apps screen, enter 1 2 3 4 5:
+   - A remote with number buttons: press 1 2 3 4 5.
+   - A slim remote with no numbers (The Frame and most 2021 and newer): press the button
+     marked 123 (on some, the button with four coloured dots). Numbers show on screen: pick
+     1, 2, 3, 4, 5 with the arrows and OK.
+   - No 123 button either: on your phone, open the SmartThings app, pick the TV, open its
+     remote, and use its 123 number pad.
+   - 2022 and newer TVs: if nothing happens, scroll to the bottom of Apps, open
+     App Settings, and enter 1 2 3 4 5 there.
+3. A Developer mode box opens. Switch Developer mode to On.
+4. Type the address the setup showed in step 2 and press OK. Type each number as it is:
+   1 is 1, not 001. Press Right to move to the next group of numbers.
+5. Restart the TV: hold the power button down for about 5 seconds, until the TV goes off and
+   comes back on. (On The Frame a short press only goes to Art Mode. Hold it.)
+   A "Developer mode" line at the top of the Apps screen means it worked.
+
+
+STEP 4. Finish the setup on the computer
+----------------------------------------
+In the setup window press Return (Windows: Enter). The setup then:
+- downloads Apps2Samsung's free command line tool (open source, about 35 MB, checked before
+  it runs). It is what signs and installs Samsung apps.
+- finds your TV and checks Developer mode. If something is not right, it says what to fix:
+  fix it on the TV, then press Return (Windows: Enter) again.
+- opens a browser for your Samsung account sign-in. This is Samsung's own page: couch-tv and
+  the setup never see your password. It makes a certificate for your TV only. If Samsung asks
+  you to agree or to allow access, say yes, then come back to the setup window.
+  Apps2Samsung keeps that signing certificate on this computer, so the next update is signed
+  the same way. Keep this computer for updates, and do not share the certificate.
+- puts couch-tv on the TV and opens it. Press Allow on the TV if it asks. (If it is not on
+  screen, open Couch TV from the TV's row of apps.)
+
+
+STEP 5. So Couch TV opens again when you switch the TV on
+---------------------------------------------------------
+On the TV: Settings, General, Smart Features (or Start Screen Option), Autorun Last App: On.
+Then, when you switch the TV on, Couch TV is back if it was the last app you used.
+To open Couch TV any time: press Home on the Samsung remote, move to Couch TV in the row of
+apps, press OK. (Samsung's Home button itself always opens Samsung's menu.)
+
+
+STEP 6. Get a design from couch-tv Studio
+-----------------------------------------
+On the TV, open the gear (Home settings), then Designs, then Get a design from your phone.
+Scan the QR code with your phone, pick your design and press Send to my TV. Say yes to
+Use this design?
+
+
+Updates
+-------
+couch-tv on a Samsung does not update itself. When a new one is out, the TV says so on the
+home. Then download the newest "couch-tv-samsung-setup.zip" from
+github.com/Seagey/couch-tv/releases and run it again (steps 2 and 4). Your settings stay.
+Developer mode can switch itself off after a Samsung software update: then do step 3 again.
+
+The setup cannot find the TV? Switch the TV on with its remote first (on The Frame, a short
+press: it falls asleep by itself). To keep it reachable: Settings, General, Network, Expert
+Settings, Power On with Mobile, On.
+
+
+Want more? (optional)
+---------------------
+Couch TV opening by itself every time the TV comes on (even when it was not the last app),
+and the phone remote, need a computer at home that stays on (the bridge). That part is in the full guide: docs/SAMSUNG.md on
+github.com/Seagey/couch-tv. An AI agent such as Claude Code (it needs a paid Claude plan; any coding
+AI agent works) can set it up for you, but you do not need one for anything above.
+
+Stuck? couchtv.joshuaseage.com/help/tv-samsung
+
+About Apps2Samsung
+------------------
+The setup downloads Apps2Samsung's command line tool, version 3.3.1, from its own GitHub
+releases (github.com/Apps2Samsung/Apps2Samsung) and checks its SHA-256 fingerprint before it
+runs. Apps2Samsung is a free community tool, not Samsung's, licensed under the GNU General
+Public License version 3 (GPL-3.0). couch-tv does not include or change it. Its source code
+and licence are on that GitHub page.
+
+To remove couch-tv: on the TV, Apps, the cog (Settings), Couch TV, Delete.
+To switch Developer mode off: Apps, 1 2 3 4 5, Developer mode Off, then restart the TV.

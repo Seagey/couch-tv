@@ -1,0 +1,96 @@
+{
+ "leagues": [
+  {
+   "name": "Australian A-League Men",
+   "abbreviation": "A-League Men"
+  }
+ ],
+ "events": [
+  {
+   "id": "401892138",
+   "date": "2026-11-20T08:40Z",
+   "name": "Adelaide United FC at Western Sydney Wanderers FC",
+   "shortName": "ADL @ WSW",
+   "status": {
+    "type": {
+     "state": "pre",
+     "completed": false,
+     "shortDetail": "Scheduled",
+     "detail": "Fri, November 20th at 3:40 AM EST"
+    },
+    "displayClock": "0'"
+   },
+   "competitions": [
+    {
+     "competitors": [
+      {
+       "homeAway": "home",
+       "winner": false,
+       "score": "0",
+       "team": {
+        "displayName": "Western Sydney Wanderers FC",
+        "shortDisplayName": "Western Sydney",
+        "abbreviation": "WSW",
+        "color": "C60000"
+       }
+      },
+      {
+       "homeAway": "away",
+       "winner": false,
+       "score": "0",
+       "team": {
+        "displayName": "Adelaide United FC",
+        "shortDisplayName": "Adelaide Utd",
+        "abbreviation": "ADL",
+        "color": "ea413c"
+       }
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "401892137",
+   "date": "2026-11-21T04:00Z",
+   "name": "Melbourne Victory at Auckland FC",
+   "shortName": "MBV @ AUC",
+   "status": {
+    "type": {
+     "state": "pre",
+     "completed": false,
+     "shortDetail": "Scheduled",
+     "detail": "Fri, November 20th at 11:00 PM EST"
+    },
+    "displayClock": "0'"
+   },
+   "competitions": [
+    {
+     "competitors": [
+      {
+       "homeAway": "home",
+       "winner": false,
+       "score": "0",
+       "team": {
+        "displayName": "Auckland FC",
+        "shortDisplayName": "Auckland",
+        "abbreviation": "AUC",
+        "color": "000000"
+       }
+      },
+      {
+       "homeAway": "away",
+       "winner": false,
+       "score": "0",
+       "team": {
+        "displayName": "Melbourne Victory",
+        "shortDisplayName": "Melbourne V",
+        "abbreviation": "MBV",
+        "color": "104C94"
+       }
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}

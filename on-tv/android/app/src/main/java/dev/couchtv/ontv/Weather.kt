@@ -18,7 +18,7 @@ object Weather {
 
     @Synchronized fun get(): JSONObject? {
         if (data != null && System.currentTimeMillis() - at < 30 * 60_000) return JSONObject(data.toString())
-        val w = Store.weather()
+        val w = Store.weather() ?: return null   // no town set yet: the home asks for one
         try {
             val url = "https://api.open-meteo.com/v1/forecast?latitude=${w.getDouble("lat")}&longitude=${w.getDouble("lon")}" +
                 "&current=temperature_2m,weather_code,is_day&daily=temperature_2m_max,temperature_2m_min" +

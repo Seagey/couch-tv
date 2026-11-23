@@ -1,0 +1,8 @@
+{
+  "rootDir": "channel",
+  "files": ["manifest", "source/**/*", "components/**/*", "images/**/*", "fonts/**/*", "scenes.json"],
+  "createPackage": false,
+  "copyToStaging": false,
+  "plugins": ["@rokucommunity/bslint"],
+  "diagnosticLevel": "info"
+}

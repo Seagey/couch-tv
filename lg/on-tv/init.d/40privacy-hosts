@@ -1,0 +1,9 @@
+#!/bin/sh
+# couch-tv privacy clean: add LG ad/ACR/diagnostics servers to a writable copy of /etc/hosts.
+# Undo: delete this file and reboot.
+if ! grep -q " /etc/hosts " /proc/mounts; then cp /etc/hosts /tmp/hosts; mount --bind /tmp/hosts /etc/hosts; fi
+D=/home/root   # the TV root user's home
+grep -q "couch-tv privacy clean" /etc/hosts || cat "$D"/couchtv/blocklist.hosts >> /etc/hosts
+if [ -e /var/luna/preferences/webosbrew_block_updates ] && ! grep -q snu.lge.com /etc/hosts; then
+  echo "127.0.0.1 snu.lge.com su-dev.lge.com su.lge.com su-ssl.lge.com" >> /etc/hosts
+fi

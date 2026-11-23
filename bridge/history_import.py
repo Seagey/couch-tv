@@ -13,6 +13,7 @@ import sys
 import zipfile
 
 import config
+import messages
 import store
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -108,7 +109,8 @@ def run(inbox=INBOX, move=True):
                 continue
             if not found:
                 report.append({"file": rel, "source": None, "rows": 0, "new": 0,
-                               "note": "not a Netflix or YouTube history file, left in place"})
+                               "note": "not a Netflix or YouTube history file, left in place",
+                               **messages.note_fields("note_import_unrecognized")})
                 continue
             for label, src, items in found:
                 new = store.add_imported(items)

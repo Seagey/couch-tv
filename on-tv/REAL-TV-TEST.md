@@ -48,7 +48,7 @@ whether wireless debugging is on.
 ## 2. Install alongside, not instead
 
 ```
-python3 scripts/real-tv.py --ip <TV_IP> install android/app/build/outputs/apk/release/app-release.apk
+python3 scripts/real-tv.py --ip <TV_IP> install android/app/build/outputs/apk/github/release/app-github-release.apk
 python3 scripts/real-tv.py --ip <TV_IP> check        # home app must be unchanged
 python3 scripts/real-tv.py --ip <TV_IP> open         # Couch TV setup screen
 python3 scripts/real-tv.py --ip <TV_IP> shot test-output/real-1-setup.png
@@ -126,6 +126,26 @@ python3 scripts/real-tv.py --ip <TV_IP> reboot      # or the TV's own menu: Sett
 After it comes back (allow 2 minutes): sound off again (step 0), then `real-tv.py check` (5555 still set?), then
 `real-tv-check.mjs run` (did the app start by itself and reconnect?). Confirm the original home
 screen is still the home app.
+
+## 6a. Checks still to do on a real TV (0.13.10)
+
+Only on the Samsung or the TCL, sound off first (step 0). None of these has been done yet.
+
+1. **Which sport apps fill Android's Continue watching.** Up next's "Your last game" (and "Last game when
+   Scores is on") picks up the last game watched in Kayo, Foxtel, 9Now, 7plus, 10 or DAZN, read from Android's
+   Continue watching on the home app alone. Whether each of those apps writes to it has never been checked.
+   For each app that is installed: play a game (or any live or replay sport) for a minute, press Home, then
+   read the rows with `TV_IP=<TV_IP> .venv/bin/python tv-home/tools/tvadb.py shell "content query --uri
+   content://android.media.tv/watch_next_program --projection package_name:title:last_engagement_time_utc_millis"`
+   (or look at Up next with "Your last game" picked). Write down per app: listed or not, and the title it gives.
+   An app that never shows there cannot fill Up next's game on a TV without a home computer; say so in Up next's
+   help if most of them are missing.
+2. **The first open, timed.** Open the home from cold (after `am force-stop dev.couchtv.ontv`), twice, and read
+   `performance.getEntriesByName("app-start")` and `"home-painted-from-cache"` (chrome://inspect on the
+   computer, if the TV's WebView allows debugging). 0.13.10 lets the second open reuse the page's files (a 304
+   from the app's server); the first open after an install still fetches and compiles about 3.3 MB of scripts.
+3. **A video background on a 1 GB TV** (the TCL, 939 MB): the Aquarium design plays (about 27 fps before), the
+   home stays alive after opening YouTube and coming back, and Designs, Your design says it plays a smaller copy.
 
 ## 7. Finish
 

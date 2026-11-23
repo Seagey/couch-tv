@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Look for Google TV, Android TV and LG devices on this Wi-Fi. Changes nothing.
+"""Look for Google TV, Android TV, LG and Philips devices on this Wi-Fi. Changes nothing.
 
     .venv/bin/python scripts/find-tvs.py [seconds]
 
@@ -11,6 +11,8 @@ line per device: its name, address, model (when it says), and what it offers:
 A TV that shows "remote" is a Google TV or Android TV. A "Cast device" only offers cast: it could
 be a speaker, an older Chromecast or a Fire TV (check-tv.py tells them apart). A Cast device that
 also answers on port 8001 is a Samsung TV and is listed as "Samsung TV" (docs/SAMSUNG.md).
+A Philips TV announces the service its network remote uses (port 1926) and is listed as "Philips TV"
+(docs/PHILIPS-TITAN.md). Only the announcement is read: nothing is sent to the TV.
 LG TVs (webOS) answer a second question, the one LG's own phone app asks (SSDP, LG's "second
 screen" service), and are listed as "LG TV" (docs/LG.md). Samsung and other TVs that do not run
 Android are not listed at all.
@@ -30,6 +32,7 @@ SERVICES = {
     "_androidtvremote2._tcp.local.": "remote",
     "_googlecast._tcp.local.": "cast",
     "_adb-tls-connect._tcp.local.": "adb",
+    "_philipstv_s_rpc._tcp.local.": "philips",
 }
 
 
@@ -71,6 +74,11 @@ def find_lg(wait, target=("239.255.255.250", 1900)):
     return found
 
 
+def philips_name(instance):
+    """"6_43PUS8909/12._philipstv_s_rpc._tcp.local." -> "43PUS8909/12" (the 6 is the API version)."""
+    return re.sub(r"^\d+_", "", instance.split("._")[0])
+
+
 class Found(ServiceListener):
     def __init__(self):
         self.devices = {}
@@ -85,7 +93,7 @@ class Found(ServiceListener):
         props = {k.decode(errors="ignore"): (v or b"").decode(errors="ignore") for k, v in info.properties.items()}
         ip = addrs[0]
         d = self.devices.setdefault(ip, {"names": set(), "models": set(), "offers": set()})
-        friendly = props.get("fn") or name.split("._")[0]
+        friendly = props.get("fn") or (philips_name(name) if SERVICES[type_] == "philips" else name.split("._")[0])
         d["names"].add(friendly)
         if props.get("md"):
             d["models"].add(props["md"])
@@ -115,13 +123,15 @@ def main():
     lgs = find_lg(wait)
     zc.close()
     tvs = {ip: d for ip, d in found.devices.items() if "remote" in d["offers"] or "adb" in d["offers"]}
-    others = {ip: d for ip, d in found.devices.items() if ip not in tvs}
+    philips = {ip: d for ip, d in found.devices.items() if "philips" in d["offers"] and ip not in tvs}
+    others = {ip: d for ip, d in found.devices.items() if ip not in tvs and ip not in philips}
     for ip in lgs:
         tvs.pop(ip, None)
         others.pop(ip, None)
+        philips.pop(ip, None)
     # A Samsung (Tizen) TV shows up only as a "Cast device" here. It also answers on port 8001.
     samsungs = {ip: others.pop(ip) for ip in list(others) if ip not in tvs and knock(ip, 8001)}
-    if not tvs and not lgs and not samsungs:
+    if not tvs and not lgs and not samsungs and not philips:
         print("No Android TV found. If your TV is Samsung, LG or another brand, that is expected: tell your")
         print("agent the brand and model.")
         print("If it is a Google TV or Android TV: check it is on, awake and on the same Wi-Fi (not a guest")
@@ -132,6 +142,8 @@ def main():
         print(f"TV       {ip:15}  {' / '.join(sorted(d['names']))}  ({model})  offers: {', '.join(sorted(d['offers']))}")
     for ip, name in sorted(lgs.items()):
         print(f"LG TV    {ip:15}  {name or 'name not given'}  (webOS: see docs/LG.md, check-tv.py tells more)")
+    for ip, d in sorted(philips.items()):
+        print(f"Philips TV  {ip:15}  {' / '.join(sorted(d['names']))}  (Titan OS or older Philips: docs/PHILIPS-TITAN.md)")
     for ip, d in sorted(samsungs.items()):
         model = ", ".join(sorted(d["models"])) or "model not given"
         print(f"Samsung TV  {ip:15}  {' / '.join(sorted(d['names']))}  ({model})  (Tizen: see docs/SAMSUNG.md)")

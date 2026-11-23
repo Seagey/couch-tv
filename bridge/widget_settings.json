@@ -1,0 +1,1100 @@
+{
+ "about": "Made by scripts/widget-settings-json.mjs from tv-home/web/widget-caps.js. Do not edit.",
+ "kinds": {
+  "clock": {
+   "name": "Digital clock",
+   "settings": [
+    {
+     "key": "format",
+     "label": "12 or 24 hour",
+     "type": "choice"
+    },
+    {
+     "key": "seconds",
+     "label": "Show seconds",
+     "type": "toggle"
+    },
+    {
+     "key": "date",
+     "label": "Show the date",
+     "type": "toggle"
+    },
+    {
+     "key": "ampm",
+     "label": "Show am and pm",
+     "type": "toggle"
+    },
+    {
+     "key": "zone",
+     "label": "Time zone",
+     "type": "zone"
+    }
+   ]
+  },
+  "tallclock": {
+   "name": "Tall clock",
+   "settings": [
+    {
+     "key": "format",
+     "label": "12 or 24 hour",
+     "type": "choice"
+    },
+    {
+     "key": "align",
+     "label": "Line up",
+     "type": "choice"
+    },
+    {
+     "key": "zone",
+     "label": "Time zone",
+     "type": "zone"
+    }
+   ]
+  },
+  "glassclock": {
+   "name": "Glass clock",
+   "settings": [
+    {
+     "key": "format",
+     "label": "12 or 24 hour",
+     "type": "choice"
+    },
+    {
+     "key": "scene",
+     "label": "Glass from",
+     "type": "choice"
+    },
+    {
+     "key": "zone",
+     "label": "Time zone",
+     "type": "zone"
+    }
+   ]
+  },
+  "analog": {
+   "name": "Analogue clock",
+   "settings": [
+    {
+     "key": "seconds",
+     "label": "Second hand",
+     "type": "toggle"
+    },
+    {
+     "key": "numbers",
+     "label": "Show the numbers",
+     "type": "toggle"
+    },
+    {
+     "key": "zone",
+     "label": "Time zone",
+     "type": "zone"
+    }
+   ]
+  },
+  "flipclock": {
+   "name": "Flip clock",
+   "settings": [
+    {
+     "key": "format",
+     "label": "12 or 24 hour",
+     "type": "choice"
+    },
+    {
+     "key": "zone",
+     "label": "Time zone",
+     "type": "zone"
+    }
+   ]
+  },
+  "wordclock": {
+   "name": "Time in words",
+   "settings": [
+    {
+     "key": "precise",
+     "label": "To the minute",
+     "type": "toggle"
+    },
+    {
+     "key": "dayline",
+     "label": "Show the day",
+     "type": "toggle"
+    },
+    {
+     "key": "zone",
+     "label": "Time zone",
+     "type": "zone"
+    }
+   ]
+  },
+  "solar": {
+   "name": "Sun clock",
+   "settings": [
+    {
+     "key": "town",
+     "label": "Place",
+     "type": "place"
+    }
+   ]
+  },
+  "worldclock": {
+   "name": "World clocks",
+   "settings": [
+    {
+     "key": "cities",
+     "label": "Cities",
+     "type": "choice"
+    },
+    {
+     "key": "format",
+     "label": "12 or 24 hour",
+     "type": "choice"
+    },
+    {
+     "key": "label",
+     "label": "Heading",
+     "type": "text"
+    }
+   ]
+  },
+  "countdown": {
+   "name": "Countdown",
+   "settings": [
+    {
+     "key": "label",
+     "label": "Name",
+     "type": "text"
+    },
+    {
+     "key": "day",
+     "label": "Day",
+     "type": "number"
+    },
+    {
+     "key": "month",
+     "label": "Month",
+     "type": "choice"
+    },
+    {
+     "key": "year",
+     "label": "Year",
+     "type": "choice"
+    },
+    {
+     "key": "rule",
+     "label": "Counts to",
+     "type": "choice"
+    },
+    {
+     "key": "unit",
+     "label": "Count in",
+     "type": "choice"
+    }
+   ]
+  },
+  "date": {
+   "name": "Date",
+   "settings": [
+    {
+     "key": "show",
+     "label": "Shows",
+     "type": "choice"
+    },
+    {
+     "key": "dfmt",
+     "label": "Date style",
+     "type": "choice"
+    },
+    {
+     "key": "place",
+     "label": "Show the town name",
+     "type": "toggle"
+    }
+   ]
+  },
+  "month": {
+   "name": "Month",
+   "settings": [
+    {
+     "key": "wstart",
+     "label": "Week starts on",
+     "type": "choice"
+    }
+   ]
+  },
+  "timer": {
+   "name": "Timer",
+   "settings": [
+    {
+     "key": "minutes",
+     "label": "Quick start",
+     "type": "choice"
+    },
+    {
+     "key": "label",
+     "label": "Timer name",
+     "type": "text"
+    }
+   ]
+  },
+  "weather": {
+   "name": "Weather",
+   "settings": [
+    {
+     "key": "town",
+     "label": "Place",
+     "type": "place"
+    },
+    {
+     "key": "place",
+     "label": "Show the town name",
+     "type": "toggle"
+    },
+    {
+     "key": "hilo",
+     "label": "Show the high and low",
+     "type": "toggle"
+    },
+    {
+     "key": "degrees",
+     "label": "Temperature in",
+     "type": "choice"
+    }
+   ]
+  },
+  "bigtemp": {
+   "name": "Big number",
+   "settings": [
+    {
+     "key": "town",
+     "label": "Place",
+     "type": "place"
+    },
+    {
+     "key": "place",
+     "label": "Show the town name",
+     "type": "toggle"
+    },
+    {
+     "key": "degrees",
+     "label": "Temperature in",
+     "type": "choice"
+    }
+   ]
+  },
+  "hourly": {
+   "name": "Hourly",
+   "settings": [
+    {
+     "key": "town",
+     "label": "Place",
+     "type": "place"
+    },
+    {
+     "key": "hours",
+     "label": "How many hours",
+     "type": "choice"
+    },
+    {
+     "key": "degrees",
+     "label": "Temperature in",
+     "type": "choice"
+    }
+   ]
+  },
+  "week": {
+   "name": "This week",
+   "settings": [
+    {
+     "key": "town",
+     "label": "Place",
+     "type": "place"
+    },
+    {
+     "key": "place",
+     "label": "Show the town name",
+     "type": "toggle"
+    }
+   ]
+  },
+  "rain": {
+   "name": "Rain soon",
+   "settings": [
+    {
+     "key": "town",
+     "label": "Place",
+     "type": "place"
+    }
+   ]
+  },
+  "uv": {
+   "name": "UV index",
+   "settings": [
+    {
+     "key": "town",
+     "label": "Place",
+     "type": "place"
+    }
+   ]
+  },
+  "sun": {
+   "name": "Sunrise and sunset",
+   "settings": [
+    {
+     "key": "town",
+     "label": "Place",
+     "type": "place"
+    }
+   ]
+  },
+  "moon": {
+   "name": "Moon",
+   "settings": [
+    {
+     "key": "hemi",
+     "label": "Moon seen from",
+     "type": "choice"
+    }
+   ]
+  },
+  "air": {
+   "name": "Air quality",
+   "settings": [
+    {
+     "key": "town",
+     "label": "Place",
+     "type": "place"
+    },
+    {
+     "key": "scale",
+     "label": "Scale",
+     "type": "choice"
+    }
+   ]
+  },
+  "surf": {
+   "name": "Surf",
+   "settings": [
+    {
+     "key": "place",
+     "label": "Beach",
+     "type": "place"
+    },
+    {
+     "key": "units",
+     "label": "Wave height in",
+     "type": "choice"
+    },
+    {
+     "key": "wind",
+     "label": "Wind in",
+     "type": "choice"
+    }
+   ]
+  },
+  "photo": {
+   "name": "Photo",
+   "settings": [
+    {
+     "key": "photo",
+     "label": "Photo",
+     "type": "tvlist"
+    },
+    {
+     "key": "fit",
+     "label": "Fill or fit",
+     "type": "choice"
+    }
+   ]
+  },
+  "slideshow": {
+   "name": "Slideshow",
+   "settings": [
+    {
+     "key": "seconds_each",
+     "label": "Next photo every",
+     "type": "choice"
+    },
+    {
+     "key": "shuffle",
+     "label": "Shuffle",
+     "type": "toggle"
+    }
+   ]
+  },
+  "mosaic": {
+   "name": "Photo mosaic",
+   "settings": [
+    {
+     "key": "count",
+     "label": "How many photos",
+     "type": "choice"
+    }
+   ]
+  },
+  "artframe": {
+   "name": "Art frame",
+   "settings": [
+    {
+     "key": "photo",
+     "label": "Photo",
+     "type": "tvlist"
+    },
+    {
+     "key": "mat",
+     "label": "Frame colour",
+     "type": "choice"
+    }
+   ]
+  },
+  "memory": {
+   "name": "On this day",
+   "settings": [
+    {
+     "key": "range",
+     "label": "Photos from",
+     "type": "choice"
+    },
+    {
+     "key": "ago",
+     "label": "Show how long ago",
+     "type": "toggle"
+    }
+   ]
+  },
+  "keep": {
+   "name": "Keep watching",
+   "settings": [
+    {
+     "key": "person",
+     "label": "Whose shows",
+     "type": "tvlist"
+    }
+   ]
+  },
+  "keeprow": {
+   "name": "Keep watching row",
+   "settings": [
+    {
+     "key": "label",
+     "label": "Heading",
+     "type": "text"
+    },
+    {
+     "key": "shows",
+     "label": "How many shows",
+     "type": "choice"
+    },
+    {
+     "key": "person",
+     "label": "Whose shows",
+     "type": "tvlist"
+    }
+   ]
+  },
+  "upnext": {
+   "name": "Up next",
+   "settings": [
+    {
+     "key": "sport",
+     "label": "What it shows",
+     "type": "choice"
+    },
+    {
+     "key": "apps",
+     "label": "Only from these apps",
+     "type": "choice"
+    }
+   ]
+  },
+  "picks": {
+   "name": "Picks for you",
+   "settings": [
+    {
+     "key": "label",
+     "label": "Heading",
+     "type": "text"
+    },
+    {
+     "key": "mix",
+     "label": "Picks from",
+     "type": "choice"
+    }
+   ]
+  },
+  "app": {
+   "name": "One app",
+   "settings": [
+    {
+     "key": "apps",
+     "label": "App",
+     "type": "apps"
+    }
+   ]
+  },
+  "folder": {
+   "name": "App folder",
+   "settings": [
+    {
+     "key": "label",
+     "label": "Folder name",
+     "type": "text"
+    },
+    {
+     "key": "apps",
+     "label": "Apps in the folder",
+     "type": "apps"
+    },
+    {
+     "key": "cols",
+     "label": "Apps across",
+     "type": "choice"
+    }
+   ]
+  },
+  "dock": {
+   "name": "Dock",
+   "settings": [
+    {
+     "key": "apps",
+     "label": "Apps",
+     "type": "apps"
+    },
+    {
+     "key": "more",
+     "label": "All apps at the end",
+     "type": "toggle"
+    }
+   ]
+  },
+  "appgrid": {
+   "name": "App grid",
+   "settings": [
+    {
+     "key": "apps",
+     "label": "Apps",
+     "type": "apps"
+    },
+    {
+     "key": "cols",
+     "label": "Apps across",
+     "type": "choice"
+    },
+    {
+     "key": "names",
+     "label": "Show app names",
+     "type": "toggle"
+    }
+   ]
+  },
+  "games": {
+   "name": "Games",
+   "settings": [
+    {
+     "key": "apps",
+     "label": "Games",
+     "type": "apps"
+    },
+    {
+     "key": "label",
+     "label": "Heading",
+     "type": "text"
+    }
+   ]
+  },
+  "nowplaying": {
+   "name": "Now playing",
+   "settings": [
+    {
+     "key": "buttons",
+     "label": "Show the buttons",
+     "type": "toggle"
+    },
+    {
+     "key": "cover",
+     "label": "Show the cover",
+     "type": "toggle"
+    }
+   ]
+  },
+  "soundscape": {
+   "name": "Soundscape",
+   "settings": [
+    {
+     "key": "sound",
+     "label": "Sound",
+     "type": "choice"
+    },
+    {
+     "key": "volume",
+     "label": "Volume",
+     "type": "number"
+    }
+   ]
+  },
+  "queue": {
+   "name": "Up next queue",
+   "settings": [
+    {
+     "key": "label",
+     "label": "Heading",
+     "type": "text"
+    },
+    {
+     "key": "count",
+     "label": "How many songs",
+     "type": "choice"
+    }
+   ]
+  },
+  "speakers": {
+   "name": "Speakers",
+   "settings": [
+    {
+     "key": "players",
+     "label": "Speakers",
+     "type": "device"
+    }
+   ]
+  },
+  "aircon": {
+   "name": "Aircon",
+   "settings": [
+    {
+     "key": "entity",
+     "label": "Room",
+     "type": "device"
+    },
+    {
+     "key": "others",
+     "label": "Show the other rooms",
+     "type": "toggle"
+    }
+   ]
+  },
+  "scenes": {
+   "name": "Scenes",
+   "settings": [
+    {
+     "key": "scenes",
+     "label": "Scenes",
+     "type": "device"
+    }
+   ]
+  },
+  "controls": {
+   "name": "Control Centre",
+   "settings": [
+    {
+     "key": "switches",
+     "label": "Lights and switches",
+     "type": "device"
+    }
+   ]
+  },
+  "camera": {
+   "name": "Camera",
+   "settings": [
+    {
+     "key": "cam",
+     "label": "Camera",
+     "type": "device"
+    },
+    {
+     "key": "label",
+     "label": "Heading",
+     "type": "text"
+    }
+   ]
+  },
+  "doorbell": {
+   "name": "Doorbell",
+   "settings": [
+    {
+     "key": "label",
+     "label": "Heading",
+     "type": "text"
+    },
+    {
+     "key": "picture",
+     "label": "Show the door camera",
+     "type": "toggle"
+    }
+   ]
+  },
+  "energy": {
+   "name": "Solar and energy",
+   "settings": [
+    {
+     "key": "label",
+     "label": "Heading",
+     "type": "text"
+    },
+    {
+     "key": "now",
+     "label": "Show power now",
+     "type": "toggle"
+    }
+   ]
+  },
+  "sensor": {
+   "name": "Sensor",
+   "settings": [
+    {
+     "key": "reading",
+     "label": "Sensor",
+     "type": "device"
+    },
+    {
+     "key": "label",
+     "label": "Heading",
+     "type": "text"
+    }
+   ]
+  },
+  "battery": {
+   "name": "Batteries",
+   "settings": [
+    {
+     "key": "low",
+     "label": "Red below",
+     "type": "number"
+    }
+   ]
+  },
+  "bins": {
+   "name": "Bin night",
+   "settings": [
+    {
+     "key": "weekday",
+     "label": "Bin night",
+     "type": "choice"
+    },
+    {
+     "key": "alt",
+     "label": "Taking turns",
+     "type": "toggle"
+    },
+    {
+     "key": "thisweek",
+     "label": "Which bin goes out this week",
+     "type": "choice"
+    },
+    {
+     "key": "bin_a",
+     "label": "First bin",
+     "type": "text"
+    },
+    {
+     "key": "bin_b",
+     "label": "Second bin",
+     "type": "text"
+    },
+    {
+     "key": "lid_a",
+     "label": "First bin's lid",
+     "type": "choice"
+    },
+    {
+     "key": "lid_b",
+     "label": "Second bin's lid",
+     "type": "choice"
+    }
+   ]
+  },
+  "people": {
+   "name": "People",
+   "settings": [
+    {
+     "key": "who",
+     "label": "Who shows",
+     "type": "tvlist"
+    },
+    {
+     "key": "names",
+     "label": "Show names",
+     "type": "toggle"
+    }
+   ]
+  },
+  "agenda": {
+   "name": "Agenda",
+   "settings": [
+    {
+     "key": "calendars",
+     "label": "Calendars",
+     "type": "tvlist"
+    },
+    {
+     "key": "days",
+     "label": "Days",
+     "type": "choice"
+    }
+   ]
+  },
+  "note": {
+   "name": "Family note",
+   "settings": [
+    {
+     "key": "byline",
+     "label": "Show who it is from",
+     "type": "toggle"
+    }
+   ]
+  },
+  "list": {
+   "name": "List",
+   "settings": [
+    {
+     "key": "list",
+     "label": "List",
+     "type": "tvlist"
+    },
+    {
+     "key": "done",
+     "label": "Show ticked items",
+     "type": "toggle"
+    }
+   ]
+  },
+  "card": {
+   "name": "Custom card",
+   "settings": [
+    {
+     "key": "label",
+     "label": "Title",
+     "type": "text"
+    },
+    {
+     "key": "text",
+     "label": "Words",
+     "type": "text"
+    },
+    {
+     "key": "live",
+     "label": "Live number",
+     "type": "tvlist"
+    }
+   ]
+  },
+  "quote": {
+   "name": "Quote",
+   "settings": [
+    {
+     "key": "mood",
+     "label": "Kind of line",
+     "type": "choice"
+    },
+    {
+     "key": "text",
+     "label": "Your own words",
+     "type": "text"
+    },
+    {
+     "key": "sub",
+     "label": "Who said it",
+     "type": "text"
+    }
+   ]
+  },
+  "word": {
+   "name": "Word of the day",
+   "settings": [
+    {
+     "key": "lang",
+     "label": "Words in",
+     "type": "choice"
+    },
+    {
+     "key": "meaning",
+     "label": "Show what it means",
+     "type": "toggle"
+    }
+   ]
+  },
+  "news": {
+   "name": "Headlines",
+   "settings": [
+    {
+     "key": "feed",
+     "label": "News source",
+     "type": "choice"
+    },
+    {
+     "key": "count",
+     "label": "How many headlines",
+     "type": "choice"
+    }
+   ]
+  },
+  "sports": {
+   "name": "Scores",
+   "settings": [
+    {
+     "key": "league",
+     "label": "Competition",
+     "type": "choice"
+    },
+    {
+     "key": "team",
+     "label": "Your team",
+     "type": "team"
+    },
+    {
+     "key": "games",
+     "label": "Which games",
+     "type": "choice"
+    }
+   ]
+  },
+  "stocks": {
+   "name": "Markets",
+   "settings": [
+    {
+     "key": "tickers",
+     "label": "Shares and prices",
+     "type": "text"
+    },
+    {
+     "key": "price",
+     "label": "Show the price",
+     "type": "toggle"
+    }
+   ]
+  },
+  "commute": {
+   "name": "Commute",
+   "settings": [
+    {
+     "key": "to",
+     "label": "Where to",
+     "type": "place"
+    },
+    {
+     "key": "arrive_h",
+     "label": "Arrive by",
+     "type": "choice"
+    },
+    {
+     "key": "arrive_m",
+     "label": "Minutes past the hour",
+     "type": "choice"
+    },
+    {
+     "key": "buffer",
+     "label": "Minutes to spare",
+     "type": "number"
+    },
+    {
+     "key": "weekdays",
+     "label": "Weekdays only",
+     "type": "toggle"
+    },
+    {
+     "key": "from",
+     "label": "Leave from",
+     "type": "place"
+    }
+   ]
+  },
+  "welcome": {
+   "name": "Welcome words",
+   "settings": [
+    {
+     "key": "text",
+     "label": "Greeting",
+     "type": "text"
+    },
+    {
+     "key": "sub",
+     "label": "Line under",
+     "type": "text"
+    },
+    {
+     "key": "source",
+     "label": "Guest name from",
+     "type": "choice"
+    },
+    {
+     "key": "times",
+     "label": "Check in and out times",
+     "type": "toggle"
+    }
+   ]
+  },
+  "quick": {
+   "name": "Quick buttons",
+   "settings": [
+    {
+     "key": "quick",
+     "label": "Buttons",
+     "type": "choice"
+    }
+   ]
+  },
+  "wifi": {
+   "name": "Guest Wi-Fi",
+   "settings": [
+    {
+     "key": "hidepass",
+     "label": "Hide the password",
+     "type": "toggle"
+    }
+   ]
+  },
+  "guide": {
+   "name": "House guide",
+   "settings": [
+    {
+     "key": "sections",
+     "label": "Parts of the guide",
+     "type": "tvlist"
+    }
+   ]
+  },
+  "screentime": {
+   "name": "Screen time",
+   "settings": [
+    {
+     "key": "appcount",
+     "label": "Apps shown",
+     "type": "choice"
+    }
+   ]
+  },
+  "ask": {
+   "name": "Ask AI",
+   "settings": [
+    {
+     "key": "keep",
+     "label": "Show the last answer",
+     "type": "choice"
+    }
+   ]
+  },
+  "agent": {
+   "name": "From your AI",
+   "settings": [
+    {
+     "key": "keep",
+     "label": "Show each message",
+     "type": "choice"
+    },
+    {
+     "key": "who",
+     "label": "Show who sent it",
+     "type": "toggle"
+    }
+   ]
+  },
+  "stack": {
+   "name": "Smart stack",
+   "settings": [
+    {
+     "key": "turn",
+     "label": "Next widget",
+     "type": "choice"
+    }
+   ]
+  }
+ }
+}

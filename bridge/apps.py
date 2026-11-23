@@ -6,7 +6,9 @@ knows which app opens which offer. `deeplink` says how a show opens in it, as te
 and search, "app" means only the app opens. `use_web` (a regex) opens the JustWatch web link cut
 down to the show page instead of the intent; `cold` restarts the app first so it takes the link
 ("background" restarts it only when it is not on screen). `verify` waits until the app says it is
-really playing before the bridge says so.
+really playing before the bridge says so. `packages` lists the same app's other builds: a Fire TV
+has Amazon's own build of YouTube, Prime Video and HBO Max under another package name, and the
+bridge opens and watches whichever one the TV has (`package` stays the Google TV one).
 """
 
 APPS = [
@@ -16,8 +18,13 @@ APPS = [
     {"id": "netflix", "name": "Netflix", "package": "com.netflix.ninja", "colour": "#E50914",
      "jw": ["netflix", "netflixbasicwithads", "netflixkids"], "deeplink": "jw",
      "cold": "background", "verify": True},
+    # com.amazon.firetv.youtube: Amazon's YouTube, seen on a Fire TV Cube (Fire OS 7.7). It takes
+    # https://www.youtube.com links (a watch link played the exact video, resumed from the account's
+    # own history, which is how a video card opens when server.open_video finds the id) but shows its
+    # home for the web search link; its search opens from youtube://search?query=
+    # (server.SEARCH_LINKS_BY_PACKAGE, tested on that Cube).
     {"id": "youtube", "name": "YouTube", "package": "com.google.android.youtube.tv", "colour": "#FF0000",
-     "jw": ["youtubered", "youtube"], "deeplink": "jw"},
+     "packages": ["com.amazon.firetv.youtube"], "jw": ["youtubered", "youtube"], "deeplink": "jw"},
     {"id": "stan", "name": "Stan", "package": "au.com.stan.and", "colour": "#0072F5",
      "jw": ["stan"], "deeplink": "jw"},
     {"id": "binge", "name": "Binge", "package": "au.com.streamotion.ares.tv", "colour": "#1E1EFF",
@@ -29,8 +36,9 @@ APPS = [
      "cold": True},
     {"id": "disney-plus", "name": "Disney+", "package": "com.disney.disneyplus", "colour": "#113CCF",
      "jw": ["disneyplus"], "deeplink": "jw"},
+    # com.amazon.firebat: Prime Video as a Fire TV ships it, seen on a Fire TV Cube (Fire OS 7.7).
     {"id": "prime-video", "name": "Prime Video", "package": "com.amazon.amazonvideo.livingroom",
-     "colour": "#00A8E1", "jw": ["amazonprimevideo", "amazonprime", "amazonprimevideowithads", "amazon"], "deeplink": "jw"},
+     "packages": ["com.amazon.firebat"], "colour": "#00A8E1", "jw": ["amazonprimevideo", "amazonprime", "amazonprimevideowithads", "amazon"], "deeplink": "jw"},
     {"id": "apple-tv", "name": "Apple TV", "package": "com.apple.atve.androidtv.appletv", "colour": "#111111",
      "jw": ["appletvplus", "itunes"], "deeplink": "jw"},
     {"id": "paramount-plus", "name": "Paramount+", "package": "com.cbs.ca", "colour": "#0064FF",
@@ -42,6 +50,15 @@ APPS = [
      "jw": ["hulu"], "deeplink": "jw"},
     {"id": "youtube-tv", "name": "YouTube TV", "package": "com.google.android.youtube.tvunplugged",
      "colour": "#FF0000", "jw": ["youtubetv"], "deeplink": "jw"},
+    # Plex has no JustWatch intent here, so only the app opens. Listed so it ranks with the known apps
+    # and is not pushed behind More apps (#56).
+    {"id": "plex", "name": "Plex", "package": "com.plexapp.android", "colour": "#E5A00D",
+     "jw": ["plex"], "deeplink": "app"},
+    # Nuvio, a Stremio-style player, is not on JustWatch. Listed so the shows it names in its media
+    # session reach Keep watching. A card opens the show's page by its IMDb id (TITLE_LINKS in
+    # server.py). Its Play Store build is com.nuvio.app (not read here).
+    {"id": "nuvio", "name": "Nuvio", "package": "com.nuvio.tv", "colour": "#111111",
+     "jw": [], "deeplink": "app"},
     {"id": "kayo", "name": "Kayo", "package": "au.com.kayosports.tv", "colour": "#00E676",
      "jw": [], "deeplink": "app"},
     {"id": "foxtel-go", "name": "Foxtel Go", "package": "au.com.foxtel.atv", "colour": "#F05A28",
@@ -52,18 +69,23 @@ APPS = [
      "jw": ["sevenplus"], "deeplink": "jw"},
     {"id": "10play", "name": "10play", "package": "au.com.tenplay", "colour": "#0B0B0B",
      "jw": ["tenplay"], "deeplink": "jw"},
+    # com.hbo.hbonow: HBO Max's Fire TV build, seen on a Fire TV Cube (Fire OS 7.7).
     {"id": "hbo-max", "name": "HBO Max", "package": "com.wbd.stream", "colour": "#002BE7",
-     "jw": ["max", "hbomax"], "deeplink": "search"},
+     "packages": ["com.hbo.hbonow"], "jw": ["max", "hbomax"], "deeplink": "search"},
     {"id": "google-tv", "name": "Google TV", "package": "com.google.android.videos", "colour": "#4285F4",
      "jw": ["play", "googleplaymovies"], "deeplink": "app"},
     {"id": "twitch", "name": "Twitch", "package": "tv.twitch.android.app", "colour": "#9146FF",
      "jw": [], "deeplink": "app"},
     {"id": "spotify", "name": "Spotify", "package": "com.spotify.tv.android", "colour": "#1DB954",
      "jw": [], "deeplink": "app"},
+    {"id": "audible", "name": "Audible", "package": "com.audible.application.firetv", "colour": "#F8991D",
+     "jw": [], "deeplink": "app"},
     {"id": "moonlight", "name": "Moonlight", "package": "com.limelight", "colour": "#2A2A2A",
      "jw": [], "deeplink": "app"},
+    # com.amazon.tv.settings.v2: Fire OS's own Settings, seen on a Fire TV Cube (Fire OS 7.7), so
+    # Settings in front there counts as Settings and not as an app someone is watching.
     {"id": "settings", "name": "Settings", "package": "com.android.tv.settings", "colour": "#5F6368",
-     "jw": [], "deeplink": "app"},
+     "packages": ["com.amazon.tv.settings.v2"], "jw": [], "deeplink": "app"},
     {"id": "home", "name": "Home", "package": "app.couchtv.launcher", "colour": "#000000",
      "jw": [], "deeplink": "app"},
 ]
@@ -117,6 +139,10 @@ WEBOS = {
     "abc-iview": {"ids": [], "names": ["ABC iview", "iview"]},
     "sbs-on-demand": {"ids": [], "names": ["SBS On Demand"]},
     "settings": {"ids": ["com.palm.app.settings"]},
+    # US apps, seen on an LG OLED77GX, webOS 5.6.2 (#56).
+    "plex": {"ids": ["cdp-30"]},
+    "youtube-tv": {"ids": ["youtube.leanback.ytv.v1"]},
+    "peacock": {"ids": ["com.peacock.tv"]},
 }
 
 # LG apps with no Android twin in APPS (so no package to invent): LG id -> name. The LG app shows
@@ -127,13 +153,68 @@ WEBOS_ONLY = {
     "com.atlas.tv": "NOW",
     "dazn": "DAZN",
     "com.crunchyroll.webapp": "Crunchyroll",
+    # Seen on an LG OLED C1 in Belgium, webOS 6.5.3 (#40). Alexa and the ad-free Cobalt YouTube are
+    # sideloaded there, so their titles differ from TV to TV; the id stays the same.
+    "be.vtmgo.app": "VTM GO",
+    "be.vrt.vrtmax": "VRT MAX",
+    "io.strem.tv": "Stremio",
+    "amazon.alexa.view": "Amazon Alexa",
+    "com.cobalt.youtube.adfree": "YouTube Cobalt AdFree",
+    # Seen on an LG QNED88T6A and an LG NANO83A6A in India, webOS 10.3 and webOS 26 (#89).
+    "com.hoichoi.tv": "Hoichoi",
+    "com.mxplayer.lg": "MX Player TV",
+    "com.wavesott.app": "Waves OTT",
+    "com.geforcenow.play": "GeForce NOW",
+    "com.microsoft.xbox": "Xbox",
+    "com.dailymotion.dailymotion": "Dailymotion",
+    "com.apple.applemusic": "Apple Music",
+    "epoxyaisports": "LG Sports Playbook",
+}
+
+# Roku channel ids, for a TV with "kind": "roku" (bridge/roku.py, docs/ROKU.md). Built from Roku's
+# documentation and community lists, NOT checked on a real Roku. Only these four ids were confirmed
+# from pages that were read (Netflix 12, YouTube 837, Hulu 2285 and Prime Video 13, in
+# github.com/zakwht/roku docs/api.md and forum.developer.roku.com/t/external-control-app-id-help/1975).
+# The rest are the ids Roku's channel store URLs and community lists give and are UNVERIFIED: the
+# driver only uses an id when the Roku's own app list (query/apps) contains it, and otherwise finds
+# the app by its name ("names", the titles a Roku lists it under, which differ by country). Roku
+# channels in Australia are fewer than in the US: ABC iview, SBS On Demand and 10play were reported
+# missing from some Australian stores, so they only show if the Roku lists them.
+ROKU = {
+    "netflix": {"ids": ["12"]},
+    "youtube": {"ids": ["837"]},
+    "prime-video": {"ids": ["13"], "names": ["Amazon Prime Video", "Prime Video"]},
+    "hulu": {"ids": ["2285"]},
+    "disney-plus": {"ids": ["291097"], "names": ["Disney+", "Disney Plus"]},
+    "hbo-max": {"ids": ["61322"], "names": ["Max", "HBO Max"]},
+    "paramount-plus": {"ids": ["31440"], "names": ["Paramount+", "Paramount Plus"]},
+    "peacock": {"ids": ["593099"], "names": ["Peacock TV", "Peacock"]},
+    "apple-tv": {"ids": ["551012"], "names": ["Apple TV", "Apple TV+"]},
+    "plex": {"ids": ["13535"]},
+    "spotify": {"ids": ["22297"]},
+    "twitch": {"ids": ["50539"]},
+    "youtube-tv": {"ids": ["195316"], "names": ["YouTube TV"]},
+    "stan": {"ids": [], "names": ["Stan"]},
+    "binge": {"ids": [], "names": ["BINGE", "Binge"]},
+    "abc-iview": {"ids": [], "names": ["ABC iview", "iview"]},
+    "sbs-on-demand": {"ids": [], "names": ["SBS On Demand"]},
+    "9now": {"ids": [], "names": ["9Now"]},
+    "7plus": {"ids": [], "names": ["7plus"]},
+    "10play": {"ids": [], "names": ["10", "10 play", "10play"]},
+    "kayo": {"ids": [], "names": ["Kayo Sports", "Kayo"]},
+    "foxtel-go": {"ids": [], "names": ["Foxtel Go", "Foxtel"]},
 }
 
 BY_ID = {a["id"]: a for a in APPS}
 TIZEN_TO_PACKAGE = {tid: BY_ID[aid]["package"] for aid, t in TIZEN.items()
                     for tid in t["ids"] + ([t["app"]] if t.get("app") else [])}
 WEBOS_TO_PACKAGE = {lid: BY_ID[aid]["package"] for aid, w in WEBOS.items() for lid in w["ids"]}
+ROKU_TO_PACKAGE = {rid: BY_ID[aid]["package"] for aid, r in ROKU.items() for rid in r["ids"]}
 BY_PACKAGE = {a["package"]: a for a in APPS}
+# The other builds too (Amazon's on a Fire TV), so what the TV says is in front is a known app.
+for _a in APPS:
+    for _p in _a.get("packages") or []:
+        BY_PACKAGE.setdefault(_p, _a)
 BY_JW = {jw: a for a in APPS for jw in a["jw"]}
 
 # Other packages that mean "the home screen" (our own launcher registers here).
@@ -146,13 +227,16 @@ def public(app, installed=None):
     if app is None:
         return None
     out = {"id": app["id"], "name": app["name"], "package": app["package"], "colour": app["colour"]}
+    if app.get("packages"):
+        out["packages"] = [app["package"], *app["packages"]]   # the Google TV one first
     if installed is not None or "installed" in app:
         out["installed"] = installed
     return out
 
 
 def describe_package(package):
-    """{id, name, package} for whatever package is in front on the TV."""
+    """{id, name, package} for whatever package is in front on the TV. `package` is the one asked
+    about, so on a Fire TV it is Amazon's build, the one the TV home's tile has."""
     if not package:
         return None
     if package in HOME_PACKAGES:

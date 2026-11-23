@@ -1,14 +1,62 @@
 // Thin client for the bridge (../../bridge/API.md). Relative URLs, so it works from any phone at home.
 
 export class ApiError extends Error {
-  constructor(message, status) { super(message); this.status = status; }
+  constructor(message, status, key = null, vars = null) {
+    super(message);
+    this.status = status;
+    this.key = key;
+    this.vars = vars;
+  }
 }
 
 // Which TV this phone is driving. null means the bridge's default (the default TV), and then
 // nothing is added to any call, exactly as before more than one TV existed.
 let tvId = null;
 export const setTvId = (id) => { tvId = id || null; };
+export const getTvId = () => tvId;
 const withTv = (path) => (tvId ? `${path}${path.includes('?') ? '&' : '?'}tv=${encodeURIComponent(tvId)}` : path);
+
+let apiKey = null;
+try {
+  apiKey = localStorage.getItem('couchtv.key') || localStorage.getItem('couchtv.token');
+} catch (e) { /* private mode */ }
+if (typeof document !== 'undefined') {
+  try {
+    if (document.cookie.indexOf('couchtv_key=') >= 0) {
+      document.cookie = 'couchtv_key=; path=/; max-age=0; SameSite=Strict';
+    }
+  } catch (e) {}
+}
+if (typeof window !== 'undefined' && window.location) {
+  try {
+    const q = window.location.search.match(/[?&](?:pair|key)=([^&]+)/);
+    if (q) {
+      apiKey = decodeURIComponent(q[1]);
+      try {
+        localStorage.setItem('couchtv.key', apiKey);
+        const u = new URL(window.location.href);
+        u.searchParams.delete('pair');
+        u.searchParams.delete('key');
+        window.history.replaceState({}, '', u.pathname + (u.search || '') + (u.hash || ''));
+      } catch (e) {}
+    }
+  } catch (e) {}
+}
+
+export const setApiKey = (key) => {
+  apiKey = key || null;
+  try {
+    if (key) {
+      localStorage.setItem('couchtv.key', key);
+    } else {
+      localStorage.removeItem('couchtv.key');
+      localStorage.removeItem('couchtv.token');
+    }
+    if (typeof document !== 'undefined' && document.cookie.indexOf('couchtv_key=') >= 0) {
+      document.cookie = 'couchtv_key=; path=/; max-age=0; SameSite=Strict';
+    }
+  } catch (e) {}
+};
 
 // Every call gives up in the end, so the app never sits on "Loading" for ever.
 // Ask and play wait longer: Claude thinks first, and waking a TV takes up to 25 s.
@@ -17,23 +65,32 @@ async function call(method, path, body, ms = 12000) {
   const ctl = new AbortController();
   const t = setTimeout(() => ctl.abort(), ms);
   if (tvId) { if (method === 'GET') path = withTv(path); else body = { ...(body || {}), tv: tvId }; }
+  const headers = {};
+  if (method === 'POST' || body) headers['content-type'] = 'application/json';
+  if (apiKey) headers['authorization'] = `Bearer ${apiKey}`;
   try {
     res = await fetch(path, {
       method,
-      headers: body ? { 'content-type': 'application/json' } : undefined,
+      headers: Object.keys(headers).length ? headers : undefined,
       body: body ? JSON.stringify(body) : undefined,
       signal: ctl.signal,
     });
   } catch (e) {
-    throw e.name === 'AbortError' ? new ApiError('The bridge is taking too long. Try again.', 408) : new ApiError('Can’t reach the bridge', 0);
+    throw e.name === 'AbortError'
+      ? new ApiError('The home computer is taking too long. Try again.', 408, 'err_bridge_timeout')
+      : new ApiError('Can’t reach the home computer', 0, 'err_bridge_unreachable');
   } finally {
     clearTimeout(t);
   }
   let data = null;
   try { data = await res.json(); } catch { /* non-JSON */ }
   if (!res.ok || !data || data.ok === false) {
+    if (res.status === 401 && typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('couchtv:unauthorized'));
+    }
+    const fallbackKey = res.status === 503 ? 'err_tv_not_connected' : res.status === 404 ? 'err_not_found' : 'err_something_wrong';
     const msg = data?.error || (res.status === 503 ? 'TV not connected' : res.status === 404 ? 'Not found' : 'Something went wrong');
-    throw new ApiError(msg, res.status);
+    throw new ApiError(msg, res.status, data?.error_key || (data?.error ? null : fallbackKey), data?.error_vars || null);
   }
   return data;
 }
@@ -43,19 +100,24 @@ export const api = {
   apps: () => call('GET', '/api/apps'),
   recs: (who) => call('GET', `/api/recs?who=${encodeURIComponent(who)}`),
   continueList: (who) => call('GET', `/api/continue?who=${encodeURIComponent(who)}`),
-  setWho: (who) => call('POST', '/api/who', { who }),
+  setWho: (who, pin) => call('POST', '/api/who', pin ? { who, pin } : { who }),
   openContinue: (id, who) => call('POST', '/api/continue/open', { id, who }, 60000),
+  hideContinue: (id) => call('POST', '/api/continue/hide', { id }),
   config: () => call('GET', '/api/config'),
   screens: () => call('GET', '/api/screens'),
   sleep: () => call('GET', '/api/sleep'),
   key: (key, hold = false) => call('POST', '/api/key', hold ? { key, hold: true } : { key }),
   text: (text) => call('POST', '/api/text', { text }),
   launch: (app) => call('POST', '/api/launch', { app }),
+  pointer: (d) => call('POST', '/api/pointer', d, 5000),
   play: (show, who) => call('POST', '/api/play', { ...show, who }, 60000),
   ask: (text, who) => call('POST', '/api/ask', { text, who }, 90000),
   power: (state) => call('POST', '/api/power', { state }, 40000),
+  // move what is playing on this TV to another one: a wake, a fresh app start and a profile screen can add up
+  move: (to, force = false) => call('POST', '/api/move', force ? { to, force: true } : { to }, 180000),
   volume: (action, steps) => call('POST', '/api/volume', steps ? { action, steps } : { action }),
   setSleep: (minutes) => call('POST', '/api/sleep', { minutes }),
+  cancelIdle: () => call('POST', '/api/idle/cancel', {}),
   openScreen: (id) => call('POST', '/api/screens/open', { id }),
   tvs: () => call('GET', '/api/tvs'),
   picture: (mode) => call('POST', '/api/picture', { mode }, 20000),   // a picture switch can take several seconds
@@ -65,6 +127,21 @@ export const api = {
   people: () => call('GET', '/api/people'),
   savePeople: (people) => call('POST', '/api/people', { people }),
   settings: () => call('GET', '/api/settings'),   // the TV home's Home settings (its language)
+  health: () => call('GET', '/api/health'),
+  athome: () => call('GET', '/api/athome', null, 15000),   // the TV home's At home view: the design's widgets with settings
+  pair: (key) => call('POST', '/api/pair', { key }),
+  find: (title) => call('GET', `/api/find?title=${encodeURIComponent(title)}`, null, 20000),
+  // kids mode: the shelves, and changes to them with the parent PIN (bridge/API.md)
+  kids: () => call('GET', '/api/kids', null, 20000),
+  kidsChange: (body) => call('POST', '/api/kids', body, 20000),
+  // the guest's name for the TV's Welcome widget (bridge/API.md, /api/guest)
+  guest: () => call('GET', '/api/guest', null, 15000),
+  setGuest: (name) => call('POST', '/api/guest', { name }, 15000),
+  setStayLink: (url) => call('POST', '/api/guest', { stay_url: url }, 15000),
+  // a couch-tv Studio design code for the TV home (designSend.js); the TV asks "Use this design?" first
+  sendDesign: (code) => call('POST', '/api/say/design', { code, from: 'phone' }),
+  // the next or the previous scene on the TV home (g34); the home reads it from /api/say
+  scene: (pick) => call('POST', '/api/say/scene', { pick }),
 };
 
 // Live TV state: server-sent events, with a slow poll as the fallback when the stream drops.
@@ -74,7 +151,9 @@ export function subscribeNow(onNow, onReach) {
     if (closed) return;
     clearTimeout(retry);
     es?.close();
-    es = new EventSource(withTv('/api/events'));
+    let streamUrl = withTv('/api/events');
+    if (apiKey && !streamUrl.includes('token=')) streamUrl += (streamUrl.includes('?') ? '&' : '?') + 'token=' + encodeURIComponent(apiKey);
+    es = new EventSource(streamUrl);
     es.addEventListener('now', (e) => { fails = 0; onReach(true); try { onNow(JSON.parse(e.data)); } catch { /* ignore */ } });
     es.onerror = () => {
       es.close(); fails += 1;

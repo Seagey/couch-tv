@@ -1,5 +1,6 @@
 # Your own settings and secrets
 config.json
+sync-delays.json
 .env
 *.pem
 *.key
@@ -18,6 +19,7 @@ tv-home/tvs/
 # Builds and tools
 *.apk
 *.aab
+dist-play/
 build/
 .gradle/
 .kotlin/
@@ -42,5 +44,25 @@ platform-tools/
 tv-home/web/backgrounds/mine/*
 !tv-home/web/backgrounds/mine/.gitkeep
 
+# The Loop look's footage (scripts/make-loop.sh writes it here): up to 80 MB of your own or stock video
+tv-home/web/loop/
+
 # Your own app logos for the Samsung home (samsung/build.py)
 samsung/my-logos/
+
+# LG Developer Mode key for the Docker example (examples/docker)
+lg-key/
+vega/src/bridge.json
+
+# Couch TV for Apple TV: your own signing settings (team id, bundle id) and Xcode's per user files
+tvos/Config/Signing.mine.xcconfig
+xcuserdata/
+*.xcuserstate
+*.mobileprovision
+*.provisionprofile
+*.p12
+*.cer
+*.certSigningRequest
+
+# the ambient loops as rendered (tv-home/tools/loops/make-loops.mjs); copies go in tv-home/web/backgrounds/
+tv-home/tools/loops/out/

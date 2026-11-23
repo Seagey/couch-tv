@@ -22,7 +22,8 @@ if [ -f "$LIST" ]; then
   PKGS=$(cat "$LIST")
 else
   # No list from apply.sh on this computer: ambient mode, which apply.sh always switches off.
-  # Anything else (an ad tracker passed in EXTRA_OFF) is not known here: see survey-tv.py's list.
+  # Anything else (an ad tracker passed in EXTRA_OFF, or an app from PRIVACY=1) is not known here:
+  # see survey-tv.py's list and tv-home/tools/privacy-list.txt.
   echo "No $LIST on this computer, switching the standard Google packages back on."
   PKGS="com.google.android.apps.tv.dreamx"
 fi
@@ -46,6 +47,8 @@ done
 "$PY" "$T" shell "appops set app.couchtv.launcher WRITE_SETTINGS default" > /dev/null 2>&1 || true
 # Spotify notification access goes back
 "$PY" "$T" shell "cmd notification disallow_listener app.couchtv.launcher/app.couchtv.launcher.SpotifyMediaListener" > /dev/null 2>&1 || true
+# And the Screen time widget's usage access, if SCREEN_TIME=1 granted it.
+"$PY" "$T" shell "appops set app.couchtv.launcher GET_USAGE_STATS default" > /dev/null 2>&1 || true
 # Switch off the Home button watch apply.sh switched on (any TV with a stock home), and leave any
 # other accessibility service alone.
 # The grant goes first, so the app cannot put the watch back.

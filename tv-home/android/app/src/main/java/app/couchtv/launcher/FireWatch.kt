@@ -1,26 +1,32 @@
 package app.couchtv.launcher
 
 import android.accessibilityservice.AccessibilityService
+import android.accessibilityservice.AccessibilityServiceInfo
 import android.content.BroadcastReceiver
+import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import android.os.SystemClock
 import android.provider.Settings
 import android.util.Log
+import android.view.KeyEvent
 import android.view.accessibility.AccessibilityEvent
 
 /**
  * The Home button watch. The TV's own home stays installed and switched on (switching it off can
- * leave a Google TV in a boot loop, see README "If your TV loops after a restart"), so on many TVs
+ * leave a Google TV in a boot loop, see docs/TROUBLESHOOTING.md "If your TV loops after a
+ * restart"), so on many TVs
  * the Home key, and the TV at power on, still open that home. This watcher sees the TV's own home
- * come on screen and puts couch-tv back on top. The TV's home flashes up for a moment; without
- * root that is as good as Android allows.
+ * come on screen and puts couch-tv back on top. On a Xiaomi TV it also catches the Home and Mi
+ * keys as they are pressed; the window watch stays the fallback when the TV still starts its home.
  *
  * - Fire TV: Amazon's TVs start Amazon's launcher from the Home key by name.
  * - Google TV and Android TV: the Google home outranks the default-home setting.
+ * - Bell's Streamer (Android TV 12): Bell's Fibe TV app is the box's only real home (issue #168).
  *
  * Off until a computer switches it on over ADB (tv-home/tools/apply.sh, or guest-tv's
  * `tools/tv_app.py home`). They also grant WRITE_SECURE_SETTINGS, because Android drops the
@@ -36,25 +42,48 @@ class FireWatch : AccessibilityService() {
     private val handler = Handler(Looper.getMainLooper())
     /** True while the latest window change this service saw was the TV's own home (events only, no screen reading). */
     private var stockInFront = false
+    /** That home is Amazon's: see [moveToFront]. */
+    private var amazonInFront = false
     private var recheckPending = false
+    /** When (elapsedRealtime) the TV's own home last came forward, couch-tv's own window last did, and any other app's last did. 0 = never. */
+    private var stockAt = 0L
+    private var ownAt = 0L
+    private var otherAt = 0L
     private val recheck = Runnable {
         recheckPending = false
-        if (stockInFront && !CrashGuard.standingAside(this)) bringBack()
+        if (shouldRecheckBringBack(stockInFront, stockAt, ownAt, otherAt) && !CrashGuard.standingAside(this)) bringBack()
     }
 
     override fun onInterrupt() {}
 
+    /** Xiaomi TVs (issue #54) and KTC/JVC TVs (a double press of Home left the Google home up): every other TV's Home key is left exactly as before. */
+    override fun onKeyEvent(event: KeyEvent): Boolean {
+        if (!catchesHomeKey()) return false
+        val homeKey = event.keyCode == KeyEvent.KEYCODE_HOME ||
+            (event.keyCode == KeyEvent.KEYCODE_BUTTON_5 && event.scanCode == XIAOMI_MI_SCAN)
+        if (!homeKey || CrashGuard.standingAside(this)) return false
+        if (event.action == KeyEvent.ACTION_UP && event.repeatCount == 0) bringBack()
+        return true
+    }
+
     override fun onServiceConnected() {
         connected = true
+        // Key filtering is switched on at run time and only on Xiaomi and KTC/JVC, so no other TV sees key presses here.
+        if (catchesHomeKey()) runCatching {
+            serviceInfo = serviceInfo.also { it.flags = it.flags or AccessibilityServiceInfo.FLAG_REQUEST_FILTER_KEY_EVENTS }
+        }
         homeClasses = homeActivitiesOf(this)
         Log.i("couchtv.firewatch", "the Home button watch is connected")
         // The TV's own home can come up before this service is bound, and then its window event is
         // never seen (issue #44: Amazon's home sat on screen about 30 s at boot). The service has no
         // permission to read windows (that would be reading the screen), so it goes by the clock
         // instead: bound in the first minutes after a restart, nothing but the TV's own home can be
-        // in front, so couch-tv goes on top once. Fire OS only: a Google TV can start on an HDMI
-        // input or live TV, and that must never be covered.
-        if (android.os.Build.MANUFACTURER.equals("Amazon", ignoreCase = true) &&
+        // in front, so couch-tv goes on top once. Fire OS, and TCL Google TVs (issue #94): TCL's own
+        // boot controller opens the Google home at power on before this service is bound, so its
+        // window event is never seen, and a Home press then changes nothing (the Google home is
+        // already in front). Other Google TVs are left alone: one can start on an HDMI input or
+        // live TV, and that must never be covered.
+        if ((android.os.Build.MANUFACTURER.equals("Amazon", ignoreCase = true) || TclPlaceholderInput.isTcl()) &&
             SystemClock.elapsedRealtime() < BOOT_WINDOW_MS && !CrashGuard.standingAside(this)) {
             Log.i("couchtv.firewatch", "bound just after a restart: putting couch-tv in front")
             runCatching { startActivity(Intent(this, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
@@ -70,7 +99,20 @@ class FireWatch : AccessibilityService() {
 
     override fun onAccessibilityEvent(e: AccessibilityEvent) {
         if (e.eventType != AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) return
-        stockInFront = isStockHome(e.packageName?.toString(), e.className?.toString())
+        val pkg = e.packageName?.toString()
+        // Fibe opened from couch-tv's own tile stays open (see [fibeOpenedNow]). Once any other window
+        // comes forward, after the launch has settled, Fibe is only ever replaced again by a new open.
+        if (pkg != BELL_FIBE_HOME && pkg != null && fibeOpenedOnPurpose && !fibeInGrace()) fibeOpenedOnPurpose = false
+        stockInFront = isStockHome(pkg, e.className?.toString()) &&
+            !(pkg == AMAZON_HOME && settingsAllowed()) &&
+            !(pkg == BELL_FIBE_HOME && fibeOpenedOnPurpose)
+        // Kept for the re-check (#175): a window event from an app that is closing arrives after the
+        // TV's home has come forward, and must not hide that the home is what is in front.
+        val now = SystemClock.elapsedRealtime()
+        if (stockInFront) stockAt = now
+        else if (pkg == packageName) ownAt = now
+        else if (pkg != null) otherAt = now
+        amazonInFront = stockInFront && e.packageName?.toString() == AMAZON_HOME
         if (!stockInFront) return
         if (CrashGuard.standingAside(this)) return
         val wait = DEBOUNCE_MS - (System.currentTimeMillis() - last)
@@ -89,7 +131,50 @@ class FireWatch : AccessibilityService() {
 
     private fun bringBack() {
         last = System.currentTimeMillis()
+        // Android 9 and older hold activity starts for 5 s after a Home press on every TV, not only
+        // Fire TV (seen on a Xiaomi MiTV-AXSO2: a second press in that time left the Google home up).
+        if ((amazonInFront || Build.VERSION.SDK_INT <= 29) && moveToFront()) {
+            // Android 10 only (issue #202): the move can be refused quietly by background start limits,
+            // so look again shortly and fall back to the normal start if the home is still not in front.
+            if (Build.VERSION.SDK_INT == 29) handler.postDelayed({
+                if (!MainActivity.isInFront()) {
+                    Log.i("couchtv.firewatch", "the move to front did not show the home: starting it")
+                    startHome()
+                }
+            }, FRONT_CHECK_MS)
+            return
+        }
+        startHome()
+    }
+
+    private fun startHome() {
         runCatching { startActivity(Intent(this, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
+    }
+
+    /**
+     * Any TV on Android 9 and older: Android holds an app's activity starts for 5 s after a Home press
+     * (the app-switch delay). Seen with the on-TV app on a Fire TV Cube (3rd gen, Fire OS 7.7.1.7):
+     * Amazon's home stayed up for 5 s, and another press in that time buried the held start under
+     * Amazon's home for good. Moving couch-tv's own task to the front is not an activity start and was
+     * not held there. False (a normal start, as before) before the home has ever opened and on
+     * Android 11 and newer (background start limits).
+     *
+     * Android 10 (SDK 29) is included since issue #202: a Hisense Android TV 10 still held the start
+     * for about 5 s after a Home press (option A) and the on-TV app never came back. There Android may
+     * quietly refuse the move, so [bringBack] checks [FRONT_CHECK_MS] later that the home is in front
+     * and starts it normally if not. Android 11 and newer are unchanged.
+     */
+    private fun moveToFront(): Boolean {
+        if (Build.VERSION.SDK_INT >= 30) return false
+        val task = runCatching {
+            getSystemService(android.app.ActivityManager::class.java).appTasks.firstOrNull {
+                it.taskInfo.topActivity?.className == MainActivity::class.java.name
+            }
+        }.getOrNull() ?: return false
+        if (runCatching { task.moveToFront() }.isFailure) return false
+        Log.i("couchtv.firewatch", "the TV's own home came forward: moved couch-tv's task to the front")
+        MainActivity.backToFirstTile()
+        return true
     }
 
     /** After an update or a reboot: put the watcher back if it was switched on. */
@@ -103,6 +188,7 @@ class FireWatch : AccessibilityService() {
     companion object {
         /** Set while Android has this service bound. */
         @Volatile var connected = false
+        private const val FRONT_CHECK_MS = 800L   // Android 10: how long to wait before checking the move worked
         private const val DEBOUNCE_MS = 1200L   // one jump per press, not one per event
         private const val BOOT_WINDOW_MS = 2 * 60_000L
 
@@ -129,12 +215,75 @@ class FireWatch : AccessibilityService() {
             }.start()
         }
 
+        /**
+         * The one re-check after a quick second Home press (#175). Normally the latest window event
+         * decides: [stockInFront]. On a Chromecast with Google TV (Android 14) the app that is closing
+         * (Jellyfin) sends its window event after the Google home's, so the latest event is no longer the
+         * home although the home is what is in front, and later Home presses send no new event at all.
+         * So the re-check also brings couch-tv back when the TV's own home came after couch-tv's last
+         * window, and the only events since were another app's within [CLOSING_SETTLE_MS] of the home's:
+         * that is the app closing. An app the user really opened takes longer than that, and keeps the
+         * screen. Times are elapsedRealtime; 0 means never.
+         */
+        fun shouldRecheckBringBack(stockInFront: Boolean, stockAt: Long, ownAt: Long, otherAt: Long): Boolean {
+            if (stockInFront) return true
+            if (stockAt == 0L || stockAt <= ownAt) return false
+            return otherAt <= stockAt || otherAt - stockAt <= CLOSING_SETTLE_MS
+        }
+
+        /** How soon after the TV's home an event from another app still counts as that app closing (#175 logged about 1.2 s). */
+        private const val CLOSING_SETTLE_MS = 2_000L
+
         const val AMAZON_HOME = "com.amazon.tv.launcher"
+        // MiTV-MOOQ1's Mi-logo key reports BUTTON_5 with this scan code, not KEYCODE_HOME.
+        private const val XIAOMI_MI_SCAN = 580
+        private fun isXiaomi() = Build.MANUFACTURER.equals("Xiaomi", ignoreCase = true)
+        /** KTC builds the JVC 4K ISDB TV (Android 11): on it a double Home press opens the Google home and no window event follows. */
+        private fun isKtc() = Build.MANUFACTURER.equals("KTC", ignoreCase = true)
+        /** Sony BRAVIA (CT1, Google TV, Android 14): a double Home press left the Google home up, the same as KTC (#258). */
+        private fun isSony() = Build.MANUFACTURER.equals("Sony", ignoreCase = true)
+        /** Nokia Android TV 11 reports its manufacturer as "My": the same double Home race left tvlauncher up (#256). */
+        private fun isNokiaMy() = Build.MANUFACTURER.equals("My", ignoreCase = true)
+        /** Skyworth 4K Google TV Stick (Android 14): the same quick Home press race left the Google home up (#256). */
+        private fun isSkyworth() = Build.MANUFACTURER.equals("SkyworthDigital", ignoreCase = true)
+        /** Hisense Google TV (#202): Home from inside an app took ~3-5 s (app exit, Google home, then the swap). */
+        private fun isHisense() = Build.MANUFACTURER.equals("Hisense", ignoreCase = true)
+        private fun catchesHomeKey() = isXiaomi() || isKtc() || isSony() || isNokiaMy() || isSkyworth() || isHisense()
         const val GOOGLE_TV_HOME = "com.google.android.apps.tv.launcherx"
         const val ANDROID_TV_HOME = "com.google.android.tvlauncher"
-        private val STOCK_HOMES = listOf(AMAZON_HOME, GOOGLE_TV_HOME, ANDROID_TV_HOME)
+        /** Bell's Fibe TV app (Bell Streamer, Canada): its MainTvActivity is the box's HOME, and also its live TV. */
+        const val BELL_FIBE_HOME = "com.quickplay.android.bellmediaplayer"
+        private const val BELL_FIBE_ACTIVITY = "ca.bell.fiberemote.tv.MainTvActivity"
+        /** Fire OS's own Settings screen, opened by name (see [amazonSettings]). */
+        const val AMAZON_SETTINGS = "$AMAZON_HOME.ui.MainSettingsActivity"
+        /** Fire OS's Settings app package (the plain Settings action goes through it too). */
+        const val AMAZON_SETTINGS_PKG = "com.amazon.tv.settings"
+        private const val SETTINGS_GRACE_MS = 8_000L
+        @Volatile private var settingsUntil = 0L
 
-        /** The activities of the Google homes that the TV itself lists as a HOME screen (read when the service binds). */
+        /**
+         * couch-tv just opened the TV's Settings itself (issue #123): for a few seconds Amazon's home
+         * coming forward is Settings being drawn, not a Home press, so the watch leaves it alone.
+         * Only Amazon's own windows are spared; the Google homes and a real Home press later are not.
+         */
+        fun allowSettingsNow() { settingsUntil = SystemClock.elapsedRealtime() + SETTINGS_GRACE_MS }
+        fun settingsAllowed(): Boolean = SystemClock.elapsedRealtime() < settingsUntil
+
+        private const val FIBE_GRACE_MS = 5_000L
+        @Volatile private var fibeOpenedOnPurpose = false
+        @Volatile private var fibeSince = 0L
+
+        /**
+         * couch-tv just opened Fibe itself (issue #168): Fibe's home screen is also its live TV, so
+         * while it stays in front the watch leaves it alone. It ends when another window comes forward.
+         * The limit: Fibe opened from anywhere else (a Fibe button on the remote, say) looks the same as
+         * a Home press and is replaced by couch-tv. That is the trade off, and it is documented.
+         */
+        fun fibeOpenedNow() { fibeSince = SystemClock.elapsedRealtime(); fibeOpenedOnPurpose = true }
+        private fun fibeInGrace(): Boolean = SystemClock.elapsedRealtime() - fibeSince < FIBE_GRACE_MS
+        private val STOCK_HOMES = listOf(AMAZON_HOME, GOOGLE_TV_HOME, ANDROID_TV_HOME, BELL_FIBE_HOME)
+
+        /** Stock activities that the TV itself lists as a HOME screen (read when the service binds). */
         @Volatile var homeClasses: Set<String> = emptySet()
 
         /**
@@ -145,7 +294,7 @@ class FireWatch : AccessibilityService() {
         fun homeActivitiesOf(c: Context): Set<String> = runCatching {
             val q = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME)
             c.packageManager.queryIntentActivities(q, 0)
-                .filter { it.activityInfo.packageName == GOOGLE_TV_HOME || it.activityInfo.packageName == ANDROID_TV_HOME }
+                .filter { it.activityInfo.packageName in STOCK_HOMES }
                 .map { it.activityInfo.name }.toSet()
         }.getOrDefault(emptySet())
 
@@ -155,10 +304,25 @@ class FireWatch : AccessibilityService() {
          * setup screens: only the home itself is replaced.
          */
         fun isStockHome(pkg: String?, cls: String?, homes: Set<String> = homeClasses): Boolean = when (pkg) {
-            AMAZON_HOME -> cls?.contains("Settings") != true
+            AMAZON_HOME -> cls == "$AMAZON_HOME.ui.HomeActivity_vNext" || cls == "$AMAZON_HOME.ui.HomeActivity" || (cls != null && cls in homes)
             GOOGLE_TV_HOME -> cls == "$GOOGLE_TV_HOME.home.HomeActivity" || cls == "$GOOGLE_TV_HOME.home.VanillaModeHomeActivity" || (cls != null && cls in homes)
             ANDROID_TV_HOME -> cls == "$ANDROID_TV_HOME.MainActivity" || (cls != null && cls in homes)
+            // Fibe's other screens (players, settings) are not its home: only the HOME activity is replaced.
+            BELL_FIBE_HOME -> cls == BELL_FIBE_ACTIVITY || (cls != null && cls in homes)
             else -> false
+        }
+
+        /**
+         * The TV's Settings, as an intent that does not go through Amazon's home. On Fire OS the plain
+         * Settings action goes through Amazon's home on its way there (`HomeActivity_vNext` draws the
+         * Settings panel inside itself), so [isStockHome] cannot tell it from a Home press and the
+         * Home button watch puts couch-tv straight back (issue #75, the same as #5 in the on-TV app).
+         * Fire OS's own Settings screen, started by name, stays on screen. Null on any other TV,
+         * which keeps the plain Settings action.
+         */
+        fun amazonSettings(pm: PackageManager): Intent? {
+            val i = Intent().setComponent(ComponentName(AMAZON_HOME, AMAZON_SETTINGS))
+            return if (runCatching { pm.getPackageInfo(AMAZON_HOME, 0) }.isSuccess && pm.resolveActivity(i, 0) != null) i else null
         }
 
         /** Puts the watcher back on, only where a computer granted secure settings and the TV has a stock home. */

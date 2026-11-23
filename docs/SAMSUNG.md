@@ -11,8 +11,67 @@ couch-tv on a Samsung is **an app that opens itself, not a true home screen**:
   seconds. So the TV "looks for" couch-tv every time it comes on.
 - **The phone remote and the Claude ask** work against the Samsung through the same bridge.
 
-It needs a computer at home that stays on (option B). Without one you can still install the app
-and open it from Samsung's app row, but nothing opens it for you.
+Opening by itself at every switch-on and the phone remote need a computer at home that stays on
+(option B). Without one you still get the app, couch-tv Studio designs and, with Samsung's
+**Autorun Last App** setting, couch-tv back on screen when the TV comes on.
+
+## The quick way: no AI agent, no paid plan
+
+Every release from 0.13.4 carries two Samsung files on
+[the Releases page](https://github.com/Seagey/couch-tv/releases):
+
+- **`couch-tv-samsung-setup.zip`**: the app, a double-click installer for Mac (`Install on
+  Mac.command`) and Windows (`Install on Windows.cmd`), and `START HERE.txt` with every step in plain
+  words. About 30 minutes, free. This is the route for anyone without an AI agent.
+- **`couch-tv-samsung.wgt`**: the app on its own, for Apps2Samsung or Tizen Studio.
+
+The installer finds the TV, shows this computer's address (the one to type on the TV), checks
+Developer mode and says what to fix, then signs and installs the app with Apps2Samsung's command line
+tool (a pinned version, checked against its SHA-256 before it runs; it downloads it once). The
+Samsung sign-in happens on Samsung's own page in the browser. Running it again with a newer download
+updates couch-tv and keeps its settings, a bridge included (`samsung/app/kept.js`).
+
+What each TV prompt means, in order:
+
+1. **Developer mode** (Apps, then 1 2 3 4 5). On a remote with no number buttons (The Frame and most
+   2021 and newer), press the **123** button (on some, four coloured dots) for numbers on screen, or
+   use the remote in the free **SmartThings** phone app, which has a 123 pad. 2022 and newer: if
+   nothing happens, Apps, App Settings (at the bottom), then 1 2 3 4 5.
+2. **Host PC IP**: the computer's address, which the installer prints. To find it yourself:
+   Mac, System Settings, Wi-Fi, Details (next to the network), TCP/IP, "IP address"; Windows,
+   Settings, Network & internet, Wi-Fi (or Ethernet), the network's Properties, "IPv4 address".
+   Type each group as it is (1, not 001).
+3. **Restart**: hold power about 5 seconds until the TV goes off and on (on a Frame a short press
+   is only Art Mode).
+4. **The Samsung account page** in the computer's browser: sign in, and agree or allow if Samsung
+   asks. It makes a certificate for this TV only.
+5. **"Allow Couch TV bridge to connect?"** only appears later, if a bridge is set up (step 5 below).
+
+**"No TV was found" or "The TV is not ready yet".** The first reason is the TV being off or asleep: switch
+the TV on with its remote first (on The Frame, a short press: it falls asleep from Art Mode by itself and
+cannot be woken over the network). To keep it reachable: Settings, General, Network, Expert Settings,
+Power On with Mobile, On. Then Developer mode, the Host PC IP and the restart above.
+
+The AI agent route (paste "Set this up on my TV: github.com/Seagey/couch-tv" into Claude Code or
+another agent) is still there for the bridge; it is an option, never needed for the app.
+
+**Apps2Samsung as a tool on its own.** Free and open source (GPL-3.0 from 3.3; MIT up to 3.2.1),
+about 2,700 stars on GitHub, releases with SHA-256 digests for every file, and the Samsung sign-in
+goes to Samsung's own page (a localhost callback), so it never holds the password. It is a community
+project, not Samsung's, and its Mac and Windows builds are not from an identified developer, so the
+first open needs Open Anyway (Mac) or More info, Run anyway (Windows). Suitable for beginners as an
+alternative to our installer: install the desktop app from
+[its releases](https://github.com/Apps2Samsung/Apps2Samsung/releases) (`-macos-arm64.dmg`,
+`-macos-x64.dmg`, `-win-x64.msi`), open it, pick the TV, choose **your own .wgt**, pick
+`couch-tv-samsung.wgt`, press Install, and sign in when it asks. Samsung's own Tizen Studio does the
+same job and is the route if you would rather not use a community tool.
+
+**How it updates.** A Samsung app cannot update itself: only a computer can put an app on the TV.
+The app asks GitHub once a day whether a newer release with a Samsung file is out
+(`samsung/app/update.js`, nothing about the TV is sent) and, if so, says on the home for 25 seconds:
+run the Samsung setup again. Nothing installs by itself. Home settings, About shows the version on
+the TV and an **Update couch-tv** row with the same steps and Check for updates now; switching off
+Tell me about new versions stops the daily look and the note.
 
 ## Test status
 
@@ -64,8 +123,13 @@ TV on the computer:
 | Picture mode switch, ADB tools, re-disabling the stock home | No (Android only) |
 
 Frame TVs: "off" from the phone, the sleep timer and a short press of power go to **Art Mode**, as
-the Frame's own remote does. The hook treats Art Mode as off, so leaving Art Mode counts as
-switching the TV on.
+the Frame's own remote does. The bridge never holds power, so a Frame is never switched fully off
+from the phone. The hook treats Art Mode as off, so leaving Art Mode counts as switching the TV on.
+It waits until the TV says twice in a row (within 15 seconds) that it is on and out of Art Mode,
+then opens couch-tv (`bridge/samsung_frame.py`). A Frame leaving Art Mode can say "standby" for a
+moment on its way to the picture; one whose Art Mode sleep timer ran out says "standby" and stays.
+The first is opened, the second left alone ("Art Mode ended and the TV went to sleep, left alone"),
+and the second does not use up the hook for the next real switch-on.
 
 ## Before you start
 
@@ -84,8 +148,10 @@ switching the TV on.
 ### 1. Developer Mode on the TV
 
 1. On the TV open **Apps** (the app store).
-2. Press **1 2 3 4 5** on the remote. If your remote has no number buttons, use the on-screen
-   number pad that some models show, or the phone remote's number keys once the bridge is paired.
+2. Press **1 2 3 4 5** on the remote. If your remote has no number buttons, press its **123**
+   button (or the four coloured dots) for the on-screen number pad, or use the 123 pad of the remote
+   in Samsung's free SmartThings phone app, or the phone remote's number keys once the bridge is
+   paired.
 3. Switch **Developer mode** to **On** and type the **IP address of the computer** that will
    install the app (the bridge computer). Press OK.
 4. **Restart the TV**: hold the power button until the TV switches off and on again (a short press
@@ -243,6 +309,31 @@ bridge brings it forward first. Then it presses OK by timing (`BLIND` in `bridge
 on a fresh start once for the profile screen, then for Play. Only Netflix's timing has been checked
 on a real TV; if an app ends up on the show's page without playing, press OK.
 
+## couch-tv Studio on a Samsung
+
+The Samsung app carries the same couch-tv Studio as the Android home (from 0.13.4): in couch-tv,
+the gear tile (Home settings), **couch-tv Studio**, **Get a design**. OK on the box opens
+Samsung's on-screen keyboard: type the code from the phone's Send sheet with the arrows and OK
+(The Frame's remote needs no number keys for this), then Done. Or, with a bridge, open the
+keyboard and type the code from the phone remote's **Type on the TV**. **Open this home in
+couch-tv Studio** shows a QR code for the phone. The TV asks the design store itself, so this works
+with no bridge too.
+
+Tested on a 2021 Frame, 19 November 2026: the code went in through the phone path (the bridge's
+`/api/text` into Samsung's keyboard), the "Use this design?" question came up, and Use this design
+put the design on the home. Two Samsung fixes came out of that test, both in `samsung/app`:
+Samsung's keyboard reports Done as key 65376, not Enter, so `tizen.js` turns Done in a text box into
+Enter (the code was never sent before); and a design's page policy refused the bridge, because on a
+Samsung the page is a file on the TV and the bridge another computer on plain http, so
+`tizen-policy.js` adds this TV's own bridge (and nothing else) to it.
+
+## Building a release
+
+`.venv/bin/python samsung/build.py --release` makes `build/samsung/couch-tv-samsung.wgt` and
+`build/samsung/couch-tv-samsung-setup.zip` from `config.example.json` (never this computer's
+`config.json`), with no bridge and no key. Attach both to the GitHub release: the app's update note
+only counts a release that carries one of them. The app's version is the TV home's `versionName`.
+
 ## A Sky box on an HDMI input
 
 Add the port to this TV's entry in `config.json`, then rebuild and reinstall the app:
@@ -265,12 +356,19 @@ and only if the TV allows it: Settings, General, Network, Expert Settings, **Pow
 models; a cable is more reliable. If it does not wake, the phone says so and you use the TV's
 remote. A Frame in Art Mode is still on the network, so "on" from the phone always works there.
 
+The bridge learns the TV's MAC address from the TV itself (its Wi-Fi MAC on port 8001) the first time
+it sees it on, and keeps it in `bridge/data/samsung-<id>-mac.txt`, so `"mac"` in `config.json` is
+optional. With no address to wake, or no answer 14 seconds after the first wake packet, the phone is
+told at once: "turn it on with its remote". It never waits half a minute.
+
 ## Limits to know
 
 - Samsung's Home button and the app row are Samsung's. couch-tv cannot hide Samsung's ads or menu.
 - **Developer Mode can switch itself off** after a firmware update, and some updates remove
-  sideloaded apps. Then turn Developer Mode on again and rerun step 3. Your settings live on the
-  bridge, so nothing is lost.
+  sideloaded apps. Then turn Developer Mode on again and rerun step 3 (or the Samsung setup from
+  the release). Your settings live on the bridge, so nothing is lost.
+- **No self-update.** See "How it updates" above: the TV says when a new release is out, and the
+  setup is run again.
 - The certificate is valid for a year. After that, rerun step 3 with `--force-login` (one more
   sign-in).
 - App ids differ between TV years. The ones in `bridge/apps.py` were checked on a 2021 model in

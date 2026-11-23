@@ -11,6 +11,8 @@ android/app/src/main/assets/
 *.keystore
 *.pk8
 *.der
+# ...except the public Matter PAA root certificates the controller checks devices against (android/matter/README.md)
+!android/matter/assets/matter-paa/*.der
 adbkey*
 # local test output
 test-output/

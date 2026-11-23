@@ -65,7 +65,7 @@ object Finder {
             val kind = KIND[o.optString("monetizationType")] ?: "other"
             val cur = best[key]
             if (cur != null && (KIND_ORDER[cur.kind] ?: 9) <= (KIND_ORDER[kind] ?: 9)) continue
-            val web = o.optString("standardWebURL").takeIf { it.isNotEmpty() && it != "null" }?.let { Html.fromHtml(it, 0).toString() }
+            val web = o.optString("standardWebURL").takeIf { it.isNotEmpty() && it != "null" }?.let { (if (android.os.Build.VERSION.SDK_INT >= 24) Html.fromHtml(it, 0) else @Suppress("DEPRECATION") Html.fromHtml(it)).toString() }
             best[key] = Provider(key, app?.name ?: pk.optString("clearName"), kind, app != null,
                 o.optString("deeplinkURL").takeIf { it.isNotEmpty() && it != "null" }, web)
         }
@@ -139,7 +139,7 @@ object Finder {
         return art
     }
 
-    private val artPending = java.util.concurrent.ConcurrentHashMap.newKeySet<String>()
+    private val artPending = java.util.Collections.newSetFromMap(java.util.concurrent.ConcurrentHashMap<String, Boolean>())
     private val artPool = java.util.concurrent.Executors.newSingleThreadExecutor()
 
     /** The same, but never waits: what is cached now, with the lookup started in the background for

@@ -6,12 +6,19 @@ Two channels:
 - ADB over Wi-Fi (pure Python, adb_shell, with this computer's adb key): open any app by package,
   open a JustWatch intent:// link exactly, screenshots, installed apps. Optional: everything
   still works without it, just less.
+
+A TV with "adb_only": true in config.json (a Fire TV on Fire OS: Amazon ships no Android TV Remote
+service, so ports 6466 and 6467 are closed) has only the second channel. Keys, typing, links,
+power and what is on screen all go over ADB from this computer instead, and the TV's "Allow USB
+debugging?" is the only pairing. Fire OS blocks apps on the TV from using the TV's own ADB, but
+not a computer, so this is the way to the full phone remote there.
 """
 import asyncio
 import logging
 import os
 import re
 import socket
+import time
 
 from adb_shell.adb_device_async import AdbDeviceTcpAsync
 from adb_shell.auth.sign_pythonrsa import PythonRSASigner
@@ -19,12 +26,38 @@ from androidtvremote2 import AndroidTVRemote, CannotConnect, ConnectionClosed, I
 
 import apps
 import config
+import messages
 
 log = logging.getLogger("tv")
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 CERT, KEY = os.path.join(config.DATA, "cert.pem"), os.path.join(config.DATA, "key.pem")
 ADB_KEY = os.path.expanduser(os.environ.get("ADB_KEY", "~/.android/adbkey"))
+
+
+# Android package names only: letters, digits and underscores, in two or more dot separated parts.
+# Anything that reaches `adb shell` as a package goes through this first, because adb_shell joins the
+# arguments into one line for the TV's shell (couch-tv#72: "a.b;touch /sdcard/proof" ran on the TV).
+PACKAGE_RE = re.compile(r"[A-Za-z][A-Za-z0-9_]*(\.[A-Za-z0-9_]+)+")
+
+
+class UnsafeInput(ValueError):
+    """A value that must never reach the TV's shell."""
+
+    def __init__(self, message, key=None, vars=None):
+        super().__init__(message)
+        self.key = key
+        self.vars = vars
+
+
+def check_package(package):
+    if not isinstance(package, str) or len(package) > 200 or not PACKAGE_RE.fullmatch(package):
+        raise UnsafeInput(
+            f"refused unsafe app name: {str(package)[:80]!r}",
+            key="err_unsafe_app_name",
+            vars={"package": str(package)[:80]},
+        )
+    return package
 
 
 def ensure_adb_key(path=None):
@@ -35,6 +68,7 @@ def ensure_adb_key(path=None):
         os.makedirs(os.path.dirname(path), exist_ok=True)
         keygen(path)
     return path
+
 
 CLIENT_NAME = config.CLIENT_NAME
 TV_BROADCAST = os.environ.get("TV_BROADCAST", "255.255.255.255")  # Wake-on-LAN; set to your subnet broadcast if it does not wake
@@ -97,6 +131,19 @@ def intent_package(uri):
     return m.group(1) if m else None
 
 
+# What `input text` may carry over adb_shell, which joins the arguments into one shell line for
+# the TV (couch-tv#72). Letters, digits and plain punctuation only; a space becomes %s, the form
+# `input text` wants; anything else (quotes, $, backticks, |, <, >, \, non-ASCII) is dropped.
+_ADB_TEXT_OK = re.compile(r"[A-Za-z0-9 .,!?@#%*_+=:/&()-]")
+
+
+def adb_text(text):
+    """Text as one single-quoted `input text` argument, or "" when nothing safe is left."""
+    kept = "".join(ch for ch in str(text or "") if _ADB_TEXT_OK.fullmatch(ch))
+    kept = kept.replace(" ", "%s")
+    return f"'{kept}'" if kept else ""
+
+
 class TV:
     kind = "android"
     can_read_media = True   # what is playing, from the media session (ADB)
@@ -115,12 +162,20 @@ class TV:
         self.adb_port = config.adb_port(cfg)
         self.mac = cfg.get("mac")
         self.paired = bool(cfg.get("paired"))
+        # "adb_only": true (Fire TV on Fire OS): no Android TV Remote protocol on this TV, so the
+        # ADB link is the connection and there is no certificate pairing to do.
+        self.adb_only = bool(cfg.get("adb_only"))
+        if self.adb_only:
+            self.paired = True
+        self._adb_on = None     # adb_only: awake or not, read from dumpsys power
+        self._adb_front = None  # adb_only: the package on screen, read from dumpsys activity
         self.keep_disabled_file = cfg.get("keep_disabled")
         # Picture mode: which number in `settings get global picture_mode` is which mode, and
         # whether switching has been tested on this TV. Filled in config.json once found.
         self.picture_cfg = config.picture_cfg(cfg.get("picture"))
         # Wake-on-LAN is tried when a mac is set, unless "wake_on_lan": false.
         self.wake_on_lan = cfg.get("wake_on_lan", True) is not False
+        self.phone_keyboard = cfg.get("phone_keyboard", True) is not False  # false: TV keeps its own on-screen keyboard
         # Per-TV state the server keeps (what is playing, sleep timer, picture mode, ...).
         self.state = {"playing": {"item": None}, "media_now": {}, "seen_playing": {},
                       "sleep": {"ends": None, "handle": None}, "waking": {"on": False},
@@ -136,18 +191,39 @@ class TV:
         self._dev = None
         self._signer = None
         self._task = None
+        self._adb_lost_at = None   # monotonic time of the last failed adb connect, None after a good one
+        self._adb_retry = None     # the one background reconnect started by retry_adb_soon
 
     # ---------- state ----------
+    # How long a failed adb connect counts as "adb is down" (the bridge retries every few seconds
+    # while it is down, so a real outage keeps this fresh; an old failure is tried again).
+    ADB_LOST_FOR = 60.0
+
+    @property
+    def adb_known_down(self):
+        """True when the last adb connect failed recently and none has worked since (a Google TV
+        closes port 5555 after a restart or deep sleep). Never probes the network. Not for adb_only
+        TVs, where adb is the only link and the run loop reconnects."""
+        if self.adb_only or self.adb_ok or self._adb_lost_at is None:
+            return False
+        return (time.monotonic() - self._adb_lost_at) < self.ADB_LOST_FOR
+
     @property
     def is_on(self):
+        if self.adb_only:
+            return self._adb_on if self.connected else None
         return self.remote.is_on if (self.remote and self.connected) else None
 
     @property
     def current_package(self):
+        if self.adb_only:
+            return self._adb_front if self.connected else None
         return self.remote.current_app if (self.remote and self.connected) else None
 
     @property
     def volume(self):
+        if self.adb_only:  # ADB gives no volume level; the keys still work
+            return {"level": None, "max": None, "muted": None, "known": False}
         v = (self.remote.volume_info if (self.remote and self.connected) else None) or {}
         mx = v.get("max") or 0
         return {"level": v.get("level") if mx else None, "max": mx or None,
@@ -181,8 +257,56 @@ class TV:
         if not self.paired:
             self.log.info("not paired yet, not connecting (run pair_tv.py %s)", self.id)
             return
+        if self.adb_only:
+            self._task = asyncio.create_task(self._run_adb_only())
+            return
         self._task = asyncio.create_task(self._run())
         self._watch = asyncio.create_task(self._watch_ip())
+
+    # ---------- adb_only (Fire TV on Fire OS) ----------
+    async def _run_adb_only(self):
+        """The ADB link is the connection: reconnect when it drops, and every few seconds read
+        what the remote protocol would have pushed (awake or not, the app on screen)."""
+        delay = 3
+        while True:
+            try:
+                if not (self.adb_ok and self._dev and self._dev.available):
+                    await self._resolve()
+                    ok = await self.adb_connect()
+                    if ok != self.connected:
+                        self.connected = ok
+                        self._changed()
+                    if not ok:
+                        if delay == 3:
+                            self.log.warning("TV not reachable over ADB (port %s), watching for it", self.adb_port)
+                        await asyncio.sleep(delay)
+                        delay = min(delay * 2, 30)
+                        continue
+                    self.log.info("adb connected to %s:%s (adb_only)", self.ip, self.adb_port)
+                    delay = 3
+                await self._adb_poll_state()
+            except Exception as e:
+                self.log.info("adb_only: %s %s", type(e).__name__, e)
+                if self.connected and not self.adb_ok:
+                    self.connected = False
+                    self._changed()
+            await asyncio.sleep(4)
+
+    async def _adb_poll_state(self):
+        """Awake or asleep (dumpsys power) and the package in front (dumpsys activity)."""
+        out = await self.adb("shell", "dumpsys power | grep -m1 -E 'Wakefulness'", timeout=8)
+        m = re.search(r"Wakefulness(?:Locked\(\))?=(\w+)", out)
+        on = (m.group(1) == "Awake") if m else None
+        out = await self.adb("shell", "dumpsys activity activities | grep -m1 -E 'topResumedActivity|mResumedActivity|mFocusedActivity'", timeout=8)
+        m = re.search(r"u0 ([A-Za-z0-9_.]+)/", out)
+        front = m.group(1) if m else None
+        if (on, front) != (self._adb_on, self._adb_front):
+            self._adb_on, self._adb_front = on, front
+            self._changed()
+
+    async def _adb_only_ready(self):
+        if not await self.adb_ready():
+            raise TVUnavailable("TV not connected", key="err_tv_not_connected")
 
     async def _watch_ip(self):
         """While the TV is unreachable: every 3 s, see if its remote port answers and reconnect
@@ -208,7 +332,7 @@ class TV:
 
     async def _connect_once(self, ip, timeout=10):
         """One connect attempt to a known address. Raises on failure."""
-        remote = AndroidTVRemote(CLIENT_NAME, CERT, KEY, ip)
+        remote = AndroidTVRemote(CLIENT_NAME, CERT, KEY, ip, enable_ime=self.phone_keyboard)
         remote.add_is_on_updated_callback(self._changed)
         remote.add_is_on_updated_callback(lambda on: self.log.info("TV reports %s", "on" if on else "standby"))
         remote.add_current_app_updated_callback(self._changed)
@@ -261,16 +385,30 @@ class TV:
 
     def require(self):
         if not self.paired:
-            raise TVUnavailable(f"the {self.name.lower()} TV is not paired yet")
+            raise TVUnavailable(
+                f"the {self.name.lower()} TV is not paired yet",
+                key="err_tv_not_paired",
+                vars={"tv": self.name.lower()},
+            )
+        if self.adb_only:
+            if not self.adb_ok:
+                raise TVUnavailable("TV not connected", key="err_tv_not_connected")
+            return
         if not (self.remote and self.connected):
-            raise TVUnavailable("TV not connected")
+            raise TVUnavailable("TV not connected", key="err_tv_not_connected")
 
     # ---------- remote protocol ----------
     async def key(self, name, hold=False):
-        self.require()
         code = resolve_key(name)
         if not code:
-            raise ValueError(f"unknown key: {name}")
+            raise messages.with_key(ValueError(f"unknown key: {name}"), "err_unknown_key", key=name)
+        if self.adb_only:
+            # resolve_key only returns names from the allow list ([A-Z0-9_]+), safe for the shell.
+            await self._adb_only_ready()
+            args = ["shell", "input", "keyevent"] + (["--longpress"] if hold else []) + [f"KEYCODE_{code}"]
+            await self.adb(*args, timeout=8)
+            return code
+        self.require()
         if hold:
             self.remote.send_key_command(code, "START_LONG")
             await asyncio.sleep(0.8)
@@ -280,11 +418,24 @@ class TV:
         return code
 
     async def text(self, text):
+        if self.adb_only:
+            await self._adb_only_ready()
+            safe = adb_text(text)
+            if safe:
+                await self.adb("shell", "input", "text", safe, timeout=10)
+            return
         self.require()
         self.remote.send_text(text)
 
     async def open_link(self, link):
-        """Open an https or app-scheme link through the remote protocol."""
+        """Open an https or app-scheme link through the remote protocol (adb_only: `am start`)."""
+        if self.adb_only:
+            await self._adb_only_ready()
+            uri = str(link or "").replace("'", "")
+            out = await self.adb("shell", "am", "start", "-W", "-a", "android.intent.action.VIEW", "-d", f"'{uri}'", timeout=25)
+            if "Error" in out:
+                raise RuntimeError(out.strip().splitlines()[-1][:160])
+            return
         self.require()
         self.remote.send_launch_app_command(link)
 
@@ -325,7 +476,7 @@ class TV:
         """Mirror of the adb CLI forms we use ("shell ...", "exec-out ...", "get-state"), sent
         over the bridge's own ADB connection."""
         if not self.paired:
-            raise TVUnavailable("TV is not paired yet")
+            raise TVUnavailable("TV is not paired yet", key="err_not_paired_yet")
         if args and args[0] == "get-state":
             return "device" if (self._dev and self._dev.available) else "offline"
         if not (self._dev and self._dev.available):
@@ -379,15 +530,39 @@ class TV:
                 self._signer = PythonRSASigner(pub, priv)
             await self._adb_close()
             dev = AdbDeviceTcpAsync(self.ip, self.adb_port, default_transport_timeout_s=9)
-            ok = await asyncio.wait_for(dev.connect(rsa_keys=[self._signer], auth_timeout_s=10), 25)
+            # Held on self._dev from the start, so a failed connect is closed below and its socket
+            # does not stay open on the TV (left open, they piled up and kept the TV's "Allow" from going through).
+            self._dev = dev
+            # 60 s for the person to press Allow on the TV: if the link closes first, the TV drops the
+            # answer ("Always allow" is not saved) and asks again on the next try.
+            ok = await asyncio.wait_for(dev.connect(rsa_keys=[self._signer], auth_timeout_s=60), 75)
+            if not ok:
+                await self._adb_close()
             self._dev = dev if ok else None
             self.adb_ok = bool(ok)
+            self._adb_lost_at = None if ok else time.monotonic()
         except Exception as e:
             self.log.info("adb not available: %s %s", type(e).__name__, e)
             await self._adb_close()
             self.adb_ok = False
+            self._adb_lost_at = time.monotonic()
         self._changed()
         return self.adb_ok
+
+    def retry_adb_soon(self):
+        """Start one adb reconnect in the background, never waited on (a request that found adb down
+        answers at once; after someone switches Network debugging off and on, the next one uses adb
+        again). One at a time: while one runs, this does nothing."""
+        if self.adb_only or (self._adb_retry and not self._adb_retry.done()):
+            return self._adb_retry
+        task = asyncio.ensure_future(self.adb_connect())
+
+        def done(t):
+            if not t.cancelled() and t.exception():
+                self.log.info("adb reconnect: %s %s", type(t.exception()).__name__, t.exception())
+        task.add_done_callback(done)
+        self._adb_retry = task   # kept, so it is not garbage collected while it runs
+        return task
 
     async def adb_ready(self):
         if self.adb_ok:
@@ -396,10 +571,13 @@ class TV:
 
     async def launch_package(self, package):
         """Open an app by package. ADB first (always works), then the remote protocol."""
+        check_package(package)
         if await self.adb_ready():
             await self.adb("shell", "monkey", "-p", package, "-c",
                            "android.intent.category.LEANBACK_LAUNCHER", "1")
             return "adb"
+        if self.adb_only:
+            raise TVUnavailable("TV not connected", key="err_tv_not_connected")
         self.require()
         self.remote.send_launch_app_command(package)  # market://launch?id=... (unreliable on this TV)
         return "remote"
@@ -407,6 +585,8 @@ class TV:
     async def start_intent(self, uri, package=None, cold=False):
         """Open a JustWatch intent:// link exactly (with ADB), else its plain-link form.
         cold=True restarts the app first (some apps ignore links when already open)."""
+        if package:
+            check_package(package)
         uri = uri.replace("'", "")
         # JustWatch sometimes names an inner screen that newer app versions no longer have
         # (SBS); naming just the app lets Android pick the screen that takes the link.
@@ -427,9 +607,11 @@ class TV:
         await self.open_link(intent_to_link(uri))
         return "remote"
 
-    async def port_open(self, port=6466, timeout=1.0):
+    async def port_open(self, port=None, timeout=1.0):
         if not self.paired:
             return False
+        if port is None:
+            port = self.adb_port if self.adb_only else 6466
         try:
             _, w = await asyncio.wait_for(asyncio.open_connection(self.ip or self.fallback_ip, port), timeout)
             w.close()
@@ -443,6 +625,12 @@ class TV:
         just came back. Returns True when connected."""
         if not self.paired:
             return False
+        if self.adb_only:
+            ok = await self.adb_connect()
+            if ok != self.connected:
+                self.connected = ok
+                self._changed()
+            return ok
         if self._task and not self._task.done():
             self._task.cancel()
         try:
@@ -480,12 +668,15 @@ class TV:
 
     async def screenshot(self):
         if not await self.adb_ready():
-            raise TVUnavailable("ADB is not on")
+            raise TVUnavailable("ADB is not on", key="err_adb_not_on")
         raw = await self.adb("exec-out", "screencap", "-p", binary=True, timeout=20)
         # This TV's screencap prints a debug line ("Init wrapper sys mutex...") before the PNG.
         start = raw.find(b"\x89PNG")
         if start < 0:
-            raise TVUnavailable("no screenshot (some apps, like Netflix, block them)")
+            raise TVUnavailable(
+                "no screenshot (some apps, like Netflix, block them)",
+                key="err_no_screenshot",
+            )
         return raw[start:]
 
     async def installed_packages(self):
@@ -494,6 +685,35 @@ class TV:
         out = await self.adb("shell", "pm", "list", "packages")
         return {line.split(":", 1)[1].strip() for line in out.splitlines() if ":" in line}
 
+    async def open_bluetooth_settings(self):
+        """Open Android's own Bluetooth settings screen over ADB with a fixed command."""
+        if not await self.adb_ready():
+            raise TVUnavailable("ADB is not on", key="err_adb_not_on")
+        out = await self.adb("shell", "am", "start", "-a", "android.settings.BLUETOOTH_SETTINGS", timeout=5)
+        if "Error" in out or "unable to resolve" in out.lower() or "not found" in out.lower():
+            # Fallback for Fire OS or devices without standard Bluetooth settings action
+            await self.adb("shell", "am", "start", "-n",
+                           "com.amazon.tv.settings.v2/.tv.controllers_bluetooth_devices.ControllersAndBluetoothActivity",
+                           timeout=5)
+
+    async def open_settings_screen(self, which):
+        """Open the TV's Bluetooth or network settings screen."""
+        if which == "bluetooth":
+            await self.open_bluetooth_settings()
+        elif which == "network":
+            if not await self.adb_ready():
+                raise TVUnavailable("ADB is not on", key="err_adb_not_on")
+            await self.adb("shell", "am", "start", "-a", "android.settings.WIFI_SETTINGS", timeout=5)
+        else:
+            raise messages.with_key(
+                ValueError(f"unknown settings screen: {which}"),
+                "err_unknown_settings_screen",
+                screen=which,
+            )
+
 
 class TVUnavailable(Exception):
-    pass
+    def __init__(self, message, key=None, vars=None):
+        super().__init__(message)
+        self.key = key
+        self.vars = vars

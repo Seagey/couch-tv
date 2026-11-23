@@ -2,7 +2,8 @@
   "bridge": {
     "host": "your-computer.local",
     "port": 5400,
-    "fallback_hosts": []
+    "fallback_hosts": [],
+    "pairing_key": ""
   },
   "default_tv": "living-room",
   "tvs": [
@@ -29,6 +30,7 @@
     "scenes": ["night", "golden", "water", "fog", "dawn"],
     "scene_seconds": 20,
     "dock_size": 10,
+    "sun_sync": false,
     "hide_packages": []
   },
   "phone_remote": true,
@@ -41,6 +43,11 @@
   },
   "country": "AU",
   "screens": [],
+  "plex": {
+    "enabled": false,
+    "url": "http://your-computer.local:32400",
+    "who": "person1"
+  },
   "home_assistant": {
     "enabled": false,
     "url": "http://homeassistant.local:8123",

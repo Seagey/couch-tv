@@ -1,0 +1,9 @@
+// Couch TV build settings shared by everyone. Your own signing settings go in Signing.mine.xcconfig
+// (copy Signing.example.xcconfig; git ignores the copy). Never put a team id here.
+PRODUCT_BUNDLE_IDENTIFIER = dev.couchtv.appletv
+DEVELOPMENT_TEAM =
+CODE_SIGN_STYLE = Automatic
+MARKETING_VERSION = 0.1
+CURRENT_PROJECT_VERSION = 1
+
+#include? "Signing.mine.xcconfig"

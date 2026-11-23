@@ -1,4 +1,4 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="watch_desc">Brings the Couch TV home screen back when the Home button opens Amazon\'s home. Reads nothing else.</string>
+    <string name="watch_desc">Brings the Couch TV home screen back when the Home button opens the TV\'s own home. Only sees which screen came forward; reads nothing else. On Xiaomi TVs, if you choose it on the setup page, it also catches the PatchWall button and passes every other key on.</string>
 </resources>

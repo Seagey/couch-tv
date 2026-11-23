@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <uses-feature android:name="android.software.leanback" android:required="false" />
+    <uses-feature android:name="android.hardware.touchscreen" android:required="false" />
+    <uses-permission android:name="android.permission.INTERNET" />
+    <application android:label="couch-tv sync" android:allowBackup="false">
+        <!-- Holding this service as an enabled notification listener is what lets the helper
+             see other apps' media sessions. Grant over ADB:
+             cmd notification allow_listener dev.couchtv.sync/dev.couchtv.sync.Listener -->
+        <service android:name=".Listener" android:exported="true"
+            android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE">
+            <intent-filter>
+                <action android:name="android.service.notification.NotificationListenerService" />
+            </intent-filter>
+        </service>
+        <!-- Commands arrive by `am broadcast`. The DUMP permission is held by the ADB shell and
+             not by ordinary apps, so only ADB (and the system) can send these. -->
+        <receiver android:name=".CmdReceiver" android:exported="true"
+            android:permission="android.permission.DUMP">
+            <intent-filter>
+                <action android:name="dev.couchtv.sync.CMD" />
+            </intent-filter>
+        </receiver>
+    </application>
+</manifest>

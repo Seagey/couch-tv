@@ -21,7 +21,23 @@ Everything else waits for the yes, including `check-tv.py --adb` (it makes the T
 debugging?" and saves a key in `~/.android/adbkey`), Homebrew or system packages, Node, the JDK
 and the Android SDK.
 
-The README's steps are numbered 1 to 6. Option A uses steps 1, 2 and 6. Option B uses steps 1 to
+**No computer or a failed home step (issue #98).** If couch-tv installed as an app but is not the
+home (the person came without a computer, or `apply.sh` could not run), on a plain Android TV 10 or
+newer the app asks Android itself: it offers "Make couch-tv your home screen?" the first time it
+opens, and Home settings, About repeats it. The on-TV app does the same from its first setup step, **Make Couch
+TV your home** (the Make it my home button), except on a TV with Google's Android TV Home
+(`com.google.android.tvlauncher`) where Couch TV cannot yet press keys: there, switching the home on put Google's
+home in front and the setup screen could not come back (a TCL on Android TV 11, 23 Nov 2026), and Home kept
+opening Google's home by name anyway, so step 1 says so in one line, with More help behind it: let Couch TV press
+keys (Settings, Phone remote, Set it up), then press **Make Home open Couch TV** (on-tv/README.md). A TV that had no
+question to show, or sent the person to its own home once, gets the same kind of note instead of a second try.
+On Google TV that does not hold the Home key: run `apply.sh` from a computer for the Home button
+watch, or, with the on-TV app (0.13.9 or newer) once its own link to the TV is connected, press **Make Home
+open Couch TV** (step 1 when the link is there, or the end of Settings, Phone remote, Set it up; on-tv/README.md,
+"Use it as the home screen"): it puts the watch version
+on and switches the watch on by itself, with the TCL steps below. Never switch off or uninstall the TV's own home to make this work.
+
+The steps in docs/SETUP.md are numbered 1 to 6. Option A uses steps 1, 2 and 6. Option B uses steps 1 to
 6. Option C follows [on-tv/README.md](on-tv/README.md) (the app `dev.couchtv.ontv`).
 
 ## 0. Before you start (quietly)
@@ -33,13 +49,14 @@ The README's steps are numbered 1 to 6. Option A uses steps 1, 2 and 6. Option B
    `python3-venv` or use `uv venv --seed .venv` instead. On a Mac the first `python3` or `git` may pop up "install the command line
    developer tools": tell them to press Install and wait a few minutes. That is normal.
 2. **Get the TV apps from the Releases page first.** Download `couch-tv-home.apk` (options A
-   and B) and `couch-tv-ontv.apk` (option C) from
+   and B) and `couch-tv-ontv.apk` (option C; on a Fire TV or for the Xiaomi PatchWall switch, `couch-tv-ontv-watch.apk`, which adds the home watch) from
    [the GitHub Releases page](https://github.com/Seagey/couch-tv/releases) into `dist/` (git
    ignores it), for example `curl -fL -o dist/couch-tv-home.apk
    https://github.com/Seagey/couch-tv/releases/latest/download/couch-tv-home.apk`. Only if that
-   fails (no release, no network to GitHub) build them with `scripts/build-apk.sh` (README,
-   "Building the app").
-3. Note what else the computer has: macOS or Linux, and Node 20+ (option B, and a build of the
+   fails (no release, no network to GitHub) build them with `scripts/build-apk.sh` (docs/SETUP.md,
+   "Building the app"). Android 6 TVs work from the 0.13 apps; 0.12 and older need
+   Android 7.1.
+3. Note what else the computer has: macOS or Linux, and Node 20.19+ or 22.12+ (option B, and a build of the
    option C app). A build also needs JDK 21 and the Android SDK (platform 34), installed only
    after the yes (step 3). If a JDK is needed, do **not** use `brew install --cask temurin@21` or `sudo`: they ask for a password the agent
    cannot type. Download the Temurin 21 `.tar.gz` from Adoptium
@@ -90,6 +107,19 @@ If nothing Android is found, or they are not sure what they have:
     Information), the IP address.
   - **LG:** Settings, Network (or All Settings, General, Network), Wi-Fi Connection, the connected
     network, Advanced Wi-Fi Settings, the IP address.
+  - **Roku:** Settings, Network, About (the IP address). `find-tvs.py` does not list a Roku, but
+    `check-tv.py <address>` recognises one by its port 8060.
+  - **Hisense VIDAA:** the IP address in the TV's network settings. `find-tvs.py` does not list one,
+    but `check-tv.py <address>` recognises it by its port 36669 (36668 on older builds).
+  - **Philips on Titan OS:** Settings, Network (or Wireless and networks), Network status. `find-tvs.py`
+    lists one it hears announcing its network remote (as "Philips TV"; seen on one real TV), and `check-tv.py <address>` recognises it by its port 1926 when it is not Android.
+  - **Older Philips with Saphi:** Settings, Wireless and networks (or Network), View network settings.
+    `check-tv.py <address>` recognises it by plain port 1925 alone, and says whether it lists a browser.
+  - **VIZIO:** Menu (or Settings), Network, Network information, the IP address. `find-tvs.py` may list
+    it only as a Cast device, but `check-tv.py <address>` recognises it by its SmartCast answer on port
+    7345 (9000 on older firmware).
+  - **Panasonic Viera (My Home Screen or older):** Menu, Network, Network Status (the IP address).
+    `find-tvs.py` does not list one, but `check-tv.py <address>` recognises it by its port 55000.
   - **Google TV or Android TV:** Settings, Network and Internet, the Wi-Fi network.
 - Ask them to open **Settings, Device Preferences, About** (older Android TV) or **Settings,
   System, About** (Google TV) and read you the model and the "Android TV OS" line. Until you know
@@ -107,7 +137,15 @@ Check the answer against [docs/TV-COMPATIBILITY.md](docs/TV-COMPATIBILITY.md):
   home still flashes up before couch-tv's comes back, and the on-TV app needs three one-off ADB grants
   (on-tv/README.md, "Fire TV (Fire OS)"). On current Fire OS (6.7.1.1, 7.6.6.9, 8.1.0.3 and newer), option C's
   phone remote cannot press keys or type, because Fire OS blocks an app from using the TV's own
-  ADB; option B can, so if they want the full phone remote on a Fire TV, recommend B.
+  ADB; option B can, so if they want the full phone remote on a Fire TV, recommend B. **Option B on a
+  Fire TV needs `"adb_only": true` on that TV in `config.json`** (docs/CONFIG.md, The TVs): Fire OS has
+  no Android TV Remote protocol, so `pair_tv.py`'s code pairing cannot work there; with the flag the
+  bridge drives the TV over ADB alone and `pair_tv.py <tv id>` only does the ADB check (the TV's "Allow
+  USB debugging?" is the pairing). Skip docs/SETUP.md step 3's code pairing for such a TV.
+  After `apply.sh` on a Fire TV, check `settings get secure enabled_accessibility_services` still lists
+  `app.couchtv.launcher/.FireWatch` and `accessibility_enabled` is 1: on a Cube (Fire OS 7.7) both were
+  cleared a few seconds after the run, twice; `apply.sh` now re-checks, and writing them again holds
+  (docs/TROUBLESHOOTING.md, "Fire TV: Home still opens Amazon's home right after apply.sh").
 - **Samsung (Tizen):** do not say no. Offer the Samsung path in
   [docs/SAMSUNG.md](docs/SAMSUNG.md), with its honest limits, in plain words: "couch-tv goes on
   your Samsung as an app, and a computer at home that stays on opens it every time the TV is
@@ -122,8 +160,8 @@ Check the answer against [docs/TV-COMPATIBILITY.md](docs/TV-COMPATIBILITY.md):
   questions in step 2 still apply; skip picture mode, apply.sh and ADB).
 - **LG (webOS):** do not say no. Offer the LG path in [docs/LG.md](docs/LG.md) the way you offer
   the Samsung one, and say first, plainly, how little it has been tried: "There is an LG version
-  of couch-tv. It was built from LG's own documentation and has run on two real LGs so far (a
-  2020/2021 model on webOS 5.6.2 and a 2021 OLED on webOS 6.5.3), so on other LG models some of it may still need fixing. Like the Samsung one, it goes on your LG as an app, and a computer at home that
+  of couch-tv. It was built from LG's own documentation and has run on thirteen real LGs so far (from
+  a 2018/2019 model on webOS 4.10 to a 2025 OLED on webOS 11.2), so on other LG models some of it may still need fixing. Like the Samsung one, it goes on your LG as an app, and a computer at home that
   stays on opens it every time the TV is switched on. It is not a true home screen: the remote's
   Home button still opens LG's menu. It needs LG's Developer Mode, which means a free LG developer
   account and LG's tools on this computer, and Developer Mode has to stay on, so the computer
@@ -135,10 +173,126 @@ Check the answer against [docs/TV-COMPATIBILITY.md](docs/TV-COMPATIBILITY.md):
   4 (most questions in step 2 still apply; skip picture mode, apply.sh and ADB). Afterwards ask
   them to open an issue on GitHub saying how it went, and write down for them what worked and what
   did not.
-- **Roku, Apple TV, Hisense VIDAA, Fire TV on Vega OS:** not supported. Say so kindly,
-  explain what the README's "Will it work on my TV?" table says for their TV, and offer the way
-  round it: a Google TV box (for example the Google TV Streamer) plugged into the TV's HDMI gets
-  them everything. If they do not want a box, stop. Do not suggest rooting the TV.
+- **Roku (TV or box):** do not say no. Offer the Roku path in [docs/ROKU.md](docs/ROKU.md) the way you offer
+  the LG one, and say first, and plainly, how little it has been tried: "There is a Roku version of
+  couch-tv. It was built from Roku's own documentation and tested against a pretend Roku on a computer and
+  a BrightScript simulator, and it has **not been run on a real Roku yet**, so you may be the first and
+  something may need fixing. Roku channels are not web pages, so the home is drawn again as a channel: the
+  scenes with the clock in them, the date and weather, your people, Keep watching and your apps. Like the
+  Samsung and LG ones it goes on as an app, and a computer at home that stays on opens it every time the TV
+  is switched on. It is not a true home screen: the remote's Home button still opens Roku's home. It needs
+  Roku's Developer Mode (a password you make up on the Roku, no account), and newer Roku OS also limits
+  remote control until Settings, System, Advanced system settings, Control by mobile apps, Network
+  access is set to Permissive or Enabled. The phone remote works. Netflix opens the show and YouTube the
+  video (the deep links are untested); other apps open on their own page, and you press Play. There is no
+  'what is playing' title and no screenshots. A Roku holds one sideloaded channel, so installing another
+  replaces couch-tv." Without a computer that stays on, only the channel itself is possible: it shows the
+  clock, the date and the Roku's own apps. Also offer the Google TV box as the way to get everything. If
+  they choose Roku, follow docs/ROKU.md for steps 2 to 4 (most questions in step 2 still apply; skip
+  picture mode, apply.sh, ADB and the quick buttons). The ids and deep links in its table are unverified:
+  if one does not open, find the Roku's real id with `query/apps` and say what you found. Afterwards ask
+  them to open an issue on GitHub saying how it went, and write down for them what worked and what did not.
+- **Computer at home paths: Hisense VIDAA, Philips (Titan OS and Saphi), Fire TV on Vega OS, VIZIO, Panasonic.** Each
+  is a supported path. Do not say no. What they share, and what you say plainly every time:
+  they need **a computer at home that stays on** (without one, nothing on these paths works), and **the
+  maker's own Home button still opens the maker's own home**; couch-tv opens itself on top, it does not
+  replace that home. None of them has run on a real TV yet, so ask them to open an issue on GitHub
+  afterwards with what the read only check printed, and write down for them what worked and what did not.
+  Also offer the Google TV box as the way to get everything. The checks below only read, but they still
+  wait for the yes in step 3, and anything that shows a PIN or opens a page on the TV waits for it too.
+- **Hisense VIDAA:** offer the VIDAA path in [docs/VIDAA.md](docs/VIDAA.md): "There is a VIDAA version of
+  couch-tv. There is nothing to install on the TV: a computer at home that stays on opens
+  couch-tv's home in the TV's own browser every time the TV is switched on (on older firmware it may also
+  go on the app row as a tile). It is not a true home screen: the remote's Home button still opens VIDAA's
+  home, and that cannot change without rooting the TV, which couch-tv never does. The phone remote works:
+  keys, volume up and down, Home, opening apps. Apps open on their own page and you pick the show. There is
+  no 'what is playing', no volume level, no typing from the phone and no screenshots. You type a PIN the TV
+  shows once. Newer TVs (2024 on, most Australian Hisense TVs bought in 2025 or 2026) also need a
+  certificate you take from your own copy of Hisense's VIDAA phone app; couch-tv does not include it.
+  Hisense documents none of this, so on your TV something may need fixing." If they have **no computer that
+  stays on**, VIDAA is the exception to "nothing works": offer the standalone home (docs/VIDAA.md, "No
+  computer: a standalone home"): the home as a website the Couch TV tile opens, with the clock, scenes or
+  photos, weather and Home settings, and on Vercel a Spotify Now playing card with Play on TV. Say plainly
+  what it lacks: the dock can't open apps (VIDAA lets no page do that), couch-tv doesn't open at power on
+  and Home doesn't bring it back (the remote's ♡+ key can be set to open it), and there is no phone remote.
+  A computer is still needed once, to point the tile at the site. Run
+  `scripts/vidaa-check.py <tv address>` first, and never suggest or walk them through rooting the TV.
+- **Philips on Titan OS** (no Google button, a home of "Lifestyle" rows; mostly Europe): offer the remote now
+  and do not promise the home yet. "There is a Philips Titan OS version of couch-tv. The **phone
+  remote works now**: power, keys, volume, inputs, opening the TV's apps, and the assistant on top of those.
+  couch-tv's own home **needs a Titan app** to open on the TV: a couch-tv app in Titan's store, or Titan's
+  DevView developer app with a developer account. Neither is there yet, so for now the home stays Philips's.
+  You type a PIN the TV shows once, and pairing needs a key from Philips's own TV Remote app that you save
+  on this computer yourself; couch-tv does not include it." Follow
+  [docs/PHILIPS-TITAN.md](docs/PHILIPS-TITAN.md): run `scripts/philips-check.py <tv address>` first
+  (pairing with `--pair` shows a PIN on the TV). Never fetch, paste or suggest a source for Philips's
+  pairing key: they save their own with `scripts/philips-secret.py`. Never use the TV's developer debug
+  port. Testing guide: [docs/PHILIPS-TITAN-TESTING.md](docs/PHILIPS-TITAN-TESTING.md).
+- **Older Philips with Saphi** (not Android, not Titan OS; roughly 2015 to 2019): offer the Saphi path and do
+  not promise a home screen. "There is a Saphi version of couch-tv. With a computer at home that
+  stays on, you get the phone remote, and if your TV offers a browser to its network remote, couch-tv's
+  page opens in that browser every time the TV is switched on. It is not a real home screen: the browser's
+  bar can show and the remote's Home button still opens Philips's menu. Many of these TVs need no pairing;
+  some want a PIN, and some have no network remote at all, so it depends on the model." Run
+  `scripts/check-tv.py <tv address>` and `scripts/philips-check.py <tv address>` first. If it wants a
+  login, pairing is the Titan OS path above. If they choose it, follow
+  [docs/PHILIPS-SAPHI.md](docs/PHILIPS-SAPHI.md). Never send `activities/browser` before the yes: it opens
+  a page on the TV. Testing guide: [docs/PHILIPS-SAPHI-TESTING.md](docs/PHILIPS-SAPHI-TESTING.md).
+- **Fire TV on Vega OS:** offer the path in [docs/FIRE-VEGA.md](docs/FIRE-VEGA.md), and say plainly that it
+  needs a computer at home that stays on, that it needs a free Amazon Developer account, Amazon's Vega tools on a Mac or Linux computer, a
+  USB cable once and a computer at home that stays on, that Amazon's Home button still opens Amazon's
+  home, that the phone remote only works while couch-tv is in front (no volume, no power off), and that only
+  Netflix and YouTube open from the phone. Follow docs/FIRE-VEGA-TESTING.md, and run `scripts/check-vega.py`
+  first. Never root anything.
+- **VIZIO (SmartCast or VIZIO OS):** offer the remote and do not promise the home. "There is a VIZIO version
+  of couch-tv, and it is the **phone remote only**: power, keys, volume, switching inputs, opening
+  apps such as Netflix and YouTube, and the assistant on top of those, with a computer at home that stays
+  on. couch-tv's own home page **does not open on a VIZIO by itself**: VIZIO OS has no browser, takes no
+  outside apps, and its app programme is closed. The remote's Home button opens VIZIO's home. Apps open on their own page
+  and you pick the show; there is no 'what is playing' title, no typing from the phone and no screenshots.
+  You type a PIN the TV shows once." If they choose the remote, follow [docs/VIZIO.md](docs/VIZIO.md): run
+  `scripts/vizio-check.py <tv address>` first (`--pair` shows a PIN on the TV). **Only if they ask
+  for the home:** `scripts/vizio-web.py` loads couch-tv's home in the TV's own webview (docs/VIZIO.md, "The
+  home"). It has been tried on one set (a V4K65X-0810), it waits for the yes in step 3 like everything that
+  changes the TV, and it is run by hand: the bridge never opens it by itself. Use only the script, which
+  sends name space 4 with an allow listed id (3001 or 17). Never send a URL to `APP_ID` 1 by any route: it
+  persists to the TV's NVRAM and can leave the TV's menus dead until a factory reset. Never open a router
+  port. Testing guide: [docs/VIZIO-TESTING.md](docs/VIZIO-TESTING.md).
+- **Panasonic Viera (My Home Screen, or older Vieras with network control):** offer the Panasonic path in
+  [docs/PANASONIC.md](docs/PANASONIC.md): "There is a Panasonic version of couch-tv. There is
+  nothing to install on the TV: a computer at home that stays on opens couch-tv's home in the TV's web
+  browser a few seconds after the TV is switched on. It is not a true home screen: the browser's own bar
+  stays visible, and the remote's Home button still opens Panasonic's home. The phone remote works: keys,
+  the volume slider, Home, opening apps. Apps open on their own page and you pick the show. There is no
+  'what is playing', no typing from the phone and no screenshots. Newer sets (2018 on) show a PIN once to
+  pair." A Panasonic Google TV model is a normal couch-tv TV, not this path. Run
+  `scripts/panasonic-check.py <tv address>` first (it presses no key); pairing with `--pair` makes the TV
+  show a PIN.
+- **Apple TV:** do not say no. Offer the path in [docs/APPLE-TV.md](docs/APPLE-TV.md), and say first,
+  plainly: "With a computer at home that stays on, the phone remote works on an Apple TV: arrows, OK, Back,
+  Play, sleep and wake, and opening any app. You type a PIN the Apple TV shows once. couch-tv's home also
+  comes as an Apple TV app, Couch TV, with the same scenes, clock, Keep watching and apps, and the computer
+  opens it whenever the Apple TV wakes. Apple's own Home button still opens Apple's home: Apple lets no app
+  replace it. Couch TV goes on the Apple TV free, from a Mac with Xcode and your own Apple ID, but Apple
+  makes that run out after 7 days, so the Mac at home has to stay on and reinstall it each week (a script
+  does it, twice a week to be safe), or you pay Apple US$99 a year for a one time install. Typing from the
+  phone, what is playing and a volume level are not available." Neither part has run on a real Apple TV
+  yet, so ask them to open an issue afterwards with what `scripts/appletv-check.py` printed and how Couch
+  TV went. Run `scripts/appletv-check.py` (read only) before the yes, pair only after it. Couch TV needs a
+  Mac: without one, offer the remote only. Signing in to Xcode is theirs to do (never ask for the Apple ID
+  password), and their team id goes only in `tvos/Config/Signing.mine.xcconfig`, which git ignores.
+- **TiVo OS on a TV built by Vestel (JVC, Telefunken and others):** do not say no. Offer the path in
+  [docs/TIVO.md](docs/TIVO.md), and say first, plainly: "There is a TiVo OS version of couch-tv,
+  worked out on one real JVC. There is nothing to install on the TV. With a computer at home that stays on,
+  the phone remote works, and couch-tv opens itself in the TV's own browser a little while after the TV is
+  switched on. You add couch-tv once as the first Speed Dial tile in that browser, typing its address with
+  the TV remote, which is slow. It is not a true home screen: TiVo's Home button still opens TiVo's home.
+  The TV gives no volume level, only Netflix and Prime Video open from the phone, and there is no 'what is
+  playing' and no screenshots." Run `scripts/tivo-check.py` first (it only reads, and finds the TV by
+  itself). `--key volume_up` presses one key and waits for the yes like everything else that changes the
+  TV. The computer needs a fixed address, because the tile holds it. Afterwards ask them to open an issue
+  with what the check printed and how it went. A TiVo OS TV that does not answer Smart Center: say so
+  kindly and offer the Google TV box. Do not suggest rooting the TV.
 
 ## 2. The questions
 
@@ -162,8 +316,9 @@ the right answer. Explain it like this, then ask which they want:
 > The computer (a Mac, a Linux box or a Raspberry Pi) has to stay on and awake. A laptop that
 > sleeps or leaves the house does not count.
 > **C. Home screen and phone remote, living on the TV.** No computer to keep on. The phone talks
-> straight to the TV. You lose turning the TV on from the phone, and the Claude assistant only
-> works if you add your own Anthropic API key, which costs a little per question. On newer Google
+> straight to the TV. You lose turning the TV on from the phone, and the AI assistant only
+> works if you add your own API key (Claude, OpenAI or another AI service, or a model on a
+> computer at home), which costs a little per question. On newer Google
 > TVs you may have to type a pairing code from the TV's settings again after the TV restarts."
 
 Then: "Do you have a computer that is always on at home?" If yes, B is the best tested. If no,
@@ -183,6 +338,17 @@ recommend C (A if they only want the home screen). Write the choice down; the re
   Option B: they are left out of the household's taste, so the shared picks are not full of
   cartoons or a visitor's shows. They still have their own row. Imported Netflix Kids profiles are
   left out the same way.
+- Optional, ask once, right after the people: "Any young kids who should only see shows you've
+  picked? I can set up a kids mode with a PIN." Kids mode is off unless they say yes: with a no (or no
+  answer) add nothing, no `kids_mode` and no PIN. If yes: whose home it is, which shows (and on which
+  app, if it matters), which apps beside them (up to six, or none), and a PIN of 4 to 8 digits they
+  choose. It goes in `kids_mode` on that person ([docs/CONFIG.md](docs/CONFIG.md), Kids mode). Say the
+  limits plainly: inside Netflix or another app the child can browse that app, so set up the app's own
+  kids profile too; and the PIN keeps a child out, it is not a password. Option A: `apply.sh` looks
+  the shows up while it installs, so run it again after changing them. Option C: there is no
+  `config.json`, so they turn it on later from the phone (TV, Kids mode) or the TV's setup page. Apple TV: it works
+  in Couch TV with the bridge; say that the Apple TV's own TV button still opens Apple's home, and walk them through
+  Apple's Restrictions and each app's kids profile ([docs/APPLE-TV.md](docs/APPLE-TV.md#kids-mode)). Roku: not yet.
 - Option B, optional: "Do you want to bring in your past Netflix or YouTube history so 'keep
   watching' and suggestions start smart?" If yes, walk them through
   [bridge/IMPORT.md](bridge/IMPORT.md) later. They download their own files. You never sign in to
@@ -194,9 +360,9 @@ recommend C (A if they only want the home screen). Write the choice down; the re
   some of them, your own photos, or the Classic look?" Own photos: 1920x1080 JPEGs into
   `tv-home/web/backgrounds/`.
 - "How long should each scene stay?" (20 seconds is the default.)
-- "Which language for the home: English, Spanish, Mexican Spanish, Italian, German or Turkish?" Leave
+- "Which language for the home: English, Spanish, Mexican Spanish, Italian, German, Turkish, French, Serbian (Latin), Polish, Dutch, Hebrew, Czech, Brazilian Portuguese or Arabic?" Leave
   `home.language` out to follow the TV's own language.
-- "12 hour or 24 hour clock?" (Left out: 24 hour in Italian, German and Turkish, 12 hour otherwise.)
+- "12 hour or 24 hour clock?" (Left out: 24 hour in Italian, German, Turkish, French, Serbian, Polish, Dutch, Hebrew, Czech and Brazilian Portuguese, 12 hour otherwise.)
 - Options A and B: "Do you want the TV to tell you when a new couch-tv version is out? It looks
   once a week and only shows a small dot. Or would you rather check yourself, in Home settings?"
   `home.updates`: `notify` or `manual`. Left out, the TV asks once the first time the home opens.
@@ -221,7 +387,7 @@ recommend C (A if they only want the home screen). Write the choice down; the re
   Settings and More apps. Everything else sits behind More apps.
 - "Any apps you never use that I should tuck away behind More apps?" A maker's own clutter (help
   apps, file browsers) can be hidden completely with `home.hide_packages`.
-- Tell them: new apps come from the **App Store** tile (top of More apps) and turn up on the home by
+- Tell them: new apps come from the **App Store** tile (in More apps, and it can be moved onto the home) and turn up on the home by
   themselves. They can rearrange later from the phone, or with the TV remote (hold OK on an app).
 
 ### 2.5 Quick settings
@@ -239,11 +405,15 @@ have an input screen. Leave the rest off.
 
 - "Who will use the phone remote, and are they on iPhone or Android?" It is a web page added to the
   home screen, no app store. Show each person how to add it.
+- On an Android 17 phone, Chrome may show `ERR_TOO_MANY_RETRIES` for the bridge's address until it has
+  Settings, Apps, Chrome, Permissions, Nearby devices, Allow. Tell them before they hit it, and if they
+  report that error, that is the fix.
 - Tell them: it works on the home Wi-Fi only. Option B, optional: a private network (VPN) app
   they run themselves can make it work away from home. Never open a router port for it.
-- Tell them plainly: **with option B there is no password, so anyone on the Wi-Fi can use the
-  remote and the assistant, kids and visitors included.** Suggest a guest Wi-Fi network for
-  visitors (most routers have one) so they cannot reach it. Option C asks for a PIN shown on the TV
+- Tell them plainly: **by default with option B there is no password, so anyone on the Wi-Fi can use the
+  remote and the assistant, kids and visitors included.** To require a password, set `bridge.pairing_key` in
+  `config.json` (12 to 128 letters, digits, `-` or `_`; the bridge refuses a shorter one at start, so pick a long enough one first time): the phone remote pairs once by typing it (or opening a `?pair=<key>` link). Suggest a guest
+  Wi-Fi network for visitors (most routers have one) so they cannot reach it. Option C asks for a PIN shown on the TV
   the first time.
 
 ### 2.7 Extras (option B)
@@ -290,15 +460,34 @@ If they say yes to the air conditioning or the doorbell card:
    sound.
 4. **Then always ask: "Are there any other smart home devices you want on the TV?"** Map what they
    say to what couch-tv can do, and say plainly what it cannot:
-   - Lights, blinds, fans, a "movie night" mood, a "good night" routine: a **scene or script
-     tile**. If they have no scene for it yet, they make one in Home Assistant (Settings,
-     Automations and scenes) and give you its `scene.*` or `script.*` name. Up to 10 tiles.
+   - A "movie night" mood, a "good night" routine: a **scene or script tile**. If they have no
+     scene for it yet, they make one in Home Assistant (Settings, Automations and scenes) and give
+     you its `scene.*` or `script.*` name. Up to 10 tiles.
+   - Single lights, switches, fans and blinds: `controls` (up to 16 `light.*`, `switch.*`, `fan.*`,
+     `cover.*`), for a couch-tv Studio design's Control Centre widget. Never a garage door or gate.
    - More air conditioners or heaters: more `climate` rooms.
-   - Other cameras: only the doorbell's camera, and only as stills. Say so.
+   - Other cameras: `cameras` (up to 4 `camera.*`), for a design's Camera widget, stills only (a new
+     one every 2 seconds, never video). Say so.
+   - The pool, a rain gauge, humidity: `sensors` (up to 8 `sensor.*`). Solar or the power meter:
+     `energy` (one `sensor.*` for today's kWh or the power in W, and a battery if they have one).
+     Speakers: `speakers` (up to 6 `media_player.*`). Each is for a design's widget of that name.
    - Locks, alarms, garage doors: **not supported, on purpose** (nothing that opens the house from
      a TV remote). Say so.
-   - Anything that is not in Home Assistant (a separate app, a hub Home Assistant does not know):
-     not supported yet. Say so; it may work if they add it to Home Assistant first.
+   - Anything that is not in Home Assistant yet (Tuya or Smart Life, Google Nest, Alexa devices, a
+     brand's own app): it shows once it is added to Home Assistant. The phone page from the TV's Smart
+     home QR code walks them through it (A device we don't list).
+   - **Matter devices need no Home Assistant.** A light, plug, fan, blind, air conditioner or sensor
+     they already have in Google Home, Apple Home, SmartThings or Alexa can be shared to couch-tv by
+     Matter: the other app gives an 11 digit code, they type it on the phone page. On option C the TV
+     itself joins the device; on option B the home computer does, after `scripts/matter-setup.sh`
+     (Node.js 22.13 or newer; [docs/MATTER.md](docs/MATTER.md)). Locks, alarms and garage doors are
+     refused, the same rule. A Thread device also needs a Thread hub at home (a Nest hub, an Apple TV
+     or HomePod, a SmartThings hub). Say plainly that sharing from the real Google Home and Apple Home
+     apps has not been tried yet: it was tested with virtual devices shared the same way.
+   - They can also do all of this with no computer, no `config.json` and no token: Home settings,
+     Designs, Smart home shows a QR code; their phone signs in on Home Assistant's own page and ticks
+     what shows. On Samsung, LG and the other web TVs the bridge serves the same phone page. Tell them
+     both ways exist.
 5. Write it down for the plan. In step 3, read it back as one line ("Smart home: the living room
    and bedroom air conditioning, the Movie night and Good night tiles, and the front door doorbell
    card, which needs 'display over other apps' switched on"), along with everything else, and
@@ -319,21 +508,48 @@ Before you touch the TV, say back, in one short list: the TV, the option, the pe
 the apps first in line, the quick settings, and what will be switched off on the TV. Then explain
 exactly what changes:
 
-- Developer options and USB debugging go on (README step 1), plus Network debugging if the TV
+- Developer options and USB debugging go on (docs/SETUP.md step 1), plus Network debugging if the TV
   has that switch (many do not: on some, USB debugging alone opens the network port). The TV asks
   "Allow USB debugging?" once per computer. They tick Always allow.
 - If `check-tv.py` said the TV only has Wireless debugging: you will pair once with Google's
-  platform-tools and run `adb tcpip 5555` (README step 1, "Only Wireless debugging?"). On some TVs
+  platform-tools and run `adb tcpip 5555` (docs/SETUP.md step 1, "Only Wireless debugging?"). On some TVs
   that port closes after a restart and has to be opened again the same way.
 - Options A and B (`apply.sh`) make couch-tv the home and switch off ambient mode (the idle
   adverts) and any ad tracker you agree to. The TV's own home screen and setup app stay on, so the
-  TV always has them when it starts; a small Home button watch (an accessibility service that only sees which
-  window came forward) puts couch-tv on top when the TV opens its own home, which may flash up for
+  TV always has them when it starts; a small Home button watch (an accessibility service that only looks at which
+  window came forward; it declares the screen reading capability only because some TVs send events to nothing else, and never reads the screen) puts couch-tv on top when the TV opens its own home, which may flash up for
   a moment. Nothing is deleted.
+  - **Privacy clean (opt in):** only if they ask, `PRIVACY=1` adds the apps in
+    `tv-home/tools/privacy-list.txt` that the TV has (ACR, ad and telemetry apps) to the switch off
+    set, through the same safety check. Run it with `DRY_RUN=1` first and show them the list. Never
+    tell them it removes all tracking; point them to docs/PRIVACY.md for the menu switches. Never add
+    a launcher, setup, remote, voice, Bluetooth, CEC, keyboard or TV provider package to that list.
   - **Never switch off the Google TV home (`launcherx`, `tvlauncher`) or the setup app
     (`setupwraith`), by hand or through `EXTRA_OFF`.** couch-tv 0.10 and older did, and a Sony
-    Bravia Google TV then looped at every restart (README, "If your TV loops after a restart").
+    Bravia Google TV then looped at every restart (docs/TROUBLESHOOTING.md, "If your TV loops after a restart").
     `apply.sh` refuses them and anything else the TV may need to start.
+  - **TCL: Home goes back to Google TV after every restart (#94, TCL Smart TV Pro, Android 14).**
+    TCL's boot manager `TclAppBoot` blocks binding `FireWatch` and `KeyWatch` and the
+    BOOT_COMPLETED to `FireWatch$Restore`, because the app lacks TCL's AUTO_START app-op, which TCL
+    resets to ignore on every boot. The app now declares an empty placeholder TV input
+    (`TclPlaceholderInput.kt`, manifest `android:enabled="false"`) that `App.onCreate` switches on
+    only when `Build.MANUFACTURER` or `Build.BRAND` is TCL, so no other TV lists a new input. TCL is
+    reported to let any app that provides a TV input start at boot (the Haven launcher's trick; its
+    source was not found, so this was written from the Android docs, nothing copied). **Unconfirmed
+    on a real TCL until the reporter tests it.** The app must be opened once after installing so the
+    switch is made (Android keeps it across reboots). Not changed: FireWatch and KeyWatch are not
+    marked `directBootAware`, because FireWatch reads CrashGuard's SharedPreferences (credential
+    encrypted storage) on every window event, which is not available before unlock. **Confirmed on
+    the reporter's real TCL (0.12, before the TV input):** `appops set app.couchtv.launcher AUTO_START
+    allow` once, then switching both services on from the TV's own Settings, Accessibility with the
+    remote (not by writing the setting over ADB) survived a real power cut, and TCL kept AUTO_START
+    allowed. Which step matters is unknown, so on a TCL do both after `apply.sh`, and walk them
+    through the Accessibility switches on the TV. If the services are missing from that menu, launch the app once, then set the app op and write the settings over ADB: on that TCL they only appeared in the menu once bound. Also seen there: installing or removing any app made Android drop couch-tv as the preferred home (role holder unchanged); `cmd package set-home-activity` again fixed it, so re-assert it after installing anything. **Second TCL (G08 AU02, Android 14, 0.12) did not hold across a real power cut:** the same steps survived a menu restart, but TCL reset AUTO_START to `ignore` about 20 s after boot (`Reject` while cached) and only KeyWatch bound, not FireWatch (not crashed, just unbound). `com.tcl.guard` has no AUTO_START switch. To rebind FireWatch there, write `enabled_accessibility_services` as KeyWatch alone, then KeyWatch:FireWatch; writing both at once did not rebind it. Fallback from a
+    computer after each reboot, if that fails: `cmd package set-home-activity
+    app.couchtv.launcher/.MainActivity`, start the app, `appops set app.couchtv.launcher AUTO_START
+    allow`, then rewrite `enabled_accessibility_services` and `accessibility_enabled 1`. Separate and
+    not fixed: a real double press of Home on that TCL remote stays on Google TV (injected keys do
+    not reproduce it); Back twice escapes.
   - If the TV was set up with couch-tv 0.10 or older, `apply.sh` switches those two back on: tell
     them that is the fix, not a fault.
   - Option A: after a Google TV update switches ambient mode back on, `apply.sh` can run again.
@@ -351,7 +567,7 @@ Ask: "Ready for me to set it up? You can undo all of it." Wait for a clear yes.
 1. Install what was missing in step 0 (say what you are installing). Use the release APKs you
    downloaded into `dist/` in step 0; build only if that download failed.
 2. Write `config.json` from their answers. Never commit it.
-3. Developer options on (README step 1). Tell them: switch on **USB debugging**; if there is
+3. Developer options on (docs/SETUP.md step 1). Tell them: switch on **USB debugging**; if there is
    also a **Network debugging** (or Wireless debugging) switch, switch that on too. Do not insist
    on Network debugging: some TVs have no such switch and USB debugging alone opens port 5555 (a
    TCL with Android TV 11 did). Then check with `.venv/bin/python scripts/check-tv.py <tv address>`
@@ -370,19 +586,19 @@ Ask: "Ready for me to set it up? You can undo all of it." Wait for a clear yes.
    by an older couch-tv: with the Google TV home and the setup app switched off, the TV stopped
    showing "Allow USB debugging?" for any new key. The current `apply.sh` leaves both on, but make
    sure each computer that will talk to the TV has been allowed first anyway, and for option C that
-   the on-TV app's **Connect ADB** has been allowed.
-5. Follow the README for their option (A: steps 1, 2 and 6; B: steps 1 to 6;
+   the on-TV app's key link (Settings, Phone remote, Set it up, then **Connect**) has been allowed.
+5. Follow docs/SETUP.md for their option (A: steps 1, 2 and 6; B: steps 1 to 6;
    C: [on-tv/README.md](on-tv/README.md)). Run `tv-home/tools/survey-tv.py` before `apply.sh`.
    Option A: run `apply.sh` with no `BRIDGE_URL`. Option B: with `BRIDGE_URL`. It copies the app
    with `tvadb.py`, which falls back to a slower copy by itself if the TV stalls; let it finish.
    If it ends with "this computer can no longer reach it", ask them to check the TV is on and on
    the Wi-Fi, then run the same `apply.sh` command again.
-   - **Pairing (option B, README step 3):** you cannot type into `pair_tv.py`. Run
+   - **Pairing (option B, docs/SETUP.md step 3):** you cannot type into `pair_tv.py`. Run
      `.venv/bin/python bridge/pair_tv.py <tv id>` in the background, ask them to read you the code
      on the TV, then run `.venv/bin/python bridge/pair_tv.py <tv id> --code <code>`. It prints
      `ok: ... is paired` and exits 0, or says the TV refused the code (then start again: each
      pairing shows a fresh code).
-   - **Keeping the bridge running (option B, README step 5):** if you started the bridge by hand to
+   - **Keeping the bridge running (option B, docs/SETUP.md step 5):** if you started the bridge by hand to
      test it, stop it before installing the service (it holds the port), and never point your
      hand-started copy's output at the service's log file. After `launchctl bootstrap`, check
      `launchctl print gui/$(id -u)/app.couchtv.bridge` says `state = running`. Exit code 78
@@ -397,6 +613,15 @@ Ask: "Ready for me to set it up? You can undo all of it." Wait for a clear yes.
    couch-tv release shows up as a dot on the gear tile within a week. Either way, Home settings,
    Updates checks for one and installs it (Android asks first, and once asks to let Home install
    apps), and the weekly look can be switched on or off there.
+
+## Two TVs in sync (only if they ask)
+
+If someone asks for two TVs to play the same show together, read [docs/SYNC.md](docs/SYNC.md) and
+follow it, including its section for you. Say how little it has been
+tried, and say that Samsung, LG, VIDAA, VIZIO, Panasonic and Roku cannot do it (a Google TV box or Fire TV stick
+plugged in fixes that). It needs the same read back and the same clear yes as everything else
+before it touches a TV: `sync/install.sh` changes each TV, and `calibrate` and `play` make both TVs
+pause, jump and play. `sync.py dry` only reads and is fine before the yes.
 
 ## Rules while you work
 

@@ -29,7 +29,7 @@ try:
 except Exception as e:
     sys.exit(f"Cannot reach the TV at {ip}:{port} over ADB ({type(e).__name__}). Is USB debugging on (and "
              "Network debugging, if the TV has that switch), and was 'Allow USB debugging?' accepted on the "
-             "TV? Check with scripts/check-tv.py <tv address>. See README step 1.")
+             "TV? Check with scripts/check-tv.py <tv address>. See docs/SETUP.md step 1.")
 sh = lambda c: dev.shell(c, timeout_s=60, read_timeout_s=30).strip()
 
 print("TV", ip)
@@ -60,7 +60,7 @@ for p, what in KEEP_ON.items():
     print(f"  {p:45} {state:15} {what}")
 if old_off:
     print("  Switched off, probably by couch-tv 0.10 or older. Some Google TVs loop at every restart")
-    print("  like this: run apply.sh or undo.sh before the TV next restarts (README, 'If your TV loops")
+    print("  like this: run apply.sh or undo.sh before the TV next restarts (docs/TROUBLESHOOTING.md, 'If your TV loops")
     print("  after a restart').")
 print("\npackages apply.sh switches off:")
 for p, what in {"com.google.android.apps.tv.dreamx": "ambient mode (promos when idle)"}.items():

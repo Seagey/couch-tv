@@ -47,6 +47,23 @@ You can still open the `.local` name in the browser: the remote moves itself to 
 straight away, so the icon you add from there gets the address. An icon added before that change
 keeps the `.local` name. If it ever opens a blank page, remove it and add it again from the browser.
 
+## The controls
+
+The Remote tab's bottom row is Back, Home, Play or Pause, an amber **keyboard** button, and volume.
+The keyboard opens **Type on the TV**: the same field that also lives in the TV menu (pull down from
+the top), and it sends through the same `POST /api/text` path on the bridge.
+
+Open a search box on the TV first, then type on the phone. Typing uses Android's `input text`, which
+is ASCII-only (letters, digits and plain punctuation). Thai, Chinese, Korean and other non-Latin
+text has to be typed with the TV's own on-screen keyboard; sending it from the phone comes back as
+`BufferOverflowException`.
+
+## More than one TV
+
+With two or more TVs the **TV** menu (pull down from the top) has **Which TV**. While something is playing
+on the TV you picked, **Move to <the other TV>** sits under the names: it pauses the show here and starts
+it there, as the same person. Android and Google TV only; the limits are in [MOVE.md](MOVE.md).
+
 ## iPhone (Safari)
 
 1. On the phone, open Safari and go to `http://<computer address>:5400`.
@@ -62,6 +79,12 @@ Use Safari for this step. Other iPhone browsers cannot add a Home Screen icon th
 3. Confirm. The icon appears on your Home screen and opens the remote full screen.
 
 Over plain `http`, Chrome may offer a shortcut rather than a full install. Either works for daily use.
+
+**Android 17: if Chrome says "This site can't be reached" with `ERR_TOO_MANY_RETRIES`.** Android 17 asks
+an app for permission before it may reach devices on your home network, and Chrome has not been given it.
+Open Settings, Apps, Chrome, Permissions, Nearby devices, and choose Allow. The remote opens straight
+away after that. It is not the address, the bridge or Chrome's "Always use secure connections" setting
+(reported on a Galaxy S25 Ultra, issue #69).
 
 ## Optional: a private network, for a real installed app, an offline copy and the mic
 

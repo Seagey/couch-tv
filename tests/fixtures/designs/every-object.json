@@ -1,0 +1,462 @@
+{
+ "v": 1,
+ "home": {
+  "clock": "24h",
+  "keep_watching": true,
+  "scene_seconds": 2,
+  "video_url": "https://example.com/v.mp4"
+ },
+ "elements": {
+  "clock": {
+   "x": 40,
+   "y": -20,
+   "scale": 0.6,
+   "colour": "#FFEEDD",
+   "format": "12h",
+   "font": "antonio"
+  },
+  "date": {
+   "x": 0,
+   "y": 30,
+   "format": "full",
+   "colour": "#abc"
+  },
+  "weather": {
+   "place": true,
+   "words": false
+  },
+  "people": {
+   "hidden": true
+  },
+  "keep_watching": {
+   "y": -40,
+   "opacity": 0.8
+  },
+  "dock": {
+   "scale": 0.2,
+   "opacity": 0.1,
+   "hidden": true,
+   "y": 20
+  },
+  "spaceship": {
+   "x": 1
+  }
+ },
+ "background": {
+  "image": "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAA0JCgsKCA0LCgsODg0PEyAVExISEyccHhcgLikxMC4pLSwzOko+MzZGNywtQFdBRkxOUlNSMj5aYVpQYEpRUk//2wBDAQ4ODhMREyYVFSZPNS01T09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT0//wAARCAAJABADASIAAhEBAxEB/8QAFgABAQEAAAAAAAAAAAAAAAAAAAUG/8QAFhABAQEAAAAAAAAAAAAAAAAAABVi/8QAFQEBAQAAAAAAAAAAAAAAAAAABAX/xAAXEQADAQAAAAAAAAAAAAAAAAAAAhQD/9oADAMBAAIRAxEAPwCPJySctEAV6FGVD//Z",
+  "darken": 5,
+  "zoom": 1.2,
+  "x": 30,
+  "y": 70,
+  "scrim": "bottom",
+  "blur": 4
+ },
+ "apps": {
+  "order": [
+   "com.netflix.ninja",
+   "roku.837",
+   "__proto__"
+  ],
+  "hidden": [
+   "roku.13",
+   "gear"
+  ]
+ },
+ "texts": [
+  {
+   "text": "Good evening",
+   "x": 120,
+   "y": 200,
+   "size": 64,
+   "colour": "#ffffff",
+   "shadow": "strong"
+  },
+  {
+   "text": "Call 1300 123 456",
+   "x": 120,
+   "y": 300
+  },
+  {
+   "text": "visit evil.example now",
+   "x": 120,
+   "y": 400
+  }
+ ],
+ "objects": [
+  {
+   "id": "t1",
+   "type": "text",
+   "text": "Welcome home\nRelax",
+   "x": 100,
+   "y": 100,
+   "size": 48,
+   "align": "center",
+   "font": "inter",
+   "weight": 300,
+   "rotate": 10
+  },
+  {
+   "id": "t2",
+   "type": "text",
+   "text": "12345",
+   "x": 0,
+   "y": 0
+  },
+  {
+   "id": "s-glass",
+   "type": "shape",
+   "variant": "glass",
+   "x": 80,
+   "y": 600,
+   "w": 500,
+   "h": 300,
+   "radius": 40
+  },
+  {
+   "id": "s-solid",
+   "type": "shape",
+   "variant": "solid",
+   "x": 600,
+   "y": 600,
+   "w": 200,
+   "h": 100,
+   "radius": 0,
+   "colour": "#11223344",
+   "layer": "back"
+  },
+  {
+   "id": "s-outline",
+   "type": "shape",
+   "variant": "outline",
+   "x": 820,
+   "y": 600,
+   "w": 200,
+   "h": 100,
+   "radius": 30,
+   "colour": "red"
+  },
+  {
+   "id": "s-line",
+   "type": "shape",
+   "variant": "line",
+   "x": 80,
+   "y": 950,
+   "w": 1700,
+   "h": 999
+  },
+  {
+   "id": "c1",
+   "type": "clock",
+   "x": 1500,
+   "y": 60,
+   "size": 140,
+   "format": "24h",
+   "date": true,
+   "date_format": "short"
+  },
+  {
+   "id": "wx-line",
+   "type": "weather",
+   "style": "line",
+   "x": 1400,
+   "y": 300,
+   "place": true
+  },
+  {
+   "id": "wx-card",
+   "type": "weather",
+   "style": "card",
+   "x": 1400,
+   "y": 360
+  },
+  {
+   "id": "wx-big",
+   "type": "weather",
+   "style": "big",
+   "x": 1400,
+   "y": 560,
+   "panel": "solid"
+  },
+  {
+   "id": "sm1",
+   "type": "smart",
+   "kind": "aircon",
+   "style": "card",
+   "x": 40,
+   "y": 40,
+   "name": "Bedroom"
+  },
+  {
+   "id": "g1",
+   "type": "group",
+   "cols": 3,
+   "rows": 2,
+   "x": 40,
+   "y": 200
+  },
+  {
+   "id": "w-clock-0",
+   "type": "widget",
+   "kind": "clock",
+   "x": 0,
+   "y": 0,
+   "w": 480,
+   "h": 240,
+   "opts": {
+    "format": "12h",
+    "ampm": true,
+    "date": true
+   }
+  },
+  {
+   "id": "w-analog-500",
+   "type": "widget",
+   "kind": "analog",
+   "x": 500,
+   "y": 0,
+   "w": 300,
+   "h": 300
+  },
+  {
+   "id": "w-date-820",
+   "type": "widget",
+   "kind": "date",
+   "x": 820,
+   "y": 0,
+   "w": 480,
+   "h": 120,
+   "opts": {
+    "show": "both",
+    "dfmt": "day_month",
+    "place": true
+   }
+  },
+  {
+   "id": "w-weather-0",
+   "type": "widget",
+   "kind": "weather",
+   "x": 0,
+   "y": 300,
+   "w": 360,
+   "h": 360,
+   "opts": {
+    "place": true,
+    "hilo": true
+   },
+   "style": {
+    "panel": "colour",
+    "colour": "#2244AA"
+   }
+  },
+  {
+   "id": "w-countdown-380",
+   "type": "widget",
+   "kind": "countdown",
+   "x": 380,
+   "y": 300,
+   "w": 360,
+   "h": 240,
+   "opts": {
+    "label": "Christmas",
+    "month": 12,
+    "day": 25,
+    "unit": "sleeps"
+   }
+  },
+  {
+   "id": "w-photo-760",
+   "type": "widget",
+   "kind": "photo",
+   "x": 760,
+   "y": 300,
+   "w": 480,
+   "h": 270,
+   "opts": {
+    "image": "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAA0JCgsKCA0LCgsODg0PEyAVExISEyccHhcgLikxMC4pLSwzOko+MzZGNywtQFdBRkxOUlNSMj5aYVpQYEpRUk//2wBDAQ4ODhMREyYVFSZPNS01T09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT0//wAARCAAJABADASIAAhEBAxEB/8QAFgABAQEAAAAAAAAAAAAAAAAAAAUG/8QAFhABAQEAAAAAAAAAAAAAAAAAABVi/8QAFQEBAQAAAAAAAAAAAAAAAAAABAX/xAAXEQADAQAAAAAAAAAAAAAAAAAAAhQD/9oADAMBAAIRAxEAPwCPJySctEAV6FGVD//Z",
+    "caption": "The beach",
+    "fit": "cover"
+   }
+  },
+  {
+   "id": "w-photo-760",
+   "type": "widget",
+   "kind": "photo",
+   "x": 760,
+   "y": 600,
+   "w": 480,
+   "h": 270,
+   "opts": {
+    "image": "https://evil.example/x.jpg"
+   }
+  },
+  {
+   "id": "w-card-0",
+   "type": "widget",
+   "kind": "card",
+   "x": 0,
+   "y": 700,
+   "w": 400,
+   "h": 200,
+   "opts": {
+    "label": "Today",
+    "text": "Bins out tonight"
+   }
+  },
+  {
+   "id": "w-quote-420",
+   "type": "widget",
+   "kind": "quote",
+   "x": 420,
+   "y": 700,
+   "w": 400,
+   "h": 200,
+   "opts": {
+    "text": "Be kind",
+    "sub": "Mum"
+   }
+  },
+  {
+   "id": "w-welcome-840",
+   "type": "widget",
+   "kind": "welcome",
+   "x": 840,
+   "y": 700,
+   "w": 400,
+   "h": 200,
+   "opts": {
+    "kicker": "Hello",
+    "text": "Welcome, guests",
+    "sub": "Make yourselves at home"
+   }
+  },
+  {
+   "id": "w-appgrid-1260",
+   "type": "widget",
+   "kind": "appgrid",
+   "x": 1260,
+   "y": 300,
+   "w": 600,
+   "h": 400,
+   "opts": {
+    "apps": [
+     "netflix",
+     "youtube",
+     "com.amazon.amazonvideo.livingroom"
+    ],
+    "cols": 3,
+    "names": true
+   }
+  },
+  {
+   "id": "w-dock-1260",
+   "type": "widget",
+   "kind": "dock",
+   "x": 1260,
+   "y": 720,
+   "w": 600,
+   "h": 140
+  },
+  {
+   "id": "w-app-1260",
+   "type": "widget",
+   "kind": "app",
+   "x": 1260,
+   "y": 880,
+   "w": 160,
+   "h": 160,
+   "opts": {
+    "apps": [
+     "youtube"
+    ]
+   }
+  },
+  {
+   "id": "w-aircon-1440",
+   "type": "widget",
+   "kind": "aircon",
+   "x": 1440,
+   "y": 880,
+   "w": 240,
+   "h": 160,
+   "opts": {
+    "label": "Lounge"
+   }
+  },
+  {
+   "id": "w-news-1700",
+   "type": "widget",
+   "kind": "news",
+   "x": 1700,
+   "y": 880,
+   "w": 200,
+   "h": 160
+  },
+  {
+   "id": "w-hologram-0",
+   "type": "widget",
+   "kind": "hologram",
+   "x": 0,
+   "y": 0,
+   "w": 200,
+   "h": 200
+  },
+  {
+   "id": "w-stack-0",
+   "type": "widget",
+   "kind": "stack",
+   "x": 0,
+   "y": 920,
+   "w": 200,
+   "h": 140,
+   "items": [
+    {
+     "kind": "moon"
+    },
+    {
+     "kind": "stack"
+    },
+    {
+     "kind": "weather"
+    }
+   ]
+  },
+  {
+   "id": "bad id with spaces",
+   "type": "text",
+   "text": "Never"
+  },
+  {
+   "id": "x1",
+   "type": "laser"
+  },
+  "not an object",
+  {
+   "id": "w-month",
+   "type": "widget",
+   "kind": "month",
+   "x": 0,
+   "y": 0,
+   "w": 420,
+   "h": 380,
+   "style": {
+    "panel": "paper"
+   }
+  },
+  {
+   "id": "w-word",
+   "type": "widget",
+   "kind": "wordclock",
+   "x": 0,
+   "y": 0,
+   "w": 420,
+   "h": 240
+  }
+ ],
+ "look": {
+  "accent": "#ff8800",
+  "ink": "rgba(1,2,3,0.5)"
+ },
+ "unknown_top_level": {
+  "anything": true
+ }
+}

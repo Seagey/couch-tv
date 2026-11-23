@@ -11,10 +11,10 @@ android {
     compileSdk = 34
     defaultConfig {
         applicationId = "app.couchtv.launcher"
-        minSdk = 25          // Android 7.1, so Fire OS 6 sticks (Fire TV Stick 4K, 1st gen) install it
+        minSdk = 23          // Android 6.0 (older Mi TVs); Fire OS 6 (7.1) sticks install it too
         targetSdk = 34
-        versionCode = 14
-        versionName = "0.12"
+        versionCode = 26
+        versionName = "0.13.10"
         // Where the bridge might be: ./gradlew assembleRelease -PbridgeUrls=http://my-computer.local:5400
         // (comma separated, more than one is fine). The last one that answered is remembered on the TV.
         // Without it, apply.sh tells the app the address when it installs (the "bridge" extra), and
@@ -25,6 +25,17 @@ android {
         // with releases of its own, -PupdateRepo= (empty) for none. Updater.kt checks the format.
         val updateRepo = (project.findProperty("updateRepo") as String? ?: "Seagey/couch-tv").trim()
         buildConfigField("String", "UPDATE_REPO", "\"" + updateRepo.filter { it.isLetterOrDigit() || it in "/._-" } + "\"")
+        // Which releases it takes (ReleaseChannel.kt): "stable" for every build people download (never
+        // a pre-release), "beta" only for a test build installed by hand: -PupdateChannel=beta.
+        val channel = if ((project.findProperty("updateChannel") as String? ?: "").trim() == "beta") "beta" else "stable"
+        buildConfigField("String", "UPDATE_CHANNEL", "\"" + channel + "\"")
+        // A beta build names its own version (-PbetaVersionCode=15 -PbetaVersionName=0.13-beta.1). Its
+        // versionCode sits between this release and the next one, so the next stable release must use
+        // a higher versionCode than any beta handed out (Android never steps a version down).
+        if (channel == "beta") {
+            (project.findProperty("betaVersionCode") as String?)?.toIntOrNull()?.let { versionCode = it }
+            (project.findProperty("betaVersionName") as String?)?.trim()?.takeIf { Regex("[0-9][0-9.]*-beta\\.[0-9]+").matches(it) }?.let { versionName = it }
+        }
     }
     buildFeatures { buildConfig = true }
     // Test builds: when COUCHTV_KEYSTORE names a keystore (a debug-style key, alias androiddebugkey,
@@ -50,6 +61,20 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
     kotlinOptions { jvmTarget = "17" }
+    // One APK for every TV (couch-tv-home.apk), native libraries compressed, the same as the on-TV app:
+    // nothing native here today, so this changes nothing until one comes (scripts/check-release-apks.py).
+    packaging { jniLibs { useLegacyPackaging = true } }
+    // Matter (MatterPage.kt): the on-TV app's controller code and library, shared, not copied
+    // (on-tv/android/matter/README.md)
+    sourceSets["main"].java.srcDir("../../../on-tv/android/app/src/main/java/dev/couchtv/ontv/matter")
+    sourceSets["main"].jniLibs.srcDir("../../../on-tv/android/matter/jni")
+    sourceSets["main"].assets.srcDir("../../../on-tv/android/matter/assets")
+    // Smart home (Home Assistant, signing in from a phone): shared with the on-TV app (on-tv/android)
+    sourceSets { getByName("main") { java.srcDir("../shared/java") }; getByName("test") { java.srcDir("../shared/test") } }
+    lint {
+        checkReleaseBuilds = false
+        abortOnError = false
+    }
 }
 
 /**
@@ -66,6 +91,10 @@ abstract class BundleTvWeb : DefaultTask() {
     @get:InputFile
     abstract val configJson: RegularFileProperty
 
+    /** on-tv/web: the phone's Home settings page (setup.html, shim.js), served by PhoneServer.kt with no computer. */
+    @get:InputDirectory
+    abstract val phonePage: DirectoryProperty
+
     @get:OutputDirectory
     abstract val outputDir: DirectoryProperty
 
@@ -79,8 +108,13 @@ abstract class BundleTvWeb : DefaultTask() {
             val rel = f.relativeTo(src).path
             // development only, or not part of the page
             if (rel == "mock.js" || rel.endsWith(".md") || f.name.startsWith(".")) return@forEach
+            // the Loop look's footage (loop/, up to 80 MB, made by scripts/make-loop.sh) is streamed from the
+            // bridge, never carried in the app: the same rule as the bridge's offline manifest, so the posters
+            // (loop/*.jpg) still ship and a Loop home with no bridge shows a still
+            if (rel.startsWith("loop/") && (!rel.endsWith(".jpg") || rel.contains("/."))) return@forEach   // and never a run's .staging-<pid>/
             f.copyTo(File(dest, rel), overwrite = true)
         }
+        for (n in listOf("setup.html", "shim.js")) File(phonePage.get().asFile, n).copyTo(File(out, "www/ontv/" + n), overwrite = true)
         File(dest, "config.js").writeText("window.COUCH_CONFIG = " + JsonOutput.toJson(publicConfig(configJson.get().asFile)) + ";\n")
     }
 
@@ -109,7 +143,9 @@ abstract class BundleTvWeb : DefaultTask() {
         }
         return mapOf(
             "people" to people,
-            "weather" to c["weather"],
+            // config.example.json's Sydney is only a sample: a build from it (the GitHub release) has no
+            // place, so the home asks for the town (Home settings, Location) instead of showing Sydney
+            "weather" to (if (file.name == "config.example.json") null else c["weather"]),
             "home" to (c["home"] ?: emptyMap<String, Any?>()),
             "tvs" to tvs,
             "default_tv" to (c["default_tv"] ?: tvs.firstOrNull()?.get("id")),
@@ -117,6 +153,19 @@ abstract class BundleTvWeb : DefaultTask() {
             "phone_remote" to false,
         )
     }
+}
+
+dependencies {
+    // Matter controller jars (Apache 2.0), the same build as the native library
+    implementation(fileTree(mapOf("dir" to "../../../on-tv/android/matter/libs", "include" to listOf("*.jar"))))
+    // The phone's Home settings page with no computer at home (PhoneServer.kt): the same small web server
+    // as the on-TV app (BSD 3-clause)
+    implementation("org.nanohttpd:nanohttpd:2.3.1")
+    // Unit tests for the plain Kotlin rules (FireWatchTest), run with testDebugUnitTest (EPL 1.0).
+    testImplementation("junit:junit:4.13.2")
+    // The real org.json for the smart home tests (HaReadingsTest, HomeAssistantTest): android.jar only
+    // has empty stand ins for it off a TV (public domain licence, test only, not in the app)
+    testImplementation("org.json:json:20240303")
 }
 
 val repoRoot = rootProject.projectDir.resolve("../..")
@@ -127,6 +176,7 @@ val configFile: File = (project.findProperty("configJson") as String?)?.let { fi
 val bundleTvWeb = tasks.register<BundleTvWeb>("bundleTvWeb") {
     web.set(rootProject.layout.projectDirectory.dir("../web"))
     configJson.set(configFile)
+    phonePage.set(rootProject.layout.projectDirectory.dir("../../on-tv/web"))
     outputDir.set(layout.buildDirectory.dir("generated/tvweb"))
 }
 

@@ -23,6 +23,8 @@ import android.widget.FrameLayout
 import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
+import app.couchtv.ha.DoorbellKept
+import app.couchtv.ha.HomeAssistant
 import org.json.JSONObject
 import java.util.concurrent.Executors
 
@@ -43,6 +45,7 @@ import java.util.concurrent.Executors
  * doorbell is set up (undo.sh takes it back). Without that grant there is no card, and nothing else
  * changes. Home Assistant not answering: no card, and it keeps quietly asking.
  */
+// DoorbellKept (the last ring, for the Doorbell widget) lives with HomeAssistant in app.couchtv.ha.
 object Doorbell {
     private const val CHECK_MS = 3_000L
     private const val PICTURE_MS = 2_000L
@@ -82,6 +85,7 @@ object Doorbell {
         looping = false
         if (watching) { try { c.unregisterReceiver(screen) } catch (e: Exception) {}; watching = false }
         wasOn = null; lastEvent = null
+        if (HomeAssistant.settings(c)?.doorbell == null) DoorbellKept.clear()   // the doorbell was taken out
         hide()
     }
 
@@ -137,6 +141,18 @@ object Doorbell {
     }
 
     private fun ring(c: Context, bell: HomeAssistant.Bell) {
+        val at = System.currentTimeMillis()
+        DoorbellKept.at = at
+        if (bell.camera != null) {
+            io.execute {
+                val s = HomeAssistant.settings(c) ?: return@execute
+                val bmp = HomeAssistant.snapshot(s, 640) ?: return@execute
+                val out = java.io.ByteArrayOutputStream()
+                val small = if (bmp.width > 640) android.graphics.Bitmap.createScaledBitmap(bmp, 640, Math.max(1, bmp.height * 640 / bmp.width), true) else bmp
+                small.compress(android.graphics.Bitmap.CompressFormat.JPEG, 72, out)
+                DoorbellKept.still = out.toByteArray(); DoorbellKept.stillAt = at
+            }
+        }
         main.removeCallbacks(timeUp)
         main.postDelayed(timeUp, RING_MS)
         if (card == null) show(c, bell)
@@ -205,8 +221,14 @@ object Doorbell {
             if (e.action == KeyEvent.ACTION_UP) hide()
             true
         }
+        @Suppress("DEPRECATION")
+        val overlayType = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
+        } else {
+            WindowManager.LayoutParams.TYPE_PHONE
+        }
         val lp = WindowManager.LayoutParams(w, WindowManager.LayoutParams.WRAP_CONTENT,
-            WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
+            overlayType,
             WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL or WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
             PixelFormat.TRANSLUCENT).apply {
             gravity = Gravity.TOP or Gravity.END
@@ -249,6 +271,7 @@ object Doorbell {
             lang.startsWith("es") -> "Timbre" to "Hay alguien en la puerta"
             lang.startsWith("it") -> "Campanello" to "C'è qualcuno alla porta"
             lang.startsWith("de") -> "Türklingel" to "Jemand ist an der Tür"
+            lang.startsWith("pl") -> "Dzwonek" to "Ktoś dzwoni do drzwi"
             else -> "Doorbell" to "Someone is at the door"
         }
     }

@@ -12,6 +12,12 @@ import time
 
 from test_deeplinks import call, front
 
+# These scripts drive a REAL TV through a running bridge (they play shows and write watch history).
+# They refuse to run unless asked on purpose, so an agent running "all the tests" never fires them.
+if os.environ.get("COUCHTV_REAL_TV") != "1":
+    sys.exit("This drives a real TV. Set COUCHTV_REAL_TV=1 to run it on purpose.")
+
+
 OUT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", "play-shots")
 
 CASES = {

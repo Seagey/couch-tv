@@ -13,10 +13,27 @@ changes, the change is written here first, with a dated note at the bottom.
 | TV home screen | `/tv/` serves `tv-home/web/` |
 | API | everything under `/api/` |
 
-- Plain HTTP on the home network. No password (home network only). Never put the bridge on the internet.
-- CORS is open (`Access-Control-Allow-Origin: *`), so you can develop against it from another port.
+- Plain HTTP on the home network. Never put the bridge on the internet or forward a router port to it.
+- Optional pairing key: set `"pairing_key"` under `"bridge"` in `config.json`. When enabled, protected endpoints require `Authorization: Bearer <key>`, `X-API-Key: <key>`, or `?token=<key>`. Wrong keys are limited on every endpoint, `/api/pair` included: after 5 different wrong keys from one address within 60 seconds, that address gets `429` for the rest of the minute. The same wrong key repeated counts once, and the bridge computer itself (loopback) is never limited. `X-Forwarded-For` is ignored.
+- DNS rebinding: a request whose `Host` is a name the bridge does not know gets `403`. Any IP address, any `.local` name, `localhost`, `bridge.host` and `bridge.fallback_hosts` are known; a request with no `Host` header (a script) passes.
+- CORS is restricted to the bridge's own origin, local dev origins (5173), and the TV homes' origins (`null`, `file://`, `home.tvos.invalid`). A page served by the bridge under the address the request went to counts as the bridge's own origin. Requests from any other origin get `403` and never reach a handler.
+- **Why "null" in the origin list matters:** TV apps (Android WebView, webOS, Tizen) load from local files and send `Origin: null`. Browsers also send `Origin: null` for requests from sandboxed `<iframe>` elements. Because of this browser behavior, an origin allowlist alone cannot block a malicious web page from sending `Origin: null` requests. The pairing key (`pairing_key`) is what truly protects the bridge from malicious cross-origin requests.
+- POST requests with a body must send `Content-Type: application/json` (otherwise rejected with `415`).
 - Use **relative URLs** (`/api/now`) in both front ends. Then they work from any device at home.
-- Static files are sent with `Cache-Control: no-cache`, so a rebuild shows on the next load.
+- Static files are sent with `Cache-Control: no-cache`, so a rebuild shows on the next load. Pictures,
+  fonts and video are `public, max-age=3600` and never compressed.
+- Byte ranges: every static file answers a `Range` request with one byte range (`bytes=0-999`,
+  `bytes=1000-`, `bytes=-500`): `206 Partial Content` with `Content-Range` and `Accept-Ranges: bytes`,
+  `416` with `Content-Range: bytes */<size>` for a range past the end, a malformed one or several at
+  once, and `HEAD` the same with no body. The Loop look's footage under `/tv/loop/` (docs/LOOP.md)
+  is played this way by the TV's media player. Not done, as aiohttp has it: `If-Range` counts only
+  in its date form (an entity tag in it is not compared, so a stale tag still gets `206`), and an
+  unknown range unit gets `416` rather than being ignored.
+- `GET /tv/manifest.json`, the launcher's offline copy, lists every file under `tv-home/web/` except
+  `mock*`, dotfiles and the video under `loop/` (`loop/*.mp4`): the Loop look's footage (up to 80 MB)
+  is streamed from the bridge, never saved on the TV. The rest of `loop/` is small and listed: the
+  posters (`loop/*.jpg`), so the offline home shows one, the cut-outs (`loop/*-fg.png`), so the clock
+  stays behind the peak there as the `config.js` snapshot's `home.loop.fg` says, and `loop.json`.
 - Unknown paths under `/` and `/tv/` fall back to that folder's `index.html` (single page apps work).
 
 ## Shape of every answer
@@ -29,6 +46,11 @@ Every response is JSON.
   - `404` not found (no show by that name, unknown screen id).
   - `503` the TV is not reachable right now (off at the wall, Wi-Fi). Show a gentle "TV not
     connected" state, the bridge keeps retrying on its own.
+- For translation, many answers also carry a message key beside the English text: `error_key` and
+  `error_vars` next to `error`, `note_key` and `note_vars` next to `note`, `reply_key` and
+  `reply_vars` next to an Ask `reply`, `reason_key` and `reason_vars` on a popular pick. The keys
+  are in `remote/src/i18n.js` and `tv-home/web/i18n.js`; a front end that has no translation for a
+  key shows the English text, which is always there and unchanged.
 
 ## Which TV (more than one TV)
 The bridge can run more than one TV. Every endpoint takes an optional TV id:
@@ -50,13 +72,27 @@ The bridge can run more than one TV. Every endpoint takes an optional TV id:
 ]}
 ```
 
+A Roku (`"kind": "roku"`) also has `ecp` and `hook`: `{"ecp": {"limited": false, "message": null}, "hook": ["13:02:11 TV came on, opened couch-tv"]}`.
+`ecp.limited` is `true` when the Roku answered a command with 403, which means its "Control by mobile apps"
+setting is limiting remote control; `message` then says where to change it (docs/ROKU.md).
+
 ## Endpoints
 
 ### `GET /api/health`
+Open without authentication. Reports bridge and TV connectivity, and whether the bridge requires a pairing key (`auth: "ok"` or `"required"`):
 ```json
-{"ok": true, "tv_connected": true, "adb": false, "version": "1"}
+{"ok": true, "tv_connected": true, "adb": false, "version": "1", "auth": "ok", "paired": true}
 ```
 `adb` tells you if the ADB features (screenshot, deep links that need it) are switched on.
+
+### `POST /api/pair`
+Pair a phone remote or client with the bridge when `pairing_key` is set in `config.json`.
+Open without authentication.
+Request: `{"key": "<pairing_key>"}`
+```json
+{"ok": true, "paired": true, "token": "<key>", "note": "paired"}
+```
+Wrong key gives HTTP 401: `{"ok": false, "error": "That pairing key is not right. Check config.json."}`.
 
 ### `GET /api/now`
 What is on the TV right now.
@@ -74,7 +110,8 @@ What is on the TV right now.
 - `power`: `"on"`, `"off"` or `"unknown"`.
 - `app`: `null` when not known. `id` is `null` for an app the bridge has no name for (the raw
   `package` is still given). `id` `"home"` means a home screen (ours, `app.couchtv.launcher`, or
-  Google's).
+  Google's). `package` is the package in front on this TV: on a Fire TV, Amazon's build of the app
+  (`com.amazon.firetv.youtube`), with the same `id` as the Google TV one.
 - `volume.known` is `false` when the TV does not report a level (this TV reports `max: 0` while
   sound goes out to an external speaker). Then hide the slider, keep the up and down buttons.
 - `playing`: what is on, `null` when nothing is known. Needs ADB. Fields:
@@ -127,6 +164,9 @@ Who is on the couch right now. The TV home and the phone send it when someone sw
   `/api/continue/open`, and shows started by hand on the TV (logged from the app's own
   "now playing"). So once a person is set, what they start on that TV lands in their keep watching.
 - `both` is the household with no people set up: its own row, like a person.
+- Kids mode: moving a TV away from a kids profile needs that profile's parent PIN, `{"who": "mum", "pin": "2580"}`.
+  Without it, or with a wrong one, `403`; five wrong PINs from one address in five minutes, `429`. Moving
+  into a kids profile needs nothing.
 
 ### `POST /api/watch-next`
 The TV home app's copy of Android's Watch Next rows ("Continue watching"), sent each time the home
@@ -139,6 +179,14 @@ it in Keep watching, for the person picked when it played, up to 3 hours later.
   "episode_title": "Pilot", "season": "1", "episode": "1", "engaged": 1794100000000}]}
 ```
 `engaged` is the row's last engagement time in milliseconds. Answers `{"ok": true, "rows": 1}`.
+
+### `GET /api/watch-next`
+Read only, for finding out why a play never gets named (issue #23). Returns the rows the home last
+sent (`rows`, `received_s_ago`), the untitled play being waited on (`untitled`: its package, whether
+it has counted, how long ago it started) and `report`: how many rows from which apps, and for the
+app being played how each of its rows fails the match (`no engagement time`, `engaged N s before the
+play started`, `title is only the app's name`, or `matches`). The bridge log says the same once a
+minute while a play is still waiting.
 
 ### `GET /api/people` and `POST /api/people`
 The people (profiles), in the order the TV and the phone show them. Any number, up to 12, and none
@@ -159,6 +207,36 @@ anything is changed the list lives in `data/people.json` and wins from then on.
 `who` back to `null`. Their watch history stays. Every change is pushed on the events stream (`now`)
 so open front ends can re-read the list.
 
+### Kids mode: `GET /api/kids` and `POST /api/kids`
+The kids profiles (people with `kids_mode`, docs/CONFIG.md "Kids mode"), each with its shelf (posters
+filled from JustWatch), its allowed apps and its PIN's salted hash (`pin_hash`, `pin_salt`,
+`pin_rounds`: SHA-256 applied `pin_rounds` times to `"salt:pin"`), the same hash `/tv/config.js` carries
+so the TV home can check a typed PIN. Never the PIN itself. `people` lists everyone with `kids` true or
+false, for the phone's Kids mode sheet.
+```json
+{"ok": true,
+ "kids": [{"id": "ruby", "name": "Ruby",
+           "shows": [{"id": "bluey-abc-iview", "title": "Bluey", "service": "abc-iview", "package": "au.net.abc.iview",
+                      "poster": "https://images.justwatch.com/...", "app": {"id": "abc-iview", "name": "ABC iview", "package": "au.net.abc.iview"}}],
+           "apps": [{"package": "au.net.abc.iview", "name": "ABC iview"}],
+           "pin_hash": "…", "pin_salt": "…", "pin_rounds": 4000}],
+ "people": [{"id": "mum", "name": "Mum", "kids": false}, {"id": "ruby", "name": "Ruby", "kids": true}]}
+```
+`POST` changes one kids profile and answers with `kids` as above. Every action but `on` needs that
+profile's `pin`:
+- `{"who": "ruby", "pin": "2580", "action": "check"}`: is the PIN right.
+- `"action": "add", "show": {"title": "Hey Duggee", "service": "abc-iview", "season": 1, "episode": 2, "poster": "https://..."}` (only `title` is needed; up to 24 shows).
+- `"action": "remove", "id": "bluey-abc-iview"`.
+- `"action": "apps", "apps": ["au.net.abc.iview"]` (app ids or packages, up to six).
+- `"action": "pin", "new_pin": "135790"` (4 to 8 digits).
+- `"action": "off"`: kids mode off for that person.
+- `{"who": "mum", "action": "on", "new_pin": "2580"}`: make someone a kids profile (no PIN of theirs yet).
+
+`403` for a missing or wrong PIN, `429` after five wrong PINs from one address in five minutes, `404`
+when the person is not a kids profile, `409` for `on` when they already are. Changes are kept in
+`data/kids.json`, which wins over `config.json` for that person. The on-TV app (option C) answers the
+same, from its own storage.
+
 ### `GET /api/config` and `/tv/config.js`
 The settings the front ends are allowed to see (never addresses, keys or history). `/tv/config.js`
 is the same object as `window.COUCH_CONFIG = {...};`, loaded by the TV home and kept in its offline
@@ -173,14 +251,32 @@ copy. All keys are explained in `docs/CONFIG.md`.
  "default_tv": "living-room", "ask": {"enabled": true}, "phone_remote": true}
 ```
 `tvs[].quick` is the quick buttons for that TV, in order: any of `sleep`, `picture`, `look`,
-`input`. `picture_modes` is the two mode names for the picture button (empty without a `picture`
-entry). The home itself hides a button that cannot work at the moment.
+`soundscape`, `input`. `picture_modes` is the two mode names for the picture button (empty without a `picture`
+entry). The home itself hides a button that cannot work at the moment. A kids profile in `people` carries
+`kids_mode` (its shelf, apps and PIN hash, as `GET /api/kids`), never the PIN.
 
 ### `GET /api/events`
 Server-sent events (`text/event-stream`). Open it with `new EventSource('/api/events')`.
 Each message is `event: now` with the same JSON as `GET /api/now`. Sent once on connect, then
 on every change (app, power, volume, connection). A comment line is sent every 20 s to keep it
-open. Use this instead of polling.
+open. Use this instead of polling. Matter devices are not on it: they come on
+`/api/matter/events` (below), which is behind the pairing rule.
+
+### Matter devices: `/api/matter/...`
+Devices shared from Google Home, Apple Home, SmartThings or Alexa, with this computer as one more
+Matter controller (bridge/matter.py). `GET /api/matter/devices`, `GET /api/matter/events` (server-sent
+`event: matter`, the same JSON as `/devices`, at once and on every change),
+`POST /api/matter/commission {code, address?}`, `POST /api/matter/command {id, action, value?}`,
+`POST /api/matter/remove {id}` and `POST /api/matter/rename {id, name}`, behind the same rule as
+`/api/ha`. Shapes, error keys and set up: [docs/MATTER.md](../docs/MATTER.md).
+
+### `POST /api/pointer`
+LG only: the TV's pointer (the Magic Remote's cursor), as the phone's touchpad drives it.
+```json
+{"dx": 12, "dy": -4}
+```
+moves it by that many pixels; `{"click": true}` clicks where it is; `{"scroll": 40}` scrolls.
+They can be combined in one request. Each value is clamped to ±400. Other TVs answer 400.
 
 ### `POST /api/key`
 ```json
@@ -208,7 +304,10 @@ inputs (HDMI and the rest) on TVs that have one.
 ```
 
 ### `POST /api/text`
-Types text into whatever text box is open on the TV (a search box).
+Types text into whatever text box is open on the TV (a search box). On Android this is `input text`,
+so only ASCII letters, digits and plain punctuation are safe. Thai, Chinese, Korean and other
+non-Latin text must be typed with the TV's own on-screen keyboard; non-Latin text comes back as
+`BufferOverflowException`.
 ```json
 {"text": "bluey"}
 ```
@@ -230,7 +329,66 @@ the known set.
 ```
 Known ids: `netflix` `youtube` `stan` `binge` `abc-iview` `sbs-on-demand` `disney-plus`
 `prime-video` `kayo` `foxtel-go` `9now` `7plus` `10play` `spotify` `plex` `moonlight`
-`settings` `home`. `installed` is `null` when the bridge cannot tell yet.
+`settings` `home`. `installed` is `null` when the bridge cannot tell yet. An app that has another
+build under another package name also lists `packages`, the Google TV one first
+(`"packages": ["com.google.android.youtube.tv", "com.amazon.firetv.youtube"]`): on a Fire TV the
+bridge opens and watches whichever build the TV has, and `installed` is true when any of them is
+there. YouTube, Prime Video and HBO Max have Amazon's builds (seen on a Fire TV Cube); every other
+app has one package.
+
+### `GET /api/roku/apps` and `GET /api/roku/icon/<id>`
+Roku only (`400` for any other TV, `503` while the Roku is not answering). The couch-tv channel on the Roku
+asks here for its apps, because a Roku channel may not read the list itself. The Roku's channels in the
+order arranged from the phone, known apps first, then by name; `package` is the Android style package where
+couch-tv knows the app and `roku.<id>` where it does not (open either with `POST /api/launch`).
+```json
+{"ok": true, "apps": [{"id": "12", "title": "Netflix", "package": "com.netflix.ninja", "icon": "/api/roku/icon/12"}]}
+```
+`/api/roku/icon/<id>` is the Roku's own icon for that channel (from its `query/icon`), kept in memory.
+`404` when the Roku has none or refuses it (newer Roku OS needs "Control by mobile apps" on Enabled).
+
+### Couch TV on an Apple TV: `/api/appletv/...`
+For couch-tv's tvOS app (`tvos/`, [docs/APPLE-TV.md](../docs/APPLE-TV.md)). Apple TV only: `400` for any other TV,
+`503` while the Apple TV is not answering. The app sends `?tv=<id>` once it knows it.
+
+- `GET /api/appletv/hello` (needs the key): which Apple TV is asking, from `?tv=`, else the address the request came
+  from, else the first Apple TV in `config.json`. `{"ok": true, "tv": "lounge-appletv", "name": "Lounge Apple TV",
+  "home_bundle": "dev.couchtv.appletv.sam", "dock_max": 10}`. `home_bundle` is couch-tv's own app on that Apple TV,
+  `null` until it is installed.
+- `GET /api/appletv/apps`: the Apple TV's apps without couch-tv itself, in the order arranged from the phone, known apps
+  first, then by name. `id` is the bundle id; `package` names couch-tv's logo for it where couch-tv knows the app
+  (`appletv.<bundle id>` where it does not). `line` is how many go in the dock.
+  ```json
+  {"ok": true, "apps": [{"id": "com.netflix.Netflix", "title": "Netflix", "package": "com.netflix.ninja"}], "line": 10, "dock_max": 10}
+  ```
+- `POST /api/appletv/open` `{"bundle": "com.netflix.Netflix"}`: open an app by its bundle id (a tvOS app cannot open
+  another app by its id itself). `400` for something that is not a bundle id, `503` when the Apple TV does not list
+  it, `502` when the Apple TV refuses. While the person watching that Apple TV is a kids profile, only that child's
+  allowed apps open (`403` for any other).
+- `GET /api/appletv/kids` (`?who=`, else the person watching that Apple TV): kids mode for the app. For a kids profile,
+  its shelf (each show's app with its `bundle` on this Apple TV when it has it), the allowed apps as Apple TV apps
+  (never Settings, the App Store or couch-tv) and the parent PIN's salted hash, which the app checks a typed PIN
+  against (SHA-256, `pin_rounds` times, of `"<salt>:<pin>"`, as `/api/kids`). Never the PIN. `grown_ups` are the people
+  the right PIN moves the Apple TV to (the first one). For anyone else `{"ok": true, "kids": false, "who": "mum"}`.
+  ```json
+  {"ok": true, "kids": true, "who": "ruby", "name": "Ruby",
+   "shows": [{"id": "bluey-abc-iview", "title": "Bluey", "poster": "https://...", "app": {"id": "abc-iview", "name": "ABC iview", "package": "au.net.abc.iview", "bundle": "au.net.abc.iview"}}],
+   "apps": [{"id": "au.net.abc.iview", "title": "ABC iview", "package": "au.net.abc.iview"}],
+   "pin_hash": "<64 hex>", "pin_salt": "<hex>", "pin_rounds": 4000, "grown_ups": ["mum"]}
+  ```
+- `POST /api/appletv/kids/open` `{"who": "ruby", "id": "bluey-abc-iview"}`: open a show from that kids profile's shelf
+  (only a show on it, `404` otherwise). Straight into the show where the app is reported to take a link on tvOS
+  (Netflix, Disney+, Apple TV and YouTube, from JustWatch's links, or the show's own `link` in `config.json` when it is
+  not an Android `intent://`), else the show's app on its own page. `{"ok": true, "opened": "show" or "app", "note": "..."}`.
+- `POST /api/appletv/code` (needs the key): a six digit code for the app, good once for ten minutes.
+  `{"ok": true, "code": "481516", "expires_in": 600, "tv": "lounge-appletv"}`. `scripts/appletv-home-code.py` asks for one.
+- `POST /api/appletv/claim` `{"code": "481516"}` (open, no key): swaps the code for the pairing key, once.
+  `{"ok": true, "key": "<the pairing key>", "tv": "lounge-appletv", "name": "Lounge Apple TV"}`. A wrong code counts
+  towards the same limit as a wrong key (`401`, then `429`).
+
+When `config.json` has an Apple TV, the bridge also says on the network that it is there (Bonjour,
+`_couchtv._tcp`, with its address and port in the record, never the key), so the app finds it without an address
+being typed. `COUCHTV_NO_BONJOUR=1` in the environment switches that off.
 
 ### `POST /api/launch`
 ```json
@@ -286,6 +444,7 @@ provider in this order: free apps, then subscriptions, then the rest.
 Free text to Claude (runs on the subscription, never the API). Takes about 5 to 20 seconds for
 simple asks; bigger jobs (installing an app) can run longer, so at 80 s it answers "Still working
 on it" and the job finishes in the background. Show a thinking state. Optional `who` (see "Who is watching").
+`403` when that person (or, with no `who`, the one on the couch) is a kids profile: no Ask for them.
 ```json
 {"text": "put on the latest Bluey", "who": "person1"}
 ```
@@ -324,8 +483,13 @@ Also in every answer (since 27 Oct 2026, for a chat box):
   knowledge plus `find` (which of the home's apps it streams on), without touching the TV until
   the person says yes.
 - `tv` in the body (or `?tv=`) picks the TV, as everywhere else.
-- After 80 s the answer is "Still working on it, ..." with no options, and the job finishes in
-  the background; the next ask is told how it ended.
+- After 80 s the answer is "Still working on it, ..." with no options, `"still": true` and
+  `reply_key` `ask_still_working` (or `ask_still_working_doing`, with `reply_vars.doing`), and the
+  job finishes in the background; the next ask is told how it ended.
+- Claude answers in the TV home's language: `lang` in that TV's Home settings, else
+  `home.language` in `config.json`, else English. Only a code from the bridge's language list is
+  used, mapped to a fixed language name; anything else counts as English. Claude's picks write
+  their `reason` in the same language.
 
 ### `GET /api/recs`
 Claude's picks plus continue watching. Optional `?who=person1`. Fast: it returns the cached picks
@@ -349,13 +513,44 @@ Claude's picks plus continue watching. Optional `?who=person1`. Fast: it returns
 
 ### `GET /api/music`
 Now playing (#31): the song any app on that TV (`?tv=`) is playing, from its media sessions, for the
-home's card. A song stays for ten minutes after a pause. `art` is the cover from Apple's free iTunes
-search, or `null` until it is found. `music` is `null` when nothing is playing. The card's buttons
+home's card and ambient music art screen. A song stays for ten minutes after a pause. `art` is the cover from Apple's free iTunes
+search, or `null` until it is found. `position` and `duration` (in seconds) are included when reported by the media session. `music` is `null` when nothing is playing. The card's buttons
 are `POST /api/key` with `previous`, `play_pause` and `next`.
 ```json
 {"ok": true, "music": {"title": "Golden Hour", "artist": "JVKE", "album": "this is what ____ feels like",
  "state": "playing", "app": {"id": "spotify", "name": "Spotify", "package": "com.spotify.tv.android"},
- "art": "https://is1-ssl.mzstatic.com/.../600x600bb.jpg"}}
+ "art": "https://is1-ssl.mzstatic.com/.../600x600bb.jpg", "position": 42.5, "duration": 215.0}}
+```
+
+### `GET /api/music/queue`
+The Up next widget: the next songs in the Spotify queue (at most 10: `title`, `artist`, `art` from
+Spotify's own picture host or `null`), read with the Spotify login above (bridge/spotify_now.py, the
+same scopes), at most every 15 seconds. `queue` is `null` when Spotify is not connected on this
+bridge, `[]` when nothing is queued. No other music app shares its queue.
+```json
+{"ok": true, "configured": true, "queue": [{"title": "Low Tide", "artist": "Saltwater Radio", "art": "https://i.scdn.co/image/..."}]}
+```
+
+### `GET /api/custom-cards`
+The household's own cards (`home.custom_cards`, docs/TV-HOME.md "Custom cards"), read from the file
+or link, cleaned and capped: at most 8, `title` (40 characters), optional `subtitle` (60), `value`
+(24), `image` (http or https) and either `app` (a package name) or `url` (http or https). The bridge
+reads the source at most once a minute and keeps the last good cards when it cannot. `[]` when the
+key is not set.
+```json
+{"ok": true, "cards": [{"title": "Solar today", "value": "18.4 kWh", "app": "com.example.solar"}]}
+```
+
+### `GET /api/webdata?src=news&id=abc`
+The relay for the TV home's web widgets (`tv-home/web/widget-web.js`, `bridge/webdata.py`): a news feed
+or a share price sends no CORS header, so the home asks here. `src` is `news` (`id` one of `abc`,
+`abc-justin`, `abc-sport`, `abc-business`, `sbs`, `guardian`, `bbc`, `rnz`) or `stocks` (`id` up to 8
+Yahoo symbols joined by commas, like `^AXJO,BHP.AX,AUDUSD=X`). Anything else is 400: it never takes a
+link. The answer is the source's own text (the home reads it); kept 10 minutes for news, 2 for prices;
+502 when the source cannot be read. The launcher (`http://tvos.invalid/webdata`) and the on-TV app
+answer the same way.
+```json
+{"ok": true, "src": "news", "id": "abc", "text": "<?xml version=\"1.0\"?><rss>..."}
 ```
 
 ### `GET /api/continue`
@@ -382,10 +577,82 @@ one card per show (its latest episode), newest first, at most 10, nothing older 
 - Android's own Watch Next list (what Google's home shows) is not readable on this TV: it needs a
   system permission that ADB does not have. If that ever changes, those rows appear here with
   `"source": "tv"` and a real `progress` (0 to 1). Until then `progress` is `null`.
+- The episode on a card is the app's own when it knows better: if the TV home's copy of Android's
+  Watch Next (`POST /api/watch-next`) has a row for the same show in the same app, engaged after the
+  history line and naming a season and episode, those win, for the card, for its `last_played` and
+  for what `/api/continue/open` plays. An app with no such row changes nothing. A play the bridge
+  opened in an app that names nothing (Netflix) is logged as the episode it asked for; when that
+  app's row then says another episode of the show, that episode is logged as well.
 - Resume with `POST /api/continue/open {"id": "3f2a9c1e0b7d4a55"}`. The id is the history line's
   own, so it always opens that card's show (and season and episode). It reopens the show in its app; the app
   itself picks up where you left off (Netflix, Stan, iview and the rest remember the position).
   Response is the same as `POST /api/play`.
+- With a `plex` section in `config.json` and `PLEX_TOKEN` in `.env` (docs/CONFIG.md, Plex), the Plex
+  Media Server's own Continue Watching list is read every five minutes and its shows and films join
+  the row with `"source": "plex"`, an id of `plex-<ratingKey>`, a real `progress` (0 to 1) and
+  pictures served by the bridge (`GET /api/plex/art?id=plex-<ratingKey>&kind=poster|backdrop`, the
+  pairing key as `?key=` when one is set). One card per show across both lists, the newer wins.
+  `/api/continue/open` and `/api/continue/hide` take those ids too; hide takes an optional `who`
+  (else the person on the couch; nobody picked means everyone). `GET /api/plex/status` says what is
+  set up and how the last read went, never the token.
+- `videos`, next to `items`: the YouTube videos this person watched on this TV, a list of their own.
+  YouTube stays out of `items` (it would bury everything else), and a video's name is never looked
+  up (matched to a film, it would put that film in the household's taste, issue #23): a video that
+  played the minute is written by the name YouTube gave it (with no picture until the video is found,
+  below), and shows only here, for the home to put under the YouTube tile and nowhere else. Never in the picks, the taste or
+  `GET /api/history`. One card per title (the newest), newest first, at most 10, within 30 days,
+  minus the ones removed with `/api/continue/hide`, in the shape of an item with `"kind": "video"`,
+  `episode_title`, `season`, `episode`, `poster` and `progress` all `null`, and `app` YouTube's
+  installed build. The line also keeps the channel and the length the app's media session gave
+  (`channel`, `duration_ms`; a live stream has no length), neither on the card. A session with a
+  channel and no length is a live stream: its line and card carry `"live": true` (every other video
+  card `"live": false`), and the Loop look's row says "YouTube · Live" under it. Once the video's id
+  is known (below) the card carries it as `video_id` and YouTube's own thumbnail for it as
+  `backdrop`, `https://i.ytimg.com/vi/<id>/mqdefault.jpg` (320x180, 16:9, no black bars; the TV
+  fetches it straight from YouTube's image host, the way it already fetches JustWatch's posters from
+  theirs); until then both are `null`, and the page shows the title alone. The thumbnail on the
+  TV's screen is not yet tested on a real TV; the lookup and the watch link are (a Fire TV Cube).
+  `/api/continue/open` with a video's id opens the exact video when it can: the id comes from
+  YouTube's public results page (the same lookup the move feature uses, no key and no sign in, and
+  warmed when the line is written), and only when the title matches and the channel or the length
+  agrees; a title many channels reuse is told apart by those, and a wrong video is worse than none,
+  so otherwise the lookup says unsure. A found id is kept on disk, in `bridge/data/video-ids.json`
+  (the normalised title and channel, the id, the video's length in whole seconds or null, and when
+  it was found; the newest 500), so a bridge restart does not lose it and a press on a card already
+  found never waits on the network. The saved id is only given back when the length agrees (within
+  3 s, or neither has one and there is a channel): a channel can put out two videos of one title, so
+  another length is looked up afresh and kept beside the first (four lengths per title and channel at
+  most, the oldest dropped). An entry written before
+  the length was kept has none. An unsure answer is remembered in memory only: the next press on
+  that card within ten minutes goes straight to the search instead of paying the lookup again, and a
+  press that comes while the warm up is still running waits on it (15 s at most) rather than
+  starting a second one. `GET /api/continue` itself may start that lookup in the background, for a
+  card whose id is not yet known and not lately unsure, and answers at once without it, so the next
+  fetch of the row has the picture; for the row, "lately" grows with each unsure answer in a row (ten
+  minutes, then twice as long each time, up to a day), so a video the results page never lists the
+  same way is asked about a few times a day, not every ten minutes for the 30 days it stays in the
+  row. However many lookups are under way, the bridge fetches YouTube's results page two at a time
+  at most (the move feature's lookups share that limit). A line with
+  neither channel nor length (written by an older bridge, or from a session that gave neither) is
+  never looked up: a title alone cannot be sure of the video, so that card has no picture and
+  searches. A sure id goes to the build as its
+  watch link with no time in it, and YouTube resumes it from the account's own history
+  (`"method": "deeplink"`, `"video_id"` the id; tested on a Fire TV Cube with Amazon's YouTube, which
+  played that very video from where it was left). Unsure, a lookup that fails or takes longer than
+  15 s, or a link that does not take: the build opens on YouTube's search for the title
+  (`"method": "search"`; Amazon's YouTube on a Fire TV shows its home for the web search link, so there
+  the bridge sends the `youtube://search?query=` link Alexa's voice search uses, which opens its results
+  page, tested on that Cube), or the app alone where that does not take either (`"method": "app"`),
+  never through the show finder. Its answer is `{"title", "service": "youtube", "app", "method",
+  "video_id", "note"}`, `video_id` null unless the method is `deeplink`.
+  ```json
+  {"ok": true, "items": [], "videos": [
+    {"id": "9c1e0b7d4a553f2a", "title": "How Trains Work", "episode_title": null, "season": null, "episode": null,
+     "app": {"id": "youtube", "name": "YouTube", "package": "com.amazon.firetv.youtube"},
+     "service": "youtube", "poster": null, "backdrop": "https://i.ytimg.com/vi/dQw4w9WgXcQ/mqdefault.jpg",
+     "progress": null, "kind": "video", "live": false, "last_played": "2030-01-01T19:31:00Z",
+     "source": "bridge", "video_id": "dQw4w9WgXcQ"}]}
+  ```
 
 ### `POST /api/sleep` and `GET /api/sleep`
 Sleep timer, kept on the bridge so it still fires when the phone locks.
@@ -422,6 +689,30 @@ settings over ADB and picks the row with the other name.
   off or no ADB).
 - A TV without a `picture` entry answers `{"ok": true, "mode": null, "supported": false,
   "can_set": false}` and `POST` answers `409`. The bridge never reads or changes its picture mode.
+
+### `GET /api/bluetooth-audio` and `POST /api/bluetooth-audio`
+Bluetooth settings screen opener, for the home screen's `headphones` quick button.
+Opens Android's own Bluetooth settings screen on the TV.
+```json
+GET /api/bluetooth-audio
+```
+Response:
+```json
+{
+  "ok": true,
+  "supported": true
+}
+```
+Open Bluetooth settings screen:
+```json
+POST /api/bluetooth-audio
+```
+Response:
+```json
+{"ok": true}
+```
+Runs the fixed command `am start -a android.settings.BLUETOOTH_SETTINGS` over ADB with no input from the request. No MAC addresses leave the bridge.
+
 
 ### App order: `POST /api/home-apps`, `GET /api/app-order`, `POST /api/app-order`
 The order of the TV home's dock and where the More apps line sits, per TV (add `?tv=` or `"tv"`).
@@ -471,13 +762,17 @@ is optional:
 
 | Key | What it is |
 |---|---|
-| `lang` | `en`, `es`, `es-MX`, `it`, `de` or `tr`. |
+| `lang` | `en`, `es`, `es-MX`, `it`, `de`, `tr`, `sr-Latn-RS`, `pl` or `pt`. |
 | `place` | The weather's place: `name`, `lat`, `lon` (rounded to two decimals, a town, never a house), `timezone`. |
 | `wx_show`, `wx_unit`, `wx_every` | Weather on or off, `c` or `f`, minutes between checks (15, 30 or 60). |
-| `look` | `night` or `classic`. |
+| `look` | `night`, `oled` (the Classic grid on pure black) or `classic`. |
 | `glass` | Glass panels: `off`, `on` or `lite` (no blur). |
 | `glass_icons` | Glass app icons: `true` or `false`. |
 | `moving_tiles` | The focused tile's slow sway: `true` or `false`. |
+| `dock` | The dock: `mac` (the focused app and its neighbours grow in a wave, the name in a bubble above it) or `classic`. |
+| `lighter` | Lighter home for a slow box (no blur, no soft shadows, a still photo, smaller pictures): `true` or `false`. |
+| `show_clock` | Look, Show the clock: `true` or `false`. |
+| `hi_res` | Look, Sharp pictures on a 4K TV: `"auto"`, `"always"` or `"off"`. |
 | `glass_amount` | How clear the glass is: `1` (frosted) to `5` (very clear). |
 | `clock_style` | The Night clock: `frosted` or `liquid`. |
 | `glass_focus` | Glass app icons, the focused app: `colour` or `glass`. |
@@ -486,13 +781,82 @@ is optional:
 | `video`, `video_url` | The video background on or off, and its link (`http://` or `https://`, an MP4 or MOV). `""` means the link was removed on the TV, and then wins over `home.video_url`. |
 | `scene_order`, `scenes_off` | Every scene in order, and the ones switched off. Ids are the five scene names and `p-<id>` for a photo. |
 | `scene_seconds`, `clock` | 5 to 3600; `12h` or `24h`. |
-| `photos` | Up to 20: `{"id", "url"}` for a photo on the web, or `{"id", "file"}` for one the TV's file picker copied into the app (`p....jpg`, kept on the TV only). |
+| `sun_sync` | Follow the sun on or off: `true` or `false`. |
+| `ambient_weather`, `ambient_sun_grade` | Weather effects over the scenes, and the sun's colour grade: `true` or `false`, both off unless chosen. |
+| `photos` | Up to 50 (`MAX_PHOTOS` in `server.py`; the rest are dropped). Each photo is kept on the TV and read into its memory when it shows, so a very old or low memory TV may stutter near the limit: `{"id", "url"}` for a photo on the web, or `{"id", "file"}` for one the TV's file picker copied into the app (`p....jpg`, kept on the TV only). |
 | `hidden_apps` | Packages hidden from the home and More apps on this TV. |
-| `quick` | The quick buttons, in order: any of `sleep`, `picture`, `look`, `input`. |
+| `soundscape` | Ambient sleep sound: `{"type": "rain", "volume": 0.5, "fade_with_sleep": true}`. `type` is `off`, `rain`, `fire`, `waves` or `brown`, `volume` 0 to 1. It never plays by itself: it starts only when someone presses the Soundscape button or the row in Home settings. |
+| `quick` | The quick buttons, in order: any of `sleep`, `picture`, `look`, `soundscape`, `input`. |
 
 Unknown keys and wrong shapes are dropped. Larger than 32 KB answers `413`. With no bridge (option
 A) the TV keeps them alone. The on-TV app (option C) keeps them in its own `/api/settings` under
 the same `settings` key, next to its setup settings.
+
+### The phone's Home settings page: `/setup` and the calls it makes
+The same page the on-TV app serves from the TV (`on-tv/web/setup.html`), served here for every TV this
+bridge runs (Samsung, LG, VIDAA, Titan, Saphi, Panasonic, TiVo, Vega, Roku, Apple TV, an Android TV with a
+computer). The TV home's Home settings shows its QR (Change this on your phone, with the address and a
+code for a computer), and Hold OK on a widget offers Edit on your phone. Code: `bridge/phonepage.py`.
+
+- `GET /api/phone-link` (the TV home asks, with the key): `{"url": "http://<this computer>:5400/setup#pin=NNNNNN", "pin_expires_in": 170}`.
+  The address is the one the TV reached the bridge by; `?tv=<id>` is added for a TV that is not the default.
+- `POST /api/pair` `{"pin": "123456"}`: the code shown on the TV, for the pairing key (`{"token": "<key>"}`,
+  the key the phone remote pairs with). A code lasts 3 minutes, is used once, and 5 different wrong tries throw it
+  away (the same wrong code again from one address is not a new try); wrong codes count towards the 5 wrong keys
+  a minute per address, and an address with 5 different wrong codes in 10 minutes waits (`429`
+  `err_pairing_locked`, `retry_after`) until the oldest is 10 minutes old. 15 wrong codes in 10 minutes while a
+  code is live lock code pairing for 10 minutes (`429` with `retry_after` and `Retry-After`); one address adds
+  at most 5 of them and the same wrong code again is not counted, so one caller alone never locks it, and a try
+  with no live code never counts. `POST /api/pair/start` (no key, no body, `?tv=<id>` for a TV that is not the
+  default): the live code when it has more than 90 seconds left (the one in the TV's QR), else a new one,
+  shown as a line on that TV's home ("Show a code on the TV"); the answer never holds it. Both refuse
+  `Origin: null` and `file:` with `403`.
+- `POST /api/settings` `{"settings_patch": {"place": {...} or null}}`: the phone changes only the town
+  (`name`, `area`, `lat`, `lon`, `timezone`; other keys answer `400`). When the TV home then sends its whole
+  copy with an older `"seen"` (the `updated` it last read), the phone's `place` and `photos` stay as they
+  are here and the answer names them in `"kept"`, so the TV home takes them. `GET` also answers `"mode":
+  "bridge"`, `people`, `weather` and `tv_name` for the page.
+- `POST /api/photos` (the picture itself as the body, a JPEG, PNG or WebP, up to 25 MB, the key checked
+  before it is read): turned the right way up, made no bigger than the screen (1920 by 1080; a portrait photo
+  fits the screen turned) with Pillow, one photo at a time, kept as `data/photos/bridge<random>.jpg` and
+  listed in that TV's `photos` as `{"id", "file"}`. Up to 50, 100 megapixels at most (`413`), `415` for
+  anything else (PostScript, PSD, TIFF and the other formats Pillow reads are never opened).
+  `GET /api/photo/<file>` (the key in the header, or `?key=` for the TV home's picture; never a cookie) and
+  `POST /api/photos/remove` `{"id"}`. A photo the TV home's own copy no longer lists is deleted when it sends
+  that copy; a copy with no `"seen"` (an older TV home) keeps the phone's photos.
+- `GET /api/athome` and `POST /api/athome` `{"edit": {...}}`: At home (`note`, `lists`, `wifi`, `guide`,
+  `cal_url`, `stay_url`, `checkin`, `checkout`) and a design's widget settings (`widget_set`, `design_apps`)
+  stay in the TV home's own store on the TV. A change waits here until the TV home asks for it, it applies
+  it exactly as on the on-TV app (app.js `atHomeEdit`) and answers back, and the phone gets that answer
+  (up to 12 seconds). With the TV home not open (it has not asked in 30 seconds) the answer is
+  `{"live": false, "queued": true}` and the change waits (up to 20); lists, the guide and widget changes are
+  refused with `409` instead, as they are sent whole. Up to 64 KB per change.
+- The TV home's side, with the key: `GET /api/phone/inbox?home=1` (every 10 seconds, every second while a
+  phone page is in use or a code is showing: `{"edits": [{"id", "edit"}], "fast", "pin", "pin_gen",
+  "settings_at", "want_view"}`; `pin_gen` changes whenever the code does, and the TV home then asks for its QR
+  again, so a used code never stays in it), `POST /api/phone/done` `{"id", "result"}`, and `POST /api/phone/view` `{"athome": {...}}`
+  (its At home view, a calendar link as its host only; up to 256 KB, kept in memory only, never on disk).
+
+The page leaves out what is set up on this computer instead (the TV's name, Ask AI, the TV's keys,
+updates, phones, Use as home screen). With no computer at all (option A), the Couch TV home app serves the
+same page itself (`tv-home/android`, `PhoneServer.kt`, port 5400) with the on-TV app's own pairing.
+
+### Calendar: `POST /api/calendar`
+For couch-tv Studio's Agenda widget on a TV whose home this computer runs (a Samsung, LG, Philips,
+TiVo OS or Panasonic TV, or a Hisense with a computer): a web page cannot read a Google, Apple or
+Outlook calendar itself. The TV sends the calendar's private address it keeps (Home settings, couch-tv
+Studio, At home) and gets the calendar's words back:
+
+```json
+{"url": "https://calendar.example.com/private-abc/basic.ics"}
+{"ok": true, "text": "BEGIN:VCALENDAR\r\n..."}
+```
+A calendar app's own link (the same address with a scheme ending in `cal`) is read as `https://`. Only https, no name or password in the address, no address on the
+home network or this computer (every redirect is checked the same way, at most 3), 4 MB at most, and
+only an answer that is a calendar: anything else is `400` with a short reason (`not a calendar link`,
+`that address is not on the internet`, `http 404`, `not a calendar`, `too big`, `unreachable`), never
+the address. The bridge keeps nothing: the address is not stored, logged or put in the action history
+(`bridge/agenda.py`).
 
 ### `GET /api/history`
 ```json
@@ -565,11 +929,54 @@ to a TV that is on does nothing. `on` only answers once the TV says it is on: ab
 the first minute after "off" (standby, still on the network), about 2 s after that (the TV has
 left the network; the bridge sends Wake-on-LAN and reconnects the moment it is back). It gives up
 after 32 s with `503`: then show "Turn the TV on with its own remote".
+LG only: an `off` sent again within 20 s of the TV going off counts as `on` (the phone's state can
+lag behind Quick Start+ standby, so a second press means "wake it"). A script or agent that repeats
+`off` should wait 20 s or check `power` first.
 ```json
 {"ok": true, "power": "on"}
 ```
 While an `on` is in progress, `/api/now` and the events stream carry `"waking": true`. Show
 "Waking the TV" until `waking` is `false` and `power` is `"on"`.
+
+### `POST /api/move`
+Moves what is playing on this TV (`tv`, as for every endpoint) to another TV. Android and Google TV at
+both ends. What it does, step by step, and its limits: [docs/MOVE.md](../docs/MOVE.md).
+```json
+{"tv": "living-room", "to": "bedroom-tv", "power_off": false, "force": false}
+```
+- `to`: the TV to move to. Leave it out when there is only one other Android or Google TV.
+- `power_off`: `true` turns this TV off once the other one is playing. Off unless it is exactly `true`.
+- `force`: `true` goes ahead when the other TV is playing something itself. Without it that is a `409`
+  (`error_key` `err_move_tv_in_use`): ask the person, then send it again with `force`.
+- `pin`: the parent PIN, only needed when the other TV is on a kids profile (`403` without it).
+
+It answers once the other TV is playing, or has stopped short of it. Allow up to three minutes: a wake,
+a fresh app start and a profile screen add up.
+```json
+{
+  "ok": true, "title": "Bluey", "from": "living-room", "to": "bedroom-tv", "who": "person1",
+  "app": {"id": "netflix", "name": "Netflix", "package": "com.netflix.ninja"},
+  "method": "deeplink", "started": true, "wrong_title": null, "source_paused": true,
+  "position_ms": 612000, "target_position_ms": 611400, "seek": null, "powered_off": false,
+  "note": "Bluey is playing on Bedroom.", "note_key": "note_moved",
+  "note_vars": {"title": "Bluey", "tv": "Bedroom"}
+}
+```
+`wrong_title` is the title the other TV came up on when it is not this TV's (both apps have to say what they
+play); it is paused there and `started` is `false`. `source_paused: false` means this TV would not pause and is still on (`note` then says to pause it by
+hand).
+`position_ms` is where this TV was; `target_position_ms` is where the other TV is playing (`null` when
+it does not say). `seek` says whether this TV's spot had to be used as the backup: `null` (the app
+resumed near it by itself, or there was no way to jump), `"link"` (YouTube, opened again with the time)
+or `"helper"` (the sync helper app of docs/SYNC.md). `started: false` means the other TV has the title
+open but not playing (`method` `deeplink`), or only the app or its search (`method` `search` or `app`);
+this TV is then left on and paused, and `note` says which.
+
+Errors: `400` no other TV to move to, the same or an unknown TV, or one end is not an Android or Google
+TV; `403` the other TV is on a kids profile and the PIN is missing or wrong; `409` nothing is playing
+here, the app gives no title, the bridge does not know the app, the other TV does not have the app, the
+other TV is in use, or another move is running; `503` the other TV did not wake. When a move fails
+before the title is open on the other TV, this TV plays on.
 
 ### `POST /api/volume`
 ```json
@@ -633,6 +1040,13 @@ would do (for testing). `GET` says whether it is armed and why it last stopped.
 on with what was playing (the show page, which resumes where the profile was up to; YouTube
 reopens its search for the video).
 
+### `POST /api/quit-app`
+`{"package": "com.netflix.ninja"}` (an app name works too): force stops the app over ADB and does
+nothing else, so it is not opened again (`/api/restart-app` does that). The home screen, couch-tv and
+the apps that are part of how the TV works are refused with 403. The TV home's hold OK menu on an
+app tile (Restart app, Quit app) uses this and `/api/restart-app`, and only offers them when the
+bridge is connected.
+
 ### `GET /api/latest?title=...`
 The newest episode available (season, episode, name, date, apps), announced upcoming releases,
 and the last episode of it played on our TVs, with `newer_than_last_watched`.
@@ -666,8 +1080,42 @@ Every title object (find result, play, playing, continue, picks) carries `poster
 URLs. Credit "Data from JustWatch" somewhere quiet (their terms).
 
 ## Change notes
+- 2026-11-19: `/tv/manifest.json` leaves only the Loop look's video (`loop/*.mp4`) out, so the offline
+  copy keeps the cut-outs and `loop.json` beside the posters. A YouTube video card carries `live`
+  (true for a live stream). `bridge/data/video-ids.json` keeps each id with the video's length
+  (`length_s`), one per length (four per title and channel), and a saved id is only used for a video
+  of that length.
+- 2026-11-19: The Loop look's depth effect: `home.loop` also carries `meta` (the folder's `loop.json`
+  from make-loop.sh, checked, or null) and `fg` (true when meta has the cut-out's rectangle and every
+  variant has `/tv/loop/<variant>-fg.png`); its `version` mark covers both (docs/LOOP.md).
+- 2026-11-18: The Loop look (New, option B): `home.look` takes `loop`, and `home.loop` (read only,
+  `{"variants": [...], "blur": bool}`) in `/api/config` and `/tv/config.js` says which of its files the
+  bridge has. `/tv/loop/<variant>.mp4`, `-blur.mp4`, `.jpg` and `-blur.jpg` are served with byte ranges;
+  `/tv/manifest.json` skips the video under `loop/` and keeps its posters (docs/LOOP.md).
+- 2026-11-17: Move what is playing to another TV (New): `POST /api/move` (docs/MOVE.md, #268).
+- 2026-11-14: Custom cards (New): `GET /api/custom-cards`, and `home.custom_cards` in `/api/config` and
+  `/tv/config.js` (the link, or `true` for a file on the bridge computer).
+- 2026-11-14: Message keys (`error_key`, `note_key`, `reply_key`, `reason_key` and their `_vars`) beside the
+  unchanged English text; `still: true` on a soft timeout of `POST /api/ask`; Ask and Claude's picks answer in the
+  home's language (#196).
+- 2026-11-12: Kids mode (New): `GET|POST /api/kids`, `pin` on `POST /api/who` when leaving a kids
+  profile, `403` from `POST /api/ask` for a kids profile, and `kids_mode` on people in `/api/config` and `/tv/config.js`.
+- 2026-11-12: Couch TV for Apple TV (New, Beta): `GET /api/appletv/hello`, `GET /api/appletv/apps`,
+  `POST /api/appletv/open`, `POST /api/appletv/code` and `POST /api/appletv/claim` (open), and the bridge's Bonjour
+  record `_couchtv._tcp` when an Apple TV is configured. `app_id` on an Apple TV is now optional: an installed app
+  whose bundle id starts with `dev.couchtv.appletv` is found by itself.
+- 2026-11-10: Optional pairing key (`bridge.pairing_key`), rate limiting on wrong keys across all endpoints (HTTP 429), Host header allowlist against DNS rebinding (HTTP 403), disallowed origin rejection before handlers run (HTTP 403), dropping of couchtv_key cookie, tighter CORS origin allowlist (bridge host and TV home origins only), Content-Type enforcement on POST bodies (HTTP 415), and `POST /api/pair` (#73).
+- Roku: `"kind": "roku"` in `config.json`, `GET /api/roku/apps`, `GET /api/roku/icon/<id>` and `ecp` and `hook` on a Roku in
+  `GET /api/tvs`. `POST /api/key` takes Roku's own key names too (`InputHDMI1`, `Rev`, `Fwd`) and `roku_home` for Roku's Home;
+  `home` opens the couch-tv channel.
 - German: `lang` in `/api/settings` and `home.language` take `de` (24 hour clock and `DE` as the
   country when they are not set).
+- Serbian: `lang` in `/api/settings` and `home.language` take `sr-Latn-RS` (24 hour clock and `RS`
+  as the country when they are not set).
+- Polish: `lang` in `/api/settings` and `home.language` take `pl` (24 hour clock and `PL`
+  as the country when they are not set).
+- Brazilian Portuguese: the same keys take `pt` (24 hour clock and `BR` as the country when they
+  are not set).
 - Italian: `lang` in `/api/settings` and `home.language` take `it`. `home.clock` and
   `home.language` in `/api/config` and `/tv/config.js` are now there only when `config.json` sets
   them; without them the TV home follows the TV's own language and that language's usual clock.

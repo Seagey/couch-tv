@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import * as Ic from './icons.jsx';
 import { tick } from './haptics.js';
 import { logoFor } from './appLogos.js';
-import { t } from './i18n.js';
+import { t, tBridge } from './i18n.js';
 
 // Names that fit under an icon, like the iPhone home screen.
 const SHORT = { 'sbs-on-demand': 'SBS', 'prime-video': 'Prime Video', 'disney-plus': 'Disney+', 'paramount-plus': 'Paramount+', 'foxtel-go': 'Foxtel', 'hbo-max': 'HBO Max' };
@@ -28,17 +28,24 @@ function episode(s) {
   return [s.season && `S${s.season}`, s.episode && `E${s.episode}`].filter(Boolean).join(' · ');
 }
 
-function Poster({ show, sub, onPlay, dim }) {
-  return (
+function Poster({ show, sub, onPlay, onRemove, dim }) {
+  const poster = (
     <button className={`poster ${dim ? 'dim' : ''}`} onClick={() => { tick(); onPlay(show); }}>
       <div className="poster-art">{show.poster ? <img src={show.poster} alt="" loading="lazy" /> : <span>{show.title}</span>}</div>
       <b>{show.title}</b>
       <small>{sub}</small>
     </button>
   );
+  if (!onRemove) return poster;
+  return (
+    <div className="poster-wrap">
+      {poster}
+      <button className="poster-remove" aria-label={t('kw_remove', { title: show.title })} onClick={() => { tick(); onRemove(show); }}><Ic.Close size={14} /></button>
+    </div>
+  );
 }
 
-export function Watch({ pull, people, who, recs, cont: contIn, apps, hidden, screens, serviceName, onPlay, onLaunch, onScreen, wide }) {
+export function Watch({ pull, people, who, recs, cont: contIn, apps, hidden, screens, serviceName, onPlay, onRemove, onLaunch, onScreen, wide }) {
   const cont = contIn || [];
   const picks = (recs?.picks || []).filter((s) => s.playable !== false);
   const ready = (screens || []).filter((s) => s.ready);
@@ -52,7 +59,7 @@ export function Watch({ pull, people, who, recs, cont: contIn, apps, hidden, scr
         <h3>{t('keep_watching')}{who !== 'both' ? <span className="h3-who"> · {(people || []).find((p) => p.id === who)?.name || ''}</span> : null}</h3>
         {cont.length ? (
           <div className="shelf">
-            {cont.map((s) => <Poster key={s.id || `${s.title}-${s.service}`} show={s} onPlay={onPlay}
+            {cont.map((s) => <Poster key={s.id || `${s.title}-${s.service}`} show={s} onPlay={onPlay} onRemove={s.id ? onRemove : null}
               sub={[episode(s) || s.episode_title, s.app?.name || serviceName(s.service)].filter(Boolean).join(' · ')} />)}
           </div>
         ) : <p className="empty">{contIn === false ? t('couldnt_load') : contIn ? t('shows_wait') : t('loading')}</p>}
@@ -82,7 +89,7 @@ export function Watch({ pull, people, who, recs, cont: contIn, apps, hidden, scr
           </button>
         ) : picks.length ? (
           <div className="shelf">
-            {picks.map((s) => <Poster key={`${s.title}-p`} show={s} onPlay={onPlay} sub={s.reason} />)}
+            {picks.map((s) => <Poster key={`${s.title}-p`} show={s} onPlay={onPlay} sub={tBridge(s.reason_key, s.reason_vars, s.reason)} />)}
           </div>
         ) : <p className="empty">{recs === false ? t('couldnt_load_ideas') : recs ? t('no_ideas') : t('loading')}</p>}
       </section>
@@ -93,7 +100,7 @@ export function Watch({ pull, people, who, recs, cont: contIn, apps, hidden, scr
           {ready.map((s) => (
             <button key={s.id} className={`row-btn cell ${s.ready ? '' : 'not-ready'}`} onClick={() => { tick(); onScreen(s); }}>
               <span className="row-icon"><Ic.Screen /></span>
-              <span className="row-text"><b>{s.name}</b><small>{s.ready ? t('screen_sub') : s.note}</small></span>
+              <span className="row-text"><b>{s.name}</b><small>{s.ready ? t('screen_sub') : tBridge(s.note_key, s.note_vars, s.note)}</small></span>
               <Ic.Chevron className="row-chev" />
             </button>
           ))}

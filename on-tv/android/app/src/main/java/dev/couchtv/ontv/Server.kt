@@ -1,7 +1,10 @@
 package dev.couchtv.ontv
 
 import android.content.Context
+import android.content.Intent
 import android.util.Log
+import app.couchtv.ha.HaPhone
+import app.couchtv.ha.HomeAssistant
 import fi.iki.elonen.NanoHTTPD
 import fi.iki.elonen.NanoWSD
 import org.json.JSONArray
@@ -36,12 +39,16 @@ class Server(private val ctx: Context, port: Int) : NanoWSD(port) {
         val uri = s.uri
         when {
             uri.startsWith("/api/") -> api(s)
+            uri == "/ha" || uri.startsWith("/ha/") -> haPhone(s)
             uri == "/setup" || uri == "/setup/" -> asset("www/ontv/setup.html")
             uri.startsWith("/ontv/") -> asset("www/ontv/" + uri.removePrefix("/ontv/"))
             uri == "/tv" -> redirect("/tv/")
             uri == "/tv/config.js" -> newFixedLengthResponse(Response.Status.OK, "application/javascript",
                 "window.COUCH_CONFIG = " + Store.publicConfig() + ";\n").noCache()
-            uri.startsWith("/tv/") -> staticOrIndex("www/tv", uri.removePrefix("/tv/"), inject = false)
+            // the home page's files: a 304 when the WebView already has this version's copy (StaticTag)
+            uri.startsWith("/tv/") && StaticTag.unchanged(s.headers["if-none-match"], tvTag) ->
+                newFixedLengthResponse(Response.Status.NOT_MODIFIED, null, "").apply { addHeader("ETag", tvTag) }.noCache()
+            uri.startsWith("/tv/") -> staticOrIndex("www/tv", uri.removePrefix("/tv/"), inject = false).apply { if (status == Response.Status.OK) addHeader("ETag", tvTag) }
             else -> staticOrIndex("www/remote", uri.removePrefix("/"), inject = true)
         }
     } catch (e: ApiError) {
@@ -63,11 +70,46 @@ class Server(private val ctx: Context, port: Int) : NanoWSD(port) {
 
     private fun authed(s: IHTTPSession) = Auth.valid(tokenOf(s))
 
+    /**
+     * After a phone or setup tool saves settings, the app order or people, the home shows them at
+     * once (#96). Saves from the home page itself (on this TV, so from 127.0.0.1) are left alone:
+     * the page already has them, and refreshing it from its own save would only repeat work.
+     */
+    private fun refreshHomeAfter(s: IHTTPSession) {
+        // The socket's own address: a "remote-addr" header sent by the client replaces NanoHTTPD's.
+        val from = s.remoteIpAddress ?: return
+        if (from != "127.0.0.1" && from != "::1" && !from.startsWith("0:0:0:0:0:0:0:1")) HomeActivity.refresh()
+    }
+
     // ---------------------------------------------------------------- API
 
     private fun api(s: IHTTPSession): Response {
         val path = s.uri.removeSuffix("/")
         val m = s.method
+        // A photo from the phone's Home settings page: the picture itself is the body (up to 25 MB),
+        // read here as a stream, never as JSON. A refused upload closes the connection, so its unread
+        // bytes are never taken as the next request.
+        if (m == Method.POST && path == "/api/photos") {
+            if (!authed(s)) return json(401, err("pair this phone first")).apply { closeConnection(true) }
+            val len = s.headers["content-length"]?.toLongOrNull() ?: 0L
+            return try {
+                val p = Photos.add(s.inputStream, len)
+                refreshHomeAfter(s)
+                json(200, ok().put("photo", p).put("count", photoCount()))
+            } catch (e: ApiError) { json(e.status, err(e.message ?: "error")).apply { closeConnection(true) } }
+        }
+        // a photo's picture for the phone page's list (the cookie the page pairs with carries the token)
+        if (m == Method.GET && path.startsWith("/api/photo/")) {
+            if (!authed(s)) return json(401, err("pair this phone first"))
+            val f = Photos.file(path.removePrefix("/api/photo/")) ?: return json(404, err("no such photo"))
+            return newFixedLengthResponse(Response.Status.OK, "image/jpeg", f.inputStream(), f.length()).noStore()
+        }
+        // an installed app's icon for the phone page's apps card (Widgets on your screen)
+        if (m == Method.GET && path.startsWith("/api/appicon/")) {
+            if (!authed(s)) return json(401, err("pair this phone first"))
+            val png = AppIcon.png(ctx, path.removePrefix("/api/appicon/")) ?: return json(404, err("no such app"))
+            return newFixedLengthResponse(Response.Status.OK, "image/png", java.io.ByteArrayInputStream(png), png.size.toLong()).apply { addHeader("Cache-Control", "private, max-age=86400") }
+        }
         // Always read the body first: an unread body would be taken as the start of the next request
         // on a kept-alive connection (seen in testing after a 401).
         bodies[s] = readBody(s)
@@ -77,26 +119,35 @@ class Server(private val ctx: Context, port: Int) : NanoWSD(port) {
             "/api/health" -> {
                 val a = authed(s)
                 val o = JSONObject().put("ok", true).put("mode", "on-tv").put("version", BuildConfig.VERSION_NAME).put("auth", if (a) "ok" else "required")
+                    .put("phone_page", true)   // this TV serves the phone's Home settings page (/setup)
                 if (a) o.put("tv_connected", true).put("adb", Adb.connected)
                 return json(200, o)
             }
+            // Pairing (Auth, PairLock): 5 different wrong codes in 10 minutes from one address make that address
+            // wait (429), and 15 in 10 minutes from all addresses lock both for everyone for 10 minutes. A new code
+            // only when none is live with time left (Auth.pinForQr), so asking again never swaps the
+            // code a QR on the TV or someone typing is using.
             "/api/pair/start" -> {
                 if (m != Method.POST) throw ApiError(405, "POST only")
-                Auth.newPin()
+                pairLocked(s.remoteIpAddress)?.let { return it }
+                Auth.pinForQr(minLeft = 90)   // someone is about to type it: at least 90 s to do so
                 App.showPin()
-                return json(200, ok().put("digits", 6).put("expires_in", 180).put("note", "The code is on the TV now."))
+                return json(200, ok().put("digits", 6).put("expires_in", Auth.pinSecondsLeft()).put("note", "The code is on the TV now."))
             }
             "/api/pair" -> {
                 if (m != Method.POST) throw ApiError(405, "POST only")
                 val b = body(s)
+                pairLocked(s.remoteIpAddress)?.let { return it }
                 Thread.sleep(400)   // slows guessing a little more
-                val token = Auth.pair(b.optString("pin"), b.optString("name").ifEmpty { null })
-                    ?: return json(401, err(if (Auth.currentPin() == null) "That code has expired. Ask the TV for a new one." else "That code is not right. Check the TV."))
+                val token = Auth.pair(b.optString("pin"), b.optString("name").ifEmpty { null }, s.remoteIpAddress)
+                    ?: return pairLocked(s.remoteIpAddress) ?: json(401, err(if (Auth.currentPin() == null) "That code has expired. Ask the TV for a new one." else "That code is not right. Check the TV."))
                 Now.push()
                 return json(200, ok().put("token", token))
             }
         }
         if (!authed(s)) return json(401, err("pair this phone first: open this page on your phone and type the code from the TV"))
+
+        if (path.startsWith("/api/matter/")) return matter("$m $path", s)
 
         val q = { k: String -> s.parameters[k]?.firstOrNull() }
         return when ("$m $path") {
@@ -109,11 +160,14 @@ class Server(private val ctx: Context, port: Int) : NanoWSD(port) {
             "POST /api/key" -> {
                 val b = body(s)
                 val key = b.optString("key").ifEmpty { throw ApiError(400, "key is required") }
+                Now.resetPausedIdle()
                 Tv.key(key, b.optBoolean("hold"))
                 json(200, ok().put("key", key))
             }
             "POST /api/text" -> {
                 val t = body(s).optString("text").ifEmpty { throw ApiError(400, "text is required") }
+                // no ADB (a phone only install): the couch-tv home's own typing box takes the words
+                if (!Adb.connected && HomeActivity.typeText(t)) return json(200, ok().put("into", "home"))
                 Tv.text(t); json(200, ok())
             }
             "GET /api/apps" -> {
@@ -134,13 +188,39 @@ class Server(private val ctx: Context, port: Int) : NanoWSD(port) {
             "POST /api/play" -> {
                 val b = body(s)
                 val title = b.optString("title").trim().ifEmpty { throw ApiError(400, "title is required") }
+                Now.resetPausedIdle()
                 json(200, ok(Finder.play(title, b.optInt("season").takeIf { it > 0 }, b.optInt("episode").takeIf { it > 0 },
                     b.optString("service").ifEmpty { null }, b.optString("who").ifEmpty { null })))
             }
             "POST /api/ask" -> {
-                if (!Ask.enabled) throw ApiError(501, "Ask is off in on-TV mode. To switch it on, add your own Anthropic API key on the setup page (it costs a fraction of a cent per ask).")
+                if (!Ask.available) throw ApiError(404, PlayRules.ASK_OFF)   // the Google Play build
+                if (Kids.isKid(body(s).optString("who").ifEmpty { Now.who })) throw ApiError(403, "Ask is off for a kids profile.")
+                if (!Ask.enabled) throw ApiError(501, "Ask AI is off. To switch it on, open Home settings on your phone, Ask AI, and add a key from an AI service (or a model on a home computer).")
                 val b = body(s)
-                json(200, Ask.ask(b.optString("text").ifEmpty { throw ApiError(400, "text is required") }, b.optString("who").ifEmpty { Now.who }))
+                val text = b.optString("text").ifEmpty { throw ApiError(400, "text is required") }
+                val r = Ask.ask(text, b.optString("who").ifEmpty { Now.who })
+                Say.asked(text, r.optString("reply"), "Your AI service, from the Couch TV app")   // shows on the TV home too
+                json(200, r)
+            }
+            // Ask AI on the TV home, and messages and designs from the person's own AI agent (Say.kt, docs/AI-AGENT.md)
+            "GET /api/say" -> {
+                if (q("home") == "1") Say.heard()   // the TV home itself (ask.js), not an agent reading it
+                json(200, ok(Say.snapshot()))
+            }
+            "POST /api/say/message" -> {
+                val b = body(s)
+                val m = try { Say.message(b.optString("text"), b.optString("from"), if (b.has("seconds")) b.optInt("seconds", 30) else null) } catch (e: IllegalArgumentException) { throw ApiError(400, e.message ?: "bad message") }
+                json(200, ok().put("message", m))
+            }
+            "POST /api/say/design" -> {
+                val b = body(s)
+                val d = try { Say.design(b.optString("code"), from = b.optString("from")) } catch (e: IllegalArgumentException) { throw ApiError(400, e.message ?: "bad code") }
+                // listening false: the home is not open now; it shows the design when it opens (within 10 minutes)
+                json(200, ok().put("design", d).put("asks_first", true).put("listening", Say.listening()))   // the TV always asks "Use this design?" first
+            }
+            "POST /api/say/scene" -> {
+                val sc = try { Say.scene(body(s).optString("pick")) } catch (e: IllegalArgumentException) { throw ApiError(400, e.message ?: "bad pick") }
+                json(200, ok().put("scene", sc).put("listening", Say.listening()))   // listening false: Couch TV is not on screen now
             }
             "GET /api/recs" -> json(200, ok().put("updated", Now.iso()).put("continue", Now.continueItems(q("who"))).put("picks", JSONArray()))
             "GET /api/continue" -> json(200, ok().put("items", Now.continueItems(q("who"))))
@@ -148,13 +228,40 @@ class Server(private val ctx: Context, port: Int) : NanoWSD(port) {
             "POST /api/continue/open" -> {
                 val b = body(s)
                 val id = b.optString("id").ifEmpty { throw ApiError(400, "id is required") }
+                // a card from Android's Watch Next rows (#122): its app opens it, as on the TV
+                if (id.startsWith(WatchNext.ID_PREFIX)) {
+                    if (!WatchNext.open(id)) throw ApiError(404, "not in keep watching")
+                    return json(200, ok())
+                }
                 val it = Store.historyItem(id) ?: throw ApiError(404, "not in keep watching")
                 json(200, ok(Finder.play(it.getString("title"), it.optInt("season").takeIf { s -> s > 0 }, it.optInt("episode").takeIf { s -> s > 0 },
                     it.optString("service").ifEmpty { null }, b.optString("who").ifEmpty { null }, resume = true)))
             }
             "GET /api/history" -> json(200, ok().put("items", Store.history()))
             "GET /api/who" -> json(200, ok().put("who", Now.who ?: JSONObject.NULL))
-            "POST /api/who" -> { Now.who = body(s).optString("who").ifEmpty { null }; Now.push(); json(200, ok().put("who", Now.who ?: JSONObject.NULL)) }
+            "POST /api/who" -> {
+                val b = body(s)
+                val next = b.optString("who").ifEmpty { null }
+                // Kids mode: moving this TV away from a kids profile needs the parent PIN (docs/CONFIG.md)
+                val was = Now.who
+                if (was != next && Kids.isKid(was)) {
+                    val addr = s.remoteIpAddress ?: ""
+                    if (Kids.lockedOut(addr)) throw ApiError(429, "Too many wrong PINs. Wait a few minutes and try again.")
+                    if (!Kids.verify(was, b.optString("pin"))) { Kids.wrongPin(addr); throw ApiError(403, "The parent PIN is needed for that.") }
+                }
+                Now.who = next; Now.push(); json(200, ok().put("who", Now.who ?: JSONObject.NULL))
+            }
+            // Kids mode: the shelves, and changes to them with the parent PIN (Kids.kt, bridge/API.md)
+            "GET /api/kids" -> {
+                val people = Store.people(); val list = JSONArray()
+                for (i in 0 until people.length()) people.optJSONObject(i)?.let { p ->
+                    list.put(JSONObject().put("id", p.optString("id")).put("name", p.optString("name")).put("kids", Kids.isKid(p.optString("id")))) }
+                json(200, ok().put("kids", Kids.list()).put("people", list))
+            }
+            "POST /api/kids" -> {
+                val r = Kids.change(body(s), s.remoteIpAddress ?: "")
+                if (r != null) json(r.first, err(r.second)) else { Now.push(); refreshHomeAfter(s); json(200, ok().put("kids", Kids.list())) }
+            }
             "GET /api/sleep" -> json(200, ok().put("ends", Now.sleepEnds?.let { Now.iso(it) } ?: JSONObject.NULL))
             "POST /api/sleep" -> {
                 val min = body(s).optDouble("minutes", Double.NaN)
@@ -162,14 +269,50 @@ class Server(private val ctx: Context, port: Int) : NanoWSD(port) {
                 App.setSleep(if (min > 0) System.currentTimeMillis() + (min * 60_000).toLong() else null)
                 json(200, ok().put("ends", Now.sleepEnds?.let { Now.iso(it) } ?: JSONObject.NULL))
             }
+            "POST /api/idle/cancel" -> {
+                Now.cancelPausedIdle()
+                json(200, ok().put("snoozed", true))
+            }
             "GET /api/picture" -> json(200, ok().put("mode", JSONObject.NULL).put("supported", false).put("can_set", false))
             "POST /api/picture" -> json(409, err("picture mode is not available in on-TV mode"))
             "GET /api/screens" -> json(200, ok().put("screens", JSONArray()))
             "POST /api/screens/open" -> json(404, err("no screens in on-TV mode"))
+            // the TV's inputs, for the setup page's input tiles (the home reads them through TVOS.tvInputs)
+            "GET /api/inputs" -> json(200, ok().put("inputs", Tv.inputs()).put("pinned", Store.inputs()))
             "POST /api/power" -> power(body(s).optString("state"))
             "POST /api/volume" -> volume(body(s))
-            "GET /api/screenshot" -> newFixedLengthResponse(Response.Status.OK, "image/png", Tv.screenshot().inputStream(), -1).noStore()
+            "GET /api/screenshot" -> if (!PlayRules.screenshots(BuildConfig.FLAVOR)) json(404, err("no screenshots in this version")) else newFixedLengthResponse(Response.Status.OK, "image/png", Tv.screenshot().inputStream(), -1).noStore()
             "GET /api/weather" -> json(200, ok(Weather.get() ?: throw ApiError(503, "No weather right now.")))
+            // the web widgets' relay (WebData.kt): news feeds and share prices, by id only
+            "GET /api/webdata" -> {
+                val src = q("src") ?: ""; val id = q("id") ?: ""
+                val url = WebData.urlFor(src, id) ?: throw ApiError(400, "unknown source")
+                val text = try { WebData.get(src, id, url) } catch (e: Exception) { throw ApiError(502, "The source could not be read just now.") }
+                json(200, ok().put("src", src).put("id", id).put("text", text))
+            }
+            // the Agenda's and the Welcome widget's calendars, read here so a phone only install greets
+            // guests with no computer at home (Ical.kt: https only, internet hosts only, 4 MB)
+            "POST /api/calendar" -> {
+                val (good, text) = Ical.read(body(s).optString("url"))
+                if (good) json(200, ok().put("text", text)) else json(400, err(text))
+            }
+            // names from booking emails need a computer at home that reads them (bridge/bookings.py)
+            "GET /api/stay-names" -> json(200, ok().put("on", false).put("names", JSONArray()))
+            // the guest's name for the Welcome widget, typed on the TV or the phone remote
+            "GET /api/guest" -> json(200, ok().put("guest", Store.guest()))
+            "POST /api/guest" -> {
+                val b = body(s)
+                if (!b.has("name") && !b.has("stay_url")) throw ApiError(400, "name is required (an empty name clears it)")
+                // a bookings link from the phone: checked like /api/calendar's (https, no name or password inside)
+                if (b.has("stay_url")) {
+                    val raw = b.optString("stay_url").trim()
+                    val u = if (raw.isEmpty()) "" else Ical.checkUrl(raw) ?: throw ApiError(400, "That is not a calendar link. It starts with https://, or is a calendar app's own link.")
+                    Store.saveStayUrl(u)
+                }
+                val g = if (b.has("name")) Store.saveGuest(b.optString("name")) else Store.guest()
+                Now.push(); refreshHomeAfter(s)
+                json(200, ok().put("guest", g))
+            }
             "POST /api/home-apps" -> {
                 val b = body(s)
                 Store.writeJson("home-apps.json", JSONObject().put("apps", b.optJSONArray("apps") ?: JSONArray()).put("line", b.optInt("line", 10)))
@@ -181,10 +324,13 @@ class Server(private val ctx: Context, port: Int) : NanoWSD(port) {
                 val order = b.optJSONArray("order") ?: throw ApiError(400, "order must be a list of app packages")
                 if (!b.has("line")) throw ApiError(400, "line is required")
                 Store.writeJson("app-order.json", JSONObject().put("order", order).put("line", b.optInt("line").coerceIn(0, 10)))
+                refreshHomeAfter(s)
                 json(200, appOrder())
             }
             // ---- on-TV extras ----
             "GET /api/adb" -> json(200, ok(JSONObject(Adb.status())))
+            // "Can't connect?" on the phone page: the one thing in the way, and a private report (ConnectCheck)
+            "GET /api/adb/check" -> json(200, ok(JSONObject(ConnectCheck.run(ctx, s.remoteIpAddress))))
             "POST /api/adb/connect" -> { val tls = body(s).optString("route") == "tls"; if (tls) Adb.disconnect(); Thread { runCatching { Adb.ensure(interactive = true, preferTls = tls) }.onFailure { Log.w(TAG, "adb connect", it) }; Now.push() }.start(); json(200, ok(JSONObject(Adb.status()))) }
             "POST /api/adb/pair" -> {
                 val b = body(s)
@@ -195,6 +341,18 @@ class Server(private val ctx: Context, port: Int) : NanoWSD(port) {
                 json(if (r.optBoolean("ok")) 200 else 502, r)
             }
             "POST /api/adb/disconnect" -> { Adb.disconnect(); json(200, ok()) }
+            // Update couch-tv from the phone's TV setup page: the same state and install as the TV's Home settings (Update.kt)
+            "GET /api/update" -> json(200, ok(JSONObject(Update.state(ctx))))
+            "POST /api/update/check" -> { Update.check(ctx, true); json(200, ok(JSONObject(Update.state(ctx)))) }
+            "POST /api/update/install" -> { Update.install(ctx); json(200, ok(JSONObject(Update.state(ctx)))) }
+            // Make Home open Couch TV (HomeKey.kt): the watch APK from GitHub over its own ADB link, then the watch on
+            "GET /api/homekey" -> json(200, ok(JSONObject(HomeKey.state(ctx))))
+            "POST /api/homekey/start" -> {
+                // like /api/home: only a JSON request, so a plain form or link on another page cannot start it
+                if (s.headers["content-type"]?.substringBefore(';')?.trim()?.lowercase() != "application/json")
+                    throw ApiError(415, "send JSON (Content-Type: application/json)")
+                HomeKey.start(ctx); json(200, ok(JSONObject(HomeKey.state(ctx))))
+            }
             // Step-by-step handshake with every packet logged (tag couchtv.adb, "diag:"). See AdbDiag.
             "POST /api/adb/diag" -> {
                 val b = body(s)
@@ -205,10 +363,75 @@ class Server(private val ctx: Context, port: Int) : NanoWSD(port) {
             // The TV home's people list (the same one /setup edits): the home's Home settings adds,
             // renames, removes and reorders people with it, as it does with the computer bridge.
             "GET /api/people" -> json(200, ok().put("people", Store.people()))
-            "POST /api/people" -> { savePeople(body(s)); json(200, ok().put("people", Store.people())) }
+            "POST /api/people" -> { savePeople(body(s)); refreshHomeAfter(s); json(200, ok().put("people", Store.people())) }
             "GET /api/settings" -> json(200, settings())
-            "POST /api/settings" -> { saveSettings(body(s)); json(200, settings()) }
+            "POST /api/settings" -> { saveSettings(body(s)); refreshHomeAfter(s); json(200, settings()) }
+            // "Use as home screen", for a paired phone or setup tool (#96). Fire OS refuses ADB's
+            // `pm enable` for the alias, so a computer cannot switch it on any other way.
+            // held: whether Android itself already sends the Home key here (on a plain Android TV the
+            // person still answers Android's own chooser once; a Fire TV relies on the watch instead).
+            "GET /api/home" -> json(200, homeState())
+            // Only ever this app's own HomeAlias: nothing in the request names a package or component,
+            // and the TV's own launcher and setup app are never touched (AGENTS.md).
+            "POST /api/home" -> {
+                if (s.headers["content-type"]?.substringBefore(';')?.trim()?.lowercase() != "application/json")
+                    throw ApiError(415, "send JSON (Content-Type: application/json)")
+                val on = body(s).opt("on") as? Boolean ?: throw ApiError(400, "on (true or false) is required")
+                if (on != App.homeEnabled(App.instance)) {
+                    val now = System.currentTimeMillis()
+                    if (now - lastHomeChange < 2_000) throw ApiError(429, "too soon: wait a moment and try again")
+                    lastHomeChange = now
+                    App.setHomeEnabled(App.instance, on)
+                    Log.i(TAG, "use as home screen switched ${if (on) "on" else "off"} over the API from ${s.remoteIpAddress}")
+                }
+                FireHome.poke()
+                json(200, homeState())
+            }
             "POST /api/phones/forget" -> { Auth.forgetAll(); json(200, ok().put("note", "Every phone must pair again.")) }
+            // ---- Home settings on the phone (/setup) ----
+            // Home settings, "Change this on your phone": this TV's own page and a pairing code inside the
+            // QR (#pin=, the phone remote's pairing QR format), so a phone that never paired goes straight in.
+            "GET /api/phone-link" -> {
+                val ip = App.lanAddress() ?: throw ApiError(503, "This TV is not on a network yet.")
+                pairLocked(null, everyone = true)?.let { return it }   // locked for every phone: no code to show, the page hides the QR and asks again
+                val pin = Auth.pinForQr()
+                json(200, ok().put("url", SetupWords.qrLink("http://$ip:${Store.port}", pin, "/setup")).put("pin_expires_in", Auth.pinSecondsLeft())
+                    .put("phones", Auth.phoneCount()))
+            }
+            "POST /api/photos/remove" -> {
+                if (!Photos.remove(body(s).optString("id"))) throw ApiError(404, "That photo is not on the TV any more.")
+                refreshHomeAfter(s)
+                json(200, ok().put("count", photoCount()))
+            }
+            // At home (the family note, lists, guest Wi-Fi, house guide, calendar links): kept in the home
+            // page's own store on this TV, so the app hands them across to the page (HomeActivity.atHome).
+            "GET /api/athome" -> {
+                val r = HomeActivity.atHomeRead()
+                json(200, if (r == null) ok().put("live", false) else ok().put("live", true).put("athome", r))
+            }
+            "POST /api/athome" -> {
+                val e = body(s).optJSONObject("edit") ?: throw ApiError(400, "edit is required")
+                val r = HomeActivity.atHomeEdit(e)
+                when {
+                    r == null -> json(200, ok().put("live", false).put("queued", true))
+                    r.optBoolean("refused") -> json(409, err(r.optString("error")))
+                    !r.optBoolean("ok") -> json(400, err(r.optString("error", "That did not save.")))
+                    else -> json(200, ok().put("live", true).put("athome", r.optJSONObject("athome") ?: JSONObject()))
+                }
+            }
+            // Smart home through Home Assistant (app.couchtv.ha, shared with the launcher): the same shapes as
+            // the computer bridge's /api/ha (bridge/smarthome.py), plus /api/ha/phone for the set up from a phone.
+            // The page never sees the address or a token.
+            "GET /api/ha/info" -> json(200, ok().put("info", HomeAssistant.info(ctx)).put("status", HomeAssistant.status(ctx).put("phone", true)))
+            "POST /api/ha" -> {
+                val b = body(s)
+                json(200, ok().put("result", try { HomeAssistant.answer(HomeAssistant.settings(ctx), b.optString("action"), b.optString("entity"), b.optString("value")) }
+                    catch (e: Exception) { JSONObject().put("ok", false).put("error", "failed") }))
+            }
+            "POST /api/ha/phone" -> json(200, ok().put("result", HaPhone.start(ctx, App.lanAddress(), Store.port)))
+            "POST /api/ha/save" -> json(200, ok().put("result", body(s).optJSONObject("picks")?.let { p -> JSONObject().put("ok", HomeAssistant.keepPicks(ctx, p)) }
+                ?: JSONObject().put("ok", false).put("error", "picks")))
+            "POST /api/ha/forget" -> { HomeAssistant.disconnect(ctx); HaPhone.stop(); json(200, ok().put("result", JSONObject().put("ok", true))) }
             else -> json(404, err("no such endpoint: $m $path"))
         }
     }
@@ -270,8 +493,21 @@ class Server(private val ctx: Context, port: Int) : NanoWSD(port) {
         val apps = known.optJSONArray("apps") ?: JSONArray()
         val saved = Store.readJson("app-order.json") as? JSONObject
         if (saved == null) return ok().put("apps", apps).put("line", minOf(known.optInt("line", 10), 10, apps.length())).put("saved", false).put("dock_max", 10)
-        val by = (0 until apps.length()).associate { apps.getJSONObject(it).optString("package") to apps.getJSONObject(it) }
+        val by = (0 until apps.length()).associate { apps.getJSONObject(it).optString("package") to apps.getJSONObject(it) }.toMutableMap()
         val order = saved.optJSONArray("order") ?: JSONArray()
+        val pm = ctx.packageManager
+        for (i in 0 until order.length()) {
+            val p = order.optString(i)
+            if (p.isNotEmpty() && !by.containsKey(p)) {
+                val ri = pm.resolveActivity(Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LEANBACK_LAUNCHER).setPackage(p), 0)
+                    ?: pm.resolveActivity(Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER).setPackage(p), 0)
+                if (ri != null) {
+                    val ai = ri.activityInfo
+                    by[p] = JSONObject().put("package", p).put("label", ri.loadLabel(pm).toString())
+                        .put("hasBanner", ai.banner != 0 || ai.applicationInfo.banner != 0)
+                }
+            }
+        }
         val listed = JSONArray(); val inOrder = HashSet<String>()
         for (i in 0 until order.length()) { val p = order.optString(i); inOrder += p; by[p]?.let { listed.put(it) } }
         val line = (0 until minOf(saved.optInt("line"), order.length())).count { by.containsKey(order.optString(it)) }
@@ -279,13 +515,28 @@ class Server(private val ctx: Context, port: Int) : NanoWSD(port) {
         return ok().put("apps", listed).put("line", minOf(line, 10)).put("saved", true).put("dock_max", 10)
     }
 
+    /** When /api/home last switched the home on or off, so a client cannot flip it many times a second. */
+    @Volatile private var lastHomeChange = 0L
+
+    private fun homeState(): JSONObject = ok()
+        .put("on", App.homeEnabled(App.instance))
+        .put("held", HomeRole.held(App.instance))
+        .put("fire_tv", FireHome.isFireTv)
+        .put("watch", WatchService.connected)
+
     private fun settings(): JSONObject = ok()
         // the TV home's own Home settings (language, place, look...), kept here as they come
         .put("settings", Store.readJson("home-settings.json") as? JSONObject ?: JSONObject())
         .put("updated", Store.str("home_settings_updated") ?: JSONObject.NULL)
-        .put("people", Store.people()).put("weather", Store.weather()).put("country", Store.country()).put("tv_name", Store.tvName())
-        .put("ask", JSONObject().put("enabled", Store.bool("ask_enabled")).put("has_key", !Store.str("ask_key").isNullOrEmpty()).put("model", Ask.MODEL))
+        .put("people", Store.people()).put("weather", Store.weather() ?: JSONObject.NULL).put("country", Store.country()).put("tv_name", Store.tvName())
+        .put("ask", Ask.status())
         .put("phones", Auth.phoneCount()).put("port", Store.port).put("adb", JSONObject(Adb.status()))
+        .put("skip_watch_next", JSONArray(Store.skipWatchNext().sorted())).put("watch_next_per_app", Store.watchNextPerApp())
+        .put("watch_next", JSONObject().put("granted", WatchNext.granted()).put("listed", WatchNext.listed()))
+        // Xiaomi only: Couch TV in PatchWall's place (FireHome); the setup page shows the switch when xiaomi is true
+        .put("xiaomi", FireHome.isXiaomi).put("patchwall_replace", Store.bool("patchwall_replace")).put("watch", WatchService.connected)
+        .put("watch_apk", BuildConfig.BUILD_TYPE == "watch" || Variant.play)   // only couch-tv-ontv-watch.apk has the Home button watch
+        .put("inputs", Store.inputs())
 
     /** {"people": [...]} replaces the list; {"order": [ids]} only reorders it. */
     private fun savePeople(b: JSONObject) {
@@ -308,11 +559,69 @@ class Server(private val ctx: Context, port: Int) : NanoWSD(port) {
         Now.push()
     }
 
+    /**
+     * A saved app order (Arrange apps) puts anything it does not list behind More apps, so a newly
+     * pinned input tile would not show. Pinned inputs go in just above the line (the home names them
+     * "input:<id>"), unpinned ones come out. Without a saved order the home already keeps them in the dock.
+     */
+    private fun pinInputsInOrder(inputs: JSONArray) {
+        val saved = Store.readJson("app-order.json") as? JSONObject ?: return
+        val old = saved.optJSONArray("order") ?: JSONArray()
+        val want = (0 until inputs.length()).mapNotNull { inputs.optJSONObject(it)?.optString("id")?.takeIf { s -> s.isNotEmpty() }?.let { s -> "input:$s" } }
+        var line = saved.optInt("line")
+        val order = ArrayList<String>()
+        for (i in 0 until old.length()) {
+            val p = old.optString(i)
+            if (p.startsWith("input:") && p !in want) { if (i < saved.optInt("line")) line--; continue }
+            order += p
+        }
+        // a full dock (10): the inputs take the last places, and the apps there move behind More apps
+        var at = minOf(line, 10 - want.size).coerceIn(0, order.size)
+        for (p in want) if (p !in order) { order.add(at++, p); line++ }
+        Store.writeJson("app-order.json", JSONObject().put("order", JSONArray(order)).put("line", line.coerceIn(0, 10)))
+    }
+
+    private fun photoCount(): Int = (Store.readJson("home-settings.json") as? JSONObject)?.optJSONArray("photos")?.length() ?: 0
+
     private fun saveSettings(b: JSONObject) {
+        Ask.save(b)   // first: a wrong Ask setting answers 400 before anything else in the request is saved
         b.optJSONObject("settings")?.let {
             if (it.toString().length > 32_000) throw ApiError(413, "settings are too big")
-            Store.writeJson("home-settings.json", it)
-            Store.putStr("home_settings_updated", Now.iso())
+            // The home sends its whole copy with "seen", the "updated" it last read. If the copy here has
+            // changed since (the phone's Home settings page: the town, a photo), the home's copy is older:
+            // the keys the phone changes stay as they are here. One lock with the phone's own writes.
+            synchronized(Store) {
+                val seen = b.optString("seen").ifEmpty { null }
+                val now = Store.str("home_settings_updated")
+                if (seen != null && now != null && seen != now) {
+                    SettingsMerge.keepServer(it, Store.readJson("home-settings.json") as? JSONObject)
+                }
+                Store.writeJson("home-settings.json", it)
+                Store.putStr("home_settings_updated", Now.iso())
+            }
+        }
+        // The phone's Home settings page changes only the keys it names (null takes one out), so a
+        // town picked on the phone never undoes a look picked on the TV. Same keys and shapes as the
+        // home's own Home settings (app.js ST); "place" is the home's Location, {name, area, lat, lon, timezone}.
+        b.optJSONObject("settings_patch")?.let { p ->
+            val keys = p.keys().asSequence().toList()
+            keys.forEach { k -> if (k !in PATCH_KEYS) throw ApiError(400, "$k is not changed from the phone") }
+            if (p.has("place") && !p.isNull("place")) {
+                val pl = p.opt("place") as? JSONObject ?: throw ApiError(400, "place must be an object or null")
+                val lat = pl.optDouble("lat", Double.NaN); val lon = pl.optDouble("lon", Double.NaN)
+                if (lat.isNaN() || lon.isNaN() || lat !in -90.0..90.0 || lon !in -180.0..180.0 || pl.optString("name").isBlank())
+                    throw ApiError(400, "place needs a name, and lat and lon as numbers")
+            }
+            Store.editHomeSettings { hs -> keys.forEach { k -> if (p.isNull(k)) hs.remove(k) else hs.put(k, p.get(k)) } }
+            // the weather the phone remote and /api/weather use follows the same town
+            if (p.has("place")) {
+                val pl = p.optJSONObject("place")
+                if (pl == null) Store.putStr("weather", null)
+                else Store.putStr("weather", JSONObject().put("lat", pl.getDouble("lat")).put("lon", pl.getDouble("lon"))
+                    .put("place", listOf(pl.optString("name"), pl.optString("area")).filter { it.isNotBlank() }.joinToString(", ").take(40))
+                    .put("timezone", pl.optString("timezone", "auto").take(40)).toString())
+                Weather.clear()
+            }
         }
         b.optJSONArray("people")?.let { arr ->
             val clean = JSONArray()
@@ -328,10 +637,84 @@ class Server(private val ctx: Context, port: Int) : NanoWSD(port) {
                 .put("place", w.optString("place").take(40)).put("timezone", w.optString("timezone", "UTC").take(40)).toString())
             Weather.clear()
         }
+        // HDMI ports as dock tiles: [{"port": 1, "label": "Camera", "icon": "hdmi"}], up to 6.
+        // An empty list takes them all off. Same keys as home.inputs in docs/CONFIG.md.
+        b.optJSONArray("inputs")?.let { arr ->
+            val clean = JSONArray()
+            for (i in 0 until minOf(arr.length(), 6)) {
+                val p = arr.optJSONObject(i) ?: continue
+                val o = JSONObject()
+                p.optInt("port", 0).takeIf { it in 1..9 }?.let { o.put("port", it) }
+                p.optString("id").trim().takeIf { it.isNotEmpty() && it.length <= 200 }?.let { o.put("id", it) }
+                p.optString("match").trim().takeIf { it.isNotEmpty() }?.let { o.put("match", it.take(40)) }
+                if (!o.has("port") && !o.has("id") && !o.has("match")) continue
+                o.put("label", p.optString("label").trim().ifEmpty { o.optInt("port").takeIf { it > 0 }?.let { "HDMI $it" } ?: "HDMI" }.take(30))
+                o.put("icon", p.optString("icon").takeIf { it in INPUT_ICONS } ?: "hdmi")
+                clean.put(o)
+            }
+            Store.putStr("inputs", clean.toString())
+            pinInputsInOrder(clean)
+        }
         b.optString("country").takeIf { Regex("[A-Z]{2}").matches(it) }?.let { Store.putStr("country", it) }
         b.optString("tv_name").trim().takeIf { it.isNotEmpty() }?.let { Store.putStr("tv_name", it.take(30)) }
-        if (b.has("ask_key")) Store.putStr("ask_key", b.optString("ask_key").trim().ifEmpty { null })
-        if (b.has("ask_enabled")) Store.putBool("ask_enabled", b.optBoolean("ask_enabled"))
+        if (b.has("patchwall_replace") && FireHome.isXiaomi) {
+            Store.putBool("patchwall_replace", b.optBoolean("patchwall_replace"))
+            WatchService.keyFilterChanged()
+        }
+        // Watch Next in Keep watching (#122): the TV home app's two settings, same names and limits
+        b.optJSONArray("skip_watch_next")?.let { arr ->
+            val clean = JSONArray()
+            (0 until minOf(arr.length(), 100)).map { arr.optString(it).trim() }.filter { Store.PACKAGE.matches(it) }.distinct().forEach { clean.put(it) }
+            Store.putStr("skip_watch_next", clean.toString())
+        }
+        if (b.has("watch_next_per_app")) Store.putStr("watch_next_per_app", b.optInt("watch_next_per_app", 5).coerceIn(1, 20).toString())
+    }
+
+    // ---------------------------------------------------------------- Matter (matter/Matter.kt, matter-contract.md)
+
+    private fun matter(route: String, s: IHTTPSession): Response = try {
+        val b = body(s)
+        when (route) {
+            "GET /api/matter/devices" -> json(200, dev.couchtv.ontv.matter.Matter.devicesJson())
+            "POST /api/matter/commission" -> {
+                val r = dev.couchtv.ontv.matter.Matter.commission(b.optString("code"), b.optString("address").ifEmpty { null })
+                json(if (r.optBoolean("ok")) 200 else 400, r)
+            }
+            "POST /api/matter/command" -> json(200, dev.couchtv.ontv.matter.Matter.command(b.optString("id"), b.optString("action"), b.opt("value")))
+            "POST /api/matter/rename" -> json(200, dev.couchtv.ontv.matter.Matter.rename(b.optString("id"), b.optString("name")))
+            "POST /api/matter/remove" -> json(200, dev.couchtv.ontv.matter.Matter.remove(b.optString("id")))
+            // live state: "event: matter" with the device list whenever a device reports a change
+            "GET /api/matter/events" -> {
+                val q = LinkedBlockingQueue<String>(20)
+                val fn: (Long) -> Unit = { q.clear(); q.offer("event: matter\ndata: ${dev.couchtv.ontv.matter.Matter.devicesJson()}\n\n") }
+                q.offer("event: matter\ndata: ${dev.couchtv.ontv.matter.Matter.devicesJson()}\n\n")
+                dev.couchtv.ontv.matter.Matter.listen(fn)
+                stream(q) { dev.couchtv.ontv.matter.Matter.unlisten(fn) }
+            }
+            else -> json(404, err("no such Matter call"))
+        }
+    } catch (e: dev.couchtv.ontv.matter.Matter.Refused) { json(e.status, err(e.message ?: "error").put("reason", e.reason)) }
+    catch (e: Exception) { Log.w("couchtv.matter", "$route", e); json(500, err("Matter could not do that just now.").put("reason", "failed")) }
+
+    private fun stream(q: LinkedBlockingQueue<String>, onClose: () -> Unit): Response {
+        val input = object : InputStream() {
+            private var buf = ByteArray(0); private var pos = 0; private var closed = false
+            override fun read(): Int { val b = ByteArray(1); return if (read(b, 0, 1) < 0) -1 else b[0].toInt() and 0xff }
+            override fun read(b: ByteArray, off: Int, len: Int): Int {
+                if (closed) return -1
+                if (pos >= buf.size) {
+                    val msg = try { q.poll(20, TimeUnit.SECONDS) } catch (e: InterruptedException) { null } ?: ": keepalive\n\n"
+                    buf = msg.toByteArray(); pos = 0
+                }
+                val n = minOf(len, buf.size - pos)
+                System.arraycopy(buf, pos, b, off, n); pos += n
+                return n
+            }
+            override fun close() { closed = true; onClose() }
+        }
+        return newChunkedResponse(Response.Status.OK, "text/event-stream", input).apply {
+            addHeader("Cache-Control", "no-cache"); addHeader("X-Accel-Buffering", "no")
+        }
     }
 
     // ---------------------------------------------------------------- server-sent events
@@ -388,6 +771,29 @@ class Server(private val ctx: Context, port: Int) : NanoWSD(port) {
         }
     }
 
+    // ---------------------------------------------------------------- smart home from a phone
+
+    /**
+     * /ha: the phone page that signs this TV in to Home Assistant and ticks what shows (HaPhone.kt).
+     * Open, like /api/pair: every call needs the key from the QR code on the TV instead of a paired phone.
+     */
+    private fun haPhone(s: IHTTPSession): Response {
+        val len = s.headers["content-length"]?.toIntOrNull() ?: 0
+        if (len > 64 * 1024) return json(413, err("request too large"))
+        val buf = ByteArray(maxOf(0, len))
+        var read = 0
+        while (read < len) { val n = s.inputStream.read(buf, read, len - read); if (n < 0) break; read += n }
+        val q = s.parameters.mapValues { it.value.firstOrNull() ?: "" }
+        val r = HaPhone.handle(ctx, s.method.name, s.uri, q, String(buf, 0, read, Charsets.UTF_8), s.headers["host"], Store.port) {
+            name -> try { assets.open("www/tv/$name").use { it.readBytes() } } catch (e: IOException) { null }
+        } ?: return newFixedLengthResponse(Response.Status.NOT_FOUND, "text/plain", "Not found")
+        return newFixedLengthResponse(Status(r.status), r.type, java.io.ByteArrayInputStream(r.body), r.body.size.toLong()).noStore().apply {
+            r.location?.let { addHeader("Location", it) }
+            addHeader("Referrer-Policy", "no-referrer")
+            addHeader("X-Content-Type-Options", "nosniff")
+        }
+    }
+
     // ---------------------------------------------------------------- static files
 
     private fun staticOrIndex(root: String, rel: String, inject: Boolean): Response {
@@ -399,10 +805,19 @@ class Server(private val ctx: Context, port: Int) : NanoWSD(port) {
         return if (inject) index(root) else asset("$root/index.html")
     }
 
+    /** 429 while pairing is locked for this address (too many wrong codes), or for everyone, else null. */
+    private fun pairLocked(addr: String?, everyone: Boolean = false): Response? {
+        val secs = if (everyone) Auth.lockedEverywhere() else Auth.lockedFor(addr)
+        if (secs <= 0) return null
+        return json(429, err("Too many wrong codes. Wait ${(secs + 59) / 60} min, then try again.").put("retry_after", secs))
+            .apply { addHeader("Retry-After", secs.toString()) }
+    }
+
     /** The phone remote's index.html with the on-TV pairing script added first. */
     private fun index(root: String): Response {
         val html = assets.open("$root/index.html").bufferedReader().readText()
-        val tag = "<script src=\"/ontv/shim.js\"></script>"
+        // the pairing box speaks the phone remote's language: phone-words.js (its table only, data-manual), then shim.js
+        val tag = "<script src=\"/tv/phone-words.js\" data-manual></script><script src=\"/ontv/shim.js\"></script>"
         val out = if (html.contains("<head>")) html.replaceFirst("<head>", "<head>$tag") else tag + html
         return newFixedLengthResponse(Response.Status.OK, "text/html; charset=utf-8", out).noCache()
     }
@@ -448,13 +863,24 @@ class Server(private val ctx: Context, port: Int) : NanoWSD(port) {
         newFixedLengthResponse(Status(status), "application/json", o.toString()).noStore()
 
     private fun Response.noCache() = apply { addHeader("Cache-Control", "no-cache") }
+    /** this install's tag for www/tv (StaticTag): the version code and when it was installed or updated */
+    private val tvTag: String by lazy {
+        val pi = runCatching { ctx.packageManager.getPackageInfo(ctx.packageName, 0) }.getOrNull()
+        StaticTag.of(BuildConfig.VERSION_CODE.toLong(), pi?.lastUpdateTime ?: 0L)
+    }
     private fun Response.noStore() = apply { addHeader("Cache-Control", "no-store") }
 
     private class Status(private val code: Int) : Response.IStatus {
         override fun getRequestStatus() = code
-        override fun getDescription() = "$code " + when (code) { 200 -> "OK"; 400 -> "Bad Request"; 401 -> "Unauthorized"; 404 -> "Not Found"
-            409 -> "Conflict"; 413 -> "Payload Too Large"; 501 -> "Not Implemented"; 502 -> "Bad Gateway"; 503 -> "Service Unavailable"; 504 -> "Gateway Timeout"; else -> "Status" }
+        override fun getDescription() = "$code " + when (code) { 200 -> "OK"; 302 -> "Found"; 403 -> "Forbidden"; 400 -> "Bad Request"; 401 -> "Unauthorized"; 404 -> "Not Found"
+            409 -> "Conflict"; 413 -> "Payload Too Large"; 415 -> "Unsupported Media Type"; 429 -> "Too Many Requests";501 -> "Not Implemented"; 502 -> "Bad Gateway"; 503 -> "Service Unavailable"; 504 -> "Gateway Timeout"; else -> "Status" }
     }
 
-    companion object { private const val TAG = "couchtv.server" }
+    companion object {
+        private const val TAG = "couchtv.server"
+        /** The dock tile pictures the home has for an input (docs/CONFIG.md, home.inputs). */
+        private val INPUT_ICONS = setOf("hdmi", "cable", "pc", "ps5", "xbox", "switch")
+        /** Home settings keys the phone's Home settings page may change (settings_patch). Photos have their own calls. */
+        private val PATCH_KEYS = setOf("place")
+    }
 }

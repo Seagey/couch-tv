@@ -3,11 +3,17 @@ package dev.couchtv.ontv
 import android.content.Context
 import android.content.Intent
 import android.media.AudioManager
+import android.media.tv.TvContract
+import android.media.tv.TvInputInfo
+import android.media.tv.TvInputManager
+import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import android.os.PowerManager
 import android.provider.Settings
 import android.content.pm.PackageManager
+import org.json.JSONArray
+import org.json.JSONObject
 
 class ApiError(val status: Int, message: String) : Exception(message)
 
@@ -58,16 +64,40 @@ object Tv {
         ctx.packageManager.getInstalledApplications(0).map { it.packageName }.toSet()
     } catch (e: Exception) { emptySet() }
 
+    val LAUNCHER_ONLY = listOf("com.amazon.venezia", "com.audible.application.firetv")
+
     fun tvLaunchables(): List<android.content.pm.ResolveInfo> {
+        val pm = ctx.packageManager
         val q = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LEANBACK_LAUNCHER)
-        return ctx.packageManager.queryIntentActivities(q, 0).distinctBy { it.activityInfo.packageName }
+        // Fire TV's Appstore declares LAUNCHER, but no LEANBACK_LAUNCHER.
+        // Also Fire TV apps that declare only LAUNCHER (Audible, #238) and packages in app order.
+        val launcherPkgs = LAUNCHER_ONLY.toMutableSet()
+        val saved = runCatching { Store.readJson("app-order.json") as? JSONObject }.getOrNull()
+        saved?.optJSONArray("order")?.let { order ->
+            for (i in 0 until order.length()) {
+                val pkg = order.optString(i)
+                if (pkg.isNotEmpty()) launcherPkgs.add(pkg)
+            }
+        }
+        val extra = launcherPkgs.flatMap {
+            pm.queryIntentActivities(Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER).setPackage(it), 0)
+        }
+        return (pm.queryIntentActivities(q, 0) + extra)
+            .distinctBy { it.activityInfo.packageName }
+    }
+
+    /** The same launch target for the TV tile and the phone remote. */
+    fun launchIntent(pkg: String): Intent? {
+        val pm = ctx.packageManager
+        // The store's ordinary LAUNCHER activity opens "Your Apps & Games", not the storefront.
+        val store = Intent("com.amazon.venezia.ade.FEATURED_LAUNCH").setPackage(pkg)
+            .takeIf { pkg == "com.amazon.venezia" && pm.resolveActivity(it, 0) != null }
+        return store ?: pm.getLeanbackLaunchIntentForPackage(pkg) ?: pm.getLaunchIntentForPackage(pkg)
     }
 
     /** Opens an app. ADB when connected (works from the background on every TV), else an intent. */
     fun launchPackage(pkg: String): String {
-        val pm = ctx.packageManager
-        val i = pm.getLeanbackLaunchIntentForPackage(pkg) ?: pm.getLaunchIntentForPackage(pkg)
-            ?: throw ApiError(404, "$pkg is not installed on the TV")
+        val i = launchIntent(pkg) ?: throw ApiError(404, "$pkg is not installed on the TV")
         val comp = i.component
         if (Adb.connected && comp != null) {
             val out = Adb.shell("am start -n ${comp.packageName}/${comp.className} -a android.intent.action.MAIN -f 0x10200000", 12_000)
@@ -98,7 +128,7 @@ object Tv {
         return "intent"
     }
 
-    private fun start(i: Intent) {
+    fun start(i: Intent) {
         i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         var err: Exception? = null
         val latch = java.util.concurrent.CountDownLatch(1)
@@ -110,6 +140,56 @@ object Tv {
             App.note = "Opened with a plain intent while in the background; if nothing appeared, connect ADB once in setup."
         }
     }
+
+    /**
+     * The TV's own inputs: the HDMI ports and the rest Android lists, minus any the TV's owner hid,
+     * with the devices HDMI-CEC found behind each. Same JSON as the TV home app's tvInputs:
+     * [{id, label, type, devices: [..]}]. The home's Input menu and its pinned input tiles use it.
+     */
+    fun inputs(): JSONArray {
+        val all = runCatching {
+            (ctx.getSystemService(Context.TV_INPUT_SERVICE) as? TvInputManager)?.tvInputList.orEmpty()
+                .filter { it.isPassthroughInput && (Build.VERSION.SDK_INT < 24 || !it.isHidden(ctx)) }
+        }.getOrDefault(emptyList())
+        val out = JSONArray()
+        for (p in all.filter { it.parentId == null }) {
+            val devices = JSONArray()
+            all.filter { it.parentId == p.id }.forEach { c -> inputLabel(c)?.let { devices.put(it) } }
+            out.put(JSONObject().put("id", p.id).put("label", inputLabel(p) ?: "")
+                .put("type", if (p.type == TvInputInfo.TYPE_HDMI) "hdmi" else "other").put("devices", devices))
+        }
+        return out
+    }
+
+    /** The name the TV gives an input: the one its owner set, else the TV's own. */
+    private fun inputLabel(i: TvInputInfo): String? = runCatching {
+        ((if (Build.VERSION.SDK_INT >= 24) i.loadCustomLabel(ctx) else null) ?: i.loadLabel(ctx))?.toString()?.trim()?.takeIf { it.isNotEmpty() }
+    }.getOrNull()
+
+    /**
+     * Switch the TV to one input: Android's passthrough channel for it, which the TV's own input
+     * app plays (checked on a Xiaomi MiTV-MSSP3, MediaTek). If nothing takes that, the TV's input
+     * list screen instead. False: neither.
+     */
+    fun openInput(id: String): Boolean {
+        if (id.isBlank()) return false
+        val view = Intent(Intent.ACTION_VIEW, TvContract.buildChannelUriForPassthroughInput(id))
+        if (ctx.packageManager.resolveActivity(view, 0) != null) return runCatching { start(view) }.isSuccess
+        return openInputs()
+    }
+
+    /** The TV's own input list screen, where it has one. */
+    fun openInputs(): Boolean = INPUT_ACTIONS.asSequence().map { Intent(it) }
+        .firstOrNull { ctx.packageManager.resolveActivity(it, 0) != null }
+        ?.let { runCatching { start(it) }.isSuccess } ?: false
+
+    /** Where a TV keeps its input list screen (the same list as the TV home app's). */
+    private val INPUT_ACTIONS = listOf(
+        "android.settings.TV_INPUT_SETTINGS",           // some Android TV builds
+        "com.android.tv.action.VIEW_INPUTS",            // the Live Channels input picker
+        "com.google.android.tv.action.VIEW_INPUTS",
+        "android.media.tv.action.SETUP_INPUTS"          // the system list of TV inputs
+    )
 
     /**
      * The TV's own settings. On Fire OS the plain Settings action goes through Amazon's home on its
@@ -234,7 +314,8 @@ object Tv {
     // ---------- what is playing (dumpsys media_session, same parsing as the computer bridge) ----------
     data class Session(val pkg: String, var active: Boolean = false, var state: String? = null, var position: Long? = null,
                        var updated: Long? = null, var speed: Double = 0.0, var title: String? = null, var subtitle: String? = null,
-                       var queueTitle: String? = null, var album: String? = null)
+                       var queueTitle: String? = null, var album: String? = null, var duration: Long? = null,
+                       var pos_s: Double? = null, var dur_s: Double? = null)
 
     fun sessions(): Pair<Long?, List<Session>> {
         if (!Adb.connected) return null to emptyList()
@@ -259,9 +340,30 @@ object Tv {
                     cur!!.title = parts.getOrNull(0)?.takeIf { it != "null" && it.isNotEmpty() }
                     cur!!.subtitle = parts.getOrNull(1)?.takeIf { it != "null" && it.isNotEmpty() }
                     cur!!.album = parts.getOrNull(2)?.takeIf { it != "null" && it.isNotEmpty() }
+                    val mDur = Regex("(?:duration|DURATION)=(\\d+)").find(line)
+                    if (mDur != null) {
+                        cur!!.duration = mDur.groupValues[1].toLongOrNull()
+                        cur!!.dur_s = cur!!.duration?.let { Math.round(it / 100.0) / 10.0 }
+                    }
+                }
+                cur != null && (line.contains("duration", ignoreCase = true) || line.contains("android.media.metadata.duration", ignoreCase = true)) -> {
+                    val mDur = Regex("(?:duration|DURATION)=(\\d+)").find(line)
+                    if (mDur != null) {
+                        cur!!.duration = mDur.groupValues[1].toLongOrNull()
+                        cur!!.dur_s = cur!!.duration?.let { Math.round(it / 100.0) / 10.0 }
+                    }
                 }
                 line.startsWith("queueTitle=") && cur != null ->
                     cur!!.queueTitle = line.substringAfter("=").substringBeforeLast(", size=").trim().takeIf { it != "null" && it.isNotEmpty() }
+            }
+        }
+        for (s in found) {
+            if (s.position != null && s.position!! >= 0) {
+                val delta = if (uptime != null && s.updated != null && s.updated!! >= 0 && s.state == "PLAYING")
+                    Math.max(0L, uptime - s.updated!!)
+                else 0L
+                val posMs = s.position!! + (delta * s.speed).toLong()
+                s.pos_s = Math.max(0.0, Math.round(posMs / 100.0) / 10.0)
             }
         }
         return uptime to found

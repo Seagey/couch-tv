@@ -72,7 +72,7 @@ RULES=(
   "home-network-hostname|[A-Za-z0-9-]+\.(lan|home\.arpa|ts\.net)([^A-Za-z0-9.-]|$)"
 )
 # Text that is allowed to match (placeholders and public noreply addresses). Per line, extended regex.
-ALLOW='users\.noreply\.github\.com|@example\.(com|org)|your-computer\.local|homeassistant\.local|my-computer\.local|example\.local|<your-computer>\.local|x@y\.z|@types/|@vitejs/|@rolldown/|@oxc-project/|@emnapi/|@napi-rs/|@tybys/|@babel/|@esbuild/|@rollup/|@img/|\.local\.(plist|service)|_tcp\.local\.'
+ALLOW='users\.noreply\.github\.com|@example\.(com|org)|your-computer\.local|homeassistant\.local|my-computer\.local|example\.local|<your-computer>\.local|x@y\.z|@types/|@vitejs/|@rolldown/|@oxc-project/|@emnapi/|@napi-rs/|@tybys/|@babel/|@esbuild/|@rollup/|@img/|\.local\.(plist|service)|_tcp\.local\.|@[23]x\.(jpg|png|webp)'
 
 echo "== 2. generic checks (private addresses, emails, phones, paths)"
 for rule in "${RULES[@]}"; do
@@ -109,12 +109,16 @@ if [ -n "$DENYLIST" ]; then
   if [ -f "$DENYLIST" ]; then
     # -a reads binary files as text too, so strings inside images and archives are caught.
     # Pass 1, whole words.
-    words=$(grep -rIaniwF "${EXCL[@]}" --exclude=privacy-scan.sh -f "$DENYLIST" . 2> /dev/null | cut -d: -f1,2 | sort -u)
+    # An optional "<denylist>.allow" file (kept outside the repo, next to the denylist) lists exact text a
+    # line may carry on purpose, such as your own public website address; lines holding it are skipped.
+    DENY_OK="$DENYLIST.allow"
+    allowed() { if [ -f "$DENY_OK" ]; then grep -aviF -f "$DENY_OK"; else cat; fi; }
+    words=$(grep -rIaniwF "${EXCL[@]}" --exclude=privacy-scan.sh -f "$DENYLIST" . 2> /dev/null | allowed | cut -d: -f1,2 | sort -u)
     if [ -n "$words" ]; then
       while IFS= read -r h; do note "denylist  $h"; done <<< "$words"
     fi
     # Pass 2, the same words inside longer words, on lines pass 1 did not already report.
-    parts=$(grep -rIaniF "${EXCL[@]}" --exclude=privacy-scan.sh -f "$DENYLIST" . 2> /dev/null | cut -d: -f1,2 | sort -u)
+    parts=$(grep -rIaniF "${EXCL[@]}" --exclude=privacy-scan.sh -f "$DENYLIST" . 2> /dev/null | allowed | cut -d: -f1,2 | sort -u)
     if [ -n "$parts" ]; then
       while IFS= read -r h; do
         if [ -z "$words" ] || ! grep -qxF "$h" <<< "$words"; then note "denylist-inside-a-word  $h"; fi

@@ -5,7 +5,7 @@ import tempfile
 import unittest
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 os.environ["COUCH_DATA"] = tempfile.mkdtemp(prefix="couchtv-keep-")
 sys.path.insert(0, str(Path(__file__).parents[1] / "bridge"))
@@ -22,12 +22,22 @@ def line(title, tv, who, days_ago=0.0, **extra):
 
 class KeepWatchingTests(unittest.IsolatedAsyncioTestCase):
     def setUp(self):
-        for f in (store.HISTORY, store.WHO_FILE):
+        import config
+        self._orig_people = config.PEOPLE
+        self._orig_people_ids = config.PEOPLE_IDS
+        config.PEOPLE = [{"id": "person1", "name": "Person 1"}, {"id": "person2", "name": "Person 2"}]
+        config.PEOPLE_IDS = ["person1", "person2"]
+        for f in (store.HISTORY, store.WHO_FILE, store.HIDDEN):
             if os.path.exists(f):
                 os.remove(f)
         store._cache.clear()
         self.tv = next(iter(server.TVS))
         server._current.set(self.tv)
+
+    def tearDown(self):
+        import config
+        config.PEOPLE = self._orig_people
+        config.PEOPLE_IDS = self._orig_people_ids
 
     def add(self, *items):
         for i in items:
@@ -75,9 +85,21 @@ class KeepWatchingTests(unittest.IsolatedAsyncioTestCase):
         with patch.object(server, "play", new=AsyncMock(return_value={"title": "x"})) as play:
             for c in cards:
                 req = AsyncMock()
+                req.headers = {}
                 with patch.object(server, "body", new=AsyncMock(return_value={"id": c["id"], "who": "person1"})):
                     await server.h_continue_open(req)
                 self.assertEqual(play.await_args.args[0], c["title"])
+
+    async def test_a_removed_card_stays_gone_until_played_again(self):
+        self.add(line("Dark", self.tv, "person1", 3), line("Dark", self.tv, "person1", 2), line("Ozark", self.tv, "person1", 1))
+        dark = next(c for c in server.continue_items("person1") if c["title"] == "Dark")
+        hide_req = AsyncMock()
+        hide_req.headers = {}
+        with patch.object(server, "body", new=AsyncMock(return_value={"id": dark["id"]})):
+            await server.h_continue_hide(hide_req)
+        self.assertEqual(self.titles("person1"), ["Ozark"])   # the older Dark line does not come back
+        self.add(line("Dark", self.tv, "person1", -0.001))   # watched again
+        self.assertEqual(self.titles("person1"), ["Dark", "Ozark"])
 
     def test_who_is_kept_per_tv(self):
         store.save_who("person2", "living-room")
@@ -120,6 +142,112 @@ class KeepWatchingTests(unittest.IsolatedAsyncioTestCase):
         s = server._sessions(out)[0]
         self.assertEqual((s["title"], s["queue_title"], s["state"]), ("PrimeVideo", "Man of Steel", "PLAYING"))
 
+
+    async def test_nuvio_is_read_and_a_year_is_no_show(self):
+        import apps
+        self.assertNotIn(apps.describe_package("com.nuvio.tv")["id"], server.NOT_VIEWING)
+        out = ("12.5 1.0\n    package=com.nuvio.tv\n    active=true\n"
+               "    state=PlaybackState {state=PLAYING(3), position=900000, buffered position=0, speed=1.0, updated=1000}\n"
+               "    metadata: size=3, description=Pluribus, S1:E8 \u2013 Charm Offensive, null\n")
+        s = server._sessions(out)[0]
+        self.assertEqual((s["package"], s["state"]), ("com.nuvio.tv", "PLAYING"))
+        self.assertEqual((s["title"], s["subtitle"]), ("Pluribus", "S1:E8 \u2013 Charm Offensive"))
+        # Nuvio sends a film's year as the subtitle, and "2012" is a film on JustWatch
+        self.assertTrue(server.generic_title("2012"))
+        film = {"title": "2012", "type": "movie", "jw_id": "x", "runtime_min": 158}
+        server.episode_cache.clear()
+        find = AsyncMock(side_effect=lambda q, *a: (film if q == "2012" else None, []))
+        with patch.object(server.finder, "find", find):
+            self.assertEqual(await server.resolve_episode("Some Unlisted Film", "2012", True), {})
+        self.assertNotIn("2012", [c.args[0] for c in find.call_args_list])
+        server.episode_cache.clear()
+        # other apps can send a show named with a number ("1923") as the subtitle: still tried
+        self.assertIn("nuvio", server.YEAR_SUBTITLE_APPS)
+        self.assertNotIn("paramountplus", server.YEAR_SUBTITLE_APPS)
+        find = AsyncMock(return_value=(None, []))
+        with patch.object(server.finder, "find", find):
+            await server.resolve_episode("Nature's Empty Throne", "1923")
+        self.assertIn("1923", [c.args[0] for c in find.call_args_list])
+        server.episode_cache.clear()
+
+    async def test_plex_sends_the_episode_first_and_the_show_with_a_country_second(self):
+        # Plex: description=Andy's Play, The Office (US), ...; JustWatch calls the show "The Office"
+        import finder
+        self.assertTrue(finder.same_title("The Office", "The Office (US)"))
+        self.assertTrue(finder.same_title("Shameless (US)", "Shameless"))
+        self.assertFalse(finder.same_title("The Office", "The Office Party"))
+        # two different brackets are two shows, not one with a country
+        self.assertFalse(finder.same_title("The Office (UK)", "The Office (US)"))
+        self.assertFalse(finder.same_title("Dune (1984)", "Dune (2021)"))
+        self.assertFalse(finder.same_title("", ""))
+        office = {"title": "The Office", "type": "tv", "jw_id": "ts-office"}
+        find = AsyncMock(side_effect=lambda q, *a: (office if q == "The Office (US)" else None, []))
+        ep = {"season": 7, "episode": 3, "name": "Andy's Play", "runtime_min": 22}
+        server.episode_cache.clear()
+        with patch.object(server.finder, "find", find), \
+             patch.object(server.finder, "episode_by_name", new=AsyncMock(return_value=ep)):
+            r = await server.resolve_episode("Andy's Play", "The Office (US)")
+        self.assertEqual((r["show"], r["season"], r["episode"], r["episode_title"]), ("The Office", 7, 3, "Andy's Play"))
+        server.episode_cache.clear()
+
+    async def test_an_episode_named_like_a_film_stays_an_episode_of_the_show(self):
+        # "The Sting" is an Office episode and a 1973 film: the show that has it as an episode wins
+        office = {"title": "The Office", "type": "tv", "jw_id": "ts-office"}
+        film = {"title": "The Sting", "type": "movie", "jw_id": "tm-sting", "runtime_min": 129, "poster": "film.jpg"}
+        find = AsyncMock(side_effect=lambda q, *a: ({"The Sting": film, "The Office (US)": office}.get(q), []))
+        ep = {"season": 7, "episode": 5, "name": "The Sting", "runtime_min": 22}
+        server.episode_cache.clear()
+        with patch.object(server.finder, "find", find), \
+             patch.object(server.finder, "episode_by_name", new=AsyncMock(return_value=ep)):
+            r = await server.resolve_episode("The Sting", "The Office (US)")
+        self.assertEqual((r["show"], r["season"], r["episode"]), ("The Office", 7, 5))
+        server.episode_cache.clear()
+        # a film on its own is still a film
+        with patch.object(server.finder, "find", find):
+            r = await server.resolve_episode("The Sting", None)
+        self.assertEqual((r["show"], r["duration_ms"]), ("The Sting", 129 * 60000))
+        server.episode_cache.clear()
+
+    async def test_a_logged_play_takes_the_shows_picture_under_its_country_name(self):
+        store.save_who("person1", self.tv)
+        office = {"title": "The Office", "poster": "office.jpg", "backdrop": "b", "year": 2005, "type": "tv"}
+        find = AsyncMock(side_effect=lambda q, *a: (office if q == "The Office (US)" else None, []))
+        with patch.object(server.finder, "find", find):
+            await server.log_seen("The Office (US)", "Andy's Play", {"id": "plex", "package": "com.plexapp.android", "name": "Plex"},
+                                  {"season": 7, "episode": 3, "episode_title": "Andy's Play"})
+        h = store.history()[0]
+        self.assertEqual((h["title"], h["poster"], h["season"], h["episode"]), ("The Office", "office.jpg", 7, 3))
+
+    def test_nuvio_link_is_the_show_or_film_page_by_imdb_id(self):
+        import apps
+        nuvio = apps.BY_ID["nuvio"]
+        self.assertEqual(server.title_link(nuvio, {"type": "tv", "imdb": "tt22202452"}), "nuvio://series/tt22202452")
+        self.assertEqual(server.title_link(nuvio, {"type": "movie", "imdb": "tt15239678"}), "nuvio://movie/tt15239678")
+        self.assertIsNone(server.title_link(nuvio, {"type": "tv", "imdb": None}))
+        self.assertIsNone(server.title_link(nuvio, {"type": "tv", "imdb": "tt1'; reboot"}))
+        self.assertIsNone(server.title_link(apps.BY_ID["plex"], {"type": "tv", "imdb": "tt22202452"}))
+
+    async def test_a_nuvio_card_opens_the_show_page(self):
+        import apps
+        nuvio = apps.BY_ID["nuvio"]
+        fake = MagicMock(kind="android", adb_ready=AsyncMock(return_value=True), start_intent=AsyncMock(), wait_for_app=AsyncMock(return_value="com.nuvio.tv"))
+        with patch.object(server, "tv", fake), patch.object(server, "launch_app", AsyncMock(return_value=("com.nuvio.tv", "adb"))) as launch:
+            method, note = await server.search_in_app(nuvio, "Pluribus", {"type": "tv", "imdb": "tt22202452"})
+            self.assertEqual(method, "deeplink")
+            fake.start_intent.assert_awaited_once_with("nuvio://series/tt22202452", "com.nuvio.tv")
+            launch.assert_not_awaited()
+            # no IMDb id: only the app opens, as before
+            fake.start_intent.reset_mock()
+            method, _ = await server.search_in_app(nuvio, "Home Video", {"type": "movie", "imdb": None})
+            self.assertEqual(method, "app")
+            fake.start_intent.assert_not_awaited()
+            launch.assert_awaited_once()
+            # no ADB: the link is never handed to the remote, which would not pin it to Nuvio
+            fake.adb_ready = AsyncMock(return_value=False)
+            fake.start_intent.reset_mock()
+            launch.reset_mock()
+            await server.search_in_app(nuvio, "Pluribus", {"type": "tv", "imdb": "tt22202452"})
+            fake.start_intent.assert_not_awaited()
 
 if __name__ == "__main__":
     unittest.main()

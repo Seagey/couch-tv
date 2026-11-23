@@ -2,9 +2,12 @@ import { forwardRef, useEffect, useRef, useState } from 'react';
 import * as Ic from './icons.jsx';
 import { usePushUp } from './gestures.js';
 import { tick } from './haptics.js';
-import { api } from './api.js';
+import { api, getTvId } from './api.js';
 import { logoFor } from './appLogos.js';
-import { t, LANGS, choice, setChoice, locale } from './i18n.js';
+import { t, tBridge, LANGS, choice, setChoice, locale } from './i18n.js';
+import { readDesignCode, studioLink, newNonce, NONCE_KEY, dsw, setTranslate } from './designSend.js';
+setTranslate(t);
+import { hasPhonePage, widgetsOf, phonePageLink, setupLink } from './phonePage.js';
 
 export const Sheet = forwardRef(function Sheet({ open, onClose, title, children, className = '', fromTop = false, closeDrag, extra = null }, ref) {
   return (
@@ -43,7 +46,7 @@ const loadThread = () => {
   } catch { return []; }
 };
 const saveThread = (items) => { try { sessionStorage.setItem(THREAD_KEY, JSON.stringify({ at: Date.now(), items })); } catch { /* private mode */ } };
-const friendly = (msg) => (msg === 'Can’t reach the bridge' ? t('cant_reach_wifi') : msg);
+const friendly = (e) => (e?.key === 'err_bridge_unreachable' || e?.message === 'Can’t reach the home computer' ? t('cant_reach_wifi') : tBridge(e?.key, e?.vars, e?.message));
 
 export const AskSheet = forwardRef(function AskSheet({ open, onClose, recs, onAsk, onDone }, inputRef) {
   const [text, setText] = useState('');
@@ -107,12 +110,14 @@ export const AskSheet = forwardRef(function AskSheet({ open, onClose, recs, onAs
     let reply;
     try {
       const r = await onAsk(ask);
-      reply = { text: r.say || r.reply || 'Done.', options: (Array.isArray(r.options) ? r.options : []).filter((o) => o && o.text).slice(0, 3), still: /^Still working on it/.test(r.reply || '') };
+      // A keyed reply (still working, did not work) is the bridge's own sentence, so translate it;
+      // anything else is Claude's answer, already in the home's language.
+      reply = { text: (r.reply_key ? tBridge(r.reply_key, r.reply_vars, r.say || r.reply) : r.say || r.reply) || 'Done.', options: (Array.isArray(r.options) ? r.options : []).filter((o) => o && o.text).slice(0, 3), still: Boolean(r.still) || /^Still working on it/.test(r.reply || '') };
       // The chat never closes by itself (it used to close after a plain "done it" answer). It closes
       // only on the X, the scrim, Escape or Back; the answer stays in the thread.
       if (c === chat.current) tick();
     } catch (e) {
-      reply = { text: friendly(e.message), err: true, options: [{ label: t('try_again'), text: ask }] };
+      reply = { text: friendly(e), err: true, options: [{ label: t('try_again'), text: ask }] };
     }
     if (c !== chat.current) return;
     lastAt.current = Date.now();
@@ -194,7 +199,7 @@ export const AskSheet = forwardRef(function AskSheet({ open, onClose, recs, onAs
       )}
       <form className="ask-field glass" onSubmit={(e) => { e.preventDefault(); submit(); }}>
         <input ref={inputRef} value={text} onChange={onType} onKeyDown={onKey} enterKeyHint="send"
-          placeholder={thread.length ? t('reply') : t('put_on')} aria-label={thread.length ? 'Reply to Claude' : 'What do you want to watch?'} autoComplete="off" autoCorrect="on" />
+          placeholder={thread.length ? t('reply') : t('put_on')} aria-label={thread.length ? t('reply').replace(/…$/, '') : 'What do you want to watch?'} autoComplete="off" autoCorrect="on" />
         {canListen && <button type="button" className={`round glass ask-mic ${listening ? 'listening' : ''}`} aria-label={listening ? 'Stop listening' : 'Speak'}
           onPointerDown={(e) => e.preventDefault()} onClick={listen}><Ic.Mic size={20} /></button>}
         <button type="submit" className="round solid ask-send" aria-label="Send" disabled={!text.trim() || busy}
@@ -237,7 +242,7 @@ export function ArrangeSheet({ open, onClose, tvName, hidden }) {
       setNames(Object.fromEntries((d.apps || []).map((a) => [a.package, a.name])));
       setMax(d.dock_max || 10);
       setRows(pk.length ? [...pk.slice(0, d.line), LINE, ...pk.slice(d.line)] : []);
-    }).catch((e) => { setRows([]); setMsg(e.message); });
+    }).catch((e) => { setRows([]); setMsg(tBridge(e.key, e.vars, e.message)); });
   }, [open]);
 
   const save = (next) => {
@@ -248,7 +253,7 @@ export function ArrangeSheet({ open, onClose, tvName, hidden }) {
       setRows(r);
       setMsg(t('dock_full', { max }));
     } else setMsg(t('saved_home'));
-    api.saveAppOrder(r.filter((p) => p !== LINE), at).catch((e) => setMsg(e.message));
+    api.saveAppOrder(r.filter((p) => p !== LINE), at).catch((e) => setMsg(tBridge(e.key, e.vars, e.message)));
   };
 
   const start = (e, p) => {
@@ -319,14 +324,14 @@ export function PeopleSheet({ open, onClose, onSaved }) {
   useEffect(() => {
     if (!open) return;
     setRows(null); setMsg(''); setAdding('');
-    api.people().then((d) => setRows(d.people || [])).catch((e) => { setRows([]); setMsg(e.message); });
+    api.people().then((d) => setRows(d.people || [])).catch((e) => { setRows([]); setMsg(tBridge(e.key, e.vars, e.message)); });
   }, [open]);
 
   const save = (next, done) => {
     // someone new has no id until the bridge gives one, so they show once it answers
     if (next.every((p) => p.id)) setRows(next);
     api.savePeople(next).then((d) => { setRows(d.people); onSaved?.(d.people); setMsg(done || t('saved_home')); })
-      .catch((e) => setMsg(e.message));
+      .catch((e) => setMsg(tBridge(e.key, e.vars, e.message)));
   };
   const rename = (id, name) => {
     const clean = name.replace(/\s+/g, ' ').trim();
@@ -383,7 +388,161 @@ export function PeopleSheet({ open, onClose, onSaved }) {
   );
 }
 
-export const MoreSheet = forwardRef(function MoreSheet({ open, onClose, sleepEnds, onSleep, onKey, onText, sleepError, tvs, tvId, onTv, picture, pictureInfo, onPicture, onArrange, onPeople }, ref) {
+// Same Type on the TV form as More, focused from the main controls so iOS can raise the keyboard
+// inside the tap (#216). Always mounted; App opens the sheet then focuses the input synchronously.
+export const TypeSheet = forwardRef(function TypeSheet({ open, onClose, onText }, inputRef) {
+  const [typed, setTyped] = useState('');
+  useEffect(() => { if (open) setTyped(''); }, [open]);
+  return (
+    <Sheet open={open} onClose={onClose} title={t('type_on_tv')} className="type-sheet">
+      <form className="ask-field glass" onSubmit={(e) => { e.preventDefault(); if (typed.trim()) { tick(); onText(typed.trim()); setTyped(''); } }}>
+        <input ref={inputRef} value={typed} onChange={(e) => setTyped(e.target.value)} placeholder={t('type_placeholder')}
+          enterKeyHint="send" aria-label="Text to type on the TV" autoComplete="off" autoCorrect="on" />
+        <button type="submit" className="round solid small" aria-label={t('send_to_tv')} disabled={!typed.trim()}
+          onPointerDown={(e) => e.preventDefault()}><Ic.Send size={18} /></button>
+      </form>
+      <p className="note">{t('type_note')}</p>
+    </Sheet>
+  );
+});
+
+// The guest's name for the TV's Welcome widget: typed here, shown on the TV at once (no computer needed
+// with the on-TV app). Empty shows just Welcome.
+function GuestName({ open }) {
+  const [name, setName] = useState('');
+  const [msg, setMsg] = useState('');
+  const [gone, setGone] = useState(false);
+  const [stay, setStay] = useState('');
+  const [stayMsg, setStayMsg] = useState('');
+  // the bookings calendar link: pasted here, sent to the TV (typing a long link with the TV remote is hard)
+  const sendStay = () => {
+    const u = stay.trim();
+    if (!u) return;
+    tick();
+    api.setStayLink(u).then(() => { setStay(''); setStayMsg(t('stay_sent')); })
+      .catch((e) => setStayMsg(e.status === 404 ? t('guest_needs_update') : e.status === 400 ? t('stay_bad') : tBridge(e.key, e.vars, e.message)));
+  };
+  useEffect(() => {
+    if (!open) return;
+    setMsg(''); setStayMsg('');
+    api.guest().then((j) => { setGone(false); setName(j?.guest?.name || ''); }).catch((e) => { if (e.status === 404) setGone(true); });
+  }, [open]);
+  const save = () => {
+    tick();
+    api.setGuest(name.trim()).then((j) => { const n = j?.guest?.name || ''; setName(n); setMsg(n ? t('guest_saved', { name: n }) : t('guest_cleared')); })
+      .catch((e) => setMsg(e.status === 404 ? t('guest_needs_update') : tBridge(e.key, e.vars, e.message)));
+  };
+  return (
+    <section className="more-block guest-block">
+      <h3><Ic.People size={16} /> {t('guest_name')}</h3>
+      {gone ? <p className="note">{t('guest_needs_update')}</p> : (
+        <>
+          <form className="ask-field glass" onSubmit={(e) => { e.preventDefault(); save(); }}>
+            <input value={name} maxLength={38} onChange={(e) => setName(e.target.value)} placeholder={t('guest_placeholder')} enterKeyHint="done" aria-label={t('guest_name')} />
+            <button type="submit" className="round solid small" aria-label={t('guest_save')}><Ic.Send size={18} /></button>
+          </form>
+          <p className="note" role="status">{msg || t('guest_note')}</p>
+          <form className="ask-field glass" onSubmit={(e) => { e.preventDefault(); sendStay(); }}>
+            <input value={stay} onChange={(e) => setStay(e.target.value)} placeholder={t('stay_placeholder')} inputMode="url" autoCapitalize="off" autoCorrect="off" spellCheck={false} enterKeyHint="send" aria-label={t('stay_link')} />
+            <button type="submit" className="round solid small" aria-label={t('stay_send')}><Ic.Send size={18} /></button>
+          </form>
+          <p className="note" role="status">{stayMsg || t('stay_note')}</p>
+        </>
+      )}
+    </section>
+  );
+}
+
+// Home settings on this phone, and Widgets on this TV: the phone's Home settings page (/setup). The on-TV
+// app serves it (its pairing script sets window.couchTv); a home computer serves it once its
+// /api/health says phone_page (a computer without the page never says so, so nothing shows there).
+// Each widget on the TV's design with settings of its own (the same records the page draws:
+// widget-caps.js settings, pre: true, where tv or phone, handed over in the At home view) opens the page
+// at that widget (#widget=<id>), where its settings change the same way the page changes them.
+function PhonePage({ open }) {
+  const [has, setHas] = useState(() => typeof window !== 'undefined' && !!window.couchTv);
+  const [widgets, setWidgets] = useState([]);
+  useEffect(() => {
+    if (!open) return;
+    let gone = false;
+    const onTv = typeof window !== 'undefined' && !!window.couchTv;
+    (onTv ? Promise.resolve(true) : api.health().then((h) => hasPhonePage(false, h), () => false)).then((yes) => {
+      if (gone) return;
+      setHas(yes);
+      if (!yes) { setWidgets([]); return; }
+      api.athome().then((j) => { if (!gone) setWidgets(widgetsOf(j)); }, () => { if (!gone) setWidgets([]); });
+    });
+    return () => { gone = true; };
+  }, [open]);
+  if (!has) return null;
+  return (
+    <>
+      <a className="pill glass arrange-open kids-open" href={setupLink(getTvId())} onClick={() => tick()}><Ic.Gear size={18} /> {t('home_settings_phone')}</a>
+      {widgets.length > 0 && (
+        <section className="more-block phone-widgets">
+          <h3><Ic.Grid size={16} /> {t('widgets_on_tv')}</h3>
+          <div className="widget-links">
+            {widgets.map((w) => (
+              <a key={w.key} className="pill glass arrange-open" href={phonePageLink(w, getTvId())} onClick={() => tick()}>{w.title || w.name}</a>
+            ))}
+          </div>
+          <p className="note">{t('widgets_on_tv_note')}</p>
+        </section>
+      )}
+    </>
+  );
+}
+
+// Send a design (designSend.js): a code from couch-tv Studio, pasted or typed here instead of on the
+// TV, and a link to Studio that brings the code back here by itself. English only for now, like the
+// TV home's couch-tv Studio rows.
+function DesignSend({ onDesign, can = true }) {
+  const [code, setCode] = useState('');
+  const [msg, setMsg] = useState('');
+  const submit = async (e) => {
+    e.preventDefault();
+    const c = readDesignCode(code);
+    if (!c) { setMsg(dsw('notCode')); return; }
+    tick();
+    const r = await onDesign(c);
+    setMsg(r.words);
+    if (r.ok) setCode('');   // on a failure the code stays in the box, to try again
+  };
+  // the link to Studio carries a fresh one time nonce, kept here, so the code Studio hands back is sent
+  // with no tap (designSend.js); a link made anywhere else asks first
+  const toStudio = (e) => {
+    const n = newNonce();
+    try { localStorage.setItem(NONCE_KEY, n); } catch { /* private mode: Studio's link then asks first */ }
+    e.currentTarget.href = studioLink(typeof location !== 'undefined' ? location.host : '', n);
+  };
+  if (!can) return (
+    <section className="more-block design-send">
+      <h3><Ic.Sparkle size={16} /> {dsw('title')}</h3>
+      <p className="note">{dsw('cannot')}</p>
+    </section>
+  );
+  return (
+    <section className="more-block design-send">
+      <h3><Ic.Sparkle size={16} /> {dsw('title')}</h3>
+      <form className="ask-field glass" onSubmit={submit}>
+        <input value={code} onChange={(e) => { setCode(e.target.value); setMsg(''); }} placeholder={dsw('placeholder')} enterKeyHint="send"
+          autoCapitalize="characters" autoComplete="off" autoCorrect="off" spellCheck={false} aria-label="Design code" />
+        <button type="submit" className="round solid small" aria-label={dsw('send')} disabled={!code.trim()}><Ic.Send size={18} /></button>
+      </form>
+      <p className="note" role="status">{msg || dsw('note')}</p>
+      <a className="pill glass arrange-open" href={studioLink(typeof location !== 'undefined' ? location.host : '')} onClick={toStudio}>{dsw('choose')}</a>
+    </section>
+  );
+}
+
+// g32: the keys of a Samsung's own remote that the phone remote has no button for (a smart monitor's
+// owner wanted Esc: that is Exit). Each name is one the bridge turns into the Samsung's KEY_ code
+// (bridge/samsung.py KEYS); tests/test_social_bugs_bridge.py checks both lists agree.
+const MORE_KEYS = [['return', 'key_return'], ['exit', 'key_exit'], ['smart_hub', 'key_smart_hub'], ['tools', 'key_tools'], ['info', 'key_info'],
+  ['guide', 'key_guide'], ['source', 'key_source'], ['channel_list', 'key_channel_list'],
+  ['red', 'key_red'], ['green', 'key_green'], ['yellow', 'key_yellow'], ['blue', 'key_blue']];
+
+export const MoreSheet = forwardRef(function MoreSheet({ open, onClose, sleepEnds, onSleep, onKey, onText, sleepError, tvs, tvId, onTv, canMove, onMove, picture, pictureInfo, onPicture, onArrange, onPeople, onKids, onDesign, canSendDesign = true, kind, onScene }, ref) {
   const [typed, setTyped] = useState('');
   const sheetEl = useRef(null);
   const setRefs = (el) => { sheetEl.current = el; if (typeof ref === 'function') ref(el); else if (ref) ref.current = el; };
@@ -402,6 +561,16 @@ export const MoreSheet = forwardRef(function MoreSheet({ open, onClose, sleepEnd
               </button>
             ))}
           </div>
+          {/* Move what is playing here to another TV (Android and Google TV only, docs/MOVE.md) */}
+          {canMove && tvs.find((tv) => tv.id === tvId)?.kind === 'android' && (
+            <div className="chips-row chips-wrap move-row">
+              {tvs.filter((tv) => tv.id !== tvId && tv.kind === 'android' && tv.paired !== false).map((tv) => (
+                <button key={tv.id} className="chip glass" onClick={() => { tick(); onMove(tv); }}>
+                  <Ic.Send size={15} /> {t('move_to', { tv: tv.name })}
+                </button>
+              ))}
+            </div>
+          )}
         </section>
       )}
 
@@ -440,6 +609,32 @@ export const MoreSheet = forwardRef(function MoreSheet({ open, onClose, sleepEnd
         <p className="note">{t('type_note')}</p>
       </section>
 
+      <DesignSend onDesign={onDesign} can={canSendDesign} />
+
+      {/* g34: change the scene behind the clock from the sofa; the sheet stays open for the next press */}
+      {onScene && canSendDesign && (
+        <section className="more-block scene-block">
+          <h3><Ic.Sparkle size={16} /> {t('scene_head')}</h3>
+          <div className="chips-row">
+            <button className="chip glass" onClick={() => { tick(); onScene('prev'); }}>{t('scene_prev')}</button>
+            <button className="chip glass" onClick={() => { tick(); onScene('next'); }}>{t('scene_next')}</button>
+          </div>
+          <p className="note">{t('scene_note')}</p>
+        </section>
+      )}
+
+      {kind === 'samsung' && (
+        <section className="more-block more-keys">
+          <h3><Ic.Keyboard size={16} /> {t('more_keys')}</h3>
+          <div className="chips-row chips-wrap">
+            {MORE_KEYS.map(([k, label]) => (
+              <button key={k} className="chip glass" onClick={() => { tick(); onKey(k); }}>{t(label)}</button>
+            ))}
+          </div>
+          <p className="note">{t('more_keys_note')}</p>
+        </section>
+      )}
+
       <div className="more-grid">
         <button className="tile glass" onClick={() => { tick(); onKey('captions'); }}><Ic.Captions /> {t('subtitles')}</button>
         <button className="tile glass" onClick={() => { tick(); onKey('input'); }}><Ic.Input /> {t('input')}</button>
@@ -449,6 +644,10 @@ export const MoreSheet = forwardRef(function MoreSheet({ open, onClose, sleepEnd
         <button className="pill glass arrange-open" onClick={() => { tick(); onArrange(); }}><Ic.Grid size={18} /> {t('arrange_apps')}</button>
         <button className="pill glass arrange-open" onClick={() => { tick(); onPeople(); }}><Ic.People size={18} /> {t('people')}</button>
       </div>
+      <button className="pill glass arrange-open kids-open" onClick={() => { tick(); onKids(); }}><Ic.Lock size={18} /> {t('kids_mode')}</button>
+      <PhonePage open={open} />
+
+      <GuestName open={open} />
 
       {/* this phone's language: "Same as the TV" follows the TV home's Home settings */}
       <section className="more-block">

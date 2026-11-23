@@ -4,8 +4,14 @@
 
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <!-- Matter (MatterPage.kt): finding devices on the home network with mDNS needs the multicast lock -->
+    <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
+    <uses-permission android:name="android.permission.CHANGE_WIFI_MULTICAST_STATE" />
     <!-- Android's Watch Next list: what each app says you are in the middle of (keep watching, no computer needed). -->
     <uses-permission android:name="android.permission.READ_TV_LISTINGS" />
+    <!-- couch-tv Studio's Screen time widget: Android's usage numbers. Not granted on install: apply.sh
+         allows it over ADB only with SCREEN_TIME=1, or the person switches on Home in Usage access. -->
+    <uses-permission android:name="android.permission.PACKAGE_USAGE_STATS" tools:ignore="ProtectedPermissions" />
     <!-- Smart home, only with a doorbell set up: the doorbell card over whatever is playing.
          Not granted on install: apply.sh grants it over ADB only when config.json has a doorbell. -->
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
@@ -23,6 +29,11 @@
          apply.sh grants once over ADB. -->
     <uses-permission android:name="android.permission.WRITE_SETTINGS" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <!-- couch-tv Studio's Batteries widget (Batteries.kt): the charge left in the remotes and controllers
+         paired with this TV. Android 12 and newer ask "Nearby devices" first (OK on the widget asks once,
+         or pm grant over ADB); older Android needs BLUETOOTH to list paired devices. -->
+    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
+    <uses-permission android:name="android.permission.BLUETOOTH" android:maxSdkVersion="30" />
 
     <uses-feature android:name="android.software.leanback" android:required="false" />
     <uses-feature android:name="android.hardware.touchscreen" android:required="false" />
@@ -33,20 +44,43 @@
             <action android:name="android.intent.action.MAIN" />
             <category android:name="android.intent.category.LEANBACK_LAUNCHER" />
         </intent>
+        <!-- Explicitly shown apps can have a regular launcher activity instead of a TV entry. -->
+        <intent>
+            <action android:name="android.intent.action.MAIN" />
+            <category android:name="android.intent.category.LAUNCHER" />
+        </intent>
         <!-- The TV's own homes: the Home button watch looks for them (FireWatch.kt), and the crash
              guard hands the screen to one if couch-tv keeps crashing (CrashGuard.kt). -->
         <package android:name="com.amazon.tv.launcher" />
+        <!-- Fire TV apps with no Leanback tile (like Appstore and Audible, #169, #238) -->
+        <package android:name="com.amazon.venezia" />
+        <package android:name="com.audible.application.firetv" />
         <package android:name="com.google.android.apps.tv.launcherx" />
         <package android:name="com.google.android.tvlauncher" />
         <intent>
             <action android:name="android.intent.action.MAIN" />
             <category android:name="android.intent.category.HOME" />
         </intent>
+        <!-- The screensaver (#86): Screensaver quick button checks the TV's dream is enabled, and the
+             look settings open the ambient settings. Android 11+ hides these packages otherwise
+             (an onn 4K Pro, Android 14, showed no Screensaver button). -->
+        <intent><action android:name="android.service.dreams.DreamService" /></intent>
+        <intent><action android:name="dreamx.two.panel.SETTINGS" /></intent>
+        <package android:name="com.google.android.apps.tv.dreamx" />
         <!-- The TV's input list, for the Input quick button when there is no bridge. -->
         <intent><action android:name="android.settings.TV_INPUT_SETTINGS" /></intent>
         <intent><action android:name="com.android.tv.action.VIEW_INPUTS" /></intent>
         <intent><action android:name="com.google.android.tv.action.VIEW_INPUTS" /></intent>
         <intent><action android:name="android.media.tv.action.SETUP_INPUTS" /></intent>
+        <!-- Web links (custom cards with a url): Android 11+ hides browser packages otherwise. -->
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:scheme="http" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:scheme="https" />
+        </intent>
         <!-- The Input menu (#30): the TV's own app that plays an input when asked to view its
              passthrough channel (content://android.media.tv/passthrough/<input>). -->
         <intent>
@@ -82,11 +116,17 @@
             <action android:name="android.settings.APPLICATION_DETAILS_SETTINGS" />
             <data android:scheme="package" />
         </intent>
+        <!-- Reminders: Android's speech screen (Google's "Speak now"), for the remote's mic. -->
+        <intent>
+            <action android:name="android.speech.action.RECOGNIZE_SPEECH" />
+        </intent>
     </queries>
 
+    <!-- The app's name in the TV's app list and to the TV's voice assistant ("Hey Google, open Couch TV"):
+         Couch TV, as the on-TV app is called; "Home" was too plain for the assistant to find (23 Nov 2026) -->
     <application
         android:name=".App"
-        android:label="Home"
+        android:label="Couch TV"
         android:icon="@drawable/icon"
         android:banner="@drawable/banner"
         android:theme="@style/Home"
@@ -157,6 +197,38 @@
                 <action android:name="android.service.notification.NotificationListenerService" />
             </intent-filter>
         </service>
+        <service
+            android:name=".SpotifySessionAccess"
+            android:exported="false"
+            android:label="@string/spotify_session_access"
+            android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE">
+            <intent-filter>
+                <action android:name="android.service.notification.NotificationListenerService" />
+            </intent-filter>
+            <meta-data android:name="android.service.notification.default_filter_types" android:value="" />
+            <meta-data android:name="android.service.notification.disabled_filter_types"
+                android:value="conversations|alerting|ongoing|silent" />
+        </service>
+        <!-- TCL only (issue #94, TclPlaceholderInput.kt): an empty TV input that TCL's boot manager
+             counts as a reason to let this app start and bind its services at boot. Off here and
+             switched on at runtime on a TCL, so no other TV lists a new input. -->
+        <service
+            android:name=".TclPlaceholderInput"
+            android:enabled="false"
+            android:exported="true"
+            android:label="Home"
+            android:permission="android.permission.BIND_TV_INPUT">
+            <intent-filter>
+                <action android:name="android.media.tv.TvInputService" />
+            </intent-filter>
+            <meta-data android:name="android.media.tv.input" android:resource="@xml/tcl_placeholder_input" />
+        </service>
+        <!-- About every 15 minutes, even after the TV killed the app: switches the Home button
+             watch back on if it is listed as on but not running (WatchRepair.kt). -->
+        <service
+            android:name=".WatchRepair"
+            android:exported="false"
+            android:permission="android.permission.BIND_JOB_SERVICE" />
         <receiver android:name=".FireWatch$Restore" android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.BOOT_COMPLETED" />

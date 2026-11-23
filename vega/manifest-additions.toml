@@ -1,0 +1,12 @@
+# Add these to the manifest.toml that `vega project generate` made. Everything else in that file stays.
+
+# The home page comes from the bridge on your own network, over plain http (Amazon blocks http unless asked).
+# Put your bridge's address here instead of "*" if you want it tighter.
+[network-traffic-policy.cleartext]
+allowed-domains = ["*"]
+
+# Lets a phone or the bridge open the app by DIAL, without Amazon's tools on the computer.
+# Whether Amazon allows this for a sideloaded app is not documented: it is optional.
+[[extras]]
+key = "dial_id"
+value = "CouchTV"

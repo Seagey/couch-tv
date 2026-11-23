@@ -3,10 +3,43 @@
 Use this if something went wrong, or you just do not want it any more. Nothing couch-tv does
 deletes anything from the TV. It only switches things off, so everything can be switched back on.
 
-## Option B: stop the bridge first
+## With only the TV remote (no computer)
 
-The bridge checks once a day that the Google home is still off and switches it off again. Stop it
-**before** you touch the TV, or it can undo your undo.
+1. On the couch-tv home, open the **Settings** tile (the gear at the end of the app row; in the
+   Classic look it is a tile in the grid). Or press the Settings button on your remote. Then pick
+   **TV settings**.
+2. **Apps**, then **See all apps**, then **Show system apps**.
+3. If **Google TV Home** or **Setup** says Disabled (couch-tv 0.10 and older switched them off),
+   open it and press **Enable**. Ambient mode and the ad tracker are optional.
+4. Back in **Apps**, open the app called **Home** (the one with the Couch TV picture, not Google TV
+   Home) and press **Uninstall**. Do the same for **Couch TV** (the "lives on the TV" app) if you
+   have it.
+5. Press the Home button. Google TV is back.
+
+**Do step 3 before step 4.** If the couch-tv home is removed while Google TV Home is still off, the
+TV has no home screen. Apps still open from the remote's app buttons, and the computer way below
+still works.
+
+## Other TVs
+
+- **Set it up with the Setup app** (Google TV or Fire TV, from a Mac or Windows computer)? Open it and
+  press **Undo**. It puts the TV's own home back.
+- **Fire TV:** Settings, Applications, Manage installed applications, Couch TV, Uninstall.
+- **Samsung:** Apps, the cog (Settings), Couch TV, Delete. **LG:** remove Couch TV from the app row.
+- **Roku:** on the Roku home, move to Couch TV, press the star button (*) and choose Remove channel
+  ([ROKU.md](ROKU.md)).
+- **Apple TV:** move to Couch TV, hold the touch surface (or the centre of the clickpad) until it
+  jiggles, press Play/Pause and choose Delete.
+- **Hisense VIDAA:** nothing is installed on the TV. Stop the computer at home (below), and remove the
+  couch-tv tile from the app row if you added one ([VIDAA.md](VIDAA.md)).
+
+## If you set it up from a computer
+
+### Option B: stop the bridge first
+
+The bridge checks once a day that ambient mode (and any ad tracker `apply.sh` switched off) is
+still off and switches it off again. It never switches the Google home off. Stop it **before** you
+touch the TV, or it can undo your undo.
 
 - **macOS:** `launchctl bootout gui/$(id -u)/app.couchtv.bridge`, then delete
   `~/Library/LaunchAgents/app.couchtv.bridge.plist`.
@@ -18,7 +51,7 @@ The bridge checks once a day that the Google home is still off and switches it o
 
 Options A and C have no bridge on a computer: go straight on.
 
-## The quick way (a computer, 1 minute)
+### The quick way (a computer, 1 minute)
 
 From the couch-tv folder on the computer you set it up with:
 
@@ -33,7 +66,10 @@ thing that fails:
    home and setup app, which couch-tv 0.10 and older switched off), switches off the Home button
    watch, and makes the home the TV had before couch-tv the home again.
 2. Removes the couch-tv apps (the home screen app `app.couchtv.launcher` and the "lives on the TV"
-   app `dev.couchtv.ontv`).
+   app `dev.couchtv.ontv`). If you also had a home app of your own from before couch-tv (a private
+   build you made yourself), name its package and it goes in the same step:
+   `EXTRA_APPS="<its package>"`. It refuses anything that looks like part of the TV itself, such as
+   the TV's own home or setup app.
 3. Switches off network debugging, USB debugging and Developer options. Leave out `DEV_OFF=1` to
    keep Developer options on.
 
@@ -43,7 +79,7 @@ To remove only one app by hand, without the rest:
 `TV_IP=<your tv address> .venv/bin/python tv-home/tools/tvadb.py shell "pm uninstall app.couchtv.launcher"`
 (nothing else to install: `tvadb.py` is the small ADB client in this repo).
 
-## Then tidy up
+### Then tidy up
 
 - **The remote pairing (option B).** The TV remembers the bridge as a remote called "Couch TV
   bridge" (or your `client_name`). On the TV: **Settings, Remotes and accessories** (on some TVs
@@ -60,21 +96,6 @@ To remove only one app by hand, without the rest:
   it, plus `config.json` and `.env`).
 - **Phones.** On each phone, press and hold the remote's icon and remove it.
 
-## With only the TV remote (no computer)
-
-1. On the couch-tv home, open the **Settings** tile (the gear at the end of the app row; in the
-   Classic look it is a tile in the grid). Or press the Settings button on your remote.
-2. **Apps**, then **See all apps**, then **Show system apps**.
-3. If **Google TV Home** or **Setup** says Disabled (couch-tv 0.10 and older switched them off),
-   open it and press **Enable**. Ambient mode and the ad tracker are optional.
-4. Back in **Apps**, open the couch-tv **Home** app and press **Uninstall**. Do the same for
-   **Couch TV** (the "lives on the TV" app) if you have it.
-5. Press the Home button. Google TV is back.
-
-**Do step 3 before step 4.** If the couch-tv home is removed while Google TV Home is still off, the
-TV has no home screen. Apps still open from the remote's app buttons, and the computer way above
-still works.
-
 ## Leave developer mode
 
 1. **Settings, System, Developer options** (Android TV 9 to 11: **Settings, Device Preferences,
@@ -90,7 +111,7 @@ restart after step 3 is enough: nothing can connect any more.
 
 - **The TV loops after a restart** (blank screen, restarts by itself, again and again). Seen on a
   Sony Bravia Google TV set up with couch-tv 0.10 or older, which switched off the Google TV home
-  and the setup app. Steps: [README, If your TV loops after a restart](../README.md#if-your-tv-loops-after-a-restart).
+  and the setup app. Steps: [TROUBLESHOOTING.md, If your TV loops after a restart](TROUBLESHOOTING.md#if-your-tv-loops-after-a-restart).
 
 - **The TV forgot its Wi-Fi.** It could happen when couch-tv 0.10 or older switched the setup app
   off, or when it is switched back on.

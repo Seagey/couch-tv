@@ -1,10 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- The couch-tv logo (the couch on the red tile, as on the couch-tv website): the app icon. -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="48dp" android:height="48dp"
-    android:viewportWidth="48" android:viewportHeight="48">
-    <path android:fillColor="#0D1E19" android:pathData="M0,0h48v48h-48z" />
-    <path android:fillColor="#191D1A" android:pathData="M12,10h24v14h-24z" />
-    <path android:fillColor="#131614" android:pathData="M12,25h24v13h-24z" />
-    <path android:fillColor="#F2EAD8" android:pathData="M18,15h3v19h-3z M27,15h3v19h-3z M21,23h6v3h-6z" />
-    <path android:fillColor="#FFB52E" android:pathData="M12,41h24v2h-24z" />
+    android:viewportWidth="32" android:viewportHeight="32">
+    <path android:fillColor="#F2441B" android:pathData="M7,0h18A7,7 0 0 1 32,7v18A7,7 0 0 1 25,32h-18A7,7 0 0 1 0,25v-18A7,7 0 0 1 7,0z" />
+    <path android:fillColor="#FBFAF7" android:pathData="M9.5,15h13A2.5,2.5 0 0 1 25,17.5v2A2.5,2.5 0 0 1 22.5,22h-13A2.5,2.5 0 0 1 7,19.5v-2A2.5,2.5 0 0 1 9.5,15z" />
+    <path android:fillColor="#FFC81E" android:pathData="M7,11h0A3,3 0 0 1 10,14v6A3,3 0 0 1 7,23h0A3,3 0 0 1 4,20v-6A3,3 0 0 1 7,11z" />
+    <path android:fillColor="#FFC81E" android:pathData="M25,11h0A3,3 0 0 1 28,14v6A3,3 0 0 1 25,23h0A3,3 0 0 1 22,20v-6A3,3 0 0 1 25,11z" />
+    <path android:fillColor="#9CCBF0" android:pathData="M12.5,8h7A2.5,2.5 0 0 1 22,10.5v2A2.5,2.5 0 0 1 19.5,15h-7A2.5,2.5 0 0 1 10,12.5v-2A2.5,2.5 0 0 1 12.5,8z" />
 </vector>

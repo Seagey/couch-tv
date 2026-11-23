@@ -1,0 +1,53 @@
+{
+ "ok": true,
+ "design": {
+  "background": {
+   "colour": "#102040",
+   "colour2": "#a04060",
+   "angle": 90,
+   "image": "https://evil.example/bg.jpg",
+   "depth_image": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAgAAAAIAQMAAAD+wSzIAAAAA1BMVEVAoGA0VW2rAAAAC0lEQVQI12NgQAUAABAAAaHFIcEAAAAASUVORK5CYII=",
+   "video": "store:abcdefabcdefabcdef"
+  },
+  "objects": [
+   {
+    "id": "hello",
+    "type": "text",
+    "text": "Hello",
+    "x": 200,
+    "y": 200,
+    "size": 120,
+    "colour": "#fff"
+   },
+   {
+    "id": "glass",
+    "type": "shape",
+    "x": 100,
+    "y": 150,
+    "w": 900,
+    "h": 300
+   },
+   {
+    "id": "wc",
+    "type": "widget",
+    "kind": "clock",
+    "x": 1300,
+    "y": 80,
+    "w": 520,
+    "h": 240,
+    "style": {
+     "panel": "glass"
+    }
+   }
+  ],
+  "elements": {
+   "clock": {
+    "hidden": true
+   },
+   "date": {
+    "hidden": true
+   }
+  }
+ },
+ "extra": "ignored"
+}

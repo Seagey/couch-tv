@@ -24,6 +24,7 @@ path). Screenshots go to `bridge/data/deeplink-shots/` and `bridge/data/play-sho
 | YouTube | `com.google.android.youtube.tv` | `https://www.youtube.com/watch?v=<id>` | **Works** (remote protocol). JustWatch rarely lists YouTube, so this is for links Claude finds. | `https://www.youtube.com/results?search_query=` |
 | Apple TV | `com.apple.atve.androidtv.appletv` | `https://tv.apple.com/au/show/<slug>/<id>` | **Opens the app** (seen on screen at 3 s). | open the app |
 | Binge | `au.com.streamotion.ares.tv` | nothing: the app only accepts `https://open.dazn.com/...` links and JustWatch gives `binge.com.au` ones | **No deep link.** `/api/play` "Colin from Accounts" opens Binge and says "Search for Colin from Accounts on the TV". | open the app |
+| Nuvio | `com.nuvio.tv` | not on JustWatch: its own link by the IMDb id JustWatch gives, `nuvio://series/<imdb id>` or `nuvio://movie/<imdb id>` (`TITLE_LINKS` in server.py) | **Opens the show page.** Tested on a Xiaomi Mi Box (Google TV), Nuvio 1.1.0: `nuvio://series/tt22202452` opened the Pluribus page. Show and film pages only: `nuvio://series/tt22202452:1:8` is read as one id and fails, and `stremio:///` links only open Nuvio's home. Film links not yet tried on the TV. | open the app |
 
 "Who's watching?" screens: Stan, Disney+ and iview ask for a profile first. The bridge does not
 pick one for you. Still to check from the couch: after picking a profile, does each app carry on

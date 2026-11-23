@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Builds the on-TV app: android/app/build/outputs/apk/release/app-release.apk
+# Builds the on-TV app: android/app/build/outputs/apk/github/release/app-github-release.apk
 # Needs JDK 17+ (JAVA_HOME), the Android SDK (ANDROID_HOME, or sdk.dir in android/local.properties)
 # and Gradle 8.9+ on PATH (or GRADLE=/path/to/gradle). Builds the phone remote first if it has no dist/.
 set -euo pipefail
@@ -15,5 +15,5 @@ fi
 
 cd "$here/android"
 if [ ! -f local.properties ] && [ -n "${ANDROID_HOME:-}" ]; then echo "sdk.dir=$ANDROID_HOME" > local.properties; fi
-"${GRADLE:-gradle}" --no-daemon -q assembleRelease
-echo "APK: $here/android/app/build/outputs/apk/release/app-release.apk"
+"${GRADLE:-gradle}" --no-daemon -q assembleGithubRelease
+echo "APK: $here/android/app/build/outputs/apk/github/release/app-github-release.apk"

@@ -18,12 +18,12 @@ for the pairing that showed it, so never reuse one from an earlier run. Makes a 
 this computer on first use (bridge/data/cert.pem), then marks the TV "paired": true in config.json.
 
 Step 2, ADB (optional, for opening shows by deep link, screenshots, picture mode, now playing):
-Developer options and USB debugging on, plus Network debugging if the TV has that switch (README
+Developer options and USB debugging on, plus Network debugging if the TV has that switch (docs/SETUP.md
 step 1), then re-run with --adb: the TV asks
 "Allow USB debugging?"; tick "Always allow from this computer" and press OK. The port is the TV's
 "adb_port" in config.json, else ADB_PORT, else 5555.
 
-Afterwards restart the bridge (see README.md).
+Afterwards restart the bridge (see docs/SETUP.md, step 5).
 """
 import asyncio
 import os
@@ -188,7 +188,7 @@ async def adb_check(cfg):
         ok = await dev.connect(rsa_keys=[signer], auth_timeout_s=60)
     except Exception as e:
         print(f"ADB did not connect on port {port} ({type(e).__name__}). Is USB debugging on (and Network debugging, if the TV has it)? "
-              "TVs with only Wireless debugging: see README step 1.")
+              "TVs with only Wireless debugging: see docs/SETUP.md step 1.")
         return False
     if ok:
         print("ADB works:", (await dev.shell("getprop ro.product.model")).strip())
@@ -204,7 +204,12 @@ def main():
     cfg = next((t for t in load()["tvs"] if t["id"] == tv_id), None)
     if not cfg:
         sys.exit(f"unknown tv {tv_id}; see config.json")
-    if "--adb" in sys.argv:
+    if cfg.get("adb_only") and not arg("--code"):
+        # A Fire TV on Fire OS has no Android TV Remote protocol to pair with: the TV's
+        # "Allow USB debugging?" is the only pairing, so only the ADB check applies.
+        print(f"{tv_id} is \"adb_only\": no remote pairing to do, checking ADB instead.")
+        ok = asyncio.run(adb_check(cfg))
+    elif "--adb" in sys.argv:
         ok = asyncio.run(adb_check(cfg))
     elif arg("--code"):
         ok = give_code(cfg, arg("--code"))

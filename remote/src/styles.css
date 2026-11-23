@@ -162,9 +162,21 @@ main { position: relative; z-index: 1; height: 100%; }
 
 /* Bottom controls */
 .controls { display: flex; gap: 10px; align-items: center; }
-.volume { flex: 1; height: var(--ctl); border-radius: calc(var(--ctl) / 2); display: flex; align-items: stretch; overflow: hidden; }
+/* Amber fill so Type on the TV stands out from Back / Home / Play (#216).
+   Slightly under --ctl so the four round buttons leave room for volume on a phone. */
+.controls .type-key {
+  width: 48px; height: 48px;
+  background: rgba(255, 159, 10, 0.92);
+  color: #1a1200;
+  border-color: rgba(255, 210, 120, 0.55);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.35), 0 6px 20px rgba(0, 0, 0, 0.22);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+button.type-key:active { background: rgba(255, 179, 64, 0.98); }
+.volume { flex: 1; min-width: 0; height: var(--ctl); border-radius: calc(var(--ctl) / 2); display: flex; align-items: stretch; overflow: hidden; }
 .volume button { width: 48px; display: grid; place-items: center; flex: none; touch-action: pan-x; }
-.volume .vol-mid { flex: 1; width: auto; display: flex; align-items: center; justify-content: center; gap: 6px; font-weight: 600; font-size: 16px; font-variant-numeric: tabular-nums; color: var(--ink-2); }
+.volume .vol-mid { flex: 1; min-width: 0; width: auto; display: flex; align-items: center; justify-content: center; gap: 6px; font-weight: 600; font-size: 16px; font-variant-numeric: tabular-nums; color: var(--ink-2); overflow: hidden; }
 .ask {
   height: var(--ask-h); border-radius: calc(var(--ask-h) / 2); background: #e4e4e8; color: var(--on-solid);
   display: flex; align-items: center; justify-content: center; gap: 10px; font: 600 17px/1 var(--font); flex: none;
@@ -194,6 +206,9 @@ main { position: relative; z-index: 1; height: 100%; }
 .poster-art img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .poster-art span { padding: 10px; font-weight: 700; text-align: center; }
 .poster:active .poster-art { transform: scale(0.96); transition: none; }
+.poster-wrap { position: relative; flex: none; scroll-snap-align: start; }
+.poster-remove { position: absolute; top: 6px; right: 6px; width: 28px; height: 28px; display: grid; place-items: center; border: 0; border-radius: 50%; background: rgba(0, 0, 0, 0.55); color: #fff; -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px); }
+.poster-remove:active { background: rgba(0, 0, 0, 0.8); }
 .poster b { display: block; font-size: 15px; font-weight: 600; margin-top: 8px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .poster small { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; font-size: 13px; color: var(--ink-2); margin-top: 2px; line-height: 1.25; }
 .poster.dim .poster-art { opacity: 0.55; }
@@ -259,11 +274,20 @@ main.single { display: flex; flex-direction: column; padding-left: var(--sa-l); 
 .banner span { flex: 1; }
 .banner button { height: 44px; padding: 0 16px; border-radius: 22px; background: var(--solid); color: var(--on-solid); font-weight: 600; font-size: 14px; }
 .toast {
-  position: fixed; z-index: 40; left: 50%; top: calc(var(--sa-t) + 60px); transform: translateX(-50%);
+  position: fixed; z-index: 61; left: 50%; top: calc(var(--sa-t) + 60px); transform: translateX(-50%);   /* above .onboard (60): a word from a design link shows on first run too */
   max-width: min(92vw, 420px); padding: 10px 16px; border-radius: 20px; font-size: 15px; font-weight: 600; text-align: center;
   background: rgba(40, 40, 46, 0.72); animation: toast-in 0.35s var(--ease) both;
 }
 .toast.err { background: rgba(110, 26, 26, 0.75); }
+/* a design code that came by link: asked before it is sent (designSend.js) */
+.design-offer {
+  position: fixed; z-index: 62; left: 50%; top: calc(var(--sa-t) + 60px); transform: translateX(-50%);   /* above .onboard (60) and the toast */
+  width: min(92vw, 420px); padding: 16px; border-radius: 22px; background: rgba(28, 28, 34, 0.94); text-align: center;
+}
+.design-offer p { margin: 0 0 12px; font-size: 16px; line-height: 1.4; }
+.design-offer b { display: block; margin-top: 4px; font-size: 22px; letter-spacing: 0.06em; }
+.design-offer-row { display: flex; gap: 10px; justify-content: center; }
+.design-offer-row .pill { min-height: 44px; padding: 0 22px; }
 @keyframes toast-in { from { opacity: 0; transform: translate(-50%, -10px); } }
 
 /* Sheets */
@@ -293,6 +317,7 @@ main.single { display: flex; flex-direction: column; padding-left: var(--sa-l); 
 .grabber-zone { padding: 12px 0 8px; touch-action: none; cursor: grab; }
 .more-sheet { min-height: 64%; display: flex; flex-direction: column; }
 .more-sheet .more-block.first { margin-top: auto; }
+.type-sheet .note { margin-top: 12px; }
 .grabber-zone .grabber { margin: 0 auto; }
 .grabber { width: 40px; height: 5px; border-radius: 3px; background: rgba(255, 255, 255, 0.28); margin: 0 auto 10px; }
 .sheet-head { display: flex; align-items: center; margin-bottom: 14px; }
@@ -330,6 +355,8 @@ main.single { display: flex; flex-direction: column; padding-left: var(--sa-l); 
 .chips-row.chips-wrap { flex-wrap: wrap; }
 .chips-row.chips-wrap .chip { flex: 1 1 auto; padding: 0 14px; white-space: nowrap; }
 .note { font-size: 13px; color: var(--ink-2); margin-top: 8px; }
+.move-row { margin-top: 8px; }
+.move-row .chip svg { vertical-align: -2px; margin-inline-end: 4px; }
 .more-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 6px; }
 .tile { height: 76px; border-radius: 20px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; font-weight: 600; font-size: 14px; }
 
@@ -358,11 +385,19 @@ main.single { display: flex; flex-direction: column; padding-left: var(--sa-l); 
   .pad { min-height: 150px; border-radius: 28px; }
   .pad .hint { display: none; }
 }
+@media (max-width: 430px) {
+  /* Four round buttons plus volume: shrink a little so mute stays usable on narrow phones. */
+  :root { --ctl: 48px; }
+  .controls { gap: 6px; }
+  .controls .type-key { width: 44px; height: 44px; }
+  .volume button { width: 36px; }
+}
 @media (max-width: 360px) {
-  :root { --side: 14px; --ctl: 52px; }
+  :root { --side: 14px; --ctl: 46px; }
   .seg button { padding: 0 9px; font-size: 14px; }
-  .volume button { width: 44px; }
-  .controls { gap: 8px; }
+  .volume button { width: 34px; }
+  .controls { gap: 5px; }
+  .controls .type-key { width: 40px; height: 40px; }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -533,3 +568,31 @@ main.single { display: flex; flex-direction: column; padding-left: var(--sa-l); 
   .glass-icons .app-icon:not(.clear) img { opacity: 0.85; mix-blend-mode: normal; }
   .glass-icons .app-icon.clear .glyph { opacity: 1; }
 }
+
+/* LG Developer Mode at risk: a plain banner above the top bar */
+.devwarn { margin: 8px 16px 0; padding: 10px 14px; border-radius: 14px; font-size: 14px; line-height: 1.35;
+  background: rgba(255, 159, 10, 0.18); color: #ffd28a; border: 1px solid rgba(255, 159, 10, 0.45); }
+.devwarn.alert { background: rgba(255, 69, 58, 0.2); color: #ffb3ad; border-color: rgba(255, 69, 58, 0.55); }
+/* LG pointer mode on the pad: a small toggle in the corner */
+.pad .pointer-toggle { position: absolute; top: 10px; left: 10px; width: 36px; height: 36px; border-radius: 50%;
+  display: grid; place-items: center; color: var(--ink); opacity: 0.45; background: transparent; border: 0; z-index: 2; }
+.pad .pointer-toggle.on { opacity: 1; background: rgba(255,255,255,0.16); }
+.pad.pointer-mode { touch-action: none; }
+
+/* kids mode (Kids.jsx) */
+.kids-open { width: 100%; margin-top: 8px; display: flex; align-items: center; justify-content: center; gap: 8px; }
+a.pill { color: inherit; text-decoration: none; box-sizing: border-box; }
+a.pill.glass:active { background: var(--glass-press); transition: none; }
+.kids-sheet .more-block { margin-top: 18px; }
+.kids-sheet .chips-row .chip svg { vertical-align: -2px; }
+.kids-pin input:not(:placeholder-shown) { letter-spacing: 0.3em; }
+.kids-sub { display: block; font-weight: 400; font-size: 13px; color: var(--ink-2); overflow: hidden; text-overflow: ellipsis; }
+.kids-sheet .arrange-row img { width: 34px; height: 50px; border-radius: 6px; }
+.kids-found { display: flex; gap: 12px; padding: 12px; border-radius: 16px; margin-top: 10px; }
+.kids-found img { width: 64px; height: 96px; border-radius: 8px; object-fit: cover; flex: none; }
+.kids-found b { font-size: 16px; }
+.kids-off { width: 100%; margin-top: 12px; color: var(--err); }
+
+/* Widgets on this TV (Sheets.jsx PhonePage): one link per widget, opening the phone Home settings page at it */
+.widget-links { display: flex; flex-direction: column; gap: 8px; }
+.widget-links .arrange-open { margin: 0; }

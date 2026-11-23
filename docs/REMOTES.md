@@ -20,9 +20,27 @@ and `NUMPAD_ENTER` into OK, and `BUTTON_B` and `ESCAPE` into Back, before the pa
 game controller works the same as a remote. Back never leaves the home: the page decides what it
 means (close a list, put an app down, go back to the first tile).
 
+The TV's own keys (TV or channels, guide, channel up and down, last channel, input) are handed back to
+the TV untouched, so the TV's own app handles them.
+
 Every other key is left alone: play and pause, volume, numbers, the coloured buttons, voice, and
 the Netflix, YouTube and other app buttons. The page does not stop them, so Android and the apps
 still get them, and they never move the focus.
+
+## Going round at the ends
+
+One press of an arrow at the end of a row or a list goes round to the other end: left on the first
+app lands on More apps and right on More apps lands on the first app; in More apps, left and right
+run continuously line by line through every app and wrap between the first and last (#167); the
+same along Keep watching;
+up from the very top lands on the apps, and down from the very bottom goes back to the top. In
+Home settings, up and down go round the sections and each section's rows, and the small menus (the
+gear menu, an app's menu, the people list) go round too. Left and right in Home settings keep their
+own jobs (changing a value, moving between the columns).
+
+It happens when the key is let go, and only for a single press: holding an arrow still runs to the
+end and stops there, so going round always takes one more deliberate press. Nothing goes round
+while an app, a name or a settings row is picked up to move.
 
 ## Holding OK
 

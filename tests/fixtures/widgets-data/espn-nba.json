@@ -1,0 +1,230 @@
+{
+ "leagues": [
+  {
+   "name": "National Basketball Association",
+   "abbreviation": "NBA"
+  }
+ ],
+ "events": [
+  {
+   "id": "401910002",
+   "date": "2026-11-18T00:30Z",
+   "name": "New York Knicks at Toronto Raptors",
+   "shortName": "NY @ TOR",
+   "status": {
+    "type": {
+     "state": "post",
+     "completed": true,
+     "shortDetail": "Final",
+     "detail": "Final"
+    },
+    "displayClock": "12:00",
+    "period": 4
+   },
+   "competitions": [
+    {
+     "competitors": [
+      {
+       "homeAway": "home",
+       "winner": false,
+       "score": "102",
+       "team": {
+        "displayName": "Toronto Raptors",
+        "shortDisplayName": "Raptors",
+        "abbreviation": "TOR",
+        "color": "d91244"
+       }
+      },
+      {
+       "homeAway": "away",
+       "winner": true,
+       "score": "111",
+       "team": {
+        "displayName": "New York Knicks",
+        "shortDisplayName": "Knicks",
+        "abbreviation": "NY",
+        "color": "1d428a"
+       }
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "401910003",
+   "date": "2026-11-18T01:00Z",
+   "name": "Portland Trail Blazers at Minnesota Timberwolves",
+   "shortName": "POR @ MIN",
+   "status": {
+    "type": {
+     "state": "post",
+     "completed": true,
+     "shortDetail": "Final",
+     "detail": "Final"
+    },
+    "displayClock": "12:00",
+    "period": 4
+   },
+   "competitions": [
+    {
+     "competitors": [
+      {
+       "homeAway": "home",
+       "winner": true,
+       "score": "106",
+       "team": {
+        "displayName": "Minnesota Timberwolves",
+        "shortDisplayName": "Timberwolves",
+        "abbreviation": "MIN",
+        "color": "266092"
+       }
+      },
+      {
+       "homeAway": "away",
+       "winner": false,
+       "score": "105",
+       "team": {
+        "displayName": "Portland Trail Blazers",
+        "shortDisplayName": "Trail Blazers",
+        "abbreviation": "POR",
+        "color": "e03a3e"
+       }
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "401910004",
+   "date": "2026-11-18T01:00Z",
+   "name": "Detroit Pistons at San Antonio Spurs",
+   "shortName": "DET @ SA",
+   "status": {
+    "type": {
+     "state": "post",
+     "completed": true,
+     "shortDetail": "Final",
+     "detail": "Final"
+    },
+    "displayClock": "12:00",
+    "period": 4
+   },
+   "competitions": [
+    {
+     "competitors": [
+      {
+       "homeAway": "home",
+       "winner": false,
+       "score": "93",
+       "team": {
+        "displayName": "San Antonio Spurs",
+        "shortDisplayName": "Spurs",
+        "abbreviation": "SA",
+        "color": "000000"
+       }
+      },
+      {
+       "homeAway": "away",
+       "winner": true,
+       "score": "105",
+       "team": {
+        "displayName": "Detroit Pistons",
+        "shortDisplayName": "Pistons",
+        "abbreviation": "DET",
+        "color": "1d428a"
+       }
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "401910006",
+   "date": "2026-11-18T03:30Z",
+   "name": "Utah Jazz at LA Clippers",
+   "shortName": "UTAH @ LAC",
+   "status": {
+    "type": {
+     "state": "post",
+     "completed": true,
+     "shortDetail": "Final",
+     "detail": "Final"
+    },
+    "displayClock": "12:00",
+    "period": 4
+   },
+   "competitions": [
+    {
+     "competitors": [
+      {
+       "homeAway": "home",
+       "winner": false,
+       "score": "107",
+       "team": {
+        "displayName": "LA Clippers",
+        "shortDisplayName": "Clippers",
+        "abbreviation": "LAC",
+        "color": "12173f"
+       }
+      },
+      {
+       "homeAway": "away",
+       "winner": true,
+       "score": "132",
+       "team": {
+        "displayName": "Utah Jazz",
+        "shortDisplayName": "Jazz",
+        "abbreviation": "UTAH",
+        "color": "4e008e"
+       }
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "401910005",
+   "date": "2026-11-18T04:00Z",
+   "name": "Charlotte Hornets at Los Angeles Lakers",
+   "shortName": "CHA @ LAL",
+   "status": {
+    "type": {
+     "state": "post",
+     "completed": true,
+     "shortDetail": "Final/OT",
+     "detail": "Final/OT"
+    },
+    "displayClock": "5:00",
+    "period": 5
+   },
+   "competitions": [
+    {
+     "competitors": [
+      {
+       "homeAway": "home",
+       "winner": true,
+       "score": "118",
+       "team": {
+        "displayName": "Los Angeles Lakers",
+        "shortDisplayName": "Lakers",
+        "abbreviation": "LAL",
+        "color": "552583"
+       }
+      },
+      {
+       "homeAway": "away",
+       "winner": false,
+       "score": "114",
+       "team": {
+        "displayName": "Charlotte Hornets",
+        "shortDisplayName": "Hornets",
+        "abbreviation": "CHA",
+        "color": "008ca8"
+       }
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}

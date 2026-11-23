@@ -14,6 +14,8 @@
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <!-- to tell which streaming apps are installed (sideloaded app, not for the Play Store) -->
     <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES" tools:ignore="QueryAllPackagesPermission" />
+    <!-- Settings, Undo Couch TV: Android's own "Uninstall?" question for this app only (a normal permission, no prompt) -->
+    <uses-permission android:name="android.permission.REQUEST_DELETE_PACKAGES" />
     <!-- Granted over ADB once, by the app itself, after "Allow debugging?":
          draw over apps lets it open apps from the background with plain intents;
          write secure settings lets it switch wireless debugging back on after a reboot. -->
@@ -33,6 +35,28 @@
     <uses-feature android:name="android.software.leanback" android:required="false" />
     <uses-feature android:name="android.hardware.touchscreen" android:required="false" />
 
+    <!-- See the TV's own home screens, so the Home button watch can tell a Home press from any other screen (#98). -->
+    <queries>
+        <intent>
+            <action android:name="android.intent.action.MAIN" />
+            <category android:name="android.intent.category.HOME" />
+        </intent>
+        <!-- Web links (custom cards with a url): Android 11+ hides browser packages otherwise. -->
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:scheme="http" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:scheme="https" />
+        </intent>
+        <package android:name="com.amazon.tv.launcher" />
+        <package android:name="com.amazon.venezia" />
+        <package android:name="com.audible.application.firetv" />
+        <package android:name="com.google.android.apps.tv.launcherx" />
+        <package android:name="com.google.android.tvlauncher" />
+    </queries>
+
     <application
         android:name=".App"
         android:label="Couch TV"
@@ -41,6 +65,7 @@
         android:theme="@style/Couch"
         android:usesCleartextTraffic="true"
         android:allowBackup="false"
+        android:dataExtractionRules="@xml/data_extraction_rules"
         android:supportsRtl="false">
 
         <!-- The setup screen: the "Couch TV" tile in the TV's app list. -->
@@ -88,18 +113,10 @@
                 android:value="Local-network server for a phone remote control of this TV" />
         </service>
 
-        <!-- Fire TV only, and only used when "Use as home screen" is on. Window-change events only:
-             it reads no screen content. FireHome switches it on with the secure-settings grant. -->
-        <service
-            android:name=".WatchService"
-            android:exported="false"
-            android:label="Couch TV home watch"
-            android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE">
-            <intent-filter>
-                <action android:name="android.accessibilityservice.AccessibilityService" />
-            </intent-filter>
-            <meta-data android:name="android.accessibilityservice" android:resource="@xml/watch_service" />
-        </service>
+        <!-- The home watch (WatchService, an accessibility service) is NOT in this APK: Google Play Protect
+             blocks a sideloaded app that declares one ("App blocked to protect your device"), which stopped
+             the phone only install from Downloader. It is in the "watch" build only
+             (src/watch/AndroidManifest.xml, couch-tv-ontv-watch.apk), for Fire TV and TVs set up from a computer. -->
 
         <receiver android:name=".BootReceiver" android:exported="true">
             <intent-filter>

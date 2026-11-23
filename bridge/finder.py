@@ -32,7 +32,8 @@ query($country: Country!, $language: Language!, $first: Int!, $filter: TitleFilt
   popularTitles(country: $country, first: $first, filter: $filter) {
     edges { node { id objectType
       content(country: $country, language: $language) {
-        title originalReleaseYear posterUrl shortDescription runtime backdrops { backdropUrl } }
+        title originalReleaseYear posterUrl shortDescription runtime backdrops { backdropUrl }
+        externalIds { imdbId } }
       offers(country: $country, platform: ANDROID_TV) { %s }
       tizen: offers(country: $country, platform: TIZENOS) { %s } } } } }
 """ % (_OFFER, _TIZEN_OFFER)
@@ -74,6 +75,30 @@ def backdrop_url(content):
 
 def _norm(s):
     return re.sub(r"[^a-z0-9]+", " ", (s or "").lower()).strip()
+
+
+def _loose(s):
+    """The title without a trailing bracket: Plex and others name a show "The Office (US)", JustWatch
+    "The Office", and a year in brackets is the same film."""
+    return _norm(re.sub(r"\s*\([^)]*\)\s*$", "", s or ""))
+
+
+def _bracket(s):
+    """The trailing bracket's text, normalised ("us" for "The Office (US)"), or "" when there is none."""
+    m = re.search(r"\(([^)]*)\)\s*$", s or "")
+    return _norm(m.group(1)) if m else ""
+
+
+def same_title(a, b):
+    """The two names are the same title: exactly, or one is the other with a trailing bracket
+    ("The Office (US)" and "The Office"). Two different brackets are two shows ("The Office (UK)"
+    and "The Office (US)", "Dune (1984)" and "Dune (2021)")."""
+    na, nb = _norm(a), _norm(b)
+    if not na:
+        return False
+    if na == nb:
+        return True
+    return _loose(a) == _loose(b) and not (_bracket(a) and _bracket(b))
 
 
 def _tizen_links(offers):
@@ -123,6 +148,7 @@ def _shape(node):
         "backdrop": backdrop_url(c),
         "overview": c.get("shortDescription"),
         "runtime_min": c.get("runtime"),
+        "imdb": (c.get("externalIds") or {}).get("imdbId"),
         "providers": _providers(node.get("offers"), node.get("tizen")),
     }
 
@@ -140,10 +166,12 @@ async def find(title, type_=None):
     results = await search(title, type_)
     if not results:
         return None, []
-    want = _norm(title)
-    # Exact title with somewhere to watch it, then exact title, then the most popular result.
+    want, want_loose = _norm(title), _loose(title)
+    # Exact title with somewhere to watch it, then exact title, then the same title but for a
+    # trailing bracket ("The Office (US)"), then the most popular result.
     ranked = sorted(range(len(results)), key=lambda i: (
         _norm(results[i]["title"]) != want,
+        _loose(results[i]["title"]) != want_loose,
         not results[i]["providers"],
         i,
     ))

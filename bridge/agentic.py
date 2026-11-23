@@ -19,6 +19,9 @@ import time
 import urllib.parse
 from datetime import datetime, timedelta
 
+import messages
+from tv import check_package
+
 S = None  # the server module (set by server.py)
 log = logging.getLogger("agentic")
 
@@ -122,7 +125,12 @@ async def h_ui(request):
     try:
         items = await ui_items()
     except RuntimeError as e:
-        raise S.ApiError(409, f"{e}. Use now, or a screenshot, instead.")
+        raise S.ApiError(
+            409,
+            f"{e}. Use now, or a screenshot, instead.",
+            key="err_ui_read_failed",
+            vars={"error": str(e)},
+        )
     return S.ok(**ui_summary(items, front))
 
 
@@ -136,14 +144,24 @@ async def h_tap(request):
         target = (next((i for i in items if _norm(i["label"]) == want), None)
                   or next((i for i in items if want and want in _norm(i["label"])), None))
         if not target:
-            raise S.ApiError(404, f"nothing on screen says {label}")
+            raise S.ApiError(
+                404,
+                f"nothing on screen says {label}",
+                key="err_nothing_on_screen_says",
+                vars={"label": label},
+            )
     elif "x" in data and "y" in data:
         target = {"label": "", "x": int(data["x"]), "y": int(data["y"])}
     else:
-        raise S.ApiError(400, "label (or x and y) is required")
+        raise S.ApiError(400, "label (or x and y) is required", key="err_label_or_xy_required")
     if target["label"] and (STOP_WORDS.search(target["label"]) or PRICE.match(target["label"])):
-        raise S.ApiError(403, f"not pressing {target['label']}: paying, signing up and signing in "
-                              "are for the person to do on the TV")
+        raise S.ApiError(
+            403,
+            f"not pressing {target['label']}: paying, signing up and signing in "
+            "are for the person to do on the TV",
+            key="err_not_pressing_sensitive",
+            vars={"label": target["label"]},
+        )
     await S.tv.adb("shell", f"input tap {target['x']} {target['y']}", timeout=8)
     S.record_action(request, "tap", {"label": target["label"] or f"{target['x']},{target['y']}"}, True)
     await asyncio.sleep(1)
@@ -216,7 +234,10 @@ async def install_app(name=None, package=None, wait_s=150):
     before = await _packages()
     if pkg and pkg in before:
         return {"installed": True, "already": True, "package": pkg, "name": shown,
-                "note": f"{shown} is already on the TV."}
+                "note": f"{shown} is already on the TV.",
+                **messages.note_fields("note_app_already_on_tv", {"name": shown})}
+    if pkg:
+        check_package(pkg)
     link = (f"market://details?id={pkg}" if pkg
             else "market://search?q=" + urllib.parse.quote(name or "") + "&c=apps")
     await S.tv.adb("shell", "am", "start", "-a", "android.intent.action.VIEW", "-d", f"'{link}'", timeout=15)
@@ -232,15 +253,19 @@ async def install_app(name=None, package=None, wait_s=150):
         if price and not button:
             return {"installed": False, "stopped": "paid",
                     "note": f"{shown} costs {price['label']} on the Play Store. I never buy apps, so it "
-                            "is left on screen for you to decide."}
+                            "is left on screen for you to decide.",
+                    **messages.note_fields("note_app_paid_on_play_store", {"name": shown, "price": price["label"]})}
         if button:
             break
     if not button:
         stop = stop_labels(items)
         why = (f"the Play Store is asking to {stop[0].lower()}, which is for you to do"
                if stop else "I could not find an Install button")
+        note_key = "note_play_store_stopped_sign_in" if stop else "note_play_store_no_install_button"
+        note_vars = {"name": shown, "action": stop[0].lower()} if stop else {"name": shown}
         return {"installed": False, "stopped": "no_button", "screen": ui_summary(items, "com.android.vending"),
-                "note": f"Opened the Play Store for {shown}, but {why}."}
+                "note": f"Opened the Play Store for {shown}, but {why}.",
+                **messages.note_fields(note_key, note_vars)}
     if not pkg:
         # A search: the first result is the one with the Install button; its name is the top label.
         top = next((i for i in items if i["y"] < button["y"] and len(i["label"]) > 2
@@ -249,7 +274,8 @@ async def install_app(name=None, package=None, wait_s=150):
     label = button["label"].lower()
     if label.startswith("open"):
         return {"installed": True, "already": True, "package": pkg, "name": shown,
-                "note": f"{shown} is already on the TV."}
+                "note": f"{shown} is already on the TV.",
+                **messages.note_fields("note_app_already_on_tv", {"name": shown})}
     if label.startswith("install") or label.startswith("update"):
         if button["focused"]:
             await S.tv.adb("shell", "input keyevent KEYCODE_DPAD_CENTER", timeout=8)
@@ -266,7 +292,8 @@ async def install_app(name=None, package=None, wait_s=150):
             got = pkg or sorted(new)[0]
             await S.installed_packages(max_age=0)
             return {"installed": True, "package": got, "name": shown,
-                    "seconds": round(time.monotonic() - started), "note": f"Installed {shown}."}
+                    "seconds": round(time.monotonic() - started), "note": f"Installed {shown}.",
+                    **messages.note_fields("note_app_installed", {"name": shown})}
         if tick % 3 == 0:
             try:
                 items = await ui_items()
@@ -276,18 +303,20 @@ async def install_app(name=None, package=None, wait_s=150):
             if stop:
                 return {"installed": False, "stopped": "sign_in_or_payment", "name": shown,
                         "note": f"The Play Store wants something only you can do ({stop[0]}). "
-                                "It is on the TV for you to finish."}
+                                "It is on the TV for you to finish.",
+                        **messages.note_fields("note_play_store_needs_you", {"action": stop[0]})}
             if _button(items, "install") and not _button(items, "installing", "pending", "cancel"):
                 b = _button(items, "install")
                 await S.tv.adb("shell", f"input tap {b['x']} {b['y']}", timeout=8)
     return {"installed": False, "stopped": "timeout", "name": shown,
-            "note": f"{shown} was still installing after {wait_s} s. It will finish by itself."}
+            "note": f"{shown} was still installing after {wait_s} s. It will finish by itself.",
+            **messages.note_fields("note_app_still_installing", {"name": shown, "seconds": wait_s})}
 
 
 async def h_install(request):
     data = await S.body(request)
     if not (data.get("name") or data.get("package")):
-        raise S.ApiError(400, "name is required")
+        raise S.ApiError(400, "name is required", key="err_name_required")
     result = await install_app(data.get("name"), data.get("package"))
     S.record_action(request, "install_app", {"name": data.get("name") or data.get("package")},
                     bool(result.get("installed")))
@@ -303,7 +332,7 @@ async def h_uninstall(request):
         hits = sorted(p for p in await _packages() if token and token in p.replace(".", "").replace("_", ""))
         pkg = hits[0] if len(hits) == 1 else None
     if not pkg:
-        raise S.ApiError(404, f"do not know which app {shown} is")
+        raise S.ApiError(404, f"do not know which app {shown} is", key="err_unknown_app_name", vars={"name": shown})
     keep = set(NEVER_UNINSTALL) | set(S.apps.HOME_PACKAGES)  # the home screen app stays
     try:
         with open(os.path.join(HERE, S.tv.keep_disabled_file or "")) as f:
@@ -311,17 +340,22 @@ async def h_uninstall(request):
     except (OSError, ValueError):
         pass
     if pkg in keep:
-        raise S.ApiError(403, f"{shown} is part of how the TV works, so it stays")
+        raise S.ApiError(403, f"{shown} is part of how the TV works, so it stays",
+                         key="err_app_system_required", vars={"name": shown})
     system = await S.tv.adb("shell", "pm list packages -s", timeout=15)
     if pkg in {line.split(":", 1)[1].strip() for line in system.splitlines() if ":" in line}:
-        raise S.ApiError(403, f"{shown} came with the TV and cannot be removed")
+        raise S.ApiError(403, f"{shown} came with the TV and cannot be removed",
+                         key="err_app_preinstalled", vars={"name": shown})
     if pkg not in await _packages():
-        return S.ok(uninstalled=False, note=f"{shown} is not on the TV.")
-    out = await S.tv.adb("shell", f"pm uninstall {pkg}", timeout=30)
+        return S.ok(uninstalled=False, note=f"{shown} is not on the TV.",
+                    **messages.note_fields("note_app_not_on_tv", {"name": shown}))
+    out = await S.tv.adb("shell", f"pm uninstall {check_package(pkg)}", timeout=30)
     done = "Success" in out
     await S.installed_packages(max_age=0)
     S.record_action(request, "uninstall_app", {"name": shown}, done)
-    return S.ok(uninstalled=done, package=pkg, note=f"Removed {shown}." if done else out.strip()[:120])
+    return S.ok(uninstalled=done, package=pkg, note=f"Removed {shown}." if done else out.strip()[:120],
+                **messages.note_fields("note_app_removed" if done else "note_app_remove_failed",
+                                       {"name": shown} if done else {"detail": out.strip()[:120]}))
 
 
 # ---------- HDMI inputs ----------
@@ -426,6 +460,10 @@ def pick_input(inputs, name):
 
 
 async def h_inputs(request):
+    if S.tv.kind == "philips":   # the TV lists its own inputs (bridge/philips.py)
+        return S.ok(inputs=[{"id": x["id"], "name": x["name"]} for x in await S.tv.read_sources()], remembered={})
+    if S.tv.kind == "vizio":   # the TV lists its own inputs (bridge/vizio.py)
+        return S.ok(inputs=await S.tv.read_sources(), remembered={})
     inputs = await list_inputs()
     saved = {k: next((i["name"] for i in inputs if i["id"] == v), v) for k, v in _saved_names().items()}
     return S.ok(inputs=inputs, remembered=saved)
@@ -435,15 +473,33 @@ async def h_input(request):
     data = await S.body(request)
     name = (data.get("name") or "").strip()
     if not name:
-        raise S.ApiError(400, "name is required (for example playstation, hdmi 2, or home)")
+        raise S.ApiError(
+            400,
+            "name is required (for example playstation, hdmi 2, or home)",
+            key="err_input_name_required",
+        )
     if _norm(name) in ("home", "tv", "apps", "google tv", "android", "smart tv"):
         await S.tv.key("home")
         S.record_action(request, "input", {"name": "home"}, True)
-        return S.ok(input="home", note="Back to the home screen.")
+        return S.ok(input="home", note="Back to the home screen.",
+                    **messages.note_fields("note_input_home"))
+    if S.tv.kind in ("philips", "vizio"):   # an input the TV listed, by its name or id (bridge/philips.py, bridge/vizio.py)
+        try:
+            src = await S.tv.switch_source(name)
+        except ValueError as e:
+            raise S.ApiError(
+                404,
+                str(e),
+                key=getattr(e, "key", None) or "err_unknown_input",
+                vars=getattr(e, "vars", None) or {"name": name},
+            )
+        S.record_action(request, "input", {"name": name, "input": src["name"]}, True)
+        return S.ok(input=src["name"], how="listed", switched=True, note=f"Switched to {src['name']}.",
+                    **messages.note_fields("note_input_switched", {"input": src["name"]}))
     inputs = await list_inputs()
     hit, how = pick_input(inputs, name)
     if not hit:
-        raise S.ApiError(404, "this TV reports no HDMI inputs")
+        raise S.ApiError(404, "this TV reports no HDMI inputs", key="err_no_hdmi_inputs")
     uri = "content://android.media.tv/passthrough/" + urllib.parse.quote(hit["id"], safe="")
     await S.tv.adb("shell", "am", "start", "-a", "android.intent.action.VIEW", "-d", f"'{uri}'", timeout=15)
     await asyncio.sleep(2)
@@ -456,13 +512,29 @@ async def h_input(request):
         _save_name(name, hit["id"])
     dev = ", ".join(d["name"] for d in hit["devices"] if d["type"] != "audio")
     note = f"Switched to {hit['name']}" + (f" ({dev})" if dev else "") + "."
-    if how == "guess":
+    is_guess = how == "guess"
+    no_signal = hit["state"] != "connected" and not dev
+    if is_guess:
         note += (f" The TV could not tell me where the {name} is, so {hit['name']} is my best guess. "
                  "If it is wrong, say which HDMI it is on and I will remember.")
-    if hit["state"] != "connected" and not dev:
+    if no_signal:
         note += " If it says no signal, turn the device on with its own controller or remote."
+    if is_guess and no_signal:
+        note_key = "note_input_switched_guess_no_signal"
+    elif is_guess:
+        note_key = "note_input_switched_device_guess" if dev else "note_input_switched_guess"
+    elif no_signal:
+        note_key = "note_input_switched_no_signal"
+    else:
+        note_key = "note_input_switched_device" if dev else "note_input_switched"
+    note_vars = {"input": hit["name"]}
+    if dev:
+        note_vars["device"] = dev
+    if is_guess:
+        note_vars["name"] = name
     S.record_action(request, "input", {"name": name, "input": hit["name"]}, switched)
-    return S.ok(input=hit["name"], how=how, switched=switched, note=note)
+    return S.ok(input=hit["name"], how=how, switched=switched, note=note,
+                **messages.note_fields(note_key, note_vars))
 
 
 # ---------- off when this episode ends ----------
@@ -590,11 +662,16 @@ async def h_off_after(request):
     if data.get("cancel"):
         was = cancel(tv_id)
         S.record_action(request, "off_after_episode", {"cancel": True}, True)
-        return S.ok(cancelled=was, note="Cancelled, the TV will stay on." if was else "Nothing was set.")
+        return S.ok(cancelled=was, note="Cancelled, the TV will stay on." if was else "Nothing was set.",
+                    **messages.note_fields("note_off_after_cancelled" if was else "note_off_after_nothing_set"))
     front = await S.tv.front_package()
     app = S.apps.describe_package(front)
     if not app or app["id"] in S.NOT_VIEWING:
-        raise S.ApiError(409, "nothing is playing, so there is no episode to wait for")
+        raise S.ApiError(
+            409,
+            "nothing is playing, so there is no episode to wait for",
+            key="err_nothing_playing_for_episode",
+        )
     await S.media_read(front, app)
     base = _reading()
     for _ in range(3):  # give the app a moment to say what is playing
@@ -604,7 +681,12 @@ async def h_off_after(request):
         await S.media_read(front, app)
         base = _reading() or base
     if not base or base.get("state") not in ("playing", "paused", "buffering"):
-        raise S.ApiError(409, f"{app['name']} is open but not playing anything I can follow")
+        raise S.ApiError(
+            409,
+            f"{app['name']} is open but not playing anything I can follow",
+            key="err_app_not_playing_followable",
+            vars={"app": app["name"]},
+        )
     threshold = int(max(0, min(float(data.get("threshold_s", 30)), 600)) * 1000)
     dry_run = bool(data.get("dry_run"))
     cancel(tv_id, clear_timer=True)
@@ -623,13 +705,15 @@ async def h_off_after(request):
     if set_timer:
         mins = max(1, round((dur - pos - threshold) / 60000))
         note = f"The TV goes off when {what} ends, in about {mins} min."
+        nk, nv = "note_off_after_armed_minutes", {"what": what, "minutes": mins}
     else:
         note = (f"The TV goes off when {what} ends. {app['name']} does not say how long it is, so I "
                 "will turn it off when it stops or the next one starts.")
+        nk, nv = "note_off_after_armed_watch", {"what": what, "app": app["name"]}
     S.record_action(request, "off_after_episode", {"title": base.get("title"), "dry_run": dry_run}, True)
     return S.ok(armed=True, title=base.get("title"), season=base.get("season"), episode=base.get("episode"),
                 minutes_left=round((dur - pos) / 60000, 1) if set_timer else None,
-                dry_run=dry_run, note=note)
+                dry_run=dry_run, note=note, **messages.note_fields(nk, nv))
 
 
 # ---------- restart an app that is playing up, then carry on ----------
@@ -640,12 +724,12 @@ async def h_restart_app(request):
     if want:
         app = S.apps.BY_ID.get(want) or S.apps.BY_PACKAGE.get(want)
         if not app:
-            raise S.ApiError(400, f"unknown app: {want}")
+            raise S.ApiError(400, f"unknown app: {want}", key="err_unknown_app", vars={"app": want})
     else:
         app = S.apps.BY_PACKAGE.get(front)
         if not app or app["id"] in ("home", "settings"):
-            raise S.ApiError(409, "no app is open to restart")
-    pkg = app["package"]
+            raise S.ApiError(409, "no app is open to restart", key="err_no_app_to_restart")
+    pkg = S.pkg_of(app)   # the build this TV has (Amazon's on a Fire TV)
     title = season = episode = None
     m = S.media_now
     if m and m.get("package") == pkg and m.get("title"):
@@ -660,25 +744,48 @@ async def h_restart_app(request):
                 if when and datetime.now(when.tzinfo) - when < timedelta(hours=3):
                     title, season, episode = h["title"], h.get("season"), h.get("episode")
                 break
-    await S.tv.adb("shell", f"am force-stop {pkg}", timeout=15)
+    await S.tv.adb("shell", f"am force-stop {check_package(pkg)}", timeout=15)
     await asyncio.sleep(1.5)
     result = {"restarted": app["name"], "resumed": None, "started": None}
     if title and app["id"] == "youtube":
         method, note = await S.search_in_app(app, title)
-        result |= {"resumed": title, "note": f"Restarted YouTube and searched for {title}."}
+        result |= {"resumed": title, "note": f"Restarted YouTube and searched for {title}.",
+                   **messages.note_fields("note_restarted_youtube_searched", {"title": title})}
     elif title and app.get("deeplink") == "jw":
         try:
             r = await S.play(title, service=app["id"], who=S.cur_who(), resume=True)
             result |= {"resumed": r["title"], "started": r.get("started"),
-                       "note": f"Restarted {app['name']}. " + (r.get("note") or "")}
+                       "note": f"Restarted {app['name']}. " + (r.get("note") or ""),
+                       **messages.note_fields("note_restarted_app_with_note",
+                                              {"app": app["name"], "note": r.get("note") or ""})}
         except S.ApiError as e:
             await S.launch_app(app)
-            result |= {"note": f"Restarted {app['name']}, but could not reopen {title}: {e.message}"}
+            result |= {"note": f"Restarted {app['name']}, but could not reopen {title}: {e.message}",
+                       **messages.note_fields("note_restarted_app_reopen_failed",
+                                              {"app": app["name"], "title": title, "error": e.message})}
     else:
         got, _ = await S.launch_app(app)
-        result |= {"note": f"Restarted {app['name']}." + (f" Pick {title} again on the TV." if title else "")}
+        note_key = "note_restarted_app_pick_again" if title else "note_restarted_app"
+        note_vars = {"app": app["name"], "title": title} if title else {"app": app["name"]}
+        result |= {"note": f"Restarted {app['name']}." + (f" Pick {title} again on the TV." if title else ""),
+                   **messages.note_fields(note_key, note_vars)}
     S.record_action(request, "restart_app", {"app": app["id"]}, True)
     return S.ok(**result)
+
+
+# ---------- quit an app (the tile menu's Quit app) ----------
+async def h_quit_app(request):
+    data = await S.body(request)
+    pkg, shown = resolve_package(data.get("package") or data.get("app") or data.get("name"))
+    if not pkg:
+        raise S.ApiError(404, f"do not know which app {shown} is", key="err_unknown_app_name", vars={"name": shown})
+    if pkg in set(NEVER_UNINSTALL) | set(S.apps.HOME_PACKAGES) | {"app.couchtv.launcher"}:   # the home stays
+        raise S.ApiError(403, f"{shown} is part of how the TV works, so it stays",
+                         key="err_app_system_required", vars={"name": shown})
+    await S.tv.adb("shell", f"am force-stop {check_package(pkg)}", timeout=15)
+    S.record_action(request, "quit_app", {"name": shown}, True)
+    return S.ok(quit=shown, package=pkg, note=f"Closed {shown}.",
+                **messages.note_fields("note_app_quit", {"name": shown}))
 
 
 # ---------- is the new episode out yet ----------
@@ -748,10 +855,10 @@ async def latest_episode(title):
 async def h_latest(request):
     title = (request.query.get("title") or "").strip()
     if not title:
-        raise S.ApiError(400, "title is required")
+        raise S.ApiError(400, "title is required", key="err_title_required")
     r = await latest_episode(title)
     if not r:
-        raise S.ApiError(404, f"could not find a show called {title}")
+        raise S.ApiError(404, f"could not find a show called {title}", key="err_show_not_found", vars={"title": title})
     return S.ok(**r)
 
 
@@ -830,5 +937,6 @@ def routes(r):
     r.add_get("/api/off-after", h_off_after_get)
     r.add_post("/api/off-after", h_off_after)
     r.add_post("/api/restart-app", h_restart_app)
+    r.add_post("/api/quit-app", h_quit_app)
     r.add_get("/api/latest", h_latest)
     r.add_get("/api/both", h_both)

@@ -1,0 +1,55 @@
+{
+ "leagues": [
+  {
+   "name": "Rugby League",
+   "abbreviation": "NRL"
+  }
+ ],
+ "week": {
+  "number": 4
+ },
+ "events": [
+  {
+   "id": "604845",
+   "date": "2026-10-04T08:30Z",
+   "name": "Roosters vs Knights",
+   "shortName": "SYD VS NEW",
+   "status": {
+    "type": {
+     "state": "post",
+     "completed": true,
+     "shortDetail": "Final",
+     "detail": "Final"
+    },
+    "displayClock": "80'",
+    "period": 2
+   },
+   "competitions": [
+    {
+     "competitors": [
+      {
+       "homeAway": "home",
+       "winner": true,
+       "score": "19",
+       "team": {
+        "displayName": "Roosters",
+        "shortDisplayName": "Roosters",
+        "abbreviation": "SYD"
+       }
+      },
+      {
+       "homeAway": "away",
+       "winner": false,
+       "score": "18",
+       "team": {
+        "displayName": "Knights",
+        "shortDisplayName": "Knights",
+        "abbreviation": "NEW"
+       }
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}

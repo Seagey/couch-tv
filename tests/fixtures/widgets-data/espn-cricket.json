@@ -1,0 +1,331 @@
+{
+ "sports": [
+  {
+   "name": "Cricket",
+   "leagues": [
+    {
+     "name": "Quaid-e-Azam Trophy Gold 2026/27",
+     "shortName": "",
+     "abbreviation": "",
+     "events": [
+      {
+       "id": "1561022",
+       "date": "2026-11-15T05:00:00Z",
+       "name": "Islamabad Region v Karachi Region Blues",
+       "shortName": "ISB v KRBLS",
+       "title": "9th Match",
+       "status": "in",
+       "summary": "Live",
+       "class": {
+        "generalClassCard": "First-class",
+        "internationalClassId": "0"
+       },
+       "fullStatus": {
+        "longSummary": "Islamabad Region won the toss",
+        "summary": "Islamabad won toss",
+        "type": {
+         "id": "0",
+         "description": "Live",
+         "detail": "Live",
+         "shortDetail": "Live",
+         "state": "in"
+        }
+       },
+       "competitors": [
+        {
+         "homeAway": "home",
+         "winner": false,
+         "score": "330",
+         "displayName": "Islamabad Region",
+         "abbreviation": "ISB",
+         "color": ""
+        },
+        {
+         "homeAway": "away",
+         "winner": false,
+         "score": "378 & 326/5 (57 ov)",
+         "displayName": "Karachi Region Blues",
+         "abbreviation": "KRBLS",
+         "color": ""
+        }
+       ]
+      },
+      {
+       "id": "1561023",
+       "date": "2026-11-15T05:00:00Z",
+       "name": "Sialkot Region Blues v Federally Administered Tribal Areas",
+       "shortName": "SRB v FATA",
+       "title": "10th Match",
+       "status": "in",
+       "summary": "Live",
+       "class": {
+        "generalClassCard": "First-class",
+        "internationalClassId": "0"
+       },
+       "fullStatus": {
+        "longSummary": "Federally Administered Tribal Areas won the toss",
+        "summary": "FATA won toss",
+        "type": {
+         "id": "0",
+         "description": "Live",
+         "detail": "Live",
+         "shortDetail": "Live",
+         "state": "in"
+        }
+       },
+       "competitors": [
+        {
+         "homeAway": "home",
+         "winner": false,
+         "score": "117 & 417",
+         "displayName": "Sialkot Region Blues",
+         "abbreviation": "SRB",
+         "color": ""
+        },
+        {
+         "homeAway": "away",
+         "winner": false,
+         "score": "150 & 85/3 (17 ov, target 385)",
+         "displayName": "Federally Administered Tribal Areas",
+         "abbreviation": "FATA",
+         "color": ""
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "name": "Quaid-e-Azam Trophy Silver League 2026/27",
+     "shortName": "",
+     "abbreviation": "",
+     "events": [
+      {
+       "id": "1561220",
+       "date": "2026-11-15T05:00:00Z",
+       "name": "Bahawalpur Region v Larkana Region",
+       "shortName": "BHLPR v LAR",
+       "title": "Group A",
+       "status": "in",
+       "summary": "Live",
+       "class": {
+        "generalClassCard": "First-class",
+        "internationalClassId": "0"
+       },
+       "fullStatus": {
+        "longSummary": "Bahawalpur Region won the toss",
+        "summary": "Bahawalpur R won toss",
+        "type": {
+         "id": "0",
+         "description": "Live",
+         "detail": "Live",
+         "shortDetail": "Live",
+         "state": "in"
+        }
+       },
+       "competitors": [
+        {
+         "homeAway": "home",
+         "winner": false,
+         "score": "116 & 283",
+         "displayName": "Bahawalpur Region",
+         "abbreviation": "BHLPR",
+         "color": ""
+        },
+        {
+         "homeAway": "away",
+         "winner": false,
+         "score": "141 & 182/8 (70 ov, target 259)",
+         "displayName": "Larkana Region",
+         "abbreviation": "LAR",
+         "color": ""
+        }
+       ]
+      },
+      {
+       "id": "1561225",
+       "date": "2026-11-15T05:00:00Z",
+       "name": "Dera Murad Jamali Region v Karachi Region Whites",
+       "shortName": "DMJIR v KARW",
+       "title": "Group B",
+       "status": "in",
+       "summary": "Live",
+       "class": {
+        "generalClassCard": "First-class",
+        "internationalClassId": "0"
+       },
+       "fullStatus": {
+        "longSummary": "Dera Murad Jamali Region won the toss",
+        "summary": "DM Jamali R won toss",
+        "type": {
+         "id": "0",
+         "description": "Live",
+         "detail": "Live",
+         "shortDetail": "Live",
+         "state": "in"
+        }
+       },
+       "competitors": [
+        {
+         "homeAway": "home",
+         "winner": false,
+         "score": "236",
+         "displayName": "Dera Murad Jamali Region",
+         "abbreviation": "DMJIR",
+         "color": ""
+        },
+        {
+         "homeAway": "away",
+         "winner": false,
+         "score": "281 & 258/4 (53 ov)",
+         "displayName": "Karachi Region Whites",
+         "abbreviation": "KARW",
+         "color": ""
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "name": "Syed Mushtaq Ali Trophy",
+     "shortName": "India Dom T20",
+     "abbreviation": "India Dom T20",
+     "events": [
+      {
+       "id": "1546709",
+       "date": "2026-11-18T02:30:00Z",
+       "name": "Chhattisgarh v Odisha",
+       "shortName": "CGR v ODSA",
+       "title": "Elite, Group D",
+       "status": "post",
+       "summary": "Result",
+       "class": {
+        "generalClassCard": "Twenty20",
+        "internationalClassId": "0"
+       },
+       "fullStatus": {
+        "longSummary": "Chhattisgarh won by 51 runs",
+        "summary": "Chhattisgarh won by 51 runs",
+        "type": {
+         "id": "1",
+         "description": "Result",
+         "detail": "Final",
+         "shortDetail": "Final",
+         "state": "post"
+        }
+       },
+       "competitors": [
+        {
+         "homeAway": "home",
+         "winner": true,
+         "score": "228/4",
+         "displayName": "Chhattisgarh",
+         "abbreviation": "CGR",
+         "color": ""
+        },
+        {
+         "homeAway": "away",
+         "winner": false,
+         "score": "177/8 (20 ov, target 229)",
+         "displayName": "Odisha",
+         "abbreviation": "ODSA",
+         "color": ""
+        }
+       ]
+      },
+      {
+       "id": "1546714",
+       "date": "2026-11-18T02:30:00Z",
+       "name": "Services v Arunachal Pradesh",
+       "shortName": "SVCS v ARP",
+       "title": "Plate Group",
+       "status": "post",
+       "summary": "Result",
+       "class": {
+        "generalClassCard": "Twenty20",
+        "internationalClassId": "0"
+       },
+       "fullStatus": {
+        "longSummary": "Services won by 53 runs",
+        "summary": "Services won by 53 runs",
+        "type": {
+         "id": "1",
+         "description": "Result",
+         "detail": "Final",
+         "shortDetail": "Final",
+         "state": "post"
+        }
+       },
+       "competitors": [
+        {
+         "homeAway": "home",
+         "winner": true,
+         "score": "184/9",
+         "displayName": "Services",
+         "abbreviation": "SVCS",
+         "color": ""
+        },
+        {
+         "homeAway": "away",
+         "winner": false,
+         "score": "131/6 (20 ov, target 185)",
+         "displayName": "Arunachal Pradesh",
+         "abbreviation": "ARP",
+         "color": ""
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "name": "Bangladesh tour of South Africa 2026/27",
+     "shortName": "Bangladesh in South Africa 2026/27",
+     "abbreviation": "Bangladesh in South Africa 2026-27",
+     "events": [
+      {
+       "id": "1525662",
+       "date": "2026-11-15T08:00:00Z",
+       "name": "South Africa v Bangladesh",
+       "shortName": "SA v BAN",
+       "title": "1st Test",
+       "status": "in",
+       "summary": "Live",
+       "class": {
+        "generalClassCard": "Test",
+        "internationalClassId": "1"
+       },
+       "fullStatus": {
+        "longSummary": "South Africa lead by 60 runs with 3 wickets remaining in the 1st innings",
+        "summary": "South Africa lead by 60 runs",
+        "type": {
+         "id": "0",
+         "description": "Live",
+         "detail": "Live",
+         "shortDetail": "Live",
+         "state": "in"
+        }
+       },
+       "competitors": [
+        {
+         "homeAway": "home",
+         "winner": false,
+         "score": "460/7 (105.5 ov)",
+         "displayName": "South Africa",
+         "abbreviation": "SA",
+         "color": "#ace411"
+        },
+        {
+         "homeAway": "away",
+         "winner": false,
+         "score": "400",
+         "displayName": "Bangladesh",
+         "abbreviation": "BAN",
+         "color": "#ed3507"
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}

@@ -5,9 +5,11 @@ import { tick } from './haptics.js';
 import * as Ic from './icons.jsx';
 import { TopBar, NowPlaying, Pad, Controls, AskButton } from './Remote.jsx';
 import { Watch } from './Watch.jsx';
-import { AskSheet, MoreSheet, ArrangeSheet, PeopleSheet, Onboarding } from './Sheets.jsx';
+import { AskSheet, MoreSheet, TypeSheet, ArrangeSheet, PeopleSheet, Onboarding } from './Sheets.jsx';
+import { KidsSheet, PinSheet } from './Kids.jsx';
 import { usePullDown, usePageDrag } from './gestures.js';
-import { t, useLang, setTvLang } from './i18n.js';
+import { t, tBridge, useLang, setTvLang } from './i18n.js';
+import { takeDesignFromHash, nonceMatches, sentWords, canSend, NONCE_KEY, dsw } from './designSend.js';
 
 const store = {
   get: (k) => { try { return localStorage.getItem(k); } catch { return null; } },
@@ -134,6 +136,9 @@ export default function App() {
   const [hidden, setHidden] = useState([]);
   // nobody set up: no picker, the remote shows everything
   useEffect(() => { if (!who && people.length === 0) setWho('both'); }, [people]); // eslint-disable-line react-hooks/exhaustive-deps
+  // the kids profiles (people with kids_mode): no Ask for them (docs/CONFIG.md, "Kids mode")
+  const kidIds = people.filter((p) => p.kids_mode).map((p) => p.id);
+  const loadConfig = () => api.config().then((c) => { if (Array.isArray(c.people)) setPeople(c.people); }).catch(() => {});
   useEffect(() => { api.config().then((c) => { if (Array.isArray(c.people)) setPeople(c.people); if (c.ask && c.ask.enabled === false) setAskOn(false); glass.current.cfg = c.home?.glass_icons === true; glass.current.amtCfg = amount(c.home?.glass_amount) ?? 3; glass.current.focusCfg = c.home?.glass_focus ?? null; showGlass(); }).catch(() => {}); }, []);
   const [who, setWhoState] = useState(() => store.get('tv.who'));
   // Which TV this phone drives, remembered per phone. null is the bridge's default (living room).
@@ -147,6 +152,15 @@ export default function App() {
   const [screens, setScreens] = useState([]);
   const [tab, setTab] = useState('remote');
   const [sheet, setSheet] = useState(null);
+  // A link from the TV's phone Home settings page (/setup) opens one sheet: /#sheet=people, arrange, kids or more.
+  useEffect(() => {
+    const m = /(?:^#|&)sheet=(people|arrange|kids|more)(?:&|$)/.exec(window.location.hash || '');
+    if (!m) return;
+    // only sheet= comes off: a #design= and its n= (designSend.js) stay for their own effect, and so does history.state
+    const rest = window.location.hash.replace(/^#/, '').split('&').filter((p) => p && !/^sheet=/.test(p)).join('&');
+    try { window.history.replaceState(window.history.state, '', window.location.pathname + window.location.search + (rest ? '#' + rest : '')); } catch (e) { /* old browser */ }
+    setSheet(m[1]);
+  }, []);
   // A sheet adds a history step, so the Android back button (or gesture) closes it instead of the app.
   useEffect(() => {
     const st = window.history.state;
@@ -162,6 +176,7 @@ export default function App() {
   const [sleepError, setSleepError] = useState(null);
   const [, setNowTick] = useState(0);
   const askInput = useRef(null);
+  const typeInput = useRef(null);
   const { w, h } = useSize();
   const wide = w >= 760 && h >= 480;
   const standalone = typeof navigator !== 'undefined' && (navigator.standalone || window.matchMedia('(display-mode: standalone)').matches);
@@ -172,7 +187,13 @@ export default function App() {
   useEffect(() => { if (!toast) return undefined; const t = setTimeout(() => setToast(null), toast.text.length > 40 ? 4500 : 2600); return () => clearTimeout(t); }, [toast]);
 
   useEffect(() => { setTv(null); return subscribeNow(setTv, setReach); }, [tvId]);
-  useEffect(() => { api.tvs().then((d) => setTvs(d.tvs || [])).catch(() => {}); }, [reach, tvId]);
+  useEffect(() => {
+    const load = () => api.tvs().then((d) => setTvs(d.tvs || [])).catch(() => {});
+    load();
+    // also every 10 minutes, so a Developer Mode warning shows without reopening the app
+    const iv = setInterval(load, 600000);
+    return () => clearInterval(iv);
+  }, [reach, tvId]);
   // "Same as the TV": the language picked in the TV home's Home settings
   // and its look and hidden apps
   useEffect(() => { api.settings().then((d) => {
@@ -206,9 +227,19 @@ export default function App() {
   const setWho = (v) => { store.set('tv.who', v); setWhoState(v); };
   // Who is on the couch is shared with the bridge, so the phones and the TV home agree.
   // A tap on the switch tells the bridge; a change made elsewhere (TV, other phone) is followed here.
-  const pickWho = (v) => {
+  // Moving the TV away from a kids profile needs the parent PIN: the bridge says so (403), and the
+  // phone asks for it once and tries again.
+  const [pinAsk, setPinAsk] = useState(null);
+  const pickWho = (v, pin) => {
     setWho(v);
-    api.setWho(v).catch(() => { say(t('cant_tell_who'), 'err'); if (couchRef.current) setWho(couchRef.current); });
+    api.setWho(v, pin).catch((e) => {
+      if (couchRef.current) setWho(couchRef.current);
+      if (e.status === 403 && kidIds.includes(couchRef.current)) {
+        setPinAsk({ msg: pin ? tBridge(e.key, e.vars, e.message) : t('kids_leave_pin', { name: people.find((p) => p.id === couchRef.current)?.name || '' }), go: (code) => pickWho(v, code) });
+        return;
+      }
+      say(e.status === 429 ? tBridge(e.key, e.vars, e.message) : t('cant_tell_who'), 'err');
+    });
   };
   const couch = tv?.who;
   const couchRef = useRef(couch);
@@ -218,7 +249,7 @@ export default function App() {
   const run = useCallback(async (p, okText) => {
     try { const r = await p; if (okText) say(typeof okText === 'function' ? okText(r) : okText); return r; } catch (e) {
       if (e.status === 0) setReach(false);
-      say(e.message, 'err'); return null;
+      say(tBridge(e.key, e.vars, e.message), 'err'); return null;
     }
   }, [say]);
 
@@ -236,33 +267,49 @@ export default function App() {
   const [wakeError, setWakeError] = useState(null);
   useEffect(() => { if (tv?.power === 'on') setWakeError(null); }, [tv?.power]);
   const onKey = (key, hold) => run(api.key(key, hold));
+  // g34: the next or the previous scene. The sheet stays open and nothing reloads; a TV whose home is
+  // not on screen changes once it is, and the phone says so
+  const onScene = (pick) => api.scene(pick).then((j) => { if (j && j.listening === false) say(t('scene_not_open')); }).catch((e) => say(tBridge(e.key, e.vars, e.message), 'err'));
   const onVolume = (a) => run(api.volume(a));
   // A fully off TV leaves the Wi-Fi; the bridge tries Wake-on-LAN for up to 25 s, then gives up.
   const onWake = async () => {
     setWakeError(null);
     try { await api.power('on'); } catch (e) {
       if (e.status === 0) setReach(false);
-      setWakeError(e.status === 503 ? t('didnt_wake') : e.message);
+      setWakeError(e.status === 503 ? t('didnt_wake') : tBridge(e.key, e.vars, e.message));
     }
   };
   const onRetry = () => api.now()
     .then((d) => { setTv(d); setReach(true); loadRecs(); api.apps().then((a) => setApps(a.apps)).catch(() => {}); })
     .catch(() => say(t('still_cant_reach'), 'err'));
   const onPower = () => (tv?.power === 'on' ? run(api.power('off')) : onWake());
+  // Move what is playing on this TV to another one. A TV that is playing something itself is only
+  // taken over after a yes.
+  const onMove = async (to, force = false) => {
+    setSheet(null); say(t('moving_to', { tv: to.name }));
+    try { const r = await api.move(to.id, force); say(tBridge(r.note_key, r.note_vars, r.note)); } catch (e) {
+      if (e.key === 'err_move_tv_in_use' && !force && window.confirm(t('move_take_over', { tv: to.name }))) { onMove(to, true); return; }
+      if (e.status === 0) setReach(false);
+      say(tBridge(e.key, e.vars, e.message), 'err');
+    }
+  };
   const onPlay = async (show) => {
     if (show.playable === false) { say(t('not_on_tv', { title: show.title, service: serviceName(show.service) })); return; }
     say(t('starting', { title: show.title }));
     const r = await run(show.id
       ? api.openContinue(show.id, who)
       : api.play({ title: show.title, season: show.season, episode: show.episode, service: show.service }, who));
-    if (r) { say(r.method === 'deeplink' ? t('is_on', { title: r.title }) : r.note || t('opened', { app: r.app?.name })); loadRecs(); if (!wide) goTo('remote'); }
+    if (r) { say(r.method === 'deeplink' ? t('is_on', { title: r.title }) : tBridge(r.note_key, r.note_vars, r.note) || t('opened', { app: r.app?.name })); loadRecs(); if (!wide) goTo('remote'); }
   };
+  const onRemoveCont = (show) => api.hideContinue(show.id)
+    .then(() => { setCont((c) => (c || recs?.continue || []).filter((s) => s.id !== show.id)); say(t('kw_removed', { title: show.title })); })
+    .catch((e) => say(e.message, 'err'));
   const onLaunch = (a) => run(api.launch(a.id), t('opening', { app: a.name })).then((r) => { if (r && !wide) goTo('remote'); });
-  const onScreen = (s) => (s.ready ? run(api.openScreen(s.id), (r) => r.note || `Opening ${s.name}`) : say(s.note || t('not_set_up')));
+  const onScreen = (s) => (s.ready ? run(api.openScreen(s.id), (r) => tBridge(r.note_key, r.note_vars, r.note) || t('opening', { app: s.name })) : say(tBridge(s.note_key, s.note_vars, s.note) || t('not_set_up')));
   const onAsk = (text) => api.ask(text, who).then((r) => { loadRecs(); return r; });
   const onSleep = async (m) => {
     try { await api.setSleep(m); setSleepError(null); setTv((t) => t && ({ ...t, sleep: { ends: m ? new Date(Date.now() + m * 60000).toISOString() : null } })); say(m ? t('sleep_set', { n: m }) : t('sleep_off')); } catch (e) {
-      setSleepError(e.status === 404 ? t('sleep_needs_update') : e.message);
+      setSleepError(e.status === 404 ? t('sleep_needs_update') : tBridge(e.key, e.vars, e.message));
     }
   };
   // Picture mode: only for TVs that have a "picture" entry in config.json.
@@ -272,11 +319,36 @@ export default function App() {
     if (sheet === 'more' && thisTv?.picture) api.getPicture().then(setPictureInfo).catch(() => {});
   }, [sheet, tvId]);
   const onPicture = async (mode) => {
-    try { const r = await api.picture(mode); setPictureInfo((i) => ({ ...(i || {}), ...r })); setTv((t) => t && { ...t, picture: r.mode }); say(t('picture_now', { mode: pictureInfo?.modes?.find((m) => m.id === r.mode)?.name || r.mode })); } catch (e) { say(e.message, 'err'); }
+    try { const r = await api.picture(mode); setPictureInfo((i) => ({ ...(i || {}), ...r })); setTv((t) => t && { ...t, picture: r.mode }); say(t('picture_now', { mode: pictureInfo?.modes?.find((m) => m.id === r.mode)?.name || r.mode })); } catch (e) { say(tBridge(e.key, e.vars, e.message), 'err'); }
   };
   // iOS only raises the keyboard if focus happens inside the tap itself, and a closed sheet is inert
   // (cannot take focus), so open it synchronously, then focus, all within the same tap.
   const openAsk = () => { tick(); flushSync(() => setSheet('ask')); askInput.current?.focus({ preventScroll: true }); };
+  const openType = () => { tick(); flushSync(() => setSheet('type')); typeInput.current?.focus({ preventScroll: true }); };
+  const sendText = (text) => run(api.text(text), t('sent_to_tv'));
+  // Send a design (designSend.js): the words to show (sent, sent but the home is not open, or failed)
+  const sendDesign = async (code) => {
+    try { const r = await api.sendDesign(code); tick(); return { ok: true, words: sentWords(r) }; }
+    catch { return { ok: false, words: dsw('failed') }; }
+  };
+  // couch-tv Studio's Send to my TV opens this page at #design=CODE. The code is taken out of the address
+  // first, so a reload or a saved bookmark never offers it again. It is sent with no tap only when Studio
+  // handed back the nonce this phone made for that trip (Choose a design in couch-tv Studio), once;
+  // any other link asks first: Send this design to the TV?
+  const [offer, setOffer] = useState(null);
+  const sendNow = (code) => sendDesign(code).then((r) => say(r.words, r.ok ? 'info' : 'err'));
+  useEffect(() => {
+    if (!/(^|[#&])design=/.test(window.location.hash)) return;
+    // on the couch-tv TV app a phone not paired yet pairs first (on-tv/web/shim.js), then the page
+    // reloads with the code still in the address
+    if (window.couchTv && typeof window.couchTv.token === 'function' && !window.couchTv.token()) return;
+    const { code, nonce, rest } = takeDesignFromHash(window.location.hash);
+    try { window.history.replaceState(window.history.state, '', window.location.pathname + window.location.search + rest); } catch { /* old browser */ }
+    if (!code) { say(dsw('notCode'), 'err'); return; }
+    const kept = store.get(NONCE_KEY);
+    if (nonceMatches(nonce, kept)) { try { localStorage.removeItem(NONCE_KEY); } catch { /* private mode */ } sendNow(code); }
+    else setOffer(code);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const sleepEnds = tv?.sleep?.ends;
   const sleepLeft = sleepEnds ? `${Math.max(0, Math.round((new Date(sleepEnds) - Date.now()) / 60000))}m` : null;
@@ -333,17 +405,24 @@ export default function App() {
   const remote = (
     <div className="remote-col">
       <div className="pull-zone" {...pull}>
+      {(() => { const d = (thisTv || (tvs.length === 1 ? tvs[0] : null))?.devmode; if (!d?.warning) return null; const said = d.warning_key ? t(d.warning_key, d.warning_vars) : d.warning; return <div className={`devwarn ${d.level || 'warn'}`} role="alert">{said === d.warning_key ? d.warning : said}</div>; })()}
       <TopBar people={people} tvName={thisTv?.name} who={who} setWho={pickWho} tv={tv} appInfo={appById[tv?.app?.id]} reach={reach} sleepLeft={sleepLeft} onPower={onPower} onMore={() => setSheet('more')} />
+      {tv?.idle?.ends && (
+        <div className="banner glass" role="status">
+          <span>{t('idle_auto_off', { n: Math.max(1, Math.round((new Date(tv.idle.ends) - Date.now()) / 60000)) })}</span>
+          <button onClick={() => { tick(); run(api.cancelIdle(), t('idle_snoozed')).then(() => setTv((cur) => cur && ({ ...cur, idle: null }))).catch(() => {}); }}>{t('idle_still_here')}</button>
+        </div>
+      )}
       {tvId && <button className="tv-chip glass" onClick={() => { tick(); setSheet('more'); }}><Ic.Screen size={15} /> {t('this_tv', { name: thisTv?.name || t('this') })}</button>}
       <NowPlaying tv={tv} appInfo={appById[tv?.app?.id]} onKey={onKey} roomy={h >= 760} />
       </div>
-      <Pad onKey={onKey} offState={offState} wakeError={wakeError} onWake={onWake} onRetry={onRetry}
+      <Pad onPointer={(thisTv || (tvs.length === 1 ? tvs[0] : null))?.kind === 'lg' ? (d) => api.pointer(d) : null} onKey={onKey} offState={offState} wakeError={wakeError} onWake={onWake} onRetry={onRetry}
         tvName={thisTv?.name} onLivingRoom={() => { tick(); chooseTv(null); }} />
-      <Controls tv={tv} onKey={onKey} onVolume={onVolume} />
-      {wide && askOn && <AskButton onAsk={openAsk} quiet={Boolean(offState)} />}
+      <Controls tv={tv} onKey={onKey} onVolume={onVolume} onType={openType} />
+      {wide && askOn && !kidIds.includes(who) && <AskButton onAsk={openAsk} quiet={Boolean(offState)} />}
     </div>
   );
-  const watch = <Watch pull={pull} people={people} who={who || people[0]?.id || 'both'} recs={recs} cont={cont === undefined ? (recs === false ? false : recs?.continue) : cont} apps={apps} hidden={hidden} screens={screens} serviceName={serviceName} onPlay={onPlay} onLaunch={onLaunch} onScreen={onScreen} wide={wide} />;
+  const watch = <Watch pull={pull} people={people} who={who || people[0]?.id || 'both'} recs={recs} cont={cont === undefined ? (recs === false ? false : recs?.continue) : cont} apps={apps} hidden={hidden} screens={screens} serviceName={serviceName} onPlay={onPlay} onRemove={onRemoveCont} onLaunch={onLaunch} onScreen={onScreen} wide={wide} />;
 
   return (
     <div className={`app ${wide ? 'is-wide' : ''} ${offState ? 'is-off' : ''}`}>
@@ -361,17 +440,31 @@ export default function App() {
             <section className="page watch-page" aria-label="Watch" inert={tab !== 'watch'}>{watch}</section>
           </div>
           <div className="dock" {...dockDrag}>
-            {askOn && <AskButton onAsk={openAsk} quiet={Boolean(offState)} />}
+            {askOn && !kidIds.includes(who) && <AskButton onAsk={openAsk} quiet={Boolean(offState)} />}
             {tabs}
           </div>
         </main>
       )}
       {toast && <div key={toast.id} className={`toast glass ${toast.kind}`} role="status">{toast.text}</div>}
+      {offer && (
+        <div className="design-offer glass" role="dialog" aria-label={dsw('ask')}>
+          <p>{dsw('ask')} <b>{offer}</b></p>
+          <div className="design-offer-row">
+            <button type="button" className="pill solid" onClick={() => { const c = offer; setOffer(null); sendNow(c); }}>{dsw('askSend')}</button>
+            <button type="button" className="pill glass" onClick={() => setOffer(null)}>{dsw('askLater')}</button>
+          </div>
+        </div>
+      )}
       <AskSheet ref={askInput} open={sheet === 'ask'} onClose={() => setSheet(null)} who={who} recs={recs} onAsk={onAsk} onDone={(reply) => say(reply)} />
+      <TypeSheet ref={typeInput} open={sheet === 'type'} onClose={() => setSheet(null)} onText={sendText} />
       <MoreSheet ref={moreSheet} open={sheet === 'more'} tvs={tvs} tvId={tvId || 'living-room'} onTv={(id) => { tick(); chooseTv(id); }}
+        canMove={!offState && ['playing', 'paused', 'buffering'].includes(tv?.playing?.state) && Boolean(tv?.playing?.title)} onMove={onMove}
         picture={tv?.picture} pictureInfo={pictureInfo} onPicture={onPicture} onClose={() => setSheet(null)} sleepEnds={sleepEnds} sleepError={sleepError} onSleep={onSleep}
-        onKey={onKey} onText={(text) => run(api.text(text), t('sent_to_tv'))} onArrange={() => setSheet('arrange')} onPeople={() => setSheet('people')} />
+        onKey={onKey} onText={sendText} onArrange={() => setSheet('arrange')} onPeople={() => setSheet('people')} onKids={() => setSheet('kids')} onDesign={sendDesign} canSendDesign={canSend((thisTv || (tvs.length === 1 ? tvs[0] : null))?.kind)}
+        kind={(thisTv || (tvs.length === 1 ? tvs[0] : null))?.kind} onScene={onScene} />
       <ArrangeSheet open={sheet === 'arrange'} onClose={() => setSheet(null)} tvName={thisTv?.name} hidden={hidden} />
+      <KidsSheet open={sheet === 'kids'} onClose={() => setSheet(null)} onChanged={loadConfig} />
+      <PinSheet ask={pinAsk} onClose={() => setPinAsk(null)} />
       <PeopleSheet open={sheet === 'people'} onClose={() => setSheet(null)} onSaved={(list) => { setPeople(list); if (who && who !== 'both' && !list.some((p) => p.id === who)) setWho(list[0]?.id || 'both'); }} />
       {!who && people.length > 0 && <Onboarding people={people} standalone={standalone} onPick={pickWho} />}
     </div>

@@ -27,7 +27,7 @@ committed):
 Plus one entry in `config.json` (`home.my_scenes`) that names the scene and designs its clock.
 
 `tv-home/tools/make-scene.py` makes the files. It needs Python 3 with numpy and Pillow, into the
-repo's `.venv` (README step 2 makes it):
+repo's `.venv` ([SETUP.md step 2](SETUP.md#step-2-get-the-code-and-set-up-python-every-option) makes it):
 
 ```sh
 .venv/bin/pip install numpy Pillow
@@ -68,6 +68,8 @@ Ask for 16:9 at about 2K. Look at the result before going on, and make it again 
 .venv/bin/python tv-home/tools/make-scene.py photo.jpg beach
 ```
 
+Add `--4k` to also write `scene-<id>@2x.jpg`, a 3840x2160 copy. A 4K screen (or `home.hi_res` set to `always`) uses it, and every other screen keeps the 1080 file. A scene made without `--4k` works exactly as before: the home tries the 4K file first and falls back to the 1080 one when there is none. (A 4K copy is about 2 to 4 MB, so on a TV with little memory keep the number of 4K scenes modest.)
+
 `beach` is the scene's id: lowercase letters and digits, up to 24, not a built-in scene's name. It
 writes `scene-beach.jpg` and `scene-beach-glass.jpg`, and prints an entry to paste into
 `config.json`.
@@ -102,6 +104,8 @@ Add the scene to `home.my_scenes` in `config.json`:
 | `date` ["above"] | The date and weather line: `above` the clock or `below` it. It lines up with the clock's side. |
 | `text` ["light"] | `light`: white date, bright glass. `dark`: dark date and a smoky glass, for a pale picture. |
 | `cutout` [false] | `true` only when step 6 made `scene-<id>-fg.webp`. The tool prints it when it did. |
+| `video` [false] | `true` plays `scene-<id>.mp4`, a looping silent clip, over the photo ([step 7](#7-optional-a-moving-scene)). |
+| `when` [none] | `dawn`, `day`, `dusk` or `night`. With `home.sun_sync` on, the scene joins the built-in scene for that time of day, and the home steps through that group slowly (`home.sun_rotate_minutes`, 25 by default), so many scenes can follow the sun. Without `when` the scene takes its turn in the ordinary rotation, as before. The time of day comes from the sun's height at `weather.lat` and `weather.lon`: night below -6 degrees, dawn or dusk below 10, day above. |
 
 The page keeps the clock above Keep watching and the dock whatever the numbers say, and the date
 moves aside if it would run into the people switch or the quick buttons.
@@ -140,9 +144,9 @@ press Home on the TV. The TV's copy for when the computer is off picks up the sc
 **Option A (no computer).** Here the home is the copy built *into* the app, and `apply.sh` can hand
 the app new settings but not new pictures. So:
 
-1. Build the app yourself with the scene in place: `sh scripts/build-apk.sh` (README, "Building
-   the app": JDK 21 and the Android SDK). The app downloaded from the Releases page does not have
-   your scene.
+1. Build the app yourself with the scene in place: `sh scripts/build-apk.sh`
+   ([SETUP.md, "Building the app"](SETUP.md#building-the-app-instead-of-downloading-it): JDK 21 and
+   the Android SDK). The app downloaded from the Releases page does not have your scene.
 2. Install it: `APK=dist/couch-tv-home.apk TV_IP=<tv address> sh tv-home/tools/apply.sh`.
 
 Changing only the clock or the name of a scene already built in needs no rebuild: edit
@@ -224,6 +228,66 @@ cliff at the side of the picture; if a digit vanishes, move the clock.
 | A soft halo along the skyline | Route B: install pymatting for the exact edge (on by default once it is there). |
 | Route A says the edit moved the scene | Make the edit again; never raise `--limit` to force a cut-out that does not line up. |
 | Nothing works | Run step 2 again without `--depth` or `--sky-edit` and leave `cutout` out. The clock sits over the photo, which is fine. |
+
+## 7. Optional: a moving scene
+
+A scene can play its own short clip, looping and silent: a nebula drifting, a black hole's disk
+turning, clouds passing. The clip plays over the photo and under the cut-out and the clock, so the
+scenery in the cut-out stays in front of the digits while everything behind it moves. Only the
+scene on screen plays, and only while the home is showing; it stops the moment an app opens.
+
+1. Make the scene from the clip's first frame (steps 1 to 6), so the photo, the glass fill and the
+   cut-out match the clip.
+2. Make the clip from that same picture: any image-to-video model, a locked-off camera, and the
+   scenery in the cut-out told to stay completely still. Ask for clearly visible motion. Clips
+   made to start and end on the same frame often come out nearly frozen; make an ordinary clip
+   and blend its end into its start instead (below).
+3. Loop it and fit it for a TV: H.264, 1920x1080, no sound, a few MB at most.
+
+   ```sh
+   # the clip from 1.5 s on, its last 1.5 s faded into its first 1.5 s: it ends where it starts
+   D=$(ffprobe -v error -show_entries format=duration -of csv=p=0 clip.mp4)
+   ffmpeg -i clip.mp4 -filter_complex "[0:v]trim=start=1.5,setpts=PTS-STARTPTS[a];[0:v]trim=end=1.5,setpts=PTS-STARTPTS[b];[a][b]xfade=transition=fade:duration=1.5:offset=$(echo "$D - 3" | bc),format=yuv420p" \
+     -an -c:v libx264 -profile:v high -level 4.1 -crf 21 -r 24 -vf scale=1920:1080 -movflags +faststart \
+     tv-home/web/backgrounds/mine/scene-<id>.mp4
+   ```
+
+4. Add `"video": true` to the scene in `home.my_scenes`. Option A: build the app again and run
+   `apply.sh` (step 5), since the clip goes inside the app.
+
+The photo shows until the clip really plays, and stays if it cannot, so a clip the TV refuses
+does no harm. The whole-home video (`home.video_url`) leaves scene clips off, and so does Lighter
+home unless `home.scene_clips_lighter` is `true`. When the scene goes off screen its clip pauses
+and keeps its place, so the next time the scene shows it carries on from there (a longer clip,
+such as a boat crossing the screen in a minute, gets all the way across over a few turns). After
+the home has sat untouched for a while the clip pauses so the TV's screensaver can start
+(`home.scene_clips_idle`).
+
+## 8. Optional: moving wave scenes, made here
+
+`tv-home/tools/make-waves.py` draws three ready-made moving scenes, nothing downloaded: layered
+colour waves (Dusk, Ocean and Dawn) as a seamless one-minute loop, a little sailboat crossing the
+screen with a stick figure in a frock waving from the stern, someone overboard waving both arms
+for help, and dolphins leaping out of the waves at random, now left to right, now right to left.
+
+```sh
+.venv/bin/pip install numpy Pillow imageio-ffmpeg
+.venv/bin/python tv-home/tools/make-waves.py --preview     # one frame of each, in build/scenes/
+.venv/bin/python tv-home/tools/make-waves.py               # the clips, their photos and glass fills
+```
+
+The two figures have cartoon faces. To use your household's faces instead, give a photo of each:
+`--captain-face me.jpg --swimmer-face them.jpg`, with `--captain-crop X,Y,SIZE` (the square
+around the face, in the photo's pixels) when the face is not in the middle. Ask before you use
+someone else's face. Leave out what you do not want: `--no-captain`, `--no-swimmer`,
+`--no-dolphins`, `--no-boat`. The files go to `tv-home/web/backgrounds/mine/`, which git
+ignores, and it prints the `home.my_scenes` entries to paste: `"video": true`, and a `when` so
+Follow the sun shows each at its time of day.
+
+Rendering is slow, about 1.5 s a frame, so each one-minute clip takes about 35 minutes; run the
+palettes in parallel (`--palettes dusk`, `--palettes ocean`, `--palettes dawn`) or make shorter
+loops with `--seconds 20`. Each one-minute clip is about 20 MB, and option A carries it inside
+the app.
 
 ## Credits
 
