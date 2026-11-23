@@ -248,7 +248,9 @@ class FireWatch : AccessibilityService() {
         private fun isSkyworth() = Build.MANUFACTURER.equals("SkyworthDigital", ignoreCase = true)
         /** Hisense Google TV (#202): Home from inside an app took ~3-5 s (app exit, Google home, then the swap). */
         private fun isHisense() = Build.MANUFACTURER.equals("Hisense", ignoreCase = true)
-        private fun catchesHomeKey() = isXiaomi() || isKtc() || isSony() || isNokiaMy() || isSkyworth() || isHisense()
+        /** Panasonic Android TV 10 (Vestel board, #202): the move to front is refused and the backup start waits out the 5 s app-switch delay. */
+        private fun isPanasonic() = Build.MANUFACTURER.equals("Panasonic", ignoreCase = true)
+        private fun catchesHomeKey() = isXiaomi() || isKtc() || isSony() || isNokiaMy() || isSkyworth() || isHisense() || isPanasonic()
         const val GOOGLE_TV_HOME = "com.google.android.apps.tv.launcherx"
         const val ANDROID_TV_HOME = "com.google.android.tvlauncher"
         /** Bell's Fibe TV app (Bell Streamer, Canada): its MainTvActivity is the box's HOME, and also its live TV. */
