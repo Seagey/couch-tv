@@ -44,6 +44,8 @@ class SetupActivity : Activity() {
     // the wait for the TV's "Allow USB debugging?" box after Connect (AllowWait): when it started, whether something
     // came over this screen in it (the box), whether the app stepped aside once, and whether the hidden line is up
     private var waitStartedAt = 0L
+    /** when the setup screen first saw Adb waiting for Allow in this wait (0: not yet) */
+    private var allowSince = 0L
     private var waitLostFocus = false
     private var steppedAside = false
     private var hiddenShown = false
@@ -250,18 +252,19 @@ class SetupActivity : Activity() {
             SetupSettings.Action.CONNECT -> {
                 if (waitStartedAt > 0) return   // one wait at a time: a second connect would only queue behind the first
                 keyStatus?.text = "Connecting. If the TV asks \"Allow debugging?\", tick Always allow and press OK."
-                waitStartedAt = System.currentTimeMillis(); waitLostFocus = false; steppedAside = false; hiddenShown = false
+                waitStartedAt = System.currentTimeMillis(); allowSince = 0L; waitLostFocus = false; steppedAside = false; hiddenShown = false
                 if (AllowWait.keepScreenOn(true)) window.addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
                 Thread { Adb.ensure(interactive = true); main.post { waitEnded(); refresh() } }.start()
             }
         }
     }
 
-    private fun waitingForAllow() = waitStartedAt > 0 && (Adb.state == "waiting_for_allow" || Adb.state == "connecting")
+    // only the plain 5555 route asks "Allow"; a paired wireless debugging connect never shows a box
+    private fun waitingForAllow() = waitStartedAt > 0 && Adb.state == "waiting_for_allow"
 
     /** The Connect wait is over (allowed, refused or ran out): the screen may sleep again, and the setup screen comes back if it stepped aside. */
     private fun waitEnded() {
-        waitStartedAt = 0L; hiddenShown = false
+        waitStartedAt = 0L; allowSince = 0L; hiddenShown = false
         runCatching { window.clearFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON) }
         if (AllowWait.comeBack(steppedAside, Adb.connected, inFront) && !isFinishing && !isDestroyed)
             runCatching { startActivity(Intent(this, SetupActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT)) }
@@ -466,7 +469,10 @@ class SetupActivity : Activity() {
                 if (Adb.connected) { show(SetupSteps.Screen.KEYS_DONE); return }
                 val st = Adb.status()
                 if (keyStatus != null && waitStartedAt > 0) {
-                    val h = AllowWait.hint(System.currentTimeMillis() - waitStartedAt, waitingForAllow(), hasWindowFocus(), waitLostFocus, inFront, steppedAside)
+                    // counted from when Adb started waiting for Allow (a paired TV first tries wireless debugging)
+                    val now = System.currentTimeMillis()
+                    if (waitingForAllow()) { if (allowSince == 0L) allowSince = now } else allowSince = 0L
+                    val h = AllowWait.hint(if (allowSince > 0) now - allowSince else 0L, waitingForAllow(), hasWindowFocus(), waitLostFocus, inFront, steppedAside)
                     if (h.sayHidden) { hiddenShown = true; keyStatus?.text = SetupWords.ALLOW_HIDDEN }
                     if (h.stepAside) stepAside()
                     if (h.sayHidden) return
