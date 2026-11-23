@@ -637,7 +637,10 @@
     NP_ON = typeof ST.now_playing === "boolean" ? ST.now_playing : HOME.now_playing !== false;
     LOCAL_SPOTIFY = !!(OFFLINE && !STANDALONE && HOME.spotify_player === true && TV && TV.spotifyMusic);
     document.documentElement.classList.toggle("spotify-row", LOCAL_SPOTIFY);
-    var spRaw = ST.spotify || (CFG && CFG.spotify) || {};
+    // config.json's spotify block, with each key Home settings saved on top: one saved row (Card alignment, say)
+    // never hides the rest of config.json's block, such as enabled
+    var spRaw = {}, spSrc = [(CFG && CFG.spotify) || {}, ST.spotify || {}];
+    spSrc.forEach(function (o) { if (o && typeof o === "object") Object.keys(o).forEach(function (k) { spRaw[k] = o[k]; }); });
     SPOTIFY = {
       enabled: typeof spRaw.enabled === "boolean" ? spRaw.enabled : false,
       show_card: typeof spRaw.show_card === "boolean" ? spRaw.show_card : true,
