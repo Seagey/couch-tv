@@ -501,6 +501,9 @@ class MainActivity : Activity() {
         if (resumed) resumeTimers()   // a WebView made while the last one's pause is still in force (a renderer crash while covered)
         isFocusable = true
         isFocusableInTouchMode = true
+        // no ring round the whole screen when the page has the focus (a thin line round the welcome on a TCL,
+        // 23 Nov 2026): the page draws its own focus
+        if (Build.VERSION.SDK_INT >= 26) defaultFocusHighlightEnabled = false
         overScrollMode = View.OVER_SCROLL_NEVER
         isVerticalScrollBarEnabled = false
         isHorizontalScrollBarEnabled = false

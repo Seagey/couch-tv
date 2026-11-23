@@ -102,6 +102,9 @@ class HomeActivity : Activity() {
     private fun makeWeb(): WebView = WebView(this).apply {
             setBackgroundColor(GROUND)
             isFocusable = true; isFocusableInTouchMode = true
+            // no ring round the whole screen when the page has the focus (a thin line round the welcome on the
+            // TCL, 23 Nov 2026): the page draws its own focus
+            if (android.os.Build.VERSION.SDK_INT >= 26) defaultFocusHighlightEnabled = false
             overScrollMode = View.OVER_SCROLL_NEVER
             settings.javaScriptEnabled = true
             settings.domStorageEnabled = true
