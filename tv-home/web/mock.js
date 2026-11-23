@@ -220,7 +220,7 @@
         "If it says App not installed, the TV is usually short of space. In Downloader, open Files, delete the old couch-tv-ontv files, then type 8180170 again.",
         "Open Couch TV again from your apps.",
         "If the code gives the version you already have, type this address in the box instead: github.com/Seagey/couch-tv/releases/latest/download/couch-tv-ontv.apk",
-        "Next time it is one button: open Couch TV, press More, then Let the phone press keys. After that, Home settings, Updates, Update to."];
+        "Next time it is one button: open Couch TV, press Settings, Phone remote, then Set it up. After that, Home settings, Updates, Update to."];
     }
     var tell = function () { if (window.tv && window.tv.update) window.tv.update(JSON.parse(JSON.stringify(up))); };
     window.MOCK_UPDATER = {

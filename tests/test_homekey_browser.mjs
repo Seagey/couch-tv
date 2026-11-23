@@ -38,7 +38,7 @@ const READY = "One press: Couch TV gets the Home button version from GitHub, che
 let HK = null, hkGets = 0, hkDown = 0, starts = 0;
 const hkState = (view, extra) => Object.assign({ view, phase: "", progress: 0, error: "", error_words: "", button: "Make Home open Couch TV",
   words: view === "ready" ? READY : view === "done" ? DONE_K : view === "steps"
-    ? "This needs Couch TV to press keys on this TV first: open More, then Let the phone press keys. Or do it once from a computer: scan the code on the right for the steps." : "",
+    ? "This needs Couch TV to press keys on this TV first: open Settings, Phone remote, then Set it up. Or do it once from a computer: scan the code on the right for the steps." : "",
   words_phone: view === "ready" ? READY : view === "done" ? DONE_K : view === "steps" ? STEPS_PHONE : "",
   help_url: HELP, steps: ["On a computer, download couch-tv-ontv-watch.apk from github.com/Seagey/couch-tv/releases/latest.", "Install it over this app with Google's adb tool: adb connect, then adb install -r couch-tv-ontv-watch.apk. Your settings stay.",
     "On the TV: Settings, Accessibility (on some TVs inside System or Device Preferences), Couch TV home watch, On.", "Open Couch TV and press Use as home screen."] }, extra || {});
@@ -132,7 +132,7 @@ async function focusRow(page, re) {
 { // 2. no link: one line and a QR code
   const page = await about("steps");
   const r = await rows(page);
-  ok(/First let Couch TV press keys on this TV: Couch TV in your apps, More, Let the phone press keys\. Or do it once from a computer\./.test(r), "says what to do first, in plain words");
+  ok(/First let Couch TV press keys on this TV: Couch TV in your apps, Settings, Phone remote, Set it up\. Or do it once from a computer\./.test(r), "says what to do first, in plain words");
   ok(!(await page.evaluate(() => Array.from(document.querySelectorAll(".srow")).some((e) => /^Make Home open Couch TV/.test(e.textContent) && e.classList.contains("action")))), "no button that cannot work");
   const qr = await page.evaluate(() => { const q = document.querySelector(".sqr"); return q && { url: q.querySelector("[data-qr]").getAttribute("data-qr"), svg: !!q.querySelector("svg"), words: q.textContent }; });
   ok(qr && qr.url === HELP && qr.svg, "a QR code for the help page (" + JSON.stringify(qr) + ")");
