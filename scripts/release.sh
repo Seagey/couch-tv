@@ -88,6 +88,11 @@ ONTV_DEFAULT=1
 [ -n "$VERSION" ] && ver_lt "$VERSION" 0.13.11 && ONTV_DEFAULT=0
 ONTV=""
 [ $OURS = 1 ] && [ "${ONTV_SIGN:-$ONTV_DEFAULT}" != 0 ] && ONTV=$ONTV_CERT
+# 0.13.10 was the last release with the debug key alone: publishing 0.13.11 or later to Seagey/couch-tv with
+# ONTV_SIGN=0 would put out on-TV APKs without the rotation the next update expects, so it stops here
+if [ "$STEP" = publish ] && [ $OURS = 1 ] && [ "${ONTV_SIGN:-}" = 0 ] && [ -n "$VERSION" ] && ! ver_lt "$VERSION" 0.13.11; then
+  echo "ONTV_SIGN=0 is refused for --version $VERSION on Seagey/couch-tv: from 0.13.11 the on-TV APKs carry the rotated key. Build and publish without ONTV_SIGN."; exit 2
+fi
 
 if [ -z "${ANDROID_HOME:-}" ]; then
   for d in "$HOME/Library/Android/sdk" "$HOME/Android/Sdk" "/opt/android-sdk"; do
