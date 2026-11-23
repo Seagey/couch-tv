@@ -185,8 +185,29 @@
     return env.memory >= 4 && env.screenPx >= 1920 ? "1080" : "720";
   }
   function tierOf(env) { var t = tier(env); return typeof t === "string" ? { tier: t, why: "" } : t; }
+  // The app version the "slow" mark was made on (SLOW_VER_KEY). An update can play video better (the 1 GB TCL
+  // played Aquarium after 0.13.10's smaller copy), so a mark from another version is dropped and the video
+  // is tried again, instead of keeping it off for the rest of the week. A page with no app behind it (a
+  // browser preview, the designer) has no version and keeps the week as before.
+  var SLOW_VER_KEY = "couchtv.video.slow.ver";
+  function appVersion() {
+    try { var T = window.TVOS; return T && T.version ? String(T.version() || "") : ""; } catch (e) { return ""; }
+  }
+  function markSlow(now) {
+    try {
+      localStorage.setItem(SLOW_KEY, String(now || Date.now()));
+      var v = appVersion();
+      if (v) localStorage.setItem(SLOW_VER_KEY, v); else localStorage.removeItem(SLOW_VER_KEY);
+    } catch (e) {}
+  }
   function slowMarked(now) {
-    try { var at = Number(localStorage.getItem(SLOW_KEY)); return !!at && (now || Date.now()) - at < LIMIT.slowDays * 86400000; } catch (e) { return false; }
+    try {
+      var at = Number(localStorage.getItem(SLOW_KEY));
+      if (!at) return false;
+      var v = appVersion(), was = localStorage.getItem(SLOW_VER_KEY) || "";
+      if (v && was !== v) { localStorage.removeItem(SLOW_KEY); localStorage.removeItem(SLOW_VER_KEY); return false; }
+      return (now || Date.now()) - at < LIMIT.slowDays * 86400000;
+    } catch (e) { return false; }
   }
 
   // ---------------------------------------------------------------- a decoder that shows only green (g33)
@@ -348,7 +369,7 @@
       if (!v || state !== "playing" || !v.getVideoPlaybackQuality) return;
       var q = v.getVideoPlaybackQuality();
       if (q.totalVideoFrames > 60 && q.droppedVideoFrames / q.totalVideoFrames > LIMIT.dropAt) {
-        try { localStorage.setItem(SLOW_KEY, String(Date.now())); } catch (e) {}
+        markSlow();
         fail("this TV could not keep up with the video");
       }
     }
@@ -412,7 +433,7 @@
     };
   })();
 
-  window.CouchVideo = { LIMIT: LIMIT, LOOPS: LOOPS, SLOW_KEY: SLOW_KEY, refOk: refOk, storeId: storeId, localOk: localOk,
+  window.CouchVideo = { LIMIT: LIMIT, LOOPS: LOOPS, SLOW_KEY: SLOW_KEY, SLOW_VER_KEY: SLOW_VER_KEY, markSlow: markSlow, refOk: refOk, storeId: storeId, localOk: localOk,
     sniff: sniff, tier: function (env) { return tierOf(env).tier; }, tierWhy: tierOf, slowMarked: slowMarked, player: player,
     greenFrame: greenFrame, greenLevel: greenLevel, watchGreen: watchGreen, greenMarked: greenMarked, clearGreen: clearGreen, GREEN_KEY: GREEN_KEY };
 })();

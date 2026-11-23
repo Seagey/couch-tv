@@ -207,4 +207,29 @@ for (const L of V.LOOPS) {
 ok(V.LOOPS.length >= 3 && V.LOOPS.length <= 5, "between three and five built in loops (" + V.LOOPS.length + ")");
 ok(fs.readFileSync(path.join(web, "backgrounds/CREDITS.md"), "utf8").includes("loop-rain.mp4"), "CREDITS.md says where the loops come from");
 
+// the "slow" mark (dropped frames) holds for a week on the app version that made it; an update tries the video
+// again (the TCL test of 0.13.10: a mark from before the update kept the video off for a week)
+{
+  const box = sandbox("");
+  const mem = {};
+  box.localStorage = { getItem: (k) => (k in mem ? mem[k] : null), setItem: (k, v) => { mem[k] = String(v); }, removeItem: (k) => { delete mem[k]; } };
+  let ver = "0.13.9";
+  box.TVOS = { version: () => ver };
+  const Vb = box.CouchVideo, t0 = Date.now();
+  Vb.markSlow(t0);
+  ok(mem[Vb.SLOW_KEY] === String(t0) && mem[Vb.SLOW_VER_KEY] === "0.13.9", "a slow mark keeps the time and the app version");
+  ok(Vb.slowMarked(t0 + 86400000), "the same version: still marked a day later");
+  ok(!Vb.slowMarked(t0 + 8 * 86400000), "a week later: no longer marked");
+  ver = "0.13.10";
+  ok(!Vb.slowMarked(t0 + 86400000), "after an update: not marked, the video is tried again");
+  ok(!(Vb.SLOW_KEY in mem) && !(Vb.SLOW_VER_KEY in mem), "and the old mark is gone");
+  // an old mark with no version at all (made before 0.13.10) is dropped too once the app has a version
+  mem[Vb.SLOW_KEY] = String(t0);
+  ok(!Vb.slowMarked(t0 + 1000), "a mark from before versions were kept: dropped on an app with a version");
+  // a page with no app behind it (a browser preview): the week as before
+  box.TVOS = null;
+  Vb.markSlow(t0);
+  ok(Vb.slowMarked(t0 + 1000) && !(Vb.SLOW_VER_KEY in mem), "no app version (a preview): marked for the week as before");
+}
+
 console.log(`OK ${n} video background checks`);
