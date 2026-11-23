@@ -26,6 +26,12 @@ class SetupSettingsTest {
         // the TCL (Android TV 11, 23 Nov 2026): About's last row is Android TV OS Build, not Build
         assertTrue(SetupSettings.keySteps(Menus.ANDROID_TV, false)[0].line.contains("Settings, then Device Preferences, then About. At the bottom, press OK on Android TV OS build seven times."))
         assertTrue(SetupSettings.keySteps(Menus.FIRE_TV, false)[0].line.contains("My Fire TV"))
+        // the menu path keeps the menu's own name, but no line is labelled with the TV's type (owner's rule)
+        for (m in Menus.values()) for (p in listOf(false, true)) SetupSettings.keySteps(m, p).forEach {
+            assertFalse(it.line, Regex("\\b(On|on) (the|this|your) (Fire TV|Google TV|Android TV)\\b|your Fire TV").containsMatchIn(it.line))
+        }
+        for (m in Menus.values()) assertTrue(SetupSettings.keySteps(m, false)[0].line.startsWith("On the TV, open Settings, then "))
+        assertFalse(SetupWords.KEYS_STRIP_FIRE.contains("Fire TV"))
         assertTrue(SetupSettings.keySteps(Menus.FIRE_TV, false)[1].title.contains("ADB debugging"))
     }
 

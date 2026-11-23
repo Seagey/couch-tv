@@ -181,7 +181,7 @@ object SetupWords {
     fun helpLine(reason: String): String = when (reason) {
         HomeAsk.NO_QUESTION -> "This TV has no question for picking a home screen. Two ways to change the Home button:"
         HomeAsk.LEFT -> "Asking sent this TV to its own home. Two ways to change the Home button:"
-        else -> "Some TVs, like many TCLs, keep Google's home on the Home button. Two ways to change that:"
+        else -> "Some TVs keep Google's home on the Home button. Two ways to change that:"
     }
     val HELP_WAYS = listOf(
         "Let Couch TV press keys, then press ${HomeKeyRules.BUTTON}.",
@@ -220,7 +220,7 @@ object SetupWords {
     /** The yellow strip, only on a TV where the phone cannot press keys yet (SetupSettings.keyStrip). */
     const val KEYS_STRIP = "For the arrow keys and typing, this TV needs one more step."
     const val KEYS_STRIP_BUTTON = "Set it up"
-    const val KEYS_STRIP_FIRE = "On this Fire TV the phone remote opens apps and changes the volume. Arrow keys and typing need a home computer."
+    const val KEYS_STRIP_FIRE = "On this TV the phone remote opens apps and changes the volume. Arrow keys and typing need a home computer."
 
     const val UNDO_ITEM = "Undo Couch TV"
     const val UNDO_SUB = "Back to normal"

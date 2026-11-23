@@ -219,7 +219,10 @@ class SetupWordsTest {
     }
 
     @Test fun moreHelpGivesBothWaysRound() {
-        assertTrue(SetupWords.helpLine("google").contains("TCL"))
+        assertTrue(SetupWords.helpLine("google").contains("Google's home on the Home button"))
+        // the TV never names TV brands or types (owner's rule)
+        for (r in listOf("google", HomeAsk.LEFT, HomeAsk.NO_QUESTION))
+            assertFalse(SetupWords.helpLine(r), Regex("TCL|Hisense|Sony|Fire TV|Google TV|Android TV").containsMatchIn(SetupWords.helpLine(r)))
         assertTrue(SetupWords.HELP_WAYS[0].contains("Make Home open Couch TV"))
         assertTrue(SetupWords.HELP_WAYS[1].contains("computer"))
         assertTrue(SetupWords.homeStepLine(SetupSteps.HomeStep.BUSY, busy = "Downloading… 40%") == "Downloading… 40%")

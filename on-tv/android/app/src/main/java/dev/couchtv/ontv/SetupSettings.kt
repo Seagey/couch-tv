@@ -48,7 +48,7 @@ object SetupSettings {
         val about = when (menus) {
             Menus.GOOGLE_TV -> "On the TV, open Settings, then System, then About. Press OK on Android TV OS build seven times."
             Menus.ANDROID_TV -> "On the TV, open Settings, then Device Preferences, then About. At the bottom, press OK on Android TV OS build seven times."
-            Menus.FIRE_TV -> "On the Fire TV, open Settings, then My Fire TV, then About. Press OK on the name of your Fire TV seven times."
+            Menus.FIRE_TV -> "On the TV, open Settings, then My Fire TV, then About. Press OK on the TV's own name, at the top, seven times."
         }
         val first = KeyStep("Turn on Developer options", about, "Open Settings", Action.OPEN_ABOUT, SetupWords.DONE_NEXT, Action.NEXT)
         val second = when {
