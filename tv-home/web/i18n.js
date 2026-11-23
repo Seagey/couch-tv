@@ -374,6 +374,8 @@
     gear_home_sub: "Language, weather, scenes, apps and people",
     gear_tv: "TV settings",
     gear_tv_sub: "Wi-Fi, picture, sound and the rest of the TV",
+    gear_phone: "Phone remote",
+    gear_phone_sub: "Scan a code to use your phone as the remote",
     tv_settings_none: "This TV's own settings could not be opened.",
 
     // ---- the settings screen ----
@@ -1485,6 +1487,8 @@ np_rewind: "Rewind {s}s",
     gear_home_sub: "语言、天气、场景、应用和成员",
     gear_tv: "电视设置",
     gear_tv_sub: "Wi-Fi、画面、声音和其它电视设置",
+    gear_phone: "手机遥控器",
+    gear_phone_sub: "扫码即可把手机当作遥控器",
     tv_settings_none: "无法打开这台电视自身的设置。",
 
     // ---- the settings screen ----
@@ -2540,6 +2544,8 @@ np_rewind: "Rewind {s}s",
     gear_home_sub: "Jazyk, počasí, scény, aplikace a lidé",
     gear_tv: "Nastavení televize",
     gear_tv_sub: "Wi-Fi, obraz, zvuk a další nastavení televize",
+    gear_phone: "Telefon jako ovladač",
+    gear_phone_sub: "Naskenujte kód a ovládejte televizi telefonem",
     tv_settings_none: "Vlastní nastavení této televize se nepodařilo otevřít.",
 
     // ---- the settings screen ----
@@ -3276,6 +3282,8 @@ np_rewind: "Rewind {s}s",
     gear_home_sub: "Idioma, tiempo, escenas, apps y perfiles",
     gear_tv: "Ajustes del televisor",
     gear_tv_sub: "Wifi, imagen, sonido y el resto del televisor",
+    gear_phone: "Mando en el móvil",
+    gear_phone_sub: "Escanea un código para usar el móvil como mando",
     tv_settings_none: "No se han podido abrir los ajustes del televisor.",
 
     set_title: "Ajustes de inicio",
@@ -3791,6 +3799,8 @@ np_rewind: "Rebobinar {s}s",
     gear_home_sub: "Idioma, clima, escenas, apps y perfiles",
     gear_tv: "Configuración de la TV",
     gear_tv_sub: "Wifi, imagen, sonido y el resto de la TV",
+    gear_phone: "Control en el celular",
+    gear_phone_sub: "Escanea un código para usar el celular como control",
     tv_settings_none: "No se pudo abrir la configuración de la TV.",
 
     set_title: "Configuración de inicio",
@@ -4306,6 +4316,8 @@ np_rewind: "Rebobinar {s}s",
     gear_home_sub: "Lingua, meteo, scene, app e persone",
     gear_tv: "Impostazioni della TV",
     gear_tv_sub: "Wi-Fi, immagine, audio e il resto della TV",
+    gear_phone: "Telecomando sul telefono",
+    gear_phone_sub: "Scansiona un codice per usare il telefono come telecomando",
     tv_settings_none: "Non è stato possibile aprire le impostazioni della TV.",
 
     set_title: "Impostazioni della home",
@@ -5009,6 +5021,8 @@ np_rewind: "Riavvolgi {s}s",
     gear_home_sub: "Sprache, Wetter, Szenen, Apps und Personen",
     gear_tv: "TV-Einstellungen",
     gear_tv_sub: "WLAN, Bild, Ton und alles andere am Fernseher",
+    gear_phone: "Handy als Fernbedienung",
+    gear_phone_sub: "Code scannen und das Handy als Fernbedienung nutzen",
     tv_settings_none: "Die Einstellungen des Fernsehers ließen sich nicht öffnen.",
 
     // ---- the settings screen ----
@@ -5713,6 +5727,8 @@ np_rewind: "Zurückspulen {s}s",
     gear_home_sub: "Dil, hava durumu, sahneler, uygulamalar ve kişiler",
     gear_tv: "TV ayarları",
     gear_tv_sub: "Wi-Fi, resim, ses ve TV'nin geri kalanı",
+    gear_phone: "Telefon kumandası",
+    gear_phone_sub: "Telefonu kumanda olarak kullanmak için bir kodu tara",
     tv_settings_none: "Bu TV'nin kendi ayarları açılamadı.",
 
     // ---- the settings screen ----
@@ -6400,6 +6416,8 @@ np_rewind: "Geri sar {s}sn",
     gear_home_sub: "Langue, météo, scènes, applis et prénoms",
     gear_tv: "Réglages de la TV",
     gear_tv_sub: "Wi-Fi, image, son et le reste de la TV",
+    gear_phone: "Télécommande sur le téléphone",
+    gear_phone_sub: "Scannez un code pour utiliser votre téléphone comme télécommande",
     tv_settings_none: "Impossible d'ouvrir les réglages de la TV.",
 
     // ---- the settings screen ----
@@ -7127,6 +7145,8 @@ np_note_offline: "Nécessite l'ordinateur à la maison ou l'appli sur la TV : sa
     gear_home_sub: "Taal, weer, scènes, apps en personen",
     gear_tv: "Tv-instellingen",
     gear_tv_sub: "Wi-Fi, beeld, geluid en de rest van de tv",
+    gear_phone: "Telefoon als afstandsbediening",
+    gear_phone_sub: "Scan een code om je telefoon als afstandsbediening te gebruiken",
     tv_settings_none: "De eigen instellingen van deze tv konden niet worden geopend.",
 
     // ---- the settings screen ----
@@ -7822,6 +7842,8 @@ np_note_offline: "Nécessite l'ordinateur à la maison ou l'appli sur la TV : sa
     gear_home_sub: "Jezik, vreme, scene, aplikacije i osobe",
     gear_tv: "Podešavanja televizora",
     gear_tv_sub: "Wi-Fi, slika, zvuk i ostala podešavanja televizora",
+    gear_phone: "Telefon kao daljinski",
+    gear_phone_sub: "Skenirajte kod da biste telefon koristili kao daljinski",
     tv_settings_none: "Nije moguće otvoriti podešavanja televizora.",
 
     // ---- the settings screen ----
@@ -8526,6 +8548,8 @@ np_note_offline: "Nécessite l'ordinateur à la maison ou l'appli sur la TV : sa
     gear_home_sub: "Język, pogoda, sceny, aplikacje i osoby",
     gear_tv: "Ustawienia telewizora",
     gear_tv_sub: "Wi-Fi, obraz, dźwięk i pozostałe ustawienia telewizora",
+    gear_phone: "Telefon jako pilot",
+    gear_phone_sub: "Zeskanuj kod, aby używać telefonu jako pilota",
     tv_settings_none: "Nie udało się otworzyć ustawień tego telewizora.",
 
     // ---- the settings screen ----
@@ -9620,6 +9644,8 @@ np_note_offline: "Nécessite l'ordinateur à la maison ou l'appli sur la TV : sa
     gear_home_sub: "שפה, מזג אוויר, מראות, אפליקציות ופרופילים",
     gear_tv: "הגדרות הטלוויזיה",
     gear_tv_sub: "Wi-Fi, תמונה, קול ושאר הגדרות הטלוויזיה",
+    gear_phone: "שלט בטלפון",
+    gear_phone_sub: "סורקים קוד כדי להשתמש בטלפון כשלט",
     tv_settings_none: "לא ניתן לפתוח את הגדרות הטלוויזיה.",
     set_title: "הגדרות מסך הבית",
     set_phone: "לשנות את זה בטלפון",
@@ -10309,6 +10335,8 @@ np_note_offline: "Nécessite l'ordinateur à la maison ou l'appli sur la TV : sa
     gear_home_sub: "Idioma, clima, cenas, apps e pessoas",
     gear_tv: "Ajustes da TV",
     gear_tv_sub: "Wi-Fi, imagem, som e o resto da TV",
+    gear_phone: "Controle no celular",
+    gear_phone_sub: "Leia um código para usar o celular como controle",
     tv_settings_none: "Não foi possível abrir os ajustes da própria TV.",
     set_title: "Ajustes da tela inicial",
     set_phone: "Altere isso no celular",
@@ -11007,6 +11035,8 @@ np_note_offline: "Nécessite l'ordinateur à la maison ou l'appli sur la TV : sa
     gear_home_sub: "اللغة والطقس والمشاهد والتطبيقات والأشخاص",
     gear_tv: "إعدادات التلفزيون",
     gear_tv_sub: "شبكة Wi-Fi والصورة والصوت وبقية إعدادات التلفزيون",
+    gear_phone: "جهاز التحكم في الهاتف",
+    gear_phone_sub: "امسح رمزًا لاستخدام هاتفك كجهاز تحكم",
     tv_settings_none: "تعذر فتح إعدادات هذا التلفزيون.",
     set_title: "إعدادات الرئيسية",
     set_phone: "غيّر هذا من هاتفك",
@@ -11729,6 +11759,8 @@ np_note_offline: "Nécessite l'ordinateur à la maison ou l'appli sur la TV : sa
     gear_home_sub: "Limbă, vreme, scene, aplicații și persoane",
     gear_tv: "Setările televizorului",
     gear_tv_sub: "Wi-Fi, imagine, sunet și restul setărilor TV",
+    gear_phone: "Telecomandă pe telefon",
+    gear_phone_sub: "Scanează un cod ca să folosești telefonul drept telecomandă",
     tv_settings_none: "Setările proprii ale televizorului nu au putut fi deschise.",
     set_title: "Setările ecranului principal",
     set_phone: "Schimbă asta din telefon",

@@ -247,6 +247,15 @@ class HomeActivity : Activity() {
             return true
         }
         @JavascriptInterface fun openSettings(): Boolean = runCatching { Tv.openSettings() }.isSuccess
+        /**
+         * The gear menu's Phone remote (launch audit, 24 Nov 2026: /get says "open Settings, then Phone remote", and the home's
+         * gear had none): the setup screen's Settings, on Phone remote, with its QR and code. Back comes back to the home.
+         */
+        @JavascriptInterface fun openPhoneRemote(): Boolean {
+            val i = Intent(this@HomeActivity, SetupActivity::class.java).putExtra(SetupActivity.PHONE_REMOTE, true)
+            main.post { runCatching { startActivity(i) } }
+            return true
+        }
         /** A Keep watching card from Android's Watch Next rows (#122): the page opens it here, as the TV home app does. */
         @JavascriptInterface fun openWatchNext(id: String): Boolean = runCatching { WatchNext.open(id) }.getOrDefault(false)
         @JavascriptInterface fun version(): String = BuildConfig.VERSION_NAME

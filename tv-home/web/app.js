@@ -453,6 +453,7 @@
     screensaver: '<svg viewBox="0 0 24 24"><rect x="2.5" y="4" width="19" height="14" rx="2.5"/><path d="M15.2 7.3a3.4 3.4 0 1 0 2.1 5 3.9 3.9 0 0 1-2.1-5z"/></svg>',
     reminder: '<svg viewBox="0 0 24 24"><path d="M6 16.5V11a6 6 0 0 1 12 0v5.5l1.5 2h-15z"/><path d="M10 20.5a2 2 0 0 0 4 0"/></svg>',
     headphones: '<svg viewBox="0 0 24 24"><path d="M3 14h3a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-7a9 9 0 0 1 18 0v7a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3"/></svg>',
+    phone: '<svg viewBox="0 0 24 24"><rect x="6.5" y="2.5" width="11" height="19" rx="2.5"/><path d="M10.5 18.5h3"/></svg>',
     bluetooth: '<svg viewBox="0 0 24 24"><path d="M6.5 7.5l11 9-5.5 4.5v-18l5.5 4.5-11 9"/></svg>',
     network: '<svg viewBox="0 0 24 24"><path d="M2.5 9a14 14 0 0 1 19 0M5.7 12.5a9.5 9.5 0 0 1 12.6 0M8.9 16a4.8 4.8 0 0 1 6.2 0"/><circle cx="12" cy="19.3" r="1"/></svg>',
     store: '<svg viewBox="0 0 24 24"><path d="M5 8h14l-1.2 11.2a2 2 0 0 1-2 1.8H8.2a2 2 0 0 1-2-1.8z"/><path d="M9 10.5V7a3 3 0 0 1 6 0v3.5"/></svg>',
@@ -5465,6 +5466,11 @@
     if (nativeSettingsScreen() || (ON_TV && !OFFLINE)) {
       items.push({ ic: ICONS.network, ti: t("network"), sub: t("net_sub"), act: function () { closeGear(); paintFocus(); openSettingsScreen("network"); } });
       items.push({ ic: ICONS.bluetooth, ti: t("bluetooth"), sub: t("bt_sub"), act: function () { closeGear(); paintFocus(); openSettingsScreen("bluetooth"); } });
+    }
+    // the on-TV app: Phone remote, its QR and code (launch audit, 24 Nov 2026: /get says "open Settings, then Phone remote",
+    // and the gear had none; it was only on the setup screen's Settings)
+    if (TV && TV.openPhoneRemote) {
+      items.push({ ic: ICONS.phone, ti: t("gear_phone"), sub: t("gear_phone_sub"), act: function () { closeGear(); paintFocus(); try { TV.openPhoneRemote(); } catch (e) {} } });
     }
     items.push({ ic: ICONS.screen_off, ti: t("screen_off"), sub: "", act: function () { closeGear(); paintFocus(); toggleScreenOff(true); } });
     return items;

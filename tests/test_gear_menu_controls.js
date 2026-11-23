@@ -12,7 +12,7 @@ assert(m, 'gearItems is in app.js');
 function build(env) {
   const calls = [];
   const names = ['ICONS', 't', 'updReady', 'UPD', 'openSettings', 'openTvSettings', 'nativeSettingsScreen', 'ON_TV', 'OFFLINE',
-    'closeGear', 'paintFocus', 'openSettingsScreen', 'toggleScreenOff'];
+    'closeGear', 'paintFocus', 'openSettingsScreen', 'toggleScreenOff', 'TV'];
   const vals = [
     new Proxy({}, { get: (_, k) => '<' + String(k) + '>' }),
     (k) => k,
@@ -20,7 +20,8 @@ function build(env) {
     () => calls.push('home'), () => calls.push('tv'),
     () => env.native, env.onTv, env.offline,
     () => calls.push('close'), () => calls.push('paint'),
-    (w) => calls.push('screen:' + w), (on) => calls.push('off:' + on)
+    (w) => calls.push('screen:' + w), (on) => calls.push('off:' + on),
+    env.tv || null
   ];
   const gearItems = new Function(...names, m[0] + '; return gearItems;')(...vals);
   return { items: gearItems(), calls };
@@ -51,6 +52,16 @@ r.calls.length = 0; r.items[3].act();
 assert.deepStrictEqual(r.calls, ['close', 'paint', 'screen:bluetooth']);
 r.calls.length = 0; r.items[4].act();
 assert.deepStrictEqual(r.calls, ['close', 'paint', 'off:true']);
+
+// the on-TV app's own Phone remote screen (launch audit, 24 Nov 2026: /get says Settings, then Phone remote): before
+// Screen off, and OK closes the menu and opens it
+r = build({ native: false, onTv: true, offline: false, tv: { openPhoneRemote: () => { r.calls.push('phone'); return true; } } });
+assert.deepStrictEqual(titles(r), ['gear_home', 'gear_tv', 'network', 'bluetooth', 'gear_phone', 'screen_off']);
+r.calls.length = 0; r.items[4].act();
+assert.deepStrictEqual(r.calls, ['close', 'paint', 'phone']);
+// a TV whose app has no such screen (the TV home app, a browser): not listed
+r = build({ native: true, onTv: false, offline: true, tv: { launch: () => true } });
+assert(!titles(r).includes('gear_phone'));
 
 // the menu's own movement and OK use the list, not a fixed two
 assert(!/gi = Math\.max\(0, Math\.min\(1, gi \+ dy\)\)/.test(js), 'the arrows are not limited to two entries');

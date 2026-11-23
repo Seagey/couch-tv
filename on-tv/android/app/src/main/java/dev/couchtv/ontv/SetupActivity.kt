@@ -33,6 +33,12 @@ class SetupActivity : Activity() {
     private var screen = SetupSteps.Screen.READY
     /** where Settings and More help go back to */
     private var backTo = SetupSteps.Screen.READY
+    private var fromHome = false   // opened by the home's gear menu, Phone remote: Back from Settings goes back to the home
+
+    companion object {
+        /** Intent extra: open on Settings, Phone remote (HomeActivity.openPhoneRemote, the home's gear menu). */
+        const val PHONE_REMOTE = "phone_remote"
+    }
     private var step: SetupScreens.Step? = null
 
     private lateinit var settings: SettingsScreen
@@ -137,6 +143,8 @@ class SetupActivity : Activity() {
         if (first == SetupSteps.Screen.READY) Store.putStr(SetupSteps.DONE_KEY, "1")
         // a phone asked to pair (App.showPin): straight to the phone remote in Settings
         if (intent?.getBooleanExtra("pin", false) == true) { backTo = first; show(SetupSteps.Screen.SETTINGS, SetupSettings.Item.PHONE) }
+        // the home's gear menu, Phone remote: Settings on Phone remote, and Back goes back to the home
+        else if (intent?.getBooleanExtra(PHONE_REMOTE, false) == true) { fromHome = true; backTo = first; show(SetupSteps.Screen.SETTINGS, SetupSettings.Item.PHONE) }
         else show(first)
     }
 
@@ -252,7 +260,7 @@ class SetupActivity : Activity() {
             SetupSettings.Action.BACK -> if (keyIndex > 0) { keyIndex--; show(SetupSteps.Screen.KEYS) } else show(SetupSteps.Screen.SETTINGS, SetupSettings.Item.PHONE)
             SetupSettings.Action.CONNECT -> {
                 if (waitStartedAt > 0) return   // one wait at a time: a second connect would only queue behind the first
-                keyStatus?.text = "Connecting. If the TV asks \"Allow debugging?\", tick Always allow and press OK."
+                keyStatus?.text = "On the TV's \"Allow USB debugging?\", tick Always allow, then Down, Left, press Allow."
                 waitStartedAt = System.currentTimeMillis(); allowSince = 0L; waitLostFocus = false; steppedAside = false; hiddenShown = false
                 if (AllowWait.keepScreenOn(true)) window.addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
                 Thread { Adb.ensure(interactive = true); main.post { waitEnded(); refresh() } }.start()
@@ -324,7 +332,7 @@ class SetupActivity : Activity() {
     @Deprecated("Back on a TV remote")
     override fun onBackPressed() {
         when (screen) {
-            SetupSteps.Screen.SETTINGS -> show(backTo)
+            SetupSteps.Screen.SETTINGS -> if (fromHome) { fromHome = false; finish() } else show(backTo)
             SetupSteps.Screen.HOME_HELP -> show(SetupSteps.Screen.HOME_STEP)
             SetupSteps.Screen.KEYS -> if (AllowWait.backStepsAside(hiddenShown, waitingForAllow())) stepAside() else keyAction(SetupSettings.Action.BACK)
             SetupSteps.Screen.KEYS_DONE -> show(SetupSteps.Screen.SETTINGS, SetupSettings.Item.PHONE)
@@ -412,7 +420,9 @@ class SetupActivity : Activity() {
     override fun onNewIntent(i: Intent) {
         super.onNewIntent(i)
         if (backFromUpdate(i)) return
-        if (i.getBooleanExtra("pin", false)) show(SetupSteps.Screen.SETTINGS, SetupSettings.Item.PHONE) else refresh()
+        if (i.getBooleanExtra("pin", false)) show(SetupSteps.Screen.SETTINGS, SetupSettings.Item.PHONE)
+        else if (i.getBooleanExtra(PHONE_REMOTE, false)) { fromHome = true; show(SetupSteps.Screen.SETTINGS, SetupSettings.Item.PHONE) }
+        else refresh()
     }
 
     /** Opens the home when the intent comes from the update's shell line, once (the extra goes). */
