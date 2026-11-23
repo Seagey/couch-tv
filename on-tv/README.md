@@ -65,8 +65,8 @@ pairing (1).** Use port 5555 (2) on older TVs.
    **Wireless debugging needs Wi-Fi.** On Ethernet, Android refuses to turn it on; use 2, or put the
    TV on Wi-Fi.
 2. **Network debugging on port 5555** (older Android TV, Fire TV, Nvidia Shield, and any TV where a
-   computer has run `adb tcpip 5555`). Turn on network (or USB) debugging, open Couch TV, press
-   **Connect ADB**, and on the TV tick **Always allow** and press **Allow**. **Some Android 13+
+   computer has run `adb tcpip 5555`). Turn on network (or USB) debugging, open Couch TV, Settings,
+   Phone remote, **Set it up**, then **Connect**, and on the TV tick **Always allow** and press **Allow**. **Some Android 13+
    Google TVs never show that question for a new key** (seen on one TV after its Google home screen
    had been switched off): the app gives up after 45 seconds and points you to pairing.
 
@@ -96,7 +96,19 @@ it can switch wireless debugging back on after a restart, the way Shizuku does).
    adb install -r couch-tv-ontv.apk
    ```
    Or copy the APK to the TV with a file app and open it there.
-3. On the TV, open **Couch TV**. It shows the address and a phone code.
+3. On the TV, open **Couch TV**. A new TV gets two steps, done with the TV remote alone:
+   **Step 1 of 2, Make Couch TV your home** (one press asks Android where it can; a TV that keeps
+   Google's home on the Home button, like a TCL with Android TV 11, says so in one line, with More help
+   behind it), then **Step 2 of 2, Open your new home**, where the home's own welcome offers a design code
+   or Couch Original. Later opens show **Couch TV is ready** with Open the home and **Settings**.
+   Settings is a list and a panel: **Edit your home** (a QR to the phone page, where widgets, the town,
+   calendars and photos are set), **Phone remote** (pictures of the phone remote's two pages, the pairing QR
+   and code, New code, Forget phones, and, only on a TV where the phone cannot press keys yet, **Set it up**:
+   three screens to Developer options, the debugging switch and Connect, with Wireless debugging pairing on
+   Android 13 and newer), **Undo Couch TV** (the TV's own home back on Home, the Home button watch off, then
+   Android's own Uninstall question for Couch TV) and **Help** (a QR to couchtv.joshuaseage.com/help).
+   Older names in this file: **Use as home screen** is step 1's Make it my home (Undo Couch TV switches it
+   off), and **Connect ADB** / **Let the phone press keys** is Settings, Phone remote, Set it up.
 
 ## Updates
 
@@ -119,7 +131,7 @@ type 8180170 again.
 
 ## Pair a phone
 
-1. Scan the QR code on the TV with the phone's camera. While a code is showing, the QR holds it
+1. On the TV, open Couch TV, then **Settings**: the phone remote is at the top. Scan its QR code with the phone's camera. While a code is showing, the QR holds it
    too (after a `#`, so it is never sent in a request line or kept in a log), and the phone pairs
    with no typing. The page takes the code out of its address at once.
 2. Or open the address the TV shows, for example `http://192.0.2.10:5400`, and type the 6 digit code
@@ -135,7 +147,8 @@ the TV, or on the setup page, signs every phone out.
 
 ## Use it as the home screen (optional)
 
-Switch on **Use as home screen** in Couch TV. On a plain Android TV that is enough. On Google TV the
+Press **Make it my home** on Couch TV's first setup step (the setting called **Use as home screen** below). On a plain Android TV with the maker's own home that is enough
+(Android asks "make Couch TV your home screen?"); with Google's Android TV Home see "When it does not ask" below. On Google TV the
 system launcher still wins the Home button, and **do not switch it off**: on some Google TVs (a
 Sony Bravia among them) the TV then loops at every restart
 ([docs/TROUBLESHOOTING.md](../docs/TROUBLESHOOTING.md#if-your-tv-loops-after-a-restart)). The Couch TV tile in the app row opens
@@ -150,13 +163,13 @@ app that has an accessibility service ("App blocked to protect your device", see
 in November 2026). Both are the same app with the same name and key, so one installs over the other.
 With the plain APK, the Couch TV setup screen says that Google's home keeps the Home button (on Google TV,
 and on a TCL with Google's Android TV Home, which opened it by name although Couch TV held the home role),
-and More, Home button from a computer, gives the steps: `adb connect <tv-ip>:5555` (with Wireless debugging,
+and More help behind step 1 (a QR to couchtv.joshuaseage.com/help/home-button) gives the steps: `adb connect <tv-ip>:5555` (with Wireless debugging,
 `adb pair` with the address, port and code from Pair device with pairing code first), then
 `adb install -r couch-tv-ontv-watch.apk` (settings stay), then Couch TV home watch on in Settings, Accessibility,
 then **Use as home screen** on the Couch TV setup screen: the watch only acts while that is on. With the watch APK
 the button shows on Google TV too (with the plain APK it is hidden there while off).
 **Make Home open Couch TV, no computer (0.13.9 or newer).** Once Couch TV can press keys on the TV (its own link to the
-TV, More, Let the phone press keys: the same link Update to ... uses), the setup screen, the phone's Home settings
+TV, Settings, Phone remote, Set it up: the same link Update to ... uses), the setup screen, the phone's Home settings
 page and Home settings, About on the TV show **Make Home open Couch TV** on Google TV, on a TV with Google's
 Android TV Home, and on a Fire TV whose Fire OS still allows the link. One press (HomeKey.kt, rules in
 HomeKeyRules.kt): it downloads `couch-tv-ontv-watch.apk` from GitHub's latest release with Update's checks (https
@@ -175,6 +188,17 @@ and nothing is installed.
 
 **Use as home screen** waits a moment after switching the home on before asking Android (a first press
 showed a black screen on that TCL), and if the question is cancelled it switches the home off again.
+**When it does not ask (the release after 0.13.9).** On a TV with Google's Android TV Home (`com.google.android.tvlauncher`,
+plain Android TV, not Google TV) the press changes nothing until Couch TV can press keys on the TV. On a TCL on
+Android TV 11 installed from Downloader with no computer (23 Nov 2026), switching the home on put Google's home in
+front, and Android only lets the app bring its setup screen back from behind with "draw over apps", which it gets
+over its own key link; so the person was left on Google's home with no question. Now the setup screen stays in front
+and says: Couch TV stays one press away in the apps row; let Couch TV press keys (Settings, Phone remote, Set it up),
+then press **Make Home open Couch TV**; or the computer steps behind More help. Once Couch TV can press keys, Use as
+home screen asks Android again. The same note (HomeAsk.kt, SetupWords.noAskNote) comes up on any TV where Android
+answered at once with no question, had no request or Home settings screen at all, or where the setup screen was
+covered by the TV's own home and the person only came back later; that TV is remembered and not asked the same way
+again. The old fallback of a Home intent in a chooser is gone: it never set a default and opened Google's home at once.
 If an older guide had you switch it off, switch it back on before the next restart:
 
 ```
@@ -223,7 +247,7 @@ On a Fire TV the quick buttons also gain **Input** (the TV's own HDMI picker).
 
 **Current Fire OS (6.7.1.1, 7.6.6.9, 8.1.0.3 and newer) blocks apps on the TV from using the
 TV's own ADB** (Amazon's fix for CVE-2024-27350, 2024, which it backported to Fire OS 6). So on an up
-to date Fire TV, **Connect ADB** cannot work, and the setup screen says so. The phone remote's keys, typing, power off and "what's
+to date Fire TV, the key link cannot work, and Settings, Phone remote says so (no Set it up button there). The phone remote's keys, typing, power off and "what's
 playing" do not work there; opening apps, playing a show by name, volume on the TV's own speaker
 and the sleep timer still do. ADB from another computer is not blocked, so for the full phone
 remote on a Fire TV use option B (the bridge), or Amazon's own Fire TV phone app for the keys.

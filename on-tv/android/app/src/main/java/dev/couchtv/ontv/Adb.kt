@@ -165,18 +165,28 @@ object Adb {
                 if (Build.VERSION.SDK_INT >= 33) " On Android 13 or newer the TV may never ask: use the newer TVs steps in Home settings on your phone." else " Press Let the phone press keys again.") }
         } catch (e: java.util.concurrent.TimeoutException) {
             note("$host:$port: library connect hung for ${limitMs / 1000} s, closed it")
-            // getAdbConnection() waits on the lock the hung connect() holds, so reach the field directly
-            runCatching {
-                val fld = AbsAdbConnectionManager::class.java.getDeclaredField("mAdbConnection").apply { isAccessible = true }
-                (fld.get(mgr) as? java.io.Closeable)?.close()
-            }.onFailure { Log.w(TAG, "could not close the hung connection: ${it.message}") }
-            f.cancel(true)
         } catch (e: java.util.concurrent.ExecutionException) {
             val c = e.cause ?: e
             note("$host:$port: ${c.javaClass.simpleName}: ${c.message}")
         } catch (e: Throwable) { note("$host:$port: ${e.javaClass.simpleName}: ${e.message}") }
-        closeQuietly()   // a half-open connection would make the next connect() return false at once
+        giveUpCleanly(f, "$r $host:$port")
         return false
+    }
+
+    /**
+     * The app stops waiting for Allow: its own socket to adbd is closed at once, whether the library's connect()
+     * returned or still hangs, and nothing of it is left running. A half-open connection would make the next
+     * connect() return false at once, and one left waiting kept adbd's question "pending" on a TCL (AllowWait).
+     */
+    private fun giveUpCleanly(f: java.util.concurrent.Future<Boolean>, what: String) {
+        // getAdbConnection() waits on the lock a hung connect() holds, so reach the field directly
+        runCatching {
+            val fld = AbsAdbConnectionManager::class.java.getDeclaredField("mAdbConnection").apply { isAccessible = true }
+            (fld.get(mgr) as? java.io.Closeable)?.close()
+        }.onFailure { Log.w(TAG, "could not close the connection: ${it.message}") }
+        f.cancel(true)
+        closeQuietly()
+        Log.i(TAG, "$what: gave up waiting, connection closed")
     }
 
     /**

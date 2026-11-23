@@ -169,7 +169,7 @@ object HomeKeyRules {
     const val READY = "One press: Couch TV gets the Home button version from GitHub, checks it and puts it on over this one, then switches its Home button watch on. Your settings stay."
     const val READY_WATCH = "One press switches on the Couch TV home watch, so the Home button brings Couch TV back."
     const val DONE = "The Home button watch is on, so Home should bring Couch TV back. Press Home on the remote to check."
-    const val STEPS = "This needs Couch TV to press keys on this TV first: open More, then Let the phone press keys. Or do it once from a computer: scan the code on the right for the steps."
+    const val STEPS = "This needs Couch TV to press keys on this TV first: open Settings, Phone remote, then Set it up. Or do it once from a computer: scan the code on the right for the steps."
     const val STEPS_FIRE = "This Fire TV does not let Couch TV press keys by itself. Do it once from a computer: scan the code on the right for the steps."
     /** The phone page: it has its own Let the phone press keys section, and the steps are on the page. */
     const val STEPS_PHONE = "This needs Couch TV to press keys on this TV first: use Let the phone press keys on this page, then come back here. Or do it once from a computer: the steps below."

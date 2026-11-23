@@ -67,13 +67,17 @@ object HomeRole {
         } else fallback(a)
     } catch (e: Exception) { fallback(a) }
 
+    /**
+     * Android's Home settings screen, where this TV has one. No more Home intent in a chooser (until 0.13.9):
+     * a chooser never sets the default home, it only opens the home picked, and with the TV's own home the
+     * only one listed it opened that at once, which put the person on Google's home with no question. NONE
+     * here: the setup screen explains instead (HomeAsk.NO_QUESTION).
+     */
     private fun fallback(a: Activity): Asked = try {
         val settings = Intent(Settings.ACTION_HOME_SETTINGS)
-        if (settings.resolveActivity(a.packageManager) != null) { a.startActivity(settings); Asked.SCREEN }
-        else {
-            // No Home settings screen: a Home intent with no default set makes Android ask "Select a home app".
-            val home = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME)
-            a.startActivity(Intent.createChooser(home, null)); Asked.SCREEN
-        }
+        if (settings.resolveActivity(a.packageManager) != null) { a.startActivity(settings); Asked.SCREEN } else Asked.NONE
     } catch (e: Exception) { Asked.NONE }
+
+    /** Whether this app may bring its setup screen back from behind ("draw over apps", granted over its own key link, Adb.kt). */
+    fun canComeBack(c: Context): Boolean = runCatching { Settings.canDrawOverlays(c) }.getOrDefault(false)
 }
