@@ -45,7 +45,10 @@ class Server(private val ctx: Context, port: Int) : NanoWSD(port) {
             uri == "/tv" -> redirect("/tv/")
             uri == "/tv/config.js" -> newFixedLengthResponse(Response.Status.OK, "application/javascript",
                 "window.COUCH_CONFIG = " + Store.publicConfig() + ";\n").noCache()
-            uri.startsWith("/tv/") -> staticOrIndex("www/tv", uri.removePrefix("/tv/"), inject = false)
+            // the home page's files: a 304 when the WebView already has this version's copy (StaticTag)
+            uri.startsWith("/tv/") && StaticTag.unchanged(s.headers["if-none-match"], tvTag) ->
+                newFixedLengthResponse(Response.Status.NOT_MODIFIED, null, "").apply { addHeader("ETag", tvTag) }.noCache()
+            uri.startsWith("/tv/") -> staticOrIndex("www/tv", uri.removePrefix("/tv/"), inject = false).apply { if (status == Response.Status.OK) addHeader("ETag", tvTag) }
             else -> staticOrIndex("www/remote", uri.removePrefix("/"), inject = true)
         }
     } catch (e: ApiError) {
@@ -853,6 +856,11 @@ class Server(private val ctx: Context, port: Int) : NanoWSD(port) {
         newFixedLengthResponse(Status(status), "application/json", o.toString()).noStore()
 
     private fun Response.noCache() = apply { addHeader("Cache-Control", "no-cache") }
+    /** this install's tag for www/tv (StaticTag): the version code and when it was installed or updated */
+    private val tvTag: String by lazy {
+        val pi = runCatching { ctx.packageManager.getPackageInfo(ctx.packageName, 0) }.getOrNull()
+        StaticTag.of(BuildConfig.VERSION_CODE.toLong(), pi?.lastUpdateTime ?: 0L)
+    }
     private fun Response.noStore() = apply { addHeader("Cache-Control", "no-store") }
 
     private class Status(private val code: Int) : Response.IStatus {
