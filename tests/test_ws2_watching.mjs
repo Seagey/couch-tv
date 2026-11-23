@@ -366,7 +366,8 @@ const tv = TV = await tvPage(design, "&ontv=1");
   // Hold OK on each: Edit on the TV and Edit on your phone (the stack: its own, after the widget showing)
   for (const k of KINDS) {
     const m = await holdOn(tv, "o" + k);
-    if (k === "stack") ok(m.items.indexOf("Edit the stack on the TV") > 0 && m.args.indexOf("ostack|stack") >= 0, "Hold OK on the stack: Edit the stack on the TV (" + m.items.join(", ") + ")");
+    // the stack too: on the phone first, right after the widget showing in it, never "Edit the stack on the TV"
+    if (k === "stack") ok(m.items[1] === "Edit the stack on your phone" && m.args[1] === "ostack|" && /^(Edit on your phone|.+: set up on your phone)$/.test(m.items[0]) && m.items.indexOf("Edit the stack on the TV") < 0, "Hold OK on the stack: the widget showing, then Edit the stack on your phone (" + m.items.join(", ") + ")");
     // (23 Nov) the phone first, "<Widget>: set up on your phone" while it waits; the TV's own page is behind "No phone? Set it up here"
     else ok(/^(Edit on your phone|.+: set up on your phone)$/.test(m.items[0]) && m.items.indexOf("Edit on the TV") < 0 && m.args[0].indexOf("o" + k + "|") === 0, "Hold OK on " + k + ": the phone first (" + m.items.join(", ") + ")");
   }
@@ -467,9 +468,25 @@ const tv = TV = await tvPage(design, "&ontv=1");
   ok(tset && String(tset.value) === "60" && tset.words === "Every minute", "a stack turned by Studio's Turns (top level 60) shows Every minute: " + JSON.stringify(tset));
   if (bare) {
     const ms = await holdOn(tv, "ostack");
-    ok(ms.items.indexOf("Edit the stack on the TV") > 0 && ms.items.indexOf("Edit on the TV") < 0, "Hold OK on a stack of " + bares.slice(0, 2).join(" and ") + ": Edit the stack on the TV only (" + ms.items.join(", ") + ")");
+    ok(ms.items[0] === "Edit the stack on your phone" && ms.items.indexOf("Edit the stack on the TV") < 0 && ms.items.indexOf("Edit on the TV") < 0, "Hold OK on a stack of " + bares.slice(0, 2).join(" and ") + ": Edit the stack on your phone only, first (" + ms.items.join(", ") + ")");
     ok(ms.note === "Nothing to set for the widget showing now.", "and the note says the widget showing has nothing to set: " + ms.note);
   } else console.log("  (every widget has a setting now: the stack note check has no widget to show)");
+  {
+    // Edit the stack on your phone: its sheet is a code for the stack, and keeps the no-phone way, "No phone?
+    // Set it up here", which opens the stack's own page in Home settings
+    const ms = await holdOn(tv, "ostack"), at = ms.items.indexOf("Edit the stack on your phone");
+    ok(at >= 0 && ms.args[at] === "ostack|", "Hold OK on the stack: Edit the stack on your phone (" + ms.items.join(", ") + ")");
+    await tv.evaluate(() => window.CouchDesign.nav.focus("ostack", 0)); await tv.waitForTimeout(200);
+    await tv.keyboard.down("Enter"); await tv.waitForTimeout(900); await tv.keyboard.up("Enter"); await tv.waitForTimeout(300);
+    for (let k = 0; k < at; k++) await press(tv, "ArrowDown", 150);
+    await press(tv, "Enter", 800);
+    const sq = await tv.evaluate(() => ({ link: (document.querySelector(".cw-sheet .cw-qr") || { getAttribute() { return ""; } }).getAttribute("data-link") || "", here: [...document.querySelectorAll(".cw-sheet .cw-mi")].map((e) => e.textContent) }));
+    ok(/&widget=ostack(&|$)/.test(sq.link) && sq.here.indexOf("No phone? Set it up here") >= 0, "the stack's phone sheet: a code for the stack, and No phone? Set it up here: " + sq.link.replace(/pin=\d+/, "pin=…") + " " + sq.here.join(", "));
+    await press(tv, "ArrowDown", 150); await press(tv, "Enter", 700);
+    const shead = await tv.evaluate(() => (document.getElementById("settings").classList.contains("on") ? (document.getElementById("set-head") || {}).textContent : "") || "");
+    ok(/stack/i.test(shead), "No phone? Set it up here: the stack's page in Home settings: " + shead);
+    for (let k = 0; k < 6 && await tv.evaluate(() => document.getElementById("settings").classList.contains("on")); k++) await press(tv, "Escape", 250);
+  }
   // then every one of the 14 taken off (only a clock left): each leaves every screen
   await newDesign(tv, { v: 1, background: { colour: "#1d3a4f" }, elements: design.elements, objects: [{ id: "oclock", type: "widget", kind: "clock", x: 40, y: 40, w: 400, h: 200 }] }, "&ontv=1");
   const v2 = await phoneView(tv);

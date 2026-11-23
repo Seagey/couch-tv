@@ -2737,7 +2737,7 @@
       // phone", each a QR code with "No phone? Set it up here" under it. Anywhere else "Edit on the TV",
       // right after Settings. A smart stack: the widget showing in it now. A widget with nothing to set
       // says so in a line, never with an item that does nothing.
-      var pw = w, Caps = window.CouchWidgetCaps, note = "", after = 0;
+      var pw = w, Caps = window.CouchWidgetCaps, note = "", after = 0, phoneFirst = 0;
       while (pw && !(pw.getAttribute && pw.getAttribute("data-obj"))) pw = pw.parentNode;
       var pid = pw && pw.getAttribute("data-obj");
       if (pid && !DESIGNER && Caps && Caps.settings) {
@@ -2748,15 +2748,19 @@
         var faceEl = w && w.getAttribute("data-face") ? w : w && w.querySelector ? w.querySelector('.cw-slot.on [data-face="1"]') : null, need = faceEl ? faceEl.getAttribute("data-need") || "" : "";
         if (typeof hooks.phoneLink === "function" && window.TVQR && known && (mine || need)) {
           var nm = (Caps.get(known.kind) || {}).name || known.kind;
-          nodes.unshift(mk(need ? nm + ": set up on your phone" : "Edit on your phone", "wphone", known.id + "|" + need));
+          nodes.unshift(mk(need ? nm + ": set up on your phone" : "Edit on your phone", "wphone", known.id + "|" + need)); phoneFirst = 1;
         } else if (mine) {
           nodes.splice(1, 0, mk("Edit on the TV", "wset", mine.key)); after = 1;
         } else if (known) note = "Nothing to set for this widget on the TV. Change how it looks in couch-tv Studio.";
       }
-      // a smart stack: its own settings (when it moves on) after the widget showing in it
+      // a smart stack: its own settings (when it moves on) after the widget showing in it. Where the phone
+      // page exists, on the phone like every other widget ("Edit the stack on your phone", right after the
+      // widget's own phone item); its sheet's "No phone? Set it up here" opens the stack's page in Home
+      // settings (tvEdit). Anywhere else "Edit the stack on the TV", after Settings.
       if (pid && !DESIGNER && Caps && Caps.settings && wid !== pid && widgetList().some(function (x) { return x.id === pid && x.kind === "stack"; }) &&
         Caps.settings("stack").some(function (s) { return s && s.pre === true; })) {
-        nodes.splice(nodes.indexOf(nodes.filter(function (n) { return n.getAttribute("data-act") === "gear"; })[0]) + 1 + after, 0, mk("Edit the stack on the TV", "wset", pid + "|stack"));
+        if (typeof hooks.phoneLink === "function" && window.TVQR) nodes.splice(phoneFirst, 0, mk("Edit the stack on your phone", "wphone", pid + "|"));
+        else nodes.splice(nodes.indexOf(nodes.filter(function (n) { return n.getAttribute("data-act") === "gear"; })[0]) + 1 + after, 0, mk("Edit the stack on the TV", "wset", pid + "|stack"));
         // the stack itself has something to set: only the widget showing now has nothing
         if (!mine) note = "Nothing to set for the widget showing now.";
       }

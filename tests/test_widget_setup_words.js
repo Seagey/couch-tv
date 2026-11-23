@@ -41,6 +41,7 @@ const detail = read("widget-detail.js"), design = read("design.js"), widgets = r
 ok(!/label\("Which TVs"\)|How to set it up on this TV|label\("Until then"\)|label\("What it needs"\)/.test(detail), "the setup layer has no Which TVs, steps, Until then or What it needs");
 ok(!/Google TV, Android TV, Fire TV|"Hisense"|Roku, Apple TV and others/.test(detail), "the setup layer draws no TV groups");
 ok(/nodes\.unshift\(mk\(need \? nm \+ ": set up on your phone" : "Edit on your phone"/.test(design), "Hold OK: the phone first");
+ok(/mk\("Edit the stack on your phone", "wphone", pid \+ "\|"\)/.test(design) && /else nodes\.splice\([^\n]*"Edit the stack on the TV"/.test(design), "Hold OK on a smart stack: the phone first, Edit the stack on the TV only with no phone page");
 ok(/"No phone\? Set it up here"/.test(design) && /"No phone\? Set it up here"/.test(detail), "No phone? Set it up here in the sheet and the layer");
 ok(/u \+ "&widgets"/.test(design) && /"Set up your widgets"/.test(design) && /120000/.test(design), "a new design's card: Set up your widgets, #widgets, 2 minutes");
 ok(/"&connect=" \+ need/.test(widgets), "the widget's code opens its step (&connect=)");
@@ -49,5 +50,5 @@ ok(!/Batteries show on a Google TV|Needs an Android TV|It needs a Google TV, And
 const askLines = (read("ask.js").replace(/^\s*\/\/.*$/gm, "").match(/"(?:[^"\\]|\\.)*"/g) || []).filter((s) => TV_NAMES.test(s));
 ok(askLines.length === 0, "ask.js draws no TV type: " + askLines.join(" | "));
 const I = {}; { const c2 = { window: {}, localStorage: { getItem() { return null; } }, navigator: { language: "en" }, document: { documentElement: { setAttribute() {} }, addEventListener() {} } }; Object.assign(c2.window, c2); vm.runInNewContext(read("i18n.js"), c2); Object.assign(I, c2.window.I18N.strings); }
-for (const k of ["tw_setup_phone", "tw_setup_name_phone", "tw_no_phone_here", "tw_scan_camera", "tw_setup_widgets"]) ok(LANGS.every((l) => typeof I[l][k] === "string" && I[l][k]), k + ": in every language of i18n.js");
+for (const k of ["tw_setup_phone", "tw_setup_name_phone", "tw_no_phone_here", "tw_scan_camera", "tw_setup_widgets", "tw_stack_edit_phone"]) ok(LANGS.every((l) => typeof I[l][k] === "string" && I[l][k]), k + ": in every language of i18n.js");
 console.log("widget setup words: " + n + " checks passed");
