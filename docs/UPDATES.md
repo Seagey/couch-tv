@@ -2,9 +2,17 @@
 
 Everything that changed in couch-tv, newest first.
 
-The newest release is **0.13.11**. The TV apps come from [the Releases page](https://github.com/Seagey/couch-tv/releases). The bridge, and with option B the home's own screen, run from your copy of this repo, so `git pull` brings their changes.
+The newest release is **0.13.12**. The TV apps come from [the Releases page](https://github.com/Seagey/couch-tv/releases). The bridge, and with option B the home's own screen, run from your copy of this repo, so `git pull` brings their changes.
 
 ## November 2026
+
+### 24 November 2026: release 0.13.12, the TV tells Couch TV Studio it has Couch TV, and a steadier Now playing card
+
+0.13.12 is on [the Releases page](https://github.com/Seagey/couch-tv/releases). Option C: Home settings, Updates, Update to; it carries the same key as 0.13.11, so a TV on 0.13.11 or 0.13.10 updates as normal. Other Android TVs: Home settings, Updates. Option B: `git pull` and restart the bridge. Full notes: [RELEASE-NOTES-0.13.12.md](../RELEASE-NOTES-0.13.12.md).
+
+- **The TV tells Couch TV Studio it has Couch TV:** getting a design by code on an Android TV also sends the Couch TV version and the TV's memory, nothing else, for Studio's "Will it play on your TV?".
+- **Now playing reaches every music app:** since 0.13.11 the wider Night card, the progress bar and scrolling long titles show for every music app, not only Spotify.
+- **Spotify's card:** follows a song change at once, never loads a cover from Spotify, shows its Home settings rows only where it works, shows the adb line only with no computer at home, and takes a skip step of 5, 10, 15 or 30 seconds everywhere.
 
 ### 24 November 2026: release 0.13.11, add many apps at once, Jost and Cormorant on the TV, and the on-TV app's own signing key
 
