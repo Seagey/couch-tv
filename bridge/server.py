@@ -4027,7 +4027,7 @@ async def h_spotify_control(request):
     # a number, a list or nothing is the caller's mistake: 400, never a 500. (Before 0.13.12 these paths called
     # an undefined bad(), so every refusal here came back as a 500.)
     if not isinstance(action, str):
-        raise ApiError(400, "action must be text")
+        raise ApiError(400, "unknown key: %s" % str(action)[:40], key="err_unknown_key", vars={"key": str(action)[:40]})
     action = action.lower()
     cmd_map = {
         "play": "play",
@@ -4040,7 +4040,7 @@ async def h_spotify_control(request):
     }
     cmd_key = cmd_map.get(action)
     if not cmd_key:
-        raise ApiError(400, "action must be one of: " + ", ".join(cmd_map))
+        raise ApiError(400, "unknown key: %s" % action[:40], key="err_unknown_key", vars={"key": action[:40]})
     if not (tv.connected and tv.is_on and await tv.adb_ready()):
         raise ApiError(503, "TV not connected over ADB", key="err_tv_not_connected")
     try:
