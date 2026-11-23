@@ -81,7 +81,9 @@ object Adb {
 
     /**
      * Connect if not connected. interactive=true waits up to 2 minutes for someone to press "Allow" on
-     * the TV; background calls wait 8 s and never start a pairing. preferTls tries wireless
+     * the TV; background calls wait AdbPolicy.BACKGROUND_ALLOW_SECONDS (long enough to answer a box the TV raised:
+     * an 8 s wait dropped the connection before Allow, so Allow was ignored and the box came back) and never start a
+     * pairing, and after one unanswered box they leave plain 5555 alone until someone presses Connect. preferTls tries wireless
      * debugging first (used straight after pairing).
      */
     fun ensure(interactive: Boolean = false, preferTls: Boolean = false): Boolean = synchronized(lock) {
@@ -90,16 +92,18 @@ object Adb {
         closeQuietly()
         state = "connecting"
         lastError = null
-        if (interactive) unanswered = false
+        if (interactive) { unanswered = false; Store.putBool(AdbPolicy.BG_UNANSWERED, false) }
+        background = !interactive
         // Some Android 13+ Google TVs never show "Allow debugging?" for a new key on 5555 (seen on one
         // TV after its Google home was switched off), so do not make people wait 2 minutes there.
-        allowSeconds = if (!interactive) 8L else if (Build.VERSION.SDK_INT >= 33 && !Store.bool("adb_ok_tcp")) 45L else 120L
+        allowSeconds = AdbPolicy.allowSeconds(interactive, Build.VERSION.SDK_INT, Store.bool("adb_ok_tcp"))
         mgr.setTimeout(allowSeconds, TimeUnit.SECONDS)
         // Paired TVs use wireless debugging first. Plain 5555 is tried in the background only once it
         // has been allowed before, so a background retry never pops "Allow debugging?" over a show.
         val order = if (preferTls || paired) listOf("tls", "tcp") else listOf("tcp", "tls")
         for (r in order) {
-            val ok = if (r == "tcp") (interactive || Store.bool("adb_ok_tcp")) && tryTcp() else tryTls(interactive)
+            val ok = if (r == "tcp") AdbPolicy.mayTryTcp(interactive, Store.bool("adb_ok_tcp"), Store.bool(AdbPolicy.BG_UNANSWERED)) && tryTcp()
+                else tryTls(interactive)
             if (ok) return true
         }
         route = null
@@ -108,7 +112,8 @@ object Adb {
     }
 
     @Volatile var lastProbe: String? = null; private set
-    @Volatile private var allowSeconds = 8L
+    @Volatile private var allowSeconds = AdbPolicy.BACKGROUND_ALLOW_SECONDS
+    @Volatile private var background = true   // this ensure() is a background one (no one pressed Connect)
 
     /**
      * Plain ADB on port 5555: 127.0.0.1 first, then the TV's own network address (some adbd builds
@@ -131,6 +136,8 @@ object Adb {
                 continue
             }
             if (connectWatched(host, 5555, "tcp")) return true
+            // a background try whose box went unanswered: never raise a second box from the next address
+            if (background && Store.bool(AdbPolicy.BG_UNANSWERED)) break
         }
         if (fireBlocked) note(FIRE_BLOCKED)
         return false
@@ -157,13 +164,20 @@ object Adb {
             if (ok) return onConnected(r)
             // the whole 2 minute wait went by with no Allow and no refusal: nobody pressed, Cancel, or the TV
             // never showed the question at all (see unanswered). Said once, in place of the note below.
-            if (r == "tcp" && allowSeconds >= 120 && System.currentTimeMillis() - started >= allowSeconds * 1000 - 2000) {
+            if (r == "tcp" && background && AdbPolicy.ranOut(System.currentTimeMillis() - started, allowSeconds)) {
+                // The TV showed its box for a background check and nobody answered (launch audit, 24 Nov 2026: after
+                // Update to, the box came back again and again). Not again from the background: the next box waits for
+                // Let the phone press keys, Connect.
+                Store.putBool(AdbPolicy.BG_UNANSWERED, true)
+                note("No answer to \"Allow USB debugging?\". Press Let the phone press keys, then Connect, to try again.")
+            } else if (r == "tcp" && allowSeconds >= 120 && AdbPolicy.ranOut(System.currentTimeMillis() - started, allowSeconds)) {
                 unanswered = true
                 note(SetupWords.NOT_ASKED)
             } else { Log.i(TAG, "$host:$port: no answer to Allow debugging in time (or the TV refused)")
-                note("No answer to \"Allow debugging?\" in time." +
+                note("No answer to \"Allow USB debugging?\" in time." +
                 if (Build.VERSION.SDK_INT >= 33) " On Android 13 or newer the TV may never ask: use the newer TVs steps in Home settings on your phone." else " Press Let the phone press keys again.") }
         } catch (e: java.util.concurrent.TimeoutException) {
+            if (r == "tcp" && background) Store.putBool(AdbPolicy.BG_UNANSWERED, true)   // the box stood the whole wait
             note("$host:$port: library connect hung for ${limitMs / 1000} s, closed it")
         } catch (e: java.util.concurrent.ExecutionException) {
             val c = e.cause ?: e
@@ -260,6 +274,7 @@ object Adb {
 
     private fun onConnected(r: String): Boolean {
         route = r; state = "connected"; lastError = null; unanswered = false
+        Store.putBool(AdbPolicy.BG_UNANSWERED, false)
         Store.putBool("adb_ok_once", true)
         if (r == "tcp") Store.putBool("adb_ok_tcp", true)
         Log.i(TAG, "connected over $r")
