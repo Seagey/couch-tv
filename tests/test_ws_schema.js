@@ -17,7 +17,7 @@ console.log("Running widget settings schema tests...");
 
 // the contract's types, plus the two the spec needs (tvlist: something kept on this TV; image: a photo
 // put in the widget in couch-tv Studio)
-const TYPES = ["place", "choice", "toggle", "text", "number", "app", "apps", "team", "device", "calendar", "tvlist", "image"];
+const TYPES = ["place", "choice", "toggle", "text", "number", "app", "apps", "team", "device", "calendar", "tvlist", "image", "zone"];
 const HA_DOMAINS = ["climate", "camera", "sensor", "light", "switch", "fan", "cover", "media_player", "scene", "script", "event", "binary_sensor"];
 const TVLISTS = ["lists", "photos", "people", "calendars", "guide", "cards"];
 const BANNED = /\b(beta|experimental|coming soon|adb|token|entity|entities|url|package|api)\b/i;
@@ -109,6 +109,7 @@ CAPS.kinds().forEach((kind) => {
         break;
       case "tvlist": ok(TVLISTS.indexOf(s.from) >= 0 && (s.many ? isArr(d) && typeof s.max === "number" : typeof d === "string"), at + ": tvlist from " + s.from + (s.many ? ", several picked: a list" : "")); break;
       case "image": ok(d === "" && s.store === "design", at + ": a photo in the widget lives in the design"); break;
+      case "zone": ok(d === "" && s.store === "design" && s.where.indexOf("tv") < 0, at + ": a time zone, empty is the TV's own, kept in the design, never picked with the remote"); break;
       case "team":
         ok(typeof d === "string", at + ": team default");
         ok(keys[s.league] && keys[s.league].type === "choice", at + ": team names its competition setting");

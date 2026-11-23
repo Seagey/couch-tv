@@ -547,6 +547,45 @@ await ctx.close();
   ok(!tv.errors.length, "no page errors: " + tv.errors.join("; "));
 }
 
+// ---- 7. the resend bug: the same widgets sent again with one design choice changed ----
+{
+  const stored = () => tv.evaluate(() => { const r = JSON.parse(localStorage.getItem("mock:tvhome.settings") || localStorage.getItem("tvhome.settings") || "{}"); return r.s || r; });
+  const valueOf = (key, k) => tv.evaluate(([key, k]) => { const w = window.tv.atHomeRead().design.widgets.filter((x) => x.key === key)[0]; const s = w && w.settings.filter((x) => x.key === k)[0]; return s ? s.value : undefined; }, [key, k]);
+  const send = async (d, wait) => {
+    await tv.evaluate((x) => localStorage.setItem("tvdesigner.design", JSON.stringify(x)), d);
+    await tv.goto(HOME + "?mock=1&wxlive=1&design=local");
+    await tv.waitForFunction(() => window.CouchDesign && window.CouchDesign.on() && document.querySelector('.cw-o[data-obj="k"] .cw'));
+    await tv.waitForTimeout(wait || 1500);
+  };
+  const clockDesign = (fmt) => ({ v: 1, background: { colour: "#1d3a4f" }, objects: [
+    { id: "k", type: "widget", kind: "clock", x: 80, y: 60, w: 560, h: 260, opts: { format: fmt } },
+    { id: "n", type: "widget", kind: "news", x: 1300, y: 40, w: 560, h: 220, opts: { feed: "abc" } }] });
+  await send(clockDesign("12h"));
+  ok((await tv.evaluate(() => window.tv.atHomeEdit({ widget_set: { key: "k|clock", values: { format: "auto" } } }))).ok, "the TV changes the clock to Follow this TV");
+  ok((await tv.evaluate(() => window.tv.atHomeEdit({ widget_set: { key: "n|news", values: { feed: "rnz" } } }))).ok, "and the news to RNZ");
+  await tv.waitForTimeout(900);
+  let st = await stored();
+  ok(st.widgets_base && st.widgets_base["k|clock"] && st.widgets_base["k|clock"].format, "the design's own clock format is kept as the base: " + JSON.stringify(st.widgets_base));
+  // the same design again: nothing changes
+  await send(clockDesign("12h"));
+  ok(await valueOf("k|clock", "format") === "auto" && await valueOf("n|news", "feed") === "rnz", "the same design again changes nothing (clock " + await valueOf("k|clock", "format") + ", news " + await valueOf("n|news", "feed") + ")");
+  // Studio sends it again made 24 hour: the new format wins, the news override stays
+  await send(clockDesign("24h"));
+  st = await stored();
+  ok(await valueOf("k|clock", "format") === "24h", "a resend made 24 hour wins over the TV's clock change: " + await valueOf("k|clock", "format") + " " + JSON.stringify(st.widgets));
+  ok(await valueOf("n|news", "feed") === "rnz" && st.widgets["n|news"] && st.widgets["n|news"].feed === "rnz", "the TV's news source stays when only the clock changed: " + JSON.stringify(st.widgets));
+  ok(!(st.widgets["k|clock"] && st.widgets["k|clock"].format), "the clock override is gone from Home settings");
+  // an older TV with no base yet: it learns the base and drops nothing
+  await tv.evaluate(() => window.tv.atHomeEdit({ widget_set: { key: "k|clock", values: { format: "12h" } } }));
+  await tv.waitForTimeout(900);
+  await tv.evaluate(() => { for (const k of ["mock:tvhome.settings", "tvhome.settings", "mock:api.settings"]) { const raw = localStorage.getItem(k); if (!raw) continue; const r = JSON.parse(raw); const s = r.s || (r.settings && typeof r.settings === "object" && !Array.isArray(r.settings) && k === "mock:api.settings" ? r.settings : r); delete s.widgets_base; localStorage.setItem(k, JSON.stringify(r)); } });
+  await send(clockDesign("24h"));
+  st = await stored();
+  ok(await valueOf("k|clock", "format") === "12h" && await valueOf("n|news", "feed") === "rnz", "with no base yet, nothing is dropped: " + JSON.stringify(st.widgets));
+  ok(st.widgets_base && st.widgets_base["k|clock"], "and the base is filled in: " + JSON.stringify(st.widgets_base));
+  ok(!tv.errors.length, "no page errors: " + tv.errors.join("; "));
+}
+
 await tv.close();
 await browser.close();
 server.close();

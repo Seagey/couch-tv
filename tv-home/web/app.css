@@ -2537,3 +2537,53 @@ html.theme-night:not(.theme-loop) .people:not(.focus), html.theme-night:not(.the
   -webkit-backdrop-filter: none; backdrop-filter: none; background: rgba(30, 20, 28, 0.62);
 }
 html.glass.theme-night:not(.theme-loop) .people:not(.focus), html.glass.theme-night:not(.theme-loop) .qbtn:not(.focus) { background: var(--glass-solid); }
+
+/* ---------- the first-run welcome (app.js welcomeStart): a TV never set up opens on this ----------
+   The light look of couch-tv Studio's website and the on-TV app's setup screens (approved 23 Nov 2026):
+   wall blue ground, off-white cards, ink words, Nunito headings, a sun yellow focus ring with a white
+   gap. A solid ground, no blur and no animation, so it costs nothing on a Lighter home or an old
+   WebView. Flexbox with margins (no gap, no grid): it lays out the same on Chrome 53. Sizes in rem
+   follow the screen's width, so 1280x720 and 1920x1080 look alike. */
+@font-face {
+  font-family: "Nunito"; font-weight: 200 1000; font-display: block;
+  src: url(fonts/nunito-latin-wght.woff2) format("woff2");
+}
+.welcome {
+  --wel-wall: #BDCFE1; --wel-card: #FBFAF7; --wel-ink: #14131A; --wel-ink-2: #4A4856; --wel-sun: #FFC81E;
+  display: none; position: fixed; top: 0; right: 0; bottom: 0; left: 0; z-index: 35;
+  -webkit-box-align: center; align-items: center; -webkit-box-pack: center; justify-content: center;
+  background: var(--wel-wall); color: var(--wel-ink); text-shadow: none;
+  font-family: "Inter", system-ui, sans-serif; font-weight: 450;
+}
+.welcome.on { display: -webkit-box; display: flex; }
+/* the couch-tv logo and its name, top left, as on the setup screens */
+.wel-brand { position: absolute; top: 3.75rem; left: 6rem; display: -webkit-box; display: flex; -webkit-box-align: center; align-items: center; }
+.wel-brand img { display: block; width: 2.75rem; height: 2.75rem; }
+.wel-brand span { margin-left: 1.25rem; font-family: "Nunito", "Inter", sans-serif; font-size: 2.625rem; line-height: 3rem; font-weight: 900; letter-spacing: -0.01em; }
+[dir="rtl"] .wel-brand { left: auto; right: 6rem; }
+[dir="rtl"] .wel-brand span { margin: 0 1.25rem 0 0; }
+.wel-in { width: 80rem; max-width: calc(100vw - 2 * var(--safe-x)); margin-top: 4rem; text-align: center; }
+.wel-title { margin: 0; font-family: "Nunito", "Inter", sans-serif; font-size: 4.5rem; line-height: 5.25rem; font-weight: 900; letter-spacing: -0.02em; }
+.wel-sub { margin: 1.25rem 0 0; font-size: 1.875rem; line-height: 2.625rem; color: var(--wel-ink-2); }
+.wel-picks { display: -webkit-box; display: flex; -webkit-box-pack: center; justify-content: center; margin-top: 3.75rem; }
+.wpick {
+  display: -webkit-box; display: flex; -webkit-box-orient: vertical; flex-direction: column; -webkit-box-align: start; align-items: flex-start;
+  width: 35rem; min-height: 18.5rem; margin: 0 1.5rem; padding: 2.75rem; border-radius: 2.5rem; text-align: left;
+  background: var(--wel-card); color: var(--wel-ink); box-shadow: 0 1.5rem 3rem rgba(20, 19, 26, 0.12);
+}
+.wpick i { display: -webkit-box; display: flex; -webkit-box-align: center; align-items: center; -webkit-box-pack: center; justify-content: center;
+  width: 5rem; height: 5rem; border-radius: 1.25rem; background: #E8EEF5; }
+.wpick svg { width: 2.75rem; height: 2.75rem; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+.wpick b { display: block; margin-top: auto; padding-top: 2rem; font-family: "Nunito", "Inter", sans-serif; font-size: 2.625rem; line-height: 3.125rem; font-weight: 900; letter-spacing: -0.01em; }
+.wpick small { display: block; margin-top: 0.625rem; font-size: 1.5rem; line-height: 2.125rem; color: var(--wel-ink-2); }
+/* the focus: a white gap, then the sun yellow ring (the setup screens' button focus) */
+.wpick.focus { box-shadow: 0 0 0 0.5rem #FFFFFF, 0 0 0 1rem var(--wel-sun), 0 1.5rem 3rem rgba(20, 19, 26, 0.16); }
+.wpick.focus i { background: var(--wel-sun); }
+[dir="rtl"] .wpick { text-align: right; }
+.wel-studio { display: -webkit-box; display: flex; -webkit-box-align: center; align-items: center; -webkit-box-pack: center; justify-content: center; margin-top: 3.75rem; }
+.wel-qr { display: block; flex: none; width: 7.5rem; height: 7.5rem; padding: 0.625rem; border-radius: 1rem; background: #FFFFFF; }
+.wel-qr svg { display: block; width: 100%; height: 100%; }
+.wel-studio p { margin: 0 0 0 1.75rem; max-width: 42rem; font-size: 1.5rem; line-height: 2.125rem; color: var(--wel-ink-2); text-align: left; }
+[dir="rtl"] .wel-studio p { margin: 0 1.75rem 0 0; text-align: right; }
+html.lighter .wpick { box-shadow: none; }
+html.lighter .wpick.focus { box-shadow: 0 0 0 0.5rem #FFFFFF, 0 0 0 1rem var(--wel-sun); }

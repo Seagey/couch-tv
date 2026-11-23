@@ -151,6 +151,18 @@
   </div>
 </div>
 
+<!-- the first-run welcome: a TV never set up opens on this (I have a design code, or Use Couch Original),
+     answered once with the remote; drawn by app.js (welcomeStart) -->
+<div class="welcome" id="welcome" role="dialog" aria-modal="true" aria-labelledby="welcome-title">
+  <!-- the product's name and logo (couch-tv Studio's site logo, couchtv-logo.svg), the same in every language -->
+  <div class="wel-brand" aria-hidden="true"><img src="couchtv-logo.svg" alt="" width="44" height="44"><span>Couch TV</span></div>
+  <div class="wel-in">
+    <h1 class="wel-title" id="welcome-title"></h1>
+    <p class="wel-sub" id="welcome-sub"></p>
+    <div class="wel-picks" id="welcome-picks"></div>
+    <div class="wel-studio"><span class="wel-qr" id="welcome-qr"></span><p id="welcome-studio-text"></p></div>
+  </div>
+</div>
 <!-- Smart home (optional): the rooms and scenes screen, drawn by smarthome.js -->
 <div class="smart" id="smart" role="dialog" aria-modal="true" aria-label="Smart home"></div>
 

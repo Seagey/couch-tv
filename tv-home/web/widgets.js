@@ -463,6 +463,25 @@
 
   // ---------------- time ----------------
   function now() { return new Date(); }
+  // a clock's own time zone (its "zone" setting, an IANA id like "Europe/London"): "" when none is set or
+  // this TV does not know the zone, and then the clock keeps the TV's own time
+  var ZONE_OK = {};
+  function zoneOk(z) {
+    if (typeof z !== "string" || !/^[A-Z][A-Za-z_]{1,30}(\/[A-Z][A-Za-z_-]{1,30}){1,2}$/.test(z)) return "";
+    if (ZONE_OK[z] === undefined) { try { new Date(0).toLocaleString("en-US", { timeZone: z }); ZONE_OK[z] = true; } catch (e) { ZONE_OK[z] = false; } }
+    return ZONE_OK[z] ? z : "";
+  }
+  // now, as a wall clock in the widget's time zone reads it: a Date whose own hours, minutes and day are
+  // that zone's, so every clock draws it the way it draws the TV's time
+  function nowIn(o, env) {
+    var d = now(), z = zoneOk(setting(o, env, "zone"));
+    if (!z) return d;
+    try {
+      var s = d.toLocaleString("en-US", { timeZone: z, hour12: false, year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", second: "2-digit" });
+      var m = /(\d{1,2})\/(\d{1,2})\/(\d{4}),?\s*(\d{1,2}):(\d{2}):(\d{2})/.exec(s);
+      return m ? new Date(+m[3], +m[1] - 1, +m[2], +m[4] % 24, +m[5], +m[6]) : d;
+    } catch (e) { return d; }
+  }
   // secs: the seconds after the minutes (the digital clock's Show seconds)
   function clockParts(d, o, env, secs) {
     var f = (o.opts || {}).format, h24 = f === "24h" ? true : f === "12h" ? false : !!env.clock24;
@@ -718,14 +737,14 @@
   // clocks
   R.clock = function (root, o, b, env) {
     var secs = setting(o, env, "seconds") === true;
-    var p = clockParts(now(), o, env, secs), sub = setting(o, env, "date") !== false && b.h >= 200, shortD = b.w < 420;
+    var p = clockParts(nowIn(o, env), o, env, secs), sub = setting(o, env, "date") !== false && b.h >= 200, shortD = b.w < 420;
     var align = op(o).align || "center", showAp = setting(o, env, "ampm") !== false && p.ap && b.w >= 300;
     var fs = Math.min((b.h - (sub ? 60 : 0)) * 0.75, b.w / (p.t.length * 0.62 + (showAp ? 0.6 : 0)), 240);
     var tEl = E("span", "", "", [p.t]), aEl = showAp ? E("span", "", "font-size:" + px(Math.max(24, fs * 0.3)) + ";letter-spacing:0;margin-left:.12em;font-weight:600;opacity:.8", [p.ap]) : null;
     var big = E("div", "cw-big", "font-size:" + px(fs) + ";font-weight:640;text-align:" + align + (root.classList.contains("cw-bare") ? ";text-shadow:0 4px 30px rgba(0,0,0,.25)" : ""), [tEl, aEl]);
-    var dEl = sub ? E("div", "cw-t29 cw-dim", "margin-top:" + px(Math.max(14, fs * 0.12)) + ";text-align:" + align + (root.classList.contains("cw-bare") ? ";text-shadow:0 2px 14px rgba(0,0,0,.3)" : ""), [shortD ? shortDate(now()) : longDate(now())]) : null;
+    var dEl = sub ? E("div", "cw-t29 cw-dim", "margin-top:" + px(Math.max(14, fs * 0.12)) + ";text-align:" + align + (root.classList.contains("cw-bare") ? ";text-shadow:0 2px 14px rgba(0,0,0,.3)" : ""), [shortD ? shortDate(nowIn(o, env)) : longDate(nowIn(o, env))]) : null;
     add(root, E("div", "cw-col cw-center", "height:100%;align-items:" + (align === "left" ? "flex-start" : align === "right" ? "flex-end" : "center"), [big, dEl]));
-    live(root, 1000, function () { var q = clockParts(now(), o, env, secs); tEl.textContent = q.t; if (aEl) aEl.textContent = q.ap; if (dEl) dEl.textContent = shortD ? shortDate(now()) : longDate(now()); });
+    live(root, 1000, function () { var q = clockParts(nowIn(o, env), o, env, secs); tEl.textContent = q.t; if (aEl) aEl.textContent = q.ap; if (dEl) dEl.textContent = shortD ? shortDate(nowIn(o, env)) : longDate(nowIn(o, env)); });
   };
   // the tall digits (Antonio, line height .82): their ink runs from .05em to .93em of the line, so the
   // box grows .12em at the bottom (and a little at the top) to hold them whole, and the size comes from
@@ -736,25 +755,25 @@
   }
   var TALL = "font-family:Antonio,'Arial Narrow',sans-serif;font-weight:300;line-height:.82;padding:.03em 0 .13em;letter-spacing:-.02em;white-space:nowrap;flex:none;";
   R.tallclock = function (root, o, b, env) {
-    var al = setting(o, env, "align"), p = clockParts(now(), o, env), fs = tallFs(root, b, p.t.length);
+    var al = setting(o, env, "align"), p = clockParts(nowIn(o, env), o, env), fs = tallFs(root, b, p.t.length);
     if (["left", "center", "right"].indexOf(al) < 0) al = "center";
     var tEl = E("div", "", TALL + "font-size:" + px(fs) + ";text-align:" + al + ";text-shadow:0 6px 40px rgba(0,0,0,.25)", [p.t]);
     add(root, E("div", "cw-col", "height:100%;justify-content:center;align-items:" + (al === "left" ? "flex-start" : al === "right" ? "flex-end" : "center"), [tEl]));
-    live(root, 1000, function () { tEl.textContent = clockParts(now(), o, env).t; });
+    live(root, 1000, function () { tEl.textContent = clockParts(nowIn(o, env), o, env).t; });
   };
   var GLASS = ["night", "fog", "golden", "dawn", "water"];
   R.glassclock = function (root, o, b, env) {
     // Glass from: a scene picked for this widget, else the home's scene now
     var pick = setting(o, env, "scene"), sc = GLASS.indexOf(pick) >= 0 ? pick : GLASS.indexOf(dataOf(env).scene) >= 0 ? dataOf(env).scene : "night";
-    var p = clockParts(now(), o, env), fs = tallFs(root, b, p.t.length);
+    var p = clockParts(nowIn(o, env), o, env), fs = tallFs(root, b, p.t.length);
     var tEl = E("div", "", TALL + "font-size:" + px(fs) + ";text-align:center;" +
       "color:rgba(255,255,255,.88);background-image:url(" + CW.base + "backgrounds/scene-" + sc + "-glass.jpg);background-size:1920px 1080px;-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;" +
       "filter:drop-shadow(0 8px 30px rgba(0,0,0,.25))", [p.t]);
     add(root, E("div", "cw-col", "height:100%;justify-content:center", [tEl]));
-    live(root, 1000, function () { tEl.textContent = clockParts(now(), o, env).t; });
+    live(root, 1000, function () { tEl.textContent = clockParts(nowIn(o, env), o, env).t; });
   };
   R.analog = function (root, o, b, env, sh) {
-    var s = Math.min(b.w, b.h) - 48, d = now(), hand = "#ff6a3d", ink = rgba(sh.ink, 1);
+    var s = Math.min(b.w, b.h) - 48, d = nowIn(o, env), hand = "#ff6a3d", ink = rgba(sh.ink, 1);
     var ticks = [];
     for (var i = 0; i < 12; i++) ticks.push(S("line", { x1: 50, y1: 5, x2: 50, y2: i % 3 ? 9 : 13, stroke: ink, "stroke-width": i % 3 ? 1.2 : 2.6, "stroke-linecap": "round", transform: "rotate(" + i * 30 + " 50 50)", opacity: i % 3 ? 0.5 : 0.95 }));
     var hH = S("line", { x1: 50, y1: 50, x2: 50, y2: 25, stroke: ink, "stroke-width": 4.4, "stroke-linecap": "round" });
@@ -766,7 +785,7 @@
       var tx = S("text", { x: n[1], y: n[2], fill: ink, "font-size": 11, "font-weight": 650, "text-anchor": "middle", "font-family": "Inter, sans-serif" });
       tx.textContent = String(n[0]); tx.setAttribute("data-num", String(n[0])); ticks.push(tx);
     });
-    var set = function () { var t = now(), h = t.getHours() % 12, m = t.getMinutes(), sec = t.getSeconds(); hH.setAttribute("transform", "rotate(" + (h * 30 + m / 2) + " 50 50)"); mH.setAttribute("transform", "rotate(" + m * 6 + " 50 50)"); sH.setAttribute("transform", "rotate(" + sec * 6 + " 50 50)"); };
+    var set = function () { var t = nowIn(o, env), h = t.getHours() % 12, m = t.getMinutes(), sec = t.getSeconds(); hH.setAttribute("transform", "rotate(" + (h * 30 + m / 2) + " 50 50)"); mH.setAttribute("transform", "rotate(" + m * 6 + " 50 50)"); sH.setAttribute("transform", "rotate(" + sec * 6 + " 50 50)"); };
     set();
     sH.setAttribute("data-hand", "seconds");
     add(root, E("div", "cw-grow cw-row cw-center", "", [svg("0 0 100 100", s, s, ticks.concat([hH, mH, secHand ? sH : null, S("circle", { cx: 50, cy: 50, r: 2.6, fill: hand })]))]));
@@ -777,19 +796,19 @@
     var pad = root.classList.contains("cw-bare") ? 0 : 48, cw = Math.min((b.w - pad - 20 - 56) / 4, (b.h - pad) * 0.72), hgt = Math.min(b.h - pad, cw / 0.72), cards = [];
     var card = function () { var t = E("span", "", "", ["0"]); var c = E("div", "", "position:relative;width:" + px(cw) + ";height:" + px(hgt) + ";border-radius:22px;background:#1f1f23;display:flex;align-items:center;justify-content:center;font-size:" + px(Math.min(hgt * 0.78, cw * 1.25)) + ";font-weight:700;letter-spacing:-.04em;color:#f2f2f2;box-shadow:inset 0 -3px 0 rgba(0,0,0,.4);margin:0 7px", [t, E("i", "", "position:absolute;left:0;right:0;top:50%;height:3px;background:#0b0b0d")]); cards.push(t); return c; };
     add(root, E("div", "cw-row cw-center", "height:100%", [card(), card(), E("div", "", "width:20px"), card(), card()]));
-    var set = function () { var t = clockParts(now(), o, env).t.replace(":", ""); if (t.length === 3) t = "0" + t; for (var i = 0; i < 4; i++) cards[i].textContent = t.charAt(i); };
+    var set = function () { var t = clockParts(nowIn(o, env), o, env).t.replace(":", ""); if (t.length === 3) t = "0" + t; for (var i = 0; i < 4; i++) cards[i].textContent = t.charAt(i); };
     set(); live(root, 1000, set);
   };
   // the widget's own settings: To the minute (precise) and Show the day (dayline)
   R.wordclock = function (root, o, b, env) {
     var precise = setting(o, env, "precise") === true, dayline = setting(o, env, "dayline") !== false;
     // the longest the words get, so the size holds as the minutes change
-    var tw = precise ? "Twenty seven minutes past\neleven" : timeWords(now()), tl = tw.split("\n"), longest = Math.max.apply(null, tl.map(function (l) { return l.length; }));
+    var tw = precise ? "Twenty seven minutes past\neleven" : timeWords(nowIn(o, env)), tl = tw.split("\n"), longest = Math.max.apply(null, tl.map(function (l) { return l.length; }));
     var fs = clamp(Math.min((b.w - 48) / (longest * 0.56), (b.h - (dayline ? 120 : 48)) / (tl.length * 1.06)), 36, 130);
-    var w = E("div", "", "font-size:" + px(fs) + ";font-weight:780;line-height:1.02;letter-spacing:-.03em;white-space:pre-line", [timeWords(now(), precise)]);
-    var s = dayline ? E("div", "cw-t29 cw-dim", "margin-top:18px", [DAYS[now().getDay()] + " " + partOfDay(now())]) : null;
+    var w = E("div", "", "font-size:" + px(fs) + ";font-weight:780;line-height:1.02;letter-spacing:-.03em;white-space:pre-line", [timeWords(nowIn(o, env), precise)]);
+    var s = dayline ? E("div", "cw-t29 cw-dim", "margin-top:18px", [DAYS[nowIn(o, env).getDay()] + " " + partOfDay(nowIn(o, env))]) : null;
     add(root, E("div", "cw-grow cw-col", "justify-content:center", [w, s]));
-    live(root, precise ? 5000 : 15000, function () { w.textContent = timeWords(now(), precise); if (s) s.textContent = DAYS[now().getDay()] + " " + partOfDay(now()); });
+    live(root, precise ? 5000 : 15000, function () { w.textContent = timeWords(nowIn(o, env), precise); if (s) s.textContent = DAYS[nowIn(o, env).getDay()] + " " + partOfDay(nowIn(o, env)); });
   };
   function arc(f) {
     f = clamp(f, 0, 1);
@@ -2707,13 +2726,13 @@
   function sample(kind, iconName, fn) { return function (root, o, b, env, sh) { if (!env.demo) return soon(root, b, iconName, kind); return fn(root, o, b, env, sh); }; }
   CR.wordclock = function (root, o, b, env) {
     var precise = setting(o, env, "precise") === true;
-    var tl = (precise ? "Twenty seven minutes past\neleven" : timeWords(now())).split("\n"), longest = Math.max.apply(null, tl.map(function (l) { return l.length; }));
+    var tl = (precise ? "Twenty seven minutes past\neleven" : timeWords(nowIn(o, env))).split("\n"), longest = Math.max.apply(null, tl.map(function (l) { return l.length; }));
     var dayline = setting(o, env, "dayline") !== false;
     var fs = clamp(Math.min((b.w - 48) / (longest * 0.56), (b.h - 48 - (dayline ? 36 : 0)) / (tl.length * 1.08)), 26, 70);
-    var w = E("div", "", "font-size:" + px(fs) + ";font-weight:780;line-height:1.04;letter-spacing:-.02em;white-space:pre-line", [timeWords(now(), precise)]);
-    var s = dayline ? E("div", "cw-t23 cw-dim", "margin-top:6px;white-space:nowrap", [DAYS[now().getDay()] + " " + partOfDay(now())]) : null;
+    var w = E("div", "", "font-size:" + px(fs) + ";font-weight:780;line-height:1.04;letter-spacing:-.02em;white-space:pre-line", [timeWords(nowIn(o, env), precise)]);
+    var s = dayline ? E("div", "cw-t23 cw-dim", "margin-top:6px;white-space:nowrap", [DAYS[nowIn(o, env).getDay()] + " " + partOfDay(nowIn(o, env))]) : null;
     add(root, E("div", "cw-col", "height:100%;justify-content:center", [w, s]));
-    live(root, precise ? 5000 : 15000, function () { w.textContent = timeWords(now(), precise); if (s) s.textContent = DAYS[now().getDay()] + " " + partOfDay(now()); });
+    live(root, precise ? 5000 : 15000, function () { w.textContent = timeWords(nowIn(o, env), precise); if (s) s.textContent = DAYS[nowIn(o, env).getDay()] + " " + partOfDay(nowIn(o, env)); });
   };
   CR.solar = CR.sun = function (root, o, b, env) {
     var s = sunToday(env, o), own = o && o.kind === "solar" && !env.demo ? pickedPlace(o, env) : null;
@@ -3320,6 +3339,8 @@
     contrast: function (a, b) { return contrast(rgbOf(a) || WHITE, rgbOf(b) || WHITE); },
     tileColour: function (kind) { return TILE[kind] || null; },
     timeWords: timeWords, moon: moon, sunTimes: sunTimes, daysTo: daysTo,
+    // a clock's time zone setting checked: the IANA id when this TV knows it, else ""
+    zoneOk: zoneOk,
     timer: Timer,
     // the building blocks and data readers the detail layers share (widget-detail.js)
     kit: { tl: tl, wl: wl, dayName: dayName, E: E, S: S, svg: svg, ic: ic, add: add, empty: empty, px: px, clamp: clamp, rgba: rgba, avatar: avatar, cssImg: cssImg, now: now, dataOf: dataOf,

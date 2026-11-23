@@ -4607,6 +4607,7 @@
     if (DOCK_MAC) setTimeout(magnify, 0);   // after this paint has put the focus class where it belongs
     saveFocusSoon();
     followSync();   // the row follows the app tile the remote is on (home.shelf_follows_app)
+    if (zone === "welcome") { renderWelcome(); return; }
     if (zone === "settings") { renderSettings(); return; }
     if (zone === "smart") { window.smartHome.paint(); return; }
     if (zone === "remind") { window.Reminders.paint(); return; }
@@ -5001,6 +5002,7 @@
   }
 
   function goHome() {
+    if (zone === "welcome") { welcomeChoose(1); return; }   // Back on the first-run welcome: Couch Original
     if (screenOffActive) {
       toggleScreenOff(false);
       return;
@@ -6615,16 +6617,32 @@
   // Which question is on screen: "upd" (new versions, once), "home" (make couch-tv the home, once)
   // or "dev" (extend Developer Mode, weekly).
   var askKind = "upd";
+  // The first-run welcome is a new TV's first question. The update question never comes over it, nor straight
+  // after it (on a TCL it popped up over the home about 5 s after the first open): it waits for a calm later
+  // moment, the next time the home comes back to the front (or the next start). welcomeSeen: the welcome was
+  // up in this start; updLater: the question is waiting for that moment.
+  var welcomeSeen = false, updLater = false;
   function updAsk() {
     askKind = "upd";
     if (!UPD || !UPD.supported || UPD.answered || kidsOn()) return;
     if (HOME.updates === "notify" || HOME.updates === "manual") { upd().auto(HOME.updates === "notify"); return; }
+    if (welcomeSeen || zone === "welcome" || kept(WELCOME_KEY) === "ask") { updLater = true; return; }
     if (zone !== "grid" && zone !== "shelf" && zone !== "people" && zone !== "quick") return;
     askKind = "upd";
     zone = "updask"; ai = 0;
     clearFocus();
     renderAsk();
   }
+  // the home is back in front after the welcome's start: ask then, once the person is on the home (not in
+  // Home settings or a menu), after a short calm moment
+  function updAskLater() {
+    if (!updLater || document.hidden || kept(WELCOME_KEY) === "ask") return;
+    if (zone !== "grid" && zone !== "shelf" && zone !== "people" && zone !== "quick") return;   // still waiting
+    updLater = false; welcomeSeen = false;
+    updRead();
+    updAsk();
+  }
+  document.addEventListener("visibilitychange", function () { if (!document.hidden && updLater) setTimeout(updAskLater, 2500); });
   function askRows() {
     if (askKind === "dev") {
       return [[ICONS.devmode, t("dev_ask_yes"), t("dev_ask_yes_sub")], [ICONS.sliders, t("dev_ask_no"), t("dev_ask_no_sub")]];
@@ -6698,6 +6716,121 @@
   function homeAnswered(held) {
     if (zone === "settings") renderSettings();
     status(t(held ? "home_now" : "home_not_yet"));
+  }
+  // ---- the first-run welcome (owner's TCL test of 0.13.9, 23 Nov 2026) ----
+  // Most people come from couch-tv Studio's website with a design picked and a short code to type. The
+  // home used to open on the standard home, and the code was three screens deep (Home settings, Designs,
+  // Get a design). Now a TV that was never set up opens on one full screen question: I have a design
+  // code (straight to the same Get a design typing box) or Use Couch Original (the standard home, as it
+  // always was). Back counts as Couch Original. Once answered it never comes back.
+  // "tvhome.welcome": "ask" while it is due, else what closed it ("code", "original", "settings"), or
+  // "set" for a TV that was already set up when this version first ran (an update never shows it).
+  var WELCOME_KEY = "tvhome.welcome", STUDIO_SITE = "couchtv.joshuaseage.com", wi = 0;
+  // A TV nobody has set up: the launcher's own copy with no computer (option A) or the on-TV app
+  // (option C), with nothing chosen or kept on it yet. Worked out before readConfig(), so nothing the
+  // first start keeps by itself (Lighter home, the apps it has seen) is taken for a setup.
+  function welcomeFresh() {
+    var cfg = window.COUCH_CONFIG || {};
+    // previews (?mock, ?preview) never show it unless asked with ?firstrun=1
+    if ((MOCK || PREVIEW) && !/[?&]firstrun=1\b/.test(Q)) return false;
+    // a home computer (bridge) set this TV up, or a design is being previewed
+    if (!(ALONE || cfg.mode === "on-tv") || /[?&]designer=1\b/.test(Q)) return false;
+    // nowhere to get a design ("design_store": "" in config.json): nothing to offer
+    if (typeof CouchDesignCode === "undefined" || !CouchDesignCode.base()) return false;
+    // a design kept, asked about or switched on or off; one in config.json
+    if (CouchDesignCode.kept() || (cfg.design && typeof cfg.design === "object")) return false;
+    if (typeof CouchDesigner !== "undefined" && kept(CouchDesigner.KEY)) return false;
+    try { if (localStorage.getItem("couchtv.design.ok") || localStorage.getItem("couchtv.design.no")) return false; } catch (e) {}
+    // people named at setup (not the two placeholders every new home has)
+    var ppl = Array.isArray(cfg.people) ? cfg.people : [];
+    if (ppl.some(function (p) { return !p || !/^person[12]$/.test(p.id) || !/^Person [12]$/.test(p.name); })) return false;
+    // anything an earlier start of this home kept: its apps, the first-run questions, Home settings
+    var r = kept(ST_KEY);
+    if (r && r.s && typeof r.s === "object" && Object.keys(r.s).length) return false;
+    return !["tvhome.apps.seen", "tvhome.home.asked", "tvhome.update.told", "tvhome.update.done", "tvhome.look", "tvhome.order.tv",
+      "tvhome.people.list", "tvhome.people.order", "tvhome.devmode.asked"].some(function (k) { return kept(k) != null; });
+  }
+  // what this start does: show it (true) or not. Kept the first time, so it is decided once per TV.
+  function welcomeDue(fresh) {
+    var w = kept(WELCOME_KEY);
+    if (w === "ask") return !kidsOn();
+    if (w) return false;
+    keep(WELCOME_KEY, fresh ? "ask" : "set");
+    return fresh && !kidsOn();
+  }
+  function welcomeStart(fresh) {
+    if (!welcomeDue(fresh)) return;
+    zone = "welcome"; wi = 0; welcomeSeen = true;
+    clearFocus();
+    var el = $("welcome");
+    if (!el) return;
+    if (!el.getAttribute("data-wired")) {
+      el.setAttribute("data-wired", "1");
+      // a pointer (LG's Magic Remote): a click is OK on that choice
+      el.addEventListener("click", function (e) {
+        var c = e.target && e.target.closest ? e.target.closest("[data-wpick]") : null;
+        if (!c) return;
+        e.preventDefault(); e.stopPropagation();
+        welcomeChoose(+c.getAttribute("data-wpick"));
+      });
+    }
+    $("welcome-title").textContent = t("welcome_title");
+    $("welcome-sub").textContent = t("welcome_sub");
+    $("welcome-studio-text").textContent = t("welcome_studio", { site: STUDIO_SITE });
+    var qr = $("welcome-qr");
+    qr.innerHTML = "";
+    try { qr.appendChild(window.TVQR.svg("https://" + STUDIO_SITE, 160)); } catch (e) { qr.style.display = "none"; }
+    el.classList.add("on");
+    document.documentElement.classList.add("welcoming");
+    renderWelcome();
+  }
+  function renderWelcome() {
+    var items = [[ICONS.designer, t("welcome_code"), t("welcome_code_sub")], [ICONS.apps, t("welcome_original"), t("welcome_original_sub")]];
+    $("welcome-picks").innerHTML = items.map(function (it, i) {
+      return '<div class="wpick' + (i === wi ? " focus" : "") + '" role="button" data-wpick="' + i + '"><i>' + it[0] + "</i><b>" +
+        esc(it[1]) + "</b><small>" + esc(it[2]) + "</small></div>";
+    }).join("");
+  }
+  function welcomeKey(e) {
+    e.preventDefault();
+    if (e.repeat && isOk(e)) return;
+    var arrow = arrowOf(e);
+    if (arrow) {
+      var d = arrow[0] || arrow[1];
+      if (arrow[0] && document.documentElement.dir === "rtl") d = -d;
+      var n = d > 0 ? 1 : 0;
+      if (n !== wi) { wi = n; blip(arrow[0], arrow[1]); renderWelcome(); }
+      return;
+    }
+    if (isOk(e)) { welcomeChoose(wi); return; }
+    if (isBack(e)) { welcomeChoose(1); return; }   // Back keeps Couch Original
+    if (isSettings(e) && !e.repeat) settingsKey();
+  }
+  function welcomeClose(how) {
+    keep(WELCOME_KEY, how);
+    var el = $("welcome");
+    if (el) el.classList.remove("on");
+    document.documentElement.classList.remove("welcoming");
+    zone = "grid";
+  }
+  function welcomeChoose(i) {
+    if (zone !== "welcome") return;
+    if (i === 0) {
+      // the same Get a design typing box as Home settings, Designs (and Back there shows Get a
+      // design from your phone right under it)
+      welcomeClose("code");
+      openSettings();
+      var at = secsNow().map(function (sc) { return sc[0]; }).indexOf("designer");
+      if (at >= 0) SET.sec = at;
+      SET.col = "rows"; SET.keyFocus = "design-get"; SET.ri = 0;
+      typeDesignCode("");
+      return;
+    }
+    welcomeClose("original");
+    startFocus();
+    paintFocus();
+    // the one other first-run question (make Couch TV the home), now the welcome is answered
+    setTimeout(homeAsk, 800);
   }
   function updWhen(u) {
     if (!u.checked) return t("upd_never");
@@ -7192,6 +7325,8 @@
   // open the gear menu (#158). So 176 only counts when the key is not a media key.
   function isSettings(e) { return e.key === "Settings" || e.key === "TvSettings" || (e.keyCode === 176 && !/^Media/.test(e.key || "")); }
   function settingsKey() {
+    // the first-run welcome: Home settings stays one press away (the welcome counts as answered)
+    if (zone === "welcome") { welcomeClose("settings"); startFocus(); paintFocus(); }
     if (kidsOn()) { window.KidsMode.askPin(); return; }
     if (idlePhotoInput(null)) return;
     if (zone === "gear" || zone === "settings" || zone === "smart" || zone === "remind" || zone === "appmenu" || zone === "shelfmenu" || zone === "updask" || zone === "inputs") { goHome(); return; }
@@ -7375,6 +7510,7 @@
       setIdleAmbient(false);
       return;
     }
+    if (zone === "welcome") { welcomeKey(e); return; }   // the first-run welcome has the remote
     if (kidsOn()) { okReset(); if (window.KidsMode.key(e)) e.preventDefault(); return; }
     if (idlePhotoInput(e)) return;
     if (typingKey(e)) return;   // typing a place or a name: the keys belong to the text box
@@ -7470,7 +7606,7 @@
   function render() {
     renderShelf();
     renderGrid();
-    if (!touched && zone !== "updask" && !restoreFocus()) startFocus();
+    if (!touched && zone !== "updask" && zone !== "welcome" && !restoreFocus()) startFocus();
     paintFocus();
     kidSync();
     if (kidsOn()) window.KidsMode.rerender();
@@ -8395,7 +8531,8 @@
   // the native side calls these
   // Home on the remote also re-reads the lists, so an order arranged on the phone shows straight away
   window.tv = { back: function () { if (typeof CouchShare !== "undefined" && CouchShare.close()) return; if (typeof CouchDesign !== "undefined" && CouchDesign.back && CouchDesign.back()) return; if (idleAmbientActive) { setIdleAmbient(false); resetSmartIdle(); return; } if (idlePhotoInput(null)) return; goHome(); resetIdlePhoto(); resetSmartIdle(); },
-    home: function () { forgetFocus(); clipWake(); if (idleAmbientActive) { setIdleAmbient(false); resetSmartIdle(); return; } if (idlePhotoInput(null)) return; if (zone === "settings") closeSettings(); else goHome(); refresh(); resetIdlePhoto(); resetSmartIdle(); },
+    home: function () { forgetFocus(); if (zone === "welcome") return;   // the first-run welcome stays until it is answered
+      clipWake(); if (idleAmbientActive) { setIdleAmbient(false); resetSmartIdle(); return; } if (idlePhotoInput(null)) return; if (zone === "settings") closeSettings(); else goHome(); refresh(); resetIdlePhoto(); resetSmartIdle(); },
     screenOff: function () { toggleScreenOff(true); },
     wakeScreen: function () { toggleScreenOff(false); },
     isScreenOff: function () { return screenOffActive; },
@@ -8672,26 +8809,77 @@
   // news source, a clock format) is dropped everywhere; a value kept on the TV (store "tv": a beach, where
   // you drive to) stays, keyed by widget id and kind, so it only ever applies to that same widget again.
   // The same design starting again changes nothing.
+  // The same widgets sent again with a design choice changed (a clock made 24 hour in Studio): the new
+  // choice wins over this TV's override of that one setting; overrides of settings the design left alone
+  // stay (ST.widgets_base keeps what the design said for every design-kept setting, as canon() text).
   // the widgets a design has (their ids and kinds, sorted): moving or restyling a widget is the same design
   var WS_NEW_WAIT = false;
   function wsAfterSync() { if (WS_NEW_WAIT) { WS_NEW_WAIT = false; wsNewDesign(); } }
+  // a value as short text that is the same whatever order its keys came in (unset is ""): a hash of its
+  // sorted JSON, so the copy kept by a computer at home (bridge clean_widget_settings) stays small
+  function wsCanon(v) {
+    if (v === undefined || v === null || v === "") return "";
+    var sort = function (x) {
+      if (Array.isArray(x)) return x.map(sort);
+      if (x && typeof x === "object") { var o = {}; Object.keys(x).sort().forEach(function (k) { o[k] = sort(x[k]); }); return o; }
+      return x;
+    };
+    var s = JSON.stringify(sort(v)), h = 0;
+    for (var i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0;
+    return "v" + (h >>> 0).toString(36);
+  }
+  // { "<id|kind>": { <key>: canon(the design's value) } } for every setting a design keeps (not "tv")
+  // that the design sets; a widget whose design keeps nothing set is left out
+  function wsBase(list) {
+    var C = window.CouchWidgetCaps, out = {};
+    list.forEach(function (w) {
+      var recs = C && C.settings ? C.settings(w.kind) : [], b = {}, any = false;
+      (Array.isArray(recs) ? recs : []).forEach(function (r) {
+        if (!r || !r.key || r.store === "tv") return;
+        var c = wsCanon((w.opts || {})[r.key]);
+        if (c) { b[r.key] = c; any = true; }
+      });
+      if (any) out[w.key] = b;
+    });
+    return out;
+  }
+  function wsSameBase(a, b) {
+    var ka = Object.keys(a).sort(), kb = Object.keys(b).sort();
+    if (ka.join(",") !== kb.join(",")) return false;
+    return ka.every(function (k) {
+      var x = a[k] || {}, y = b[k] || {}, n = Object.keys(x).sort(), m = Object.keys(y).sort();
+      return n.join(",") === m.join(",") && n.every(function (s) { return x[s] === y[s]; });
+    });
+  }
   function wsNewDesign() {
     if (typeof CouchDesign === "undefined" || !CouchDesign.on || !CouchDesign.on() || !CFG.design || !CouchDesign.widgetList) return;
-    var s = CouchDesign.widgetList().map(function (w) { return w.key; }).sort().join(","), h = 0;
+    var wl = CouchDesign.widgetList();
+    var s = wl.map(function (w) { return w.key; }).sort().join(","), h = 0;
     for (var i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0;
-    var mark = String(h), was = ST.widgets_design;
-    if (was === mark) return;
+    var mark = String(h), was = ST.widgets_design, base = wsBase(wl);
+    var oldBase = ST.widgets_base && typeof ST.widgets_base === "object" && !Array.isArray(ST.widgets_base) ? ST.widgets_base : null;
+    if (was === mark && oldBase && wsSameBase(oldBase, base)) return;
     var C = window.CouchWidgetCaps, all = wsAll(), changed = false;
-    if (was !== undefined) Object.keys(all).forEach(function (key) {
+    // which overrides go: a new set of widgets drops every design-kept one (today's rule); the same widgets
+    // with a design choice changed drop only the overrides of that choice; an older TV with no base yet
+    // only learns it and drops nothing
+    var drop = was === undefined ? null : was !== mark ? "all" : oldBase ? "base" : null;
+    if (drop) Object.keys(all).forEach(function (key) {
       var kind = key.split("|")[1] || "", recs = C && C.settings ? C.settings(kind) : [];
       Object.keys(all[key]).forEach(function (k) {
         var r = recs.filter(function (x) { return x && (x.key === k || x.sets === k); })[0];
-        if (!r || r.store !== "tv") { delete all[key][k]; changed = true; }
+        if (r && r.store === "tv") return;
+        if (drop === "base") {
+          var bk = r ? r.key : k, ob = oldBase[key] || {}, nb = base[key] || {};
+          if ((ob[bk] || "") === (nb[bk] || "")) return;
+        }
+        delete all[key][k]; changed = true;
       });
       if (!Object.keys(all[key]).length) delete all[key];
     });
     ST.widgets = all;
     ST.widgets_design = mark;
+    ST.widgets_base = base;
     keepSettings(true);
     if (!OFFLINE && data.bridge !== false) { clearTimeout(pushTimer); pushTimer = setTimeout(function () { pushSettings(kept(ST_KEY)); }, 400); }
     if (changed && CouchDesign.dataChanged) CouchDesign.dataChanged("wset", JSON.stringify(all));
@@ -9084,6 +9272,7 @@
         }
         else if (s.type === "calendar") { v = String(v).trim().slice(0, 600); v = window.CouchAtHome ? CouchAtHome.calUrl(v) : ""; if (!v) { bad = "That is not a calendar link. It starts with https://."; return; } }
         else if (s.type === "apps") { bad = "Change that on the TV."; return; }
+        else if (s.type === "zone") { v = window.CouchWidgets && CouchWidgets.zoneOk ? CouchWidgets.zoneOk(String(v).trim()) : ""; if (!v) { bad = "That time zone is not one this TV knows."; return; } }
         else if (s.type !== "choice" && s.type !== "tvlist") v = String(v).replace(/[\u0000-\u001f]/g, "").trim().slice(0, 80);
         wsSave(w, s, v);
       });
@@ -9094,6 +9283,8 @@
   }
 
   function start() {
+    // decided before readConfig(), which may keep things by itself on a first start (Lighter home)
+    var freshTv = welcomeFresh();
     readConfig();
     footballEnabled = HOME.football_scores === true && !!(TV && TV.fotmobScores);
     if (footballEnabled) {
@@ -9227,6 +9418,7 @@
     document.addEventListener("wheel", resetSmartIdle, { passive: true });
     initSettings();
     remindersInit();
+    welcomeStart(freshTv);   // a TV never set up: the first-run welcome, over everything else
     // Home settings gets an Updates section, before About, where the launcher can update itself
     if (updRead() && UPD.supported) SECS.splice(SECS.length - 1, 0, ["updates", "download"]);
     // back from Update to ... on the on-TV app: say so once

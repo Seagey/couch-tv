@@ -35,6 +35,13 @@
   var S = {};
 
   S.en = {
+    welcome_title: "Welcome to Couch TV",
+    welcome_sub: "Choose how your home looks. You can change it any time in Home settings.",
+    welcome_code: "I have a design code",
+    welcome_code_sub: "Type the code you got from Couch TV Studio",
+    welcome_original: "Use Couch Original",
+    welcome_original_sub: "The standard Couch TV home, ready now",
+    welcome_studio: "No code yet? Pick a design on your phone at {site}, or scan this.",
     tw_fb_title: "Football scores",
     tw_fb_full_time: "Full time",
     tw_fb_loading: "Loading scores…",
@@ -147,6 +154,7 @@
     tw_cleared: "Cleared.",
     tw_nothing_change: "Nothing to change.",
     tw_choice_bad: "That choice is not one of the choices.",
+    tw_zone_bad: "That time zone is not one this TV knows.",
     tw_needs_on_off: "That needs on or off.",
     tw_widget_gone2: "That widget is not on the home now.",
     tw_setting_not_here: "That setting is not on this widget.",
@@ -1097,6 +1105,13 @@
   };
 
   S["zh-CN"] = {
+    welcome_title: "欢迎使用 Couch TV",
+    welcome_sub: "选择主页的样子。之后随时可以在主页设置中更改。",
+    welcome_code: "我有设计代码",
+    welcome_code_sub: "输入你从 Couch TV Studio 得到的代码",
+    welcome_original: "使用 Couch Original",
+    welcome_original_sub: "标准的 Couch TV 主页，现在就能用",
+    welcome_studio: "还没有代码？用手机在 {site} 挑一个设计，或扫描这个二维码。",
     tw_fb_title: "足球比分",
     tw_fb_full_time: "全场结束",
     tw_fb_loading: "正在加载比分…",
@@ -1209,6 +1224,7 @@
     tw_cleared: "已清除。",
     tw_nothing_change: "没有需要更改的内容。",
     tw_choice_bad: "这个选项不在可选范围内。",
+    tw_zone_bad: "这台电视不认识这个时区。",
     tw_needs_on_off: "这里只能选开或关。",
     tw_widget_gone2: "那个小组件现在不在主页上。",
     tw_setting_not_here: "这个小组件没有这项设置。",
@@ -2158,6 +2174,13 @@
   };
 
   S.cs = {
+    welcome_title: "Vítá vás Couch TV",
+    welcome_sub: "Vyberte, jak bude domovská obrazovka vypadat. Kdykoli to změníte v Nastavení domovské obrazovky.",
+    welcome_code: "Mám kód návrhu",
+    welcome_code_sub: "Zadejte kód, který jste dostali z Couch TV Studio",
+    welcome_original: "Použít Couch Original",
+    welcome_original_sub: "Standardní domovská obrazovka Couch TV, hned připravená",
+    welcome_studio: "Ještě nemáte kód? Vyberte si návrh v telefonu na {site}, nebo naskenujte tento kód.",
     tw_fb_title: "Fotbalové výsledky",
     tw_fb_full_time: "Konec zápasu",
     tw_fb_loading: "Načítání výsledků…",
@@ -2270,6 +2293,7 @@
     tw_cleared: "Vymazáno.",
     tw_nothing_change: "Není co měnit.",
     tw_choice_bad: "Tato volba mezi možnostmi není.",
+    tw_zone_bad: "Toto časové pásmo tato televize nezná.",
     tw_needs_on_off: "To musí být zapnuto, nebo vypnuto.",
     tw_widget_gone2: "Tento widget teď na domovské obrazovce není.",
     tw_setting_not_here: "Toto nastavení tento widget nemá.",
@@ -2836,6 +2860,13 @@
   };
 
   S.es = {
+    welcome_title: "Te damos la bienvenida a Couch TV",
+    welcome_sub: "Elige cómo se ve tu inicio. Puedes cambiarlo cuando quieras en Ajustes de inicio.",
+    welcome_code: "Tengo un código de diseño",
+    welcome_code_sub: "Escribe el código que te dio Couch TV Studio",
+    welcome_original: "Usar Couch Original",
+    welcome_original_sub: "El inicio estándar de Couch TV, listo ya",
+    welcome_studio: "¿Aún no tienes código? Elige un diseño en tu móvil en {site}, o escanea esto.",
     tw_fb_title: "Resultados de fútbol",
     tw_fb_full_time: "Final",
     tw_fb_loading: "Cargando resultados…",
@@ -2948,6 +2979,7 @@
     tw_cleared: "Borrado.",
     tw_nothing_change: "No hay nada que cambiar.",
     tw_choice_bad: "Esa opción no está entre las opciones.",
+    tw_zone_bad: "Este televisor no conoce esa zona horaria.",
     tw_needs_on_off: "Eso tiene que ser activado o desactivado.",
     tw_widget_gone2: "Ese widget ya no está en el inicio.",
     tw_setting_not_here: "Ese ajuste no está en este widget.",
@@ -3487,6 +3519,8 @@
 
   // Only what Mexico says differently; everything else comes from es.
   S["es-MX"] = {
+    welcome_sub: "Elige cómo se ve tu inicio. Puedes cambiarlo cuando quieras en Configuración de inicio.",
+    welcome_studio: "¿Aún no tienes código? Elige un diseño en tu celular en {site}, o escanea esto.",
     tw_fb_title: "Resultados de futbol",
     tw_fb_full_time: "Final",
     tw_fb_loading: "Cargando resultados…",
@@ -3806,6 +3840,13 @@
   };
 
   S.it = {
+    welcome_title: "Benvenuto in Couch TV",
+    welcome_sub: "Scegli l'aspetto della tua home. Puoi cambiarlo quando vuoi in Impostazioni della home.",
+    welcome_code: "Ho un codice di design",
+    welcome_code_sub: "Inserisci il codice che hai ricevuto da Couch TV Studio",
+    welcome_original: "Usa Couch Original",
+    welcome_original_sub: "La home standard di Couch TV, pronta subito",
+    welcome_studio: "Non hai ancora un codice? Scegli un design dal telefono su {site}, oppure inquadra questo.",
     tw_fb_title: "Risultati di calcio",
     tw_fb_full_time: "Finale",
     tw_fb_loading: "Caricamento risultati…",
@@ -3918,6 +3959,7 @@
     tw_cleared: "Cancellato.",
     tw_nothing_change: "Niente da cambiare.",
     tw_choice_bad: "Quella scelta non è tra le opzioni.",
+    tw_zone_bad: "Questa TV non conosce quel fuso orario.",
     tw_needs_on_off: "Serve acceso o spento.",
     tw_widget_gone2: "Quel widget non è più nella home.",
     tw_setting_not_here: "Questa impostazione non c'è in questo widget.",
@@ -4457,6 +4499,13 @@
 
   // German. The air conditioning words are the ones Home Assistant's German interface uses.
   S.de = {
+    welcome_title: "Willkommen bei Couch TV",
+    welcome_sub: "Wähle, wie dein Startbildschirm aussieht. Du kannst es jederzeit unter Startbildschirm ändern.",
+    welcome_code: "Ich habe einen Designcode",
+    welcome_code_sub: "Gib den Code von Couch TV Studio ein",
+    welcome_original: "Couch Original verwenden",
+    welcome_original_sub: "Der normale Couch TV Startbildschirm, sofort bereit",
+    welcome_studio: "Noch keinen Code? Such dir auf dem Handy unter {site} ein Design aus, oder scanne das hier.",
     tw_fb_title: "Fußballergebnisse",
     tw_fb_full_time: "Abpfiff",
     tw_fb_loading: "Ergebnisse werden geladen…",
@@ -4569,6 +4618,7 @@
     tw_cleared: "Gelöscht.",
     tw_nothing_change: "Nichts zu ändern.",
     tw_choice_bad: "Diese Auswahl gehört nicht zu den Möglichkeiten.",
+    tw_zone_bad: "Diese Zeitzone kennt dieser Fernseher nicht.",
     tw_needs_on_off: "Das braucht an oder aus.",
     tw_widget_gone2: "Dieses Widget ist gerade nicht auf dem Startbildschirm.",
     tw_setting_not_here: "Diese Einstellung gibt es bei diesem Widget nicht.",
@@ -5112,6 +5162,13 @@
   };
 
   S.tr = {
+    welcome_title: "Couch TV'ye hoş geldin",
+    welcome_sub: "Ana ekranının nasıl görüneceğini seç. Ana ekran ayarları'ndan istediğin zaman değiştirebilirsin.",
+    welcome_code: "Tasarım kodum var",
+    welcome_code_sub: "Couch TV Studio'dan aldığın kodu yaz",
+    welcome_original: "Couch Original'ı kullan",
+    welcome_original_sub: "Standart Couch TV ana ekranı, hemen hazır",
+    welcome_studio: "Henüz kodun yok mu? Telefonundan {site} adresinde bir tasarım seç ya da bunu tara.",
     tw_fb_title: "Futbol skorları",
     tw_fb_full_time: "Maç sonu",
     tw_fb_loading: "Skorlar yükleniyor…",
@@ -5224,6 +5281,7 @@
     tw_cleared: "Temizlendi.",
     tw_nothing_change: "Değiştirilecek bir şey yok.",
     tw_choice_bad: "Bu seçim seçeneklerden biri değil.",
+    tw_zone_bad: "Bu TV bu saat dilimini tanımıyor.",
     tw_needs_on_off: "Bunun açık ya da kapalı olması gerek.",
     tw_widget_gone2: "O widget artık ana ekranda değil.",
     tw_setting_not_here: "Bu ayar bu widget'ta yok.",
@@ -5762,6 +5820,13 @@
 
   // French. Not in the upstream repo yet; added here so the home speaks French.
   S.fr = {
+    welcome_title: "Bienvenue sur Couch TV",
+    welcome_sub: "Choisissez l'apparence de votre accueil. Vous pourrez la changer à tout moment dans Réglages de l'accueil.",
+    welcome_code: "J'ai un code de design",
+    welcome_code_sub: "Saisissez le code reçu de Couch TV Studio",
+    welcome_original: "Utiliser Couch Original",
+    welcome_original_sub: "L'accueil Couch TV standard, prêt tout de suite",
+    welcome_studio: "Pas encore de code ? Choisissez un design sur votre téléphone sur {site}, ou scannez ceci.",
     tw_fb_title: "Scores de football",
     tw_fb_full_time: "Fin du match",
     tw_fb_loading: "Chargement des scores…",
@@ -5874,6 +5939,7 @@
     tw_cleared: "Effacé.",
     tw_nothing_change: "Rien à changer.",
     tw_choice_bad: "Ce choix ne fait pas partie des choix.",
+    tw_zone_bad: "Ce téléviseur ne connaît pas ce fuseau horaire.",
     tw_needs_on_off: "Il faut activé ou désactivé.",
     tw_widget_gone2: "Ce widget n'est plus sur l'accueil.",
     tw_setting_not_here: "Ce réglage n'existe pas sur ce widget.",
@@ -6416,6 +6482,13 @@
     video_apple: "Ce lien est sur le serveur vidéo d'Apple, auquel les TV Android ne font pas confiance. Utilise une copie de la vidéo sur un autre serveur.",
   };
   S.nl = {
+    welcome_title: "Welkom bij Couch TV",
+    welcome_sub: "Kies hoe je startscherm eruitziet. Je kunt het altijd wijzigen in Startinstellingen.",
+    welcome_code: "Ik heb een ontwerpcode",
+    welcome_code_sub: "Typ de code die je van Couch TV Studio kreeg",
+    welcome_original: "Couch Original gebruiken",
+    welcome_original_sub: "Het standaard startscherm van Couch TV, meteen klaar",
+    welcome_studio: "Nog geen code? Kies een ontwerp op je telefoon via {site}, of scan dit.",
     tw_fb_title: "Voetbaluitslagen",
     tw_fb_full_time: "Einde wedstrijd",
     tw_fb_loading: "Uitslagen laden…",
@@ -6528,6 +6601,7 @@
     tw_cleared: "Gewist.",
     tw_nothing_change: "Niets te veranderen.",
     tw_choice_bad: "Die keuze hoort niet bij de keuzes.",
+    tw_zone_bad: "Deze tv kent die tijdzone niet.",
     tw_needs_on_off: "Dat moet aan of uit zijn.",
     tw_widget_gone2: "Die widget staat nu niet op het startscherm.",
     tw_setting_not_here: "Die instelling hoort niet bij deze widget.",
@@ -7095,6 +7169,13 @@
 
   // Anything this translation does not have yet speaks English rather than showing a key.
   S["sr-Latn-RS"] = {
+    welcome_title: "Dobro došli u Couch TV",
+    welcome_sub: "Izaberite kako izgleda početni ekran. Možete ga promeniti bilo kada u Podešavanjima početnog ekrana.",
+    welcome_code: "Imam kod dizajna",
+    welcome_code_sub: "Unesite kod koji ste dobili od Couch TV Studio",
+    welcome_original: "Koristi Couch Original",
+    welcome_original_sub: "Standardni Couch TV početni ekran, odmah spreman",
+    welcome_studio: "Još nemate kod? Izaberite dizajn na telefonu na {site}, ili skenirajte ovo.",
     tw_fb_title: "Fudbalski rezultati",
     tw_fb_full_time: "Kraj utakmice",
     tw_fb_loading: "Učitavanje rezultata…",
@@ -7207,6 +7288,7 @@
     tw_cleared: "Obrisano.",
     tw_nothing_change: "Nema šta da se menja.",
     tw_choice_bad: "Taj izbor nije među ponuđenima.",
+    tw_zone_bad: "Ovaj televizor ne poznaje tu vremensku zonu.",
     tw_needs_on_off: "To mora biti uključeno ili isključeno.",
     tw_widget_gone2: "Taj vidžet trenutno nije na početnom ekranu.",
     tw_setting_not_here: "To podešavanje ne postoji na ovom vidžetu.",
@@ -7749,6 +7831,13 @@
   // Polish. Words that change with a number (sekundy, minut, zdjęć) never follow the number:
   // "{n} s", "{n} min", "Zdjęcia: {n}".
   S.pl = {
+    welcome_title: "Witaj w Couch TV",
+    welcome_sub: "Wybierz, jak ma wyglądać ekran główny. Zmienisz to w każdej chwili w Ustawieniach ekranu głównego.",
+    welcome_code: "Mam kod projektu",
+    welcome_code_sub: "Wpisz kod otrzymany z Couch TV Studio",
+    welcome_original: "Użyj Couch Original",
+    welcome_original_sub: "Standardowy ekran główny Couch TV, gotowy od razu",
+    welcome_studio: "Nie masz jeszcze kodu? Wybierz projekt na telefonie na {site} albo zeskanuj ten kod.",
     tw_fb_title: "Wyniki piłkarskie",
     tw_fb_full_time: "Koniec meczu",
     tw_fb_loading: "Wczytywanie wyników…",
@@ -7861,6 +7950,7 @@
     tw_cleared: "Wyczyszczono.",
     tw_nothing_change: "Nie ma nic do zmiany.",
     tw_choice_bad: "Tego wyboru nie ma wśród opcji.",
+    tw_zone_bad: "Ten telewizor nie zna tej strefy czasowej.",
     tw_needs_on_off: "To musi być włączone albo wyłączone.",
     tw_widget_gone2: "Tego widżetu nie ma teraz na ekranie głównym.",
     tw_setting_not_here: "Tego ustawienia nie ma w tym widżecie.",
@@ -8812,6 +8902,13 @@
   for (var fk in S.en) if (!(fk in S.fr)) S.fr[fk] = S.en[fk];
 
     S.he = {
+    welcome_title: "ברוכים הבאים ל-Couch TV",
+    welcome_sub: "בוחרים איך מסך הבית ייראה. אפשר לשנות את זה בכל עת בהגדרות מסך הבית.",
+    welcome_code: "יש לי קוד עיצוב",
+    welcome_code_sub: "מקלידים את הקוד שקיבלתם מ-Couch TV Studio",
+    welcome_original: "שימוש ב-Couch Original",
+    welcome_original_sub: "מסך הבית הרגיל של Couch TV, מוכן עכשיו",
+    welcome_studio: "אין עדיין קוד? בוחרים עיצוב בטלפון באתר {site}, או סורקים את זה.",
     tw_fb_title: "תוצאות כדורגל",
     tw_fb_full_time: "סיום המשחק",
     tw_fb_loading: "טוען תוצאות…",
@@ -8924,6 +9021,7 @@
     tw_cleared: "נמחק.",
     tw_nothing_change: "אין מה לשנות.",
     tw_choice_bad: "הבחירה הזו לא נמצאת בין האפשרויות.",
+    tw_zone_bad: "הטלוויזיה הזו לא מכירה את אזור הזמן הזה.",
     tw_needs_on_off: "זה צריך להיות מופעל או כבוי.",
     tw_widget_gone2: "הווידג'ט הזה לא נמצא עכשיו במסך הבית.",
     tw_setting_not_here: "ההגדרה הזו לא קיימת בווידג'ט הזה.",
@@ -9473,6 +9571,13 @@
 
   // Portuguese (Brazil), translated locally from en.
   S.pt = {
+    welcome_title: "Boas-vindas ao Couch TV",
+    welcome_sub: "Escolha como fica sua tela inicial. Você pode mudar quando quiser em Ajustes da tela inicial.",
+    welcome_code: "Tenho um código de design",
+    welcome_code_sub: "Digite o código que você recebeu do Couch TV Studio",
+    welcome_original: "Usar o Couch Original",
+    welcome_original_sub: "A tela inicial padrão do Couch TV, pronta agora",
+    welcome_studio: "Ainda não tem código? Escolha um design no celular em {site}, ou escaneie isto.",
     tw_fb_title: "Placares de futebol",
     tw_fb_full_time: "Fim de jogo",
     tw_fb_loading: "Carregando placares…",
@@ -9585,6 +9690,7 @@
     tw_cleared: "Apagado.",
     tw_nothing_change: "Nada para mudar.",
     tw_choice_bad: "Essa escolha não está entre as opções.",
+    tw_zone_bad: "Esta TV não conhece esse fuso horário.",
     tw_needs_on_off: "Isso precisa ser ligado ou desligado.",
     tw_widget_gone2: "Esse widget não está na tela inicial agora.",
     tw_setting_not_here: "Esse ajuste não existe neste widget.",
@@ -10134,6 +10240,13 @@
 
   // Arabic (ar). Right to left, like Hebrew. Messages from the bridge stay in English for now.
   S.ar = {
+    welcome_title: "مرحبًا بك في Couch TV",
+    welcome_sub: "اختر شكل شاشتك الرئيسية. يمكنك تغييره في أي وقت من إعدادات الرئيسية.",
+    welcome_code: "لدي رمز تصميم",
+    welcome_code_sub: "اكتب الرمز الذي حصلت عليه من Couch TV Studio",
+    welcome_original: "استخدام Couch Original",
+    welcome_original_sub: "شاشة Couch TV الرئيسية العادية، جاهزة الآن",
+    welcome_studio: "ليس لديك رمز بعد؟ اختر تصميمًا من هاتفك على {site}، أو امسح هذا الرمز.",
     tw_fb_title: "نتائج كرة القدم",
     tw_fb_full_time: "نهاية المباراة",
     tw_fb_loading: "جارٍ تحميل النتائج…",
@@ -10246,6 +10359,7 @@
     tw_cleared: "تم المسح.",
     tw_nothing_change: "لا يوجد ما يتغير.",
     tw_choice_bad: "هذا الاختيار ليس من بين الخيارات.",
+    tw_zone_bad: "هذا التلفزيون لا يعرف هذه المنطقة الزمنية.",
     tw_needs_on_off: "يحتاج هذا إلى تشغيل أو إيقاف.",
     tw_widget_gone2: "هذه الأداة ليست على الشاشة الرئيسية الآن.",
     tw_setting_not_here: "هذا الإعداد غير موجود في هذه الأداة.",
@@ -10807,6 +10921,13 @@
 
   // Romanian. Bridge error and note keys are still shown in their supplied fallback language.
   S.ro = {
+    welcome_title: "Bine ai venit la Couch TV",
+    welcome_sub: "Alege cum arată ecranul principal. Îl poți schimba oricând din Setările ecranului principal.",
+    welcome_code: "Am un cod de design",
+    welcome_code_sub: "Scrie codul primit de la Couch TV Studio",
+    welcome_original: "Folosește Couch Original",
+    welcome_original_sub: "Ecranul principal standard Couch TV, gata acum",
+    welcome_studio: "Încă nu ai un cod? Alege un design pe telefon la {site} sau scanează asta.",
     tw_fb_title: "Scoruri de fotbal",
     tw_fb_full_time: "Final de meci",
     tw_fb_loading: "Se încarcă scorurile…",
@@ -10919,6 +11040,7 @@
     tw_cleared: "Șters.",
     tw_nothing_change: "Nimic de schimbat.",
     tw_choice_bad: "Alegerea nu e printre opțiuni.",
+    tw_zone_bad: "Televizorul nu cunoaște acest fus orar.",
     tw_needs_on_off: "Asta trebuie să fie pornit sau oprit.",
     tw_widget_gone2: "Widgetul nu mai e pe ecranul principal.",
     tw_setting_not_here: "Setarea nu există pe acest widget.",

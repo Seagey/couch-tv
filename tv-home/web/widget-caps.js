@@ -754,6 +754,12 @@
   };
   Object.keys(WATCHING).forEach(function (k) { SETTINGS[k] = WATCHING[k]; });
   Object.keys(LATER).forEach(function (k) { SETTINGS[k] = (SETTINGS[k] || []).concat(LATER[k]); });
+  // a clock's own time zone (owner, 23 Nov 2026: Studio's Basic designer asks "Which time zone? Your TV's
+  // time zone, or pick another"): an IANA id kept in the design; empty, or a zone the TV does not know,
+  // keeps the TV's own time. Picked in couch-tv Studio or on the phone, never with the TV remote.
+  ["clock", "tallclock", "glassclock", "flipclock", "analog", "wordclock"].forEach(function (k) {
+    SETTINGS[k] = (SETTINGS[k] || []).concat([st("zone", "Time zone", "zone", "", "Empty uses this TV's own time zone.", "design", ["studio", "phone"], true)]);
+  });
   // the sun clock: its own town, before launch (widgets.js R.solar names it and works the sun out for it)
   SETTINGS.solar = [st("town", "Place", "place", "", "Where the sun is for. Empty uses this home's town.", "tv", ON_TV, true, { "private": true })];
   // The family, guest and photo widgets (At home, kept on this TV: athome.js; this TV's photos and
