@@ -280,7 +280,15 @@ await page.evaluate(() => window.I18N.set("es"));
 await focus("f", 0); await hold(); await choose("Añadir apps");
 s = await sheet();
 ok(s && s.count === "3 de 12 elegidas" && /Mantén OK/.test(s.hint) && /guarda/.test(s.hint), "in Spanish: " + (s && s.count) + " | " + (s && s.hint));
-await press("Escape", 400);
+// the move line and Saved. too (tw_apps_move_hint, tw_saved)
+await goTo("kayo"); await hold();
+s = await sheet();
+ok(s.hint === "Izquierda y Derecha la mueven. OK cuando esté en su sitio.", "the move line in Spanish: " + s.hint);
+await press("ArrowLeft", 300); await press("Enter", 400);
+await page.evaluate(() => document.querySelectorAll(".cw-say").forEach((e) => e.remove()));
+await press("Escape", 500);
+ok(await page.evaluate(() => (document.querySelector(".cw-say") || {}).textContent || "") === "Guardado.", "Saved. in Spanish: " + await page.evaluate(() => (document.querySelector(".cw-say") || {}).textContent || ""));
+ok(JSON.stringify((await edits())["f|folder"]) === '["kayo","iview","youtube"]', "and the move was saved");
 await page.evaluate(() => window.I18N.set("en"));
 
 ok(!errors.length, "no page errors " + errors.join(" | "));
