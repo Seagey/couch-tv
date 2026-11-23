@@ -19,7 +19,10 @@
   var KEY = "tvhome.designer";
   // where "Get a design" and "Share this home" go when config.json names no design_store
   var DEFAULT_STORE = "https://tvdesigner.sites.underseage.studio";
-  var DESIGNER_PAGE = DEFAULT_STORE + "/design/";
+  // the Couch TV Studio website a person opens (its old address, DEFAULT_STORE, now forwards there): the links
+  // and codes the TV shows point here; the store's own calls still go to DEFAULT_STORE
+  var STUDIO_SITE = "https://couchtv.joshuaseage.com";
+  var DESIGNER_PAGE = STUDIO_SITE + "/design/";
 
   // What the home gets, from what it knows. o: {
   //   choice: "on" | "off" | null (the kept choice),
@@ -95,6 +98,6 @@
     return true;
   }
 
-  window.CouchDesigner = { KEY: KEY, DEFAULT_STORE: DEFAULT_STORE, DESIGNER_PAGE: DESIGNER_PAGE, POLICY: POLICY,
+  window.CouchDesigner = { KEY: KEY, DEFAULT_STORE: DEFAULT_STORE, STUDIO_SITE: STUDIO_SITE, DESIGNER_PAGE: DESIGNER_PAGE, POLICY: POLICY,
     decide: decide, readChoice: readChoice, shownOn: shownOn, lockPage: lockPage, policy: policy };
 })();

@@ -129,6 +129,18 @@ async function sends() {
   ok(seen.opt.credentials === "omit" && seen.opt.referrerPolicy === "no-referrer" && seen.opt.redirect === "error", "no cookies, no referrer, no redirects");
   ok(JSON.stringify(Object.keys(JSON.parse(seen.opt.body))) === '["design"]', "only the design goes");
   ok(res.code === "ABCDE-FGHJK" && res.link === "https://designs.example/design/?from=" + good.token && res.page === "designs.example/design", "the code, and the link the QR holds");
+  // Couch TV Studio's own store: the QR and the words point at its website, not the store's old address
+  // (the TCL test of 0.13.10: "Open this home in Couch TV Studio" showed tvdesigner.sites.underseage.studio/design)
+  const gate = fs.readFileSync(path.join(web, "designer-gate.js"), "utf8");
+  const OLD = /DEFAULT_STORE = "([^"]+)"/.exec(gate)[1], SITE = /STUDIO_SITE = "([^"]+)"/.exec(gate)[1];
+  ok(SITE === "https://couchtv.joshuaseage.com" && /DESIGNER_PAGE = STUDIO_SITE \+ "\/design\/"/.test(gate), "designer-gate.js: the Studio website is couchtv.joshuaseage.com, its page /design/");
+  sb.CouchDesigner = { DEFAULT_STORE: OLD, STUDIO_SITE: SITE };
+  const own = await S.send(OLD, design, fake(201, good));
+  ok(seen.url === OLD + "/v1/shares", "the share still goes to the store (" + seen.url + ")");
+  ok(own.link === "https://couchtv.joshuaseage.com/design/?from=" + good.token && own.page === "couchtv.joshuaseage.com/design", "and the link and words name the website: " + own.page);
+  const other = await S.send("https://designs.example", design, fake(201, good));
+  ok(other.page === "designs.example/design", "a store of its own (config.json) keeps its own address");
+  delete sb.CouchDesigner;
   for (const [status, kind] of [[404, "off"], [405, "off"], [429, "slow"], [503, "slow"], [400, "refused"], [500, "refused"]]) {
     try { await S.send("https://designs.example", design, fake(status, {})); ok(false, "no throw"); } catch (e) { ok(e.kind === kind, status + " is " + kind); }
   }

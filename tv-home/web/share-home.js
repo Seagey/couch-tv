@@ -145,7 +145,10 @@
       var code = j && typeof j.code === "string" && /^[2-9A-HJ-NP-TV-Z]{5}-[2-9A-HJ-NP-TV-Z]{5}$/.test(j.code) ? j.code : "";
       var token = j && typeof j.token === "string" && /^CTV1-[A-Za-z0-9_-]{43}$/.test(j.token) ? j.token : "";
       if (!code || !token) throw fail("refused");
-      return { code: code, token: token, link: base + "/design/?from=" + token, page: base.replace(/^https:\/\//, "") + "/design" };
+      // Couch TV Studio's own store: the link goes to its website's address (the store's old address only
+      // forwards there); a store named in config.json is its own website
+      var G = window.CouchDesigner, site = G && G.STUDIO_SITE && base === G.DEFAULT_STORE ? G.STUDIO_SITE : base;
+      return { code: code, token: token, link: site + "/design/?from=" + token, page: site.replace(/^https:\/\//, "") + "/design" };
     });
   }
 
