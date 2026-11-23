@@ -193,7 +193,8 @@ class BridgeService : Service() {
     private fun foreground() {
         val n = note ?: return
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
-            startForeground(1, n, ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE)
+            // Play: connectedDevice (the phone is the device; src/play/AndroidManifest.xml), else specialUse as before
+            startForeground(1, n, if (Variant.play) ServiceInfo.FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE else ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE)
         } else {
             startForeground(1, n)
         }
@@ -239,7 +240,7 @@ object HisenseAllow {
     }
 
     fun start(c: Context) {
-        if (!isHisense) return
+        if (!isHisense || !PlayRules.changesTvRules(BuildConfig.FLAVOR)) return   // Play: not the launch list (PlayRules)
         write(c)
         later.postDelayed({ write(c) }, 60_000)
         later.postDelayed({ rebindWatch(c) }, 10_000)
@@ -259,6 +260,7 @@ object HisenseAllow {
      */
     fun rebindWatch(c: Context) {
         if (WatchService.connected) return
+        if (!PlayRules.mayRebind(BuildConfig.FLAVOR, Variant.agreed())) return
         if (c.checkSelfPermission("android.permission.WRITE_SECURE_SETTINGS") != android.content.pm.PackageManager.PERMISSION_GRANTED) return
         runCatching {
             val cr = c.contentResolver

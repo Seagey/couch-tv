@@ -27,6 +27,7 @@ object WatchNext {
         "episode_display_number", "last_engagement_time_utc_millis", "poster_art_uri")
 
     fun rows(pkg: String? = null): List<Row> {
+        if (!PlayRules.tvListings(BuildConfig.FLAVOR)) return emptyList()   // Play: no READ_TV_LISTINGS
         val out = ArrayList<Row>()
         runCatching {
             Store.context().contentResolver.query(URI, COLS, null, null, null)?.use { c ->
@@ -48,7 +49,8 @@ object WatchNext {
     private val PERMISSION = if (Build.VERSION.SDK_INT >= 29) "android.permission.READ_TV_LISTINGS"
         else "com.android.providers.tv.permission.READ_EPG_DATA"
 
-    fun granted(): Boolean = Store.context().checkSelfPermission(PERMISSION) == PackageManager.PERMISSION_GRANTED
+    /** The Google Play build never has the permission (PlayRules.tvListings): Keep watching uses what the app sees itself. */
+    fun granted(): Boolean = PlayRules.tvListings(BuildConfig.FLAVOR) && Store.context().checkSelfPermission(PERMISSION) == PackageManager.PERMISSION_GRANTED
 
     /** Lists the rows as cards only where Keep watching has no other way to fill: the permission is
      *  there and the app's own ADB has never connected. A TV whose ADB works keeps Keep watching

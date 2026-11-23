@@ -196,6 +196,8 @@ object FireHome {
      */
     private fun selfEnableWatch() {
         val c = App.instance
+        // Play: only the person switches the watch on, in Android's settings, after the disclosure (PlayRules)
+        if (!PlayRules.switchesWatchOnItself(BuildConfig.FLAVOR)) return
         if (c.checkSelfPermission("android.permission.WRITE_SECURE_SETTINGS") != android.content.pm.PackageManager.PERMISSION_GRANTED) return
         runCatching {
             val cr = c.contentResolver

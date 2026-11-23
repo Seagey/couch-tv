@@ -138,6 +138,10 @@
     return { on: !offline && !mock && !!W.XMLHttpRequest, api: api, key: key, tv: tv };
   }
 
+  // the Google Play build of the on-TV app has no Ask AI (window.TVPLAY.askOff, HomeActivity.kt,
+  // coord/GOOGLE-PLAY-BUILD.md): no Ask sheet, and an Ask AI widget in a design says it is not here
+  function off() { try { return !!(W.TVPLAY && typeof W.TVPLAY.askOff === "function" && W.TVPLAY.askOff()); } catch (e) { return false; } }
+
   // what is set up, in plain words (never the key)
   function status() {
     var c = config(), p = provider(c.provider), h = home(), key = keyFor(c);
@@ -408,6 +412,7 @@
   }
   function drawAsk(root, o, b, env) {
     var K = kit(); if (!K) return root;
+    if (off() && !(env && env.demo)) return blank(K, root, o, b, "mic", "Ask AI", "Not in this version of Couch TV");
     var v = env && env.demo ? DEMO_ASK : last, s = status(), tiny = b.w < 300 || b.h < 220;
     if (v && !(env && env.demo) && !v.pending && !kept(K, o, env, v.at)) v = null;
     if (!(env && env.demo) && !s.ready) return blank(K, root, o, b, "mic", tiny ? "Set up Ask AI" : "Ask AI: pick who answers", "OK here sets it up, step by step");
@@ -464,7 +469,7 @@
     return inp;
   }
   function open(view) {
-    if (!DOC || !DOC.body) return false;
+    if (!DOC || !DOC.body || off()) return false;
     if (W.CouchDetail && W.CouchDetail.isOpen && W.CouchDetail.isOpen()) W.CouchDetail.close(true);
     if (!sheet) {
       var el = E("div", "cask"), panel = E("div", "cask-panel");
@@ -605,7 +610,7 @@
 
   var API = {
     providers: function () { return PROVIDERS.map(function (p) { return { id: p.id, name: p.name, base: p.base, model: p.model, key: p.key, where: p.where }; }); },
-    status: status, save: save, forget: forget, ask: ask, open: open, close: close, isOpen: function () { return !!sheet; },
+    status: status, save: save, forget: forget, ask: ask, open: open, close: close, isOpen: function () { return !!sheet; }, off: off,
     last: function () { return last; }, message: function () { return message; },
     on: function (f) { listeners.push(f); },
     // the home network address a model at home is asked on, for the design page policy (designer-gate.js)

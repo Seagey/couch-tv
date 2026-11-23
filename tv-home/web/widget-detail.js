@@ -314,6 +314,8 @@
   // Ask AI (ask.js): the last question and answer in full, then Ask and Set up, which open the Ask sheet
   B.ask = function (o, env) {
     var A = window.CouchAsk, st = A ? A.status() : { ready: false, by: "" };
+    // the Google Play build of the on-TV app has no Ask AI (ask.js off): say so, nothing to press
+    if (A && A.off && A.off() && !env.demo) { S.body.appendChild(head("mic", "Ask AI", "Not in this version of Couch TV")); return; }
     var v = env.demo ? { q: "How far away is the moon?", a: "About 384,000 kilometres. Light from it takes just over a second to reach us." } : A && A.last();
     // Show the last answer: No keeps the question private here too; For an hour hides an older one
     var keep = kit().setting(o, env, "keep");

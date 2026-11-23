@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The Play build's Home button watch: window state changes only. No key filtering (the GitHub watch build's
+     canRequestFilterKeyEvents is for the Xiaomi PatchWall and Hisense Home key cases, left out here), no window
+     content (canRetrieveWindowContent stays false), no gestures, no feedback. isAccessibilityTool stays false:
+     it is not a tool for people with disabilities, so the Play Console's accessibility declaration covers it. -->
+<accessibility-service xmlns:android="http://schemas.android.com/apk/res/android"
+    android:accessibilityEventTypes="typeWindowStateChanged"
+    android:accessibilityFeedbackType="feedbackGeneric"
+    android:notificationTimeout="0"
+    android:canRetrieveWindowContent="false"
+    android:description="@string/watch_desc" />

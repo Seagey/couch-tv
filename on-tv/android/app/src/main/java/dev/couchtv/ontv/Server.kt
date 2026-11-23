@@ -193,6 +193,7 @@ class Server(private val ctx: Context, port: Int) : NanoWSD(port) {
                     b.optString("service").ifEmpty { null }, b.optString("who").ifEmpty { null })))
             }
             "POST /api/ask" -> {
+                if (!Ask.available) throw ApiError(404, PlayRules.ASK_OFF)   // the Google Play build
                 if (Kids.isKid(body(s).optString("who").ifEmpty { Now.who })) throw ApiError(403, "Ask is off for a kids profile.")
                 if (!Ask.enabled) throw ApiError(501, "Ask AI is off. To switch it on, open Home settings on your phone, Ask AI, and add a key from an AI service (or a model on a home computer).")
                 val b = body(s)
@@ -280,7 +281,7 @@ class Server(private val ctx: Context, port: Int) : NanoWSD(port) {
             "GET /api/inputs" -> json(200, ok().put("inputs", Tv.inputs()).put("pinned", Store.inputs()))
             "POST /api/power" -> power(body(s).optString("state"))
             "POST /api/volume" -> volume(body(s))
-            "GET /api/screenshot" -> newFixedLengthResponse(Response.Status.OK, "image/png", Tv.screenshot().inputStream(), -1).noStore()
+            "GET /api/screenshot" -> if (!PlayRules.screenshots(BuildConfig.FLAVOR)) json(404, err("no screenshots in this version")) else newFixedLengthResponse(Response.Status.OK, "image/png", Tv.screenshot().inputStream(), -1).noStore()
             "GET /api/weather" -> json(200, ok(Weather.get() ?: throw ApiError(503, "No weather right now.")))
             // the web widgets' relay (WebData.kt): news feeds and share prices, by id only
             "GET /api/webdata" -> {
@@ -534,7 +535,7 @@ class Server(private val ctx: Context, port: Int) : NanoWSD(port) {
         .put("watch_next", JSONObject().put("granted", WatchNext.granted()).put("listed", WatchNext.listed()))
         // Xiaomi only: Couch TV in PatchWall's place (FireHome); the setup page shows the switch when xiaomi is true
         .put("xiaomi", FireHome.isXiaomi).put("patchwall_replace", Store.bool("patchwall_replace")).put("watch", WatchService.connected)
-        .put("watch_apk", BuildConfig.BUILD_TYPE == "watch")   // only couch-tv-ontv-watch.apk has the Home button watch
+        .put("watch_apk", BuildConfig.BUILD_TYPE == "watch" || Variant.play)   // only couch-tv-ontv-watch.apk has the Home button watch
         .put("inputs", Store.inputs())
 
     /** {"people": [...]} replaces the list; {"order": [ids]} only reorders it. */

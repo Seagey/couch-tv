@@ -36,6 +36,18 @@ object UpdateRules {
     fun asset(watch: Boolean) = if (watch) WATCH_ASSET else ASSET
 
     /**
+     * May a file signed by [theirs] replace this app, signed by [mine]? The same signer, or (Android 9 and
+     * newer) a file whose proof of rotation lists this app's signer: from 0.13.10 GitHub releases move from the
+     * old debug key to the Couch TV release key (~/.couchtv-keys/couchtv.lineage, scripts/sign-ontv.sh),
+     * and Android itself takes that update and keeps the app's data. [theirHistory] is the file's signing
+     * certificate history (PackageInfo.signingInfo.signingCertificateHistory, oldest first, the current signer
+     * last), empty when Android gives none. An empty [mine] or [theirs] (some Android 9 builds read no signer
+     * from a file that is not installed yet) is left to Android's installer, which makes the same check.
+     */
+    fun signerOk(mine: Set<String>, theirs: Set<String>, theirHistory: List<String>): Boolean =
+        mine.isEmpty() || theirs.isEmpty() || mine == theirs || (mine.size == 1 && theirHistory.containsAll(mine))
+
+    /**
      * What GitHub's latest release says, for this app. url, digest and size are this app's file: only a
      * file on this repo's own release download address, with the SHA-256 GitHub lists for it, else "".
      */

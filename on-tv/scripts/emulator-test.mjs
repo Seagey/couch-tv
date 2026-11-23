@@ -1,6 +1,6 @@
 // End-to-end test of on-TV mode against an Android TV EMULATOR. Never point it at a real TV.
 //
-//   adb -s emulator-5554 install -r android/app/build/outputs/apk/release/app-release.apk
+//   adb -s emulator-5554 install -r android/app/build/outputs/apk/github/release/app-github-release.apk
 //   adb -s emulator-5554 forward tcp:15400 tcp:5400
 //   PLAYWRIGHT_DIR=/path/to/node_modules node scripts/emulator-test.mjs
 //

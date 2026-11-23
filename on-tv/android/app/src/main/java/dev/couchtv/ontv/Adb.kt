@@ -268,7 +268,8 @@ object Adb {
         //  - write secure settings: lets the app switch wireless debugging back on after a reboot
         //  - usage access: the Home button watch for Fire OS 6, which never connects the accessibility watcher (#50)
         //  - read TV listings: lets Keep watching read Android's Watch Next rows (WatchNext.kt)
-        io.execute {
+        // Play: none of these grants (PlayRules.changesTvRules); key presses, typing and opening apps stay
+        if (PlayRules.changesTvRules(BuildConfig.FLAVOR)) io.execute {
             runCatching { shell("appops set ${BuildConfig.APPLICATION_ID} SYSTEM_ALERT_WINDOW allow", 8000) }
             runCatching { shell("appops set ${BuildConfig.APPLICATION_ID} GET_USAGE_STATS allow", 8000) }
             if (Build.VERSION.SDK_INT >= 30) runCatching { shell("pm grant ${BuildConfig.APPLICATION_ID} android.permission.WRITE_SECURE_SETTINGS", 8000) }
@@ -280,7 +281,7 @@ object Adb {
 
     /** Android 11+ turns wireless debugging off after a reboot. With the secure-settings grant, turn it back on. */
     fun selfEnableWireless(): Boolean {
-        if (Build.VERSION.SDK_INT < 30 || !canWriteSecure()) return false
+        if (Build.VERSION.SDK_INT < 30 || !canWriteSecure() || !PlayRules.changesTvRules(BuildConfig.FLAVOR)) return false
         return try {
             val cr = ctx.contentResolver
             if (Settings.Global.getInt(cr, Settings.Global.ADB_ENABLED, 0) != 1) Settings.Global.putInt(cr, Settings.Global.ADB_ENABLED, 1)

@@ -1,0 +1,81 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The Google Play build of the on-TV app (flavour "play", bundlePlayRelease; coord/GOOGLE-PLAY-PLAN.md section 4,
+     coord/GOOGLE-PLAY-BUILD.md, PlayRules.kt). Merged over src/main/AndroidManifest.xml:
+      - TV only: leanback required.
+      - Out: QUERY_ALL_PACKAGES (the launcher queries below instead), and the permissions that were only ever
+        granted over the app's own ADB link (draw over apps, secure settings, usage access, the TV provider's
+        EPG permission for Android 9 and older). REQUEST_DELETE_PACKAGES stays (Undo Couch TV's own Uninstall?).
+      - The phone remote's service is a connectedDevice foreground service (the phone is the device), not specialUse.
+      - In: the Home button watch (WatchService), off until the person switches it on in Android's Accessibility
+        settings after the disclosure (DisclosureActivity) and Agree; and the QR screen for web link cards. -->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES" tools:node="remove" />
+    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" tools:node="remove" />
+    <uses-permission android:name="android.permission.WRITE_SECURE_SETTINGS" tools:node="remove" />
+    <uses-permission android:name="android.permission.PACKAGE_USAGE_STATS" tools:node="remove" />
+    <uses-permission android:name="com.android.providers.tv.permission.READ_EPG_DATA" tools:node="remove" />
+    <!-- Watch Next rows for Keep watching: only ever granted over ADB, so out of Play (PlayRules.tvListings). -->
+    <uses-permission android:name="android.permission.READ_TV_LISTINGS" tools:node="remove" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" tools:node="remove" />
+    <!-- Implied by the manifest merger only because libadb-android's manifest names no targetSdk (the GitHub
+         APKs carry them too). The app uses none of them; Play would list them in the Data safety review. -->
+    <uses-permission android:name="android.permission.READ_PHONE_STATE" tools:node="remove" />
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" tools:node="remove" />
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" tools:node="remove" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CONNECTED_DEVICE" />
+
+    <uses-feature android:name="android.software.leanback" android:required="true" tools:replace="android:required" />
+
+    <!-- Instead of QUERY_ALL_PACKAGES: the apps a TV can open (its app row and More apps), nothing else. -->
+    <queries>
+        <intent>
+            <action android:name="android.intent.action.MAIN" />
+            <category android:name="android.intent.category.LEANBACK_LAUNCHER" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.MAIN" />
+            <category android:name="android.intent.category.LAUNCHER" />
+        </intent>
+    </queries>
+
+    <application>
+        <!-- The phone remote's local network server: the phone is the connected device. -->
+        <service
+            android:name=".BridgeService"
+            android:foregroundServiceType="connectedDevice"
+            tools:replace="android:foregroundServiceType">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                tools:node="remove" />
+        </service>
+
+        <!-- Prominent disclosure for the Home button watch: what it reads, why, Agree and Not now. -->
+        <activity
+            android:name=".DisclosureActivity"
+            android:exported="false"
+            android:excludeFromRecents="true"
+            android:screenOrientation="landscape" />
+
+        <!-- A web link card: a QR code for the phone, never the TV's browser (TV quality TV-WB). -->
+        <activity
+            android:name=".LinkQrActivity"
+            android:exported="false"
+            android:excludeFromRecents="true"
+            android:screenOrientation="landscape" />
+
+        <!-- The Home button watch. Window changes only (src/play/res/xml/watch_service.xml: no key filtering,
+             no window content). Not an accessibility tool: isAccessibilityTool stays unset. -->
+        <service
+            android:name=".WatchService"
+            android:exported="false"
+            android:label="Couch TV home watch"
+            android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE">
+            <intent-filter>
+                <action android:name="android.accessibilityservice.AccessibilityService" />
+            </intent-filter>
+            <meta-data android:name="android.accessibilityservice" android:resource="@xml/watch_service" />
+        </service>
+    </application>
+</manifest>

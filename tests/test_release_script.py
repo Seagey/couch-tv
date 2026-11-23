@@ -20,6 +20,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).parents[1]
 CERT = "5b5ef39266a1b5bb2425ca8a0023003e895753630fffd4831efcf8c112372116"
+ONTV = "fab6cebbd4958043be63273fbba15f34447d6169d309f0c8e3bd65ac58469556"
 HEAD = "0123456789abcdef0123456789abcdef01234567"
 FILES = ["couch-tv-home.apk", "couch-tv-ontv.apk", "couch-tv-ontv-watch.apk", "couch-tv-sync.apk",
          "couch-tv-samsung-setup.zip", "couch-tv-samsung.wgt"]
@@ -54,7 +55,17 @@ d=$2
 mkdir -p "$d/app/build/outputs/apk/release" "$d/app/build/outputs/apk/watch"
 echo "$d release" > "$d/app/build/outputs/apk/release/app-release.apk"
 echo "$d watch" > "$d/app/build/outputs/apk/watch/app-watch.apk"
+# the on-TV app has store flavours (github, play): its GitHub APKs are under apk/github/
+mkdir -p "$d/app/build/outputs/apk/github/release" "$d/app/build/outputs/apk/github/watch"
+echo "$d release" > "$d/app/build/outputs/apk/github/release/app-github-release.apk"
+echo "$d watch" > "$d/app/build/outputs/apk/github/watch/app-github-watch.apk"
 exit "${FAKE_GRADLE_RC:-0}"
+"""
+# called as: sign-ontv.sh apk|aab <in> <out>: logs, then copies (the real one signs with the release key)
+FAKE_SIGN = """#!/bin/bash
+echo "sign $1 $(basename "$3")" >> "$CALLS"
+[ -n "${FAKE_SIGN_RC:-}" ] && exit "$FAKE_SIGN_RC"
+cp "$2" "$3"
 """
 FAKE_SAMSUNG = """#!/bin/bash
 echo "samsung $*" >> "$CALLS"
@@ -91,6 +102,7 @@ class ReleaseScript(unittest.TestCase):
         exe(b / "gh", FAKE_GH)
         exe(self.r / "tv-home/android/gradlew", FAKE_GRADLEW)
         exe(self.r / "fake-samsung", FAKE_SAMSUNG)
+        exe(self.r / "scripts/sign-ontv.sh", FAKE_SIGN)
         (self.r / "remote/dist").mkdir(parents=True)
         (self.r / "remote/dist/index.html").write_text("x")
         self.calls = self.r / "calls.log"
@@ -201,12 +213,12 @@ class ReleaseScript(unittest.TestCase):
         for l in lines:
             h, n = l.split()
             self.assertEqual(h, hashlib.sha256((self.dist / n).read_bytes()).hexdigest())
-        self.assertEqual(self.log(), [f"check {self.dist} --release --matter --signer {CERT} --previous {self.prev}"])
+        self.assertEqual(self.log(), [f"check {self.dist} --release --matter --signer {CERT} --previous {self.prev} --ontv-signer {ONTV}"])
 
     def test_sums_passes_the_version_when_given(self):
         rc, out = self.run_step("sums", "--previous", str(self.prev), "--version", "0.13.9")
         self.assertEqual(rc, 0, out)
-        self.assertEqual(self.log(), [f"check {self.dist} --release --matter --signer {CERT} --previous {self.prev} --version 0.13.9"])
+        self.assertEqual(self.log(), [f"check {self.dist} --release --matter --signer {CERT} --previous {self.prev} --ontv-signer {ONTV} --version 0.13.9"])
 
     def test_sums_stops_when_a_samsung_file_is_missing(self):
         (self.dist / "couch-tv-samsung.wgt").unlink()
@@ -237,6 +249,41 @@ class ReleaseScript(unittest.TestCase):
         self.assertEqual(log.count("gradle lock held"), 3)      # each gradle run under the lock
         self.assertFalse(self.lock.exists())                   # and the lock given back
         self.assertTrue(log[-1].startswith("check "))
+        # the two on-TV APKs are signed with the release key and the proof of rotation (sign-ontv.sh)
+        self.assertEqual([l for l in log if l.startswith("sign ")], ["sign apk couch-tv-ontv.apk", "sign apk couch-tv-ontv-watch.apk"])
+
+    def test_a_fork_build_signs_nothing_itself(self):
+        rc, out = self.build(REPO="someone/couch-tv", FAKE_REMOTE_URL="https://github.com/someone/couch-tv")
+        self.assertEqual(rc, 0, out)
+        self.assertFalse(any(l.startswith("sign ") for l in self.log()))
+        self.assertNotIn("--ontv-signer", self.log()[-1])
+
+    def test_one_more_debug_only_release_when_asked(self):
+        rc, out = self.build(ONTV_SIGN="0")
+        self.assertEqual(rc, 0, out)
+        self.assertFalse(any(l.startswith("sign ") for l in self.log()))
+        self.assertNotIn("--ontv-signer", self.log()[-1])
+
+    def test_a_failed_signing_stops_the_build(self):
+        rc, out = self.build(GRADLE_LOCK=str(self.lock), FAKE_SIGN_RC="1")
+        self.assertEqual(rc, 6, out)
+        self.assertIn("SIGNING FAILED", out)
+        self.assertFalse((self.dist / "BUILT-FROM").exists())
+        self.assertFalse(any(l.startswith("check ") for l in self.log()))
+
+    def test_play_builds_and_signs_the_bundle(self):
+        out_aab = self.r / "on-tv/android/app/build/outputs/bundle/playRelease"
+        out_aab.mkdir(parents=True)
+        (out_aab / "app-play-release.aab").write_text("aab")
+        rc, out = self.run_step("play", GRADLE_LOCK=str(self.lock))
+        self.assertEqual(rc, 0, out)
+        log = self.log()
+        self.assertTrue(any(l.startswith("gradle -p") and l.endswith("clean bundlePlayRelease") for l in log), log)
+        self.assertIn("sign aab couch-tv-play.aab", log)
+        self.assertEqual((self.r / "dist-play/couch-tv-play.aab").read_text(), "aab")
+        self.assertFalse(any(l.startswith("check ") or " push " in l for l in log))
+        rc, out = self.run_step("play", FAKE_STATUS="?? x")
+        self.assertEqual(rc, 1, out)
 
     def test_build_always_carries_the_example_config(self):
         # M4: a CONFIG in the environment (this computer's own settings) is never built in
@@ -292,7 +339,7 @@ class ReleaseScript(unittest.TestCase):
         remote_tag = next(i for i, l in enumerate(log) if "ls-remote --tags origin refs/tags/v9.9.9" in l)
         auth = next(i for i, l in enumerate(log) if l == "gh auth status")
         self.assertLess(max(check, local_tag, remote_tag, auth), first_push)
-        self.assertEqual(log[check], f"check {self.dist} --release --matter --signer {CERT} --previous {self.prev} --version 9.9.9")
+        self.assertEqual(log[check], f"check {self.dist} --release --matter --signer {CERT} --previous {self.prev} --ontv-signer {ONTV} --version 9.9.9")
         # the tag first, then ONE atomic push of main and the tag, then the GitHub release
         tag = next(i for i, l in enumerate(log) if "tag -a v9.9.9 -m couch-tv 9.9.9" in l)
         pushes = [l for l in log if " push " in l]

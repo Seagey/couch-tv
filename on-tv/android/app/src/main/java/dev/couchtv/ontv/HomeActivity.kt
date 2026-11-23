@@ -113,6 +113,8 @@ class HomeActivity : Activity() {
             addJavascriptInterface(Update.Page(this@HomeActivity, this, base), "TVUP")
             // Home settings, About, Make Home open Couch TV (HomeKey.kt)
             addJavascriptInterface(HomeKey.Page(this@HomeActivity, this, base), "TVHK")
+            // Play: no Ask AI, so no Ask sheet and the Ask AI widget says so (PlayPage.kt, ask.js)
+            if (!PlayRules.askAi(BuildConfig.FLAVOR)) addJavascriptInterface(PlayPage(), "TVPLAY")
             webViewClient = object : WebViewClient() {
                 override fun onPageFinished(view: WebView, url: String) { if (url.startsWith(base)) { ready = true; view.requestFocus(); sendWaitingAtHome() } }
                 override fun onReceivedError(view: WebView, req: WebResourceRequest, err: WebResourceError) {
@@ -232,6 +234,8 @@ class HomeActivity : Activity() {
             if (!url.startsWith("http://") && !url.startsWith("https://")) return false
             val uri = Uri.parse(url)
             if (uri.host.isNullOrEmpty()) return false
+            // Play: no browser from a TV app (TV-WB); a QR code for the phone instead (LinkQrActivity)
+            if (!PlayRules.opensBrowser(BuildConfig.FLAVOR)) { main.post { LinkQrActivity.show(this@HomeActivity, url) }; return true }
             val intent = Intent(Intent.ACTION_VIEW, uri).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             if (packageManager.resolveActivity(intent, 0) == null) return false
             main.post { runCatching { startActivity(intent) } }

@@ -33,7 +33,8 @@ class XiaomiCardTests(unittest.TestCase):
 
     def test_the_tv_says_which_apk_it_is(self):
         kt = read("on-tv", "android", "app", "src", "main", "java", "dev", "couchtv", "ontv", "Server.kt")
-        self.assertIn('.put("watch_apk", BuildConfig.BUILD_TYPE == "watch")', kt)
+        # the GitHub watch APK, or the Google Play build (which has the watch inside, PlayRules.kt)
+        self.assertIn('.put("watch_apk", BuildConfig.BUILD_TYPE == "watch" || Variant.play)', kt)
 
 
 if __name__ == "__main__":

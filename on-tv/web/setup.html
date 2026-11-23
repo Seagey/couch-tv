@@ -1765,6 +1765,8 @@
     $('ask-model').placeholder = p.model ? '' : 'the model name your service gives you';
   };
   function showAsk(a) {
+    // the Google Play build has no Ask AI (PlayRules.askAi): no card, no jump link
+    if (a.available === false) { $('ask').style.display = 'none'; var j = document.querySelector('.jump a[href="#ask"]'); if (j) j.style.display = 'none'; return; }
     var p = askFor(a);
     $('ask-service').value = p.id; $('ask-base').value = a.base || p.base; $('ask-model').value = a.model || ''; $('ask-hint').textContent = p.hint;
     $('ask-model').placeholder = p.model ? '' : 'the model name your service gives you';
@@ -1829,6 +1831,12 @@
   };
   var updPoll = null, updFrom = '', updWaiting = false;
   function showUpd(u) {
+    // the Google Play build: Play updates it, so only the version and that line (PlayRules.UPDATES)
+    if (u.supported === false) {
+      $('upd-line').textContent = 'Version ' + u.current + '. ' + (u.how || '');
+      $('upd-install').style.display = 'none'; $('upd-check').style.display = 'none'; $('upd-steps').style.display = 'none';
+      return;
+    }
     var newer = u.available && u.latest;
     $('upd-line').textContent = newer ? 'Version ' + u.latest + ' is out (this TV has ' + u.current + ').'
       : 'Version ' + u.current + '. ' + (u.checked ? 'This is the latest version.' : 'Not checked yet.');
