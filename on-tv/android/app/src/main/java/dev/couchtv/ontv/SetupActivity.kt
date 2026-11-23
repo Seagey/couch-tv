@@ -118,7 +118,7 @@ class SetupActivity : Activity() {
         settings = SettingsScreen(look, object : SettingsScreen.Actions {
             override fun newCode() { Auth.resetLocks(); Auth.newPin(); refresh() }   // someone with the TV remote is here: every pairing lock opens
             override fun forgetPhones() { Auth.forgetAll(); refresh() }
-            override fun keys() { keyIndex = 0; show(SetupSteps.Screen.KEYS) }
+            override fun keys() { keyIndex = firstKeyStep(); show(SetupSteps.Screen.KEYS) }
             override fun undo() { show(SetupSteps.Screen.UNDO_CONFIRM) }
             override fun accessibility() { runCatching { startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)) } }
         })
@@ -149,7 +149,7 @@ class SetupActivity : Activity() {
                 second = SetupWords.SETTINGS, onSecond = { show(SetupSteps.Screen.SETTINGS) },
                 note = SetupWords.READY_NOTE_START to SetupWords.SETTINGS)
             SetupSteps.Screen.HOME_HELP -> step = screens.help(explainReason(), SetupScreens.qrBitmap(HomeKeyRules.HELP_URL),
-                onKeys = { keyIndex = 0; show(if (Adb.connected) SetupSteps.Screen.KEYS_DONE else SetupSteps.Screen.KEYS) },
+                onKeys = { keyIndex = firstKeyStep(); show(if (Adb.connected) SetupSteps.Screen.KEYS_DONE else SetupSteps.Screen.KEYS) },
                 onBack = { show(SetupSteps.Screen.HOME_STEP) })
             SetupSteps.Screen.KEYS -> step = buildKeyStep()
             SetupSteps.Screen.KEYS_DONE -> step = buildKeysDone()
@@ -209,6 +209,13 @@ class SetupActivity : Activity() {
 
     private fun keySteps() = SetupSettings.keySteps(SetupSettings.menus(HomeRole.googleTv(this), FireHome.isFireTv),
         SetupSettings.needsPairing(android.os.Build.VERSION.SDK_INT, Adb.state, FireHome.isFireTv))
+
+    /** Skips the screens for switches this TV already has on (Settings.Global: development_settings_enabled, adb_enabled, adb_wifi_enabled). */
+    private fun firstKeyStep(): Int {
+        fun on(k: String) = runCatching { Settings.Global.getInt(contentResolver, k, 0) == 1 }.getOrDefault(false)
+        val pairing = SetupSettings.needsPairing(android.os.Build.VERSION.SDK_INT, Adb.state, FireHome.isFireTv)
+        return SetupSettings.firstKeyStep(on("development_settings_enabled"), if (pairing) on("adb_wifi_enabled") else on("adb_enabled"))
+    }
 
     private fun buildKeyStep(): SetupScreens.Step {
         val all = keySteps()

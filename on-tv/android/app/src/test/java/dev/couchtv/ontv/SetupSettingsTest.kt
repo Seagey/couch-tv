@@ -23,7 +23,8 @@ class SetupSettingsTest {
         assertEquals(Menus.GOOGLE_TV, SetupSettings.menus(googleTv = true, fireTv = false))
         assertEquals(Menus.ANDROID_TV, SetupSettings.menus(googleTv = false, fireTv = false))
         assertTrue(SetupSettings.keySteps(Menus.GOOGLE_TV, false)[0].line.contains("Settings, then System, then About. Press OK on Android TV OS build seven times."))
-        assertTrue(SetupSettings.keySteps(Menus.ANDROID_TV, false)[0].line.contains("Settings, then Device Preferences, then About. Press OK on Build seven times."))
+        // the TCL (Android TV 11, 23 Nov 2026): About's last row is Android TV OS Build, not Build
+        assertTrue(SetupSettings.keySteps(Menus.ANDROID_TV, false)[0].line.contains("Settings, then Device Preferences, then About. At the bottom, press OK on Android TV OS build seven times."))
         assertTrue(SetupSettings.keySteps(Menus.FIRE_TV, false)[0].line.contains("My Fire TV"))
         assertTrue(SetupSettings.keySteps(Menus.FIRE_TV, false)[1].title.contains("ADB debugging"))
     }
@@ -53,6 +54,12 @@ class SetupSettingsTest {
                 assertFalse(k.line, Regex("[–—]|\\s-\\s|\\bBeta\\b|coming soon", RegexOption.IGNORE_CASE).containsMatchIn(k.line + k.title))
             }
         }
+    }
+
+    @Test fun theWalkThroughSkipsWhatIsAlreadyOn() {
+        assertEquals(0, SetupSettings.firstKeyStep(developerOn = false, debuggingOn = false))
+        assertEquals(1, SetupSettings.firstKeyStep(developerOn = true, debuggingOn = false))
+        assertEquals(2, SetupSettings.firstKeyStep(developerOn = true, debuggingOn = true))   // the owner's TCL: straight to Connect
     }
 
     @Test fun makeHomeOpenCouchTvIsOfferedWhereItHelps() {

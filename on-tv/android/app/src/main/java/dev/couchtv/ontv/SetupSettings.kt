@@ -47,7 +47,7 @@ object SetupSettings {
     fun keySteps(menus: Menus, pairing: Boolean): List<KeyStep> {
         val about = when (menus) {
             Menus.GOOGLE_TV -> "On the TV, open Settings, then System, then About. Press OK on Android TV OS build seven times."
-            Menus.ANDROID_TV -> "On the TV, open Settings, then Device Preferences, then About. Press OK on Build seven times."
+            Menus.ANDROID_TV -> "On the TV, open Settings, then Device Preferences, then About. At the bottom, press OK on Android TV OS build seven times."
             Menus.FIRE_TV -> "On the Fire TV, open Settings, then My Fire TV, then About. Press OK on the name of your Fire TV seven times."
         }
         val first = KeyStep("Turn on Developer options", about, "Open Settings", Action.OPEN_ABOUT, SetupWords.DONE_NEXT, Action.NEXT)
@@ -68,6 +68,17 @@ object SetupSettings {
         else KeyStep("Let Couch TV in", "Press Connect. When the TV asks, tick Always allow and press Allow.",
             SetupWords.CONNECT, Action.CONNECT, SetupWords.BACK, Action.BACK)
         return listOf(first, second, third)
+    }
+
+    /**
+     * Where the walk-through starts: a TV that already has Developer options on skips the first screen, and one with
+     * its debugging switch on (USB debugging, or Wireless debugging where it pairs) goes straight to Connect.
+     * (The owner's TCL, 23 Nov 2026, had both on already: the About screen's last row is Android TV OS build.)
+     */
+    fun firstKeyStep(developerOn: Boolean, debuggingOn: Boolean): Int = when {
+        debuggingOn -> 2
+        developerOn -> 1
+        else -> 0
     }
 
     /** After the walk-through: offer Make Home open Couch TV where the Home button needs it and one press can do it now. */
