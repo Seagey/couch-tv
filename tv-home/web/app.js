@@ -2912,7 +2912,16 @@
     }
   }
 
-  function handleSpotifyState(s) {
+  // Where the Spotify card can work: the TV home app reads the TV's own player (TV.spotifyState), and a
+  // computer at home reads it over ADB (/api/spotify/now_playing) for the home app on an Android TV. Not in a
+  // browser, the on-TV app, a standalone site or a TV a computer runs without Android.
+  function spotifyWorks() { return !!(TV && (TV.spotifyState || (!OFFLINE && !ON_TV))); }
+  // A cover from the TV's own player is a picture inside the message (data:), never a link: a link would load
+  // from Spotify, and the card sends nothing to Spotify. The computer at home's cover comes from its own lookup.
+  function localArt(a) { return typeof a === "string" && a.indexOf("data:image/") === 0 ? a : null; }
+
+  function handleSpotifyState(s, local) {
+    if (s && local) s.art = localArt(s.art);
     if (!s || !s.available || !s.title) {
       if (music && music.isSpotify) {
         music = null;
@@ -2941,15 +2950,15 @@
   }
 
   function refreshSpotify() {
-    if (!SPOTIFY.enabled) return;
+    if (!SPOTIFY.enabled || !spotifyWorks()) return;
     if (TV && TV.spotifyState) {
       try {
         var raw = TV.spotifyState();
-        if (raw) handleSpotifyState(JSON.parse(raw));
+        if (raw) handleSpotifyState(JSON.parse(raw), true);
       } catch (e) {}
       return;
     }
-    if (!OFFLINE) {
+    if (!OFFLINE && !ON_TV) {
       api("GET", "/api/spotify/now_playing", null, 4000).then(function (j) {
         if (j && j.spotify) handleSpotifyState(j.spotify);
       }).catch(function () {});
@@ -6671,12 +6680,8 @@
   
   function spotifyRows() {
     var rows = [];
+    if (!spotifyWorks()) return rows;   // only where the card can work (spotifyWorks), never a switch that does nothing
     rows.push(head(t("spotify_head")));
-    var isTizen = typeof window.tizen !== "undefined" || (TV && TV.isTizen);
-    if (isTizen) {
-      rows.push(info("spotify-unsupported", t("spotify_unsupported")));
-      return rows;
-    }
     rows.push({
       kind: "toggle",
       key: "spotify-enabled",
@@ -6695,8 +6700,13 @@
     try {
       hasPerm = !!(TV && TV.spotifyHasPermission && TV.spotifyHasPermission());
     } catch (e) {}
-    if (hasPerm) {
+    if (!TV.spotifyState) {
+      // an older home app with a computer at home: the computer reads the player over ADB, no access needed
+    } else if (hasPerm) {
       rows.push(info("spotify-perm", t("spotify_perm_ok")));
+    } else if (!OFFLINE && !ON_TV) {
+      // a computer at home gives the access when it sets up the TV (apply.sh): no adb line to type
+      rows.push(info("spotify-perm", t("spotify_perm_needed")));
     } else {
       rows.push(info("spotify-perm", t("spotify_perm_needed"), "", t("spotify_perm_hint")));
     }
@@ -9030,6 +9040,9 @@
     home: function () { forgetFocus(); updFront(); if (zone === "welcome") return;   // the first-run welcome stays until it is answered
       clipWake(); if (idleAmbientActive) { setIdleAmbient(false); resetSmartIdle(); return; } if (idlePhotoInput(null)) return; if (zone === "settings") closeSettings(); else goHome(); refresh(); resetIdlePhoto(); resetSmartIdle(); },
     screenOff: function () { toggleScreenOff(true); },
+    // the TV home app's Spotify listener says the moment the song, play or pause changes (MainActivity), so
+    // the card follows at once; the 5 second look in refreshMusic stays as the fallback
+    spotifyUpdate: function (s) { if (SPOTIFY.enabled && spotifyWorks() && !covered() && s && typeof s === "object") handleSpotifyState(s, true); },
     wakeScreen: function () { toggleScreenOff(false); },
     isScreenOff: function () { return screenOffActive; },
     noDream: function () { note(t("no_dream")); },

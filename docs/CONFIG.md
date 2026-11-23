@@ -770,7 +770,9 @@ card is drawn by the app itself, so it cannot be previewed in a browser.
 
 Off unless enabled. Displays what the locally installed Spotify app is playing on the TV, complete with album cover art, live local progress bar, and playback controls (previous, rewind, play/pause, fast-forward, next).
 
-Completely local and privacy-friendly: uses Android's local `MediaSessionManager` + `MediaController`. **No accounts, tokens, client IDs, or network calls to Spotify are ever used.**
+Completely local and privacy-friendly: uses Android's local `MediaSessionManager` + `MediaController`. **No accounts, tokens, client IDs, or network calls to Spotify are ever used.** The cover is only the picture inside the TV's own player; a song that gives its cover only as a link shows no cover, because loading that link would reach Spotify.
+
+The Spotify rows in Home settings show only where the card works: the Couch TV home app on an Android TV, with or without a computer at home. A browser, the on-TV app and the TVs a computer runs without Android do not show them.
 
 ```json
 "spotify": {
@@ -786,20 +788,20 @@ Completely local and privacy-friendly: uses Android's local `MediaSessionManager
 | Key | What it does |
 |---|---|
 | `enabled` [false] | `true` switches the Spotify integration on. Off by default with zero background overhead. |
-| `seek_seconds` [10] | Step in seconds for rewind and fast-forward controls (5, 10, 15, or 30). |
+| `seek_seconds` [10] | Step in seconds for rewind and fast-forward controls: 5, 10, 15 or 30, the same four Home settings cycles through. Any other value is 10. |
 | `hide_idle` [false] | `true` hides the Now Playing card when Spotify is paused or stopped. |
 | `title_mode` ["pingpong"] | Display mode for long song titles: `"dots"` (standard `...` truncation), `"pingpong"` (ping-pong marquee sliding), or `"continuous"` (continuous scrolling marquee). |
 | `show_app` [true] | `true` displays the "SPOTIFY" label above the song title; `false` hides it and proportionally centers and sizes the playback controls and track details. |
 | `align` ["classic"] | Shelf layout alignment for the Spotify card and Keep watching items: `"classic"` aligns left starting from the screen safe margin; `"center"` centers inline with the dock/app bar. |
 
 ### Permissions & Setup
-The integration reads local media sessions via a `NotificationListenerService` belonging to Couch-TV. On Android TV / Google TV, grant Notification Access once over ADB:
+The integration reads local media sessions via a `NotificationListenerService` belonging to Couch TV (listed in Android as Couch TV Spotify Now playing). On Android TV / Google TV, grant Notification Access once over ADB:
 ```sh
 adb shell cmd notification allow_listener app.couchtv.launcher/app.couchtv.launcher.SpotifyMediaListener
 ```
-`apply.sh` grants this automatically when setting up the TV. The TV app will indicate whether the permission is active under **Home settings, Look, Spotify**.
+`apply.sh` grants this automatically when setting up the TV. The TV app will indicate whether the permission is active under **Home settings, Look, Spotify**; with a computer at home it leaves out the adb line, since the computer gives the access itself.
 
-*Note:* Media sessions are an Android system feature and are not available on Samsung (Tizen).
+*Note:* Media sessions are an Android system feature, so TVs without Android do not have the card.
 
 ## Plex (optional, option B)
 
