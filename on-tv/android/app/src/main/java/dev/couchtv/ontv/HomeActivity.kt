@@ -171,6 +171,8 @@ class HomeActivity : Activity() {
     override fun onNewIntent(i: Intent) { super.onNewIntent(i); js("window.tv && tv.home()") }
 
     override fun dispatchKeyEvent(e: KeyEvent): Boolean {
+        // The mic/search button: the TV's own assistant opens, the page never sees it (VoiceKeys)
+        VoiceKeys.handle(this, e)?.let { return it }
         if (e.keyCode == KeyEvent.KEYCODE_BACK) { if (e.action == KeyEvent.ACTION_UP && ready) js("window.tv && tv.back()"); return true }
         // Long press MENU opens setup, so the home screen can always reach it. Android marks a long
         // press on the repeated key down while the button is held (repeat 1, FLAG_LONG_PRESS), never
