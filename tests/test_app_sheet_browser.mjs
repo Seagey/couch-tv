@@ -10,7 +10,9 @@
 //     (a TCL) moves too and never adds or takes out;
 //  5. a picked app that is not on this TV is listed dimmed, and OK takes it out; the Add app place opens
 //     the sheet; a full container says so;
-//  6. Home settings, the widget's page: Add apps opens the sheet over the settings, Back goes back to them.
+//  6. Home settings, the widget's page: Add apps opens the sheet over the settings, Back goes back to them;
+//  7. the Android apps' Back, window.tv.back() (never a key): saves from Home settings and from the home,
+//     and during a move puts the app down first.
 // Screenshots go to $SHOTS when it is set.
 // Needs Playwright (Chromium). Without it the test says so and passes:
 //   COUCHTV_PLAYWRIGHT=<a folder whose node_modules has playwright> node tests/test_app_sheet_browser.mjs
@@ -237,9 +239,43 @@ ok(!(await sheet()) && await page.evaluate(() => document.getElementById("settin
 ok(JSON.stringify((await edits())["f|folder"]) === '["kayo","iview","youtube"]', "with YouTube added");
 ok(/3 of 12 picked/.test((await page.evaluate(() => [...document.querySelectorAll("#set-rows .srow")].map((e) => e.textContent).join(" | ")))), "and the page shows 3 of 12 picked");
 
-// Spanish: the sheet's words in the TV's language
+// 7. the Android apps (tv-home MainActivity, on-TV HomeActivity) send the remote's Back as tv.back(), never
+// as a key: it saves the same as the Back key, from Home settings and from the home, and puts a move down
+const tvBack = async (wait) => { await page.evaluate(() => window.tv.back()); await page.waitForTimeout(wait || 600); };
+const toAddApps = async () => { for (let k = 0; k < 8 && !(await page.evaluate(() => /^Add apps/.test(((document.querySelector("#set-rows .srow.focus") || {}).textContent || "").trim()))); k++) await press("ArrowDown", 150); await press("Enter", 500); };
+const settingsOn = () => page.evaluate(() => document.getElementById("settings").classList.contains("on"));
+await toAddApps();
+ok(!!(await sheet()), "Home settings, Add apps again");
+await goTo("youtube"); await press("Enter", 300);
+await tvBack();
+ok(!(await sheet()) && await settingsOn(), "tv.back() saves and goes back to Home settings");
+ok(JSON.stringify((await edits())["f|folder"]) === '["kayo","iview"]', "tv.back() from Home settings saved YouTube out: " + JSON.stringify((await edits())["f|folder"]));
+ok(/2 of 12 picked/.test((await page.evaluate(() => [...document.querySelectorAll("#set-rows .srow")].map((e) => e.textContent).join(" | ")))), "and the page shows 2 of 12 picked (the done callback ran)");
+// a move in progress: tv.back() puts the app down, the sheet stays; the next tv.back() saves
+await toAddApps();
+await goTo("iview"); await hold();
+ok(/Left and Right move it/.test((await sheet()).hint), "Hold OK picks ABC iview up to move");
+await press("ArrowLeft", 300);
+await tvBack(400);
+s = await sheet();
+ok(s && !/Left and Right/.test(s.hint) && s.tiles[0].key === "iview" && s.tiles[0].badge === "1" && s.count === "2 of 12 picked", "tv.back() during a move puts it down and keeps the sheet: " + (s && s.hint));
+ok(JSON.stringify((await edits())["f|folder"]) === '["kayo","iview"]', "nothing saved while the sheet is up");
+await tvBack();
+ok(!(await sheet()) && await settingsOn() && JSON.stringify((await edits())["f|folder"]) === '["iview","kayo"]', "the next tv.back() saves the move: " + JSON.stringify((await edits())["f|folder"]));
+
+// tv.back() from the home: saved, and Saved. said
 for (let k = 0; k < 6 && await page.evaluate(() => document.getElementById("settings").classList.contains("on")); k++) await press("Escape", 300);
 await page.waitForTimeout(900);
+await page.evaluate(() => document.querySelectorAll(".cw-say").forEach((e) => e.remove()));
+await focus("f", 0); await hold(); await choose("Add apps");
+await goTo("youtube"); await press("Enter", 300);
+await tvBack();
+ok(!(await sheet()) && JSON.stringify((await edits())["f|folder"]) === '["iview","kayo","youtube"]', "tv.back() from the home saves: " + JSON.stringify((await edits())["f|folder"]));
+ok(/Saved\./.test(await page.evaluate(() => (document.querySelector(".cw-say") || {}).textContent || "")), "and says Saved.");
+ok(await inFolder() === "au.net.abc.iview,au.com.kayosports.tv,com.google.android.youtube.tv", "the folder on the home shows them: " + await inFolder());
+ok(!(await page.evaluate(() => document.getElementById("settings").classList.contains("on"))), "and the home stays (tv.back() went no further)");
+
+// Spanish: the sheet's words in the TV's language
 await page.evaluate(() => window.I18N.set("es"));
 await focus("f", 0); await hold(); await choose("Añadir apps");
 s = await sheet();

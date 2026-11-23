@@ -104,6 +104,9 @@ ok(!(await page.evaluate(() => window.CouchAsk.isOpen())), "Back closes the shee
 await page.waitForTimeout(400);
 ok(/How far away is the moon\?/.test(await text("w0")) && /384,000/.test(await text("w0")), "the widget shows the question and the answer: " + await text("w0"));
 if (SHOTS) await page.screenshot({ path: path.join(SHOTS, "ask-3-answered.png") });
+// the Android apps send Back as tv.back(), never a key: it closes the sheet too
+await page.evaluate(() => window.CouchAsk.open("ask"));
+ok(await page.evaluate(() => window.tv.back() === undefined && !window.CouchAsk.isOpen()), "tv.back() closes the sheet");
 
 // 3. a message from an agent
 await page.evaluate(() => window.CouchAsk._test.took({ message: { text: "Dinner is ready", from: "Claude", at: Date.now(), seconds: 20 } }, Date.now()));

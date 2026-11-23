@@ -617,6 +617,14 @@
     connectOrigin: function () { var c = config(), o = originOf(c.base); return c.provider === "local" && /^http:\/\//.test(o) && isLocalHost(hostOf(o)) && !isThisDevice(hostOf(o)) ? o : ""; },
     // for the setup sheet and tests
     current: function () { return sheet ? { view: sheet.view, stops: sheet.stops.length, focus: sheet.cur, text: sheet.el.textContent } : null; },
+    // the Android apps' Back (app.js tv.back, never a key): what the Back key does here; false with no sheet
+    back: function () {
+      if (!sheet) return false;
+      var s = sheet.stops[sheet.cur];
+      if (s && s.input && DOC.activeElement === s.input.el) { s.input.el.blur(); return true; }
+      if (sheet.view === "service") show("setup"); else if (sheet.view === "setup" && status().ready) show("ask"); else close();
+      return true;
+    },
     move: function (d) { if (!sheet) return false; sheet.cur = Math.max(0, Math.min(sheet.stops.length - 1, sheet.cur + d)); paint(); return true; },
     ok: function () { if (!sheet) return false; var s = sheet.stops[sheet.cur]; if (s && s.input) { submitted(s.input, s.input.el.value); return true; } if (s && s.ok) s.ok(); return true; },
     type: function (text) { if (!sheet) return false; var s = sheet.stops[sheet.cur]; if (!s || !s.input) return false; s.input.el.value = text; return true; },

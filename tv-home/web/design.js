@@ -3136,7 +3136,15 @@
       phoneAgain: function () { if (document.querySelector('.cw[data-face="1"]')) { PLINK.at = 0; askPhone(); } if (sheet && sheet.phone) { if (sheet.arrive) setupCard(); else phoneSheet(sheet.phone); } },
       // a design that needs setting up has just arrived: "Set up your widgets" and the phone page's code
       setupCard: function () { setupCard(); },
-      back: function () { if (window.CouchDetail && window.CouchDetail.isOpen()) { window.CouchDetail.close(); return true; } if (sheet) { closeSheet(); return true; } return false; },
+      // the Android apps' Back (tv.back(), never a key): the same as the Back key in keydown. Add apps saves
+      // on Back (a move in progress is put down first), and a Hold OK Move ends with "Moved."
+      back: function () {
+        if (sheet && sheet.apps) { var S = sheet.apps; if (S.moving) { var mk = S.moving; S.moving = null; asDraw(S, mk); } else asDone(S); return true; }
+        if (window.CouchDetail && window.CouchDetail.isOpen()) { window.CouchDetail.close(); return true; }
+        if (sheet) { closeSheet(); return true; }
+        if (MOVING && ours()) { MOVING = null; say("Moved."); return true; }
+        return false;
+      },
       detail: function () { var t = target(); if (t) openDetail(t); },
       // the designer's Remote path: from every stop, where each press goes
       paths: function () {
