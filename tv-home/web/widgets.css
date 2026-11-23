@@ -129,8 +129,9 @@
 .cw-ifocus { outline: 5px solid var(--focus); outline-offset: 5px; }
 .cw .cw-app.cw-ifocus { -webkit-transform: scale(1.06); transform: scale(1.06); }
 
-/* widget mode: the design's widgets are the home, the home's own parts step aside (design.js) */
-html.cd-wmode header.top, html.cd-wmode .scrim, html.cd-wmode #shelf-section, html.cd-wmode #scenes .gclock, html.cd-wmode #scenes .fg { visibility: hidden !important; }
+/* widget mode: the design's widgets are the home, the home's own parts step aside (design.js), the weather line a
+   design copies out of the date (#cd-weather) too: it was drawn over a big stack and behind a Wi-Fi tile (0.13.10) */
+html.cd-wmode header.top, html.cd-wmode #cd-weather, html.cd-wmode .scrim, html.cd-wmode #shelf-section, html.cd-wmode #scenes .gclock, html.cd-wmode #scenes .fg { visibility: hidden !important; }
 html.cd-wmode:not(.expanded) #apps-section { visibility: hidden !important; }
 html.cd-wmode.expanded #cd-front, html.cd-wmode.expanded #cd-back { visibility: hidden; }
 html.cd-wmode #grid .app.focus { outline: none; }
