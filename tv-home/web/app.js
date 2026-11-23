@@ -6591,16 +6591,32 @@
   // Which question is on screen: "upd" (new versions, once), "home" (make couch-tv the home, once)
   // or "dev" (extend Developer Mode, weekly).
   var askKind = "upd";
+  // The first-run welcome is a new TV's first question. The update question never comes over it, nor straight
+  // after it (on a TCL it popped up over the home about 5 s after the first open): it waits for a calm later
+  // moment, the next time the home comes back to the front (or the next start). welcomeSeen: the welcome was
+  // up in this start; updLater: the question is waiting for that moment.
+  var welcomeSeen = false, updLater = false;
   function updAsk() {
     askKind = "upd";
     if (!UPD || !UPD.supported || UPD.answered || kidsOn()) return;
     if (HOME.updates === "notify" || HOME.updates === "manual") { upd().auto(HOME.updates === "notify"); return; }
+    if (welcomeSeen || zone === "welcome" || kept(WELCOME_KEY) === "ask") { updLater = true; return; }
     if (zone !== "grid" && zone !== "shelf" && zone !== "people" && zone !== "quick") return;
     askKind = "upd";
     zone = "updask"; ai = 0;
     clearFocus();
     renderAsk();
   }
+  // the home is back in front after the welcome's start: ask then, once the person is on the home (not in
+  // Home settings or a menu), after a short calm moment
+  function updAskLater() {
+    if (!updLater || document.hidden || kept(WELCOME_KEY) === "ask") return;
+    if (zone !== "grid" && zone !== "shelf" && zone !== "people" && zone !== "quick") return;   // still waiting
+    updLater = false; welcomeSeen = false;
+    updRead();
+    updAsk();
+  }
+  document.addEventListener("visibilitychange", function () { if (!document.hidden && updLater) setTimeout(updAskLater, 2500); });
   function askRows() {
     if (askKind === "dev") {
       return [[ICONS.devmode, t("dev_ask_yes"), t("dev_ask_yes_sub")], [ICONS.sliders, t("dev_ask_no"), t("dev_ask_no_sub")]];
@@ -6718,7 +6734,7 @@
   }
   function welcomeStart(fresh) {
     if (!welcomeDue(fresh)) return;
-    zone = "welcome"; wi = 0;
+    zone = "welcome"; wi = 0; welcomeSeen = true;
     clearFocus();
     var el = $("welcome");
     if (!el) return;

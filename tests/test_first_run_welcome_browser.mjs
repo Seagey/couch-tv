@@ -73,7 +73,13 @@ try {
   ok(words.includes("couchtv.joshuaseage.com") && await page.evaluate(() => !!document.querySelector("#welcome-qr svg")), "the Studio address and its QR code");
   ok(!/[–—]|Beta|Experimental|coming soon/i.test(words), "no dashes, Beta, Experimental or coming soon");
   ok(await focusIs() === 0, "the focus starts on I have a design code");
-  ok(await page.evaluate(() => getComputedStyle(document.querySelector(".wpick.focus")).backgroundColor === "rgb(255, 255, 255)"), "and it shows (a white card)");
+  ok(await page.evaluate(() => /rgb\(255, 200, 30\)/.test(getComputedStyle(document.querySelector(".wpick.focus")).boxShadow) &&
+    !/rgb\(255, 200, 30\)/.test(getComputedStyle(document.querySelector(".wpick:not(.focus)")).boxShadow)), "and it shows (the sun yellow ring, on that card only)");
+  // the light look of the Studio site and the setup screens: wall blue, Nunito headings, the logo
+  const look = await page.evaluate(() => ({ wall: getComputedStyle(document.getElementById("welcome")).backgroundColor,
+    head: getComputedStyle(document.getElementById("welcome-title")).fontFamily, logo: (document.querySelector(".wel-brand img") || {}).naturalWidth || 0,
+    nunito: document.fonts.check('900 40px "Nunito"') }));
+  ok(look.wall === "rgb(189, 207, 225)" && /Nunito/.test(look.head) && look.logo > 0 && look.nunito, "the light look: wall blue, Nunito, the logo (" + JSON.stringify(look) + ")");
   ok(await kept() === "ask", "kept as due, so it is asked again until answered");
   await press("ArrowRight"); ok(await focusIs() === 1, "Right: Use Couch Original");
   await press("ArrowLeft"); ok(await focusIs() === 0, "Left: back to the code");

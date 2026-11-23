@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32" role="img" aria-label="couch-tv">
+  <title>couch-tv</title>
+  <rect x="0" y="0" width="32" height="32" rx="7" fill="#F2441B"/>
+  <rect x="7" y="15" width="18" height="7" rx="2.5" fill="#FBFAF7"/>
+  <rect x="4" y="11" width="6" height="12" rx="3" fill="#FFC81E"/>
+  <rect x="22" y="11" width="6" height="12" rx="3" fill="#FFC81E"/>
+  <rect x="10" y="8" width="12" height="7" rx="2.5" fill="#9CCBF0"/>
+</svg>
