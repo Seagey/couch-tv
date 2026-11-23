@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="spotify_session_access">Spotify playback controls</string>
+    <string name="spotify_listener">Couch TV Spotify Now playing</string>
     <string name="key_watch_desc">Opens the home\'s settings menu when the remote\'s gear button is pressed. Passes every other key on and reads nothing else.</string>
     <string name="fire_watch_desc">Brings this home screen back when the TV opens its own home. On a Xiaomi TV it also catches the Mi button. Reads no screen content.</string>
 </resources>

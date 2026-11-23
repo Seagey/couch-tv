@@ -82,6 +82,7 @@ class MainActivity : Activity() {
     private val prefs by lazy { getSharedPreferences("home", MODE_PRIVATE) }
     private val bingDailyPhoto by lazy { BingDailyPhoto(File(filesDir, "bing-daily-photo"), io) }
     private val spotifyPlayer by lazy { SpotifyPlayer(applicationContext) }
+    private var spotifyPush: ((org.json.JSONObject) -> Unit)? = null   // this activity's SpotifyMediaListener callback
     private val fotMobScores by lazy { FotMobScores(io) }
 
     /**
@@ -157,9 +158,10 @@ class MainActivity : Activity() {
         Doorbell.start(this)   // smart home (optional): nothing happens unless a doorbell is set up
         FireWatch.ensure(this)   // Fire TV only, and only once a computer has switched it on
         main.postDelayed({ FireWatch.rebindIfUnbound(applicationContext) }, 10_000L)   // listed but not bound after a force-stop
-        SpotifyMediaListener.onStateChangedListener = { json ->
-            js("window.tv && tv.spotifyUpdate && tv.spotifyUpdate($json)")
-        }
+        // the listener is static and lives longer than this activity: hold it weakly, and clear it in onDestroy
+        val self = java.lang.ref.WeakReference(this)
+        spotifyPush = { json -> self.get()?.js("window.tv && tv.spotifyUpdate && tv.spotifyUpdate($json)") }
+        SpotifyMediaListener.onStateChangedListener = spotifyPush
         // At power-on the page is often asked for before Wi-Fi is up: try again the moment it is.
         val netBack = object : android.net.ConnectivityManager.NetworkCallback() {
             override fun onAvailable(network: android.net.Network) {
@@ -260,6 +262,8 @@ class MainActivity : Activity() {
     }
 
     override fun onDestroy() {
+        if (SpotifyMediaListener.onStateChangedListener === spotifyPush) SpotifyMediaListener.onStateChangedListener = null
+        spotifyPush = null
         runCatching { unregisterReceiver(packageChanged) }
         runCatching { contentResolver.unregisterContentObserver(watchNextChanged) }
         super.onDestroy()

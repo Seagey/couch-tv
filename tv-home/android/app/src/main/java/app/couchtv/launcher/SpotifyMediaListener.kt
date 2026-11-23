@@ -21,7 +21,11 @@ import java.io.ByteArrayOutputStream
  * via Android's MediaSessionManager and MediaController.
  *
  * Requires Notification Access (cmd notification allow_listener app.couchtv.launcher/.SpotifyMediaListener).
- * Completely local: zero network requests to Spotify, zero tokens, zero accounts.
+ * Completely local: no network requests to Spotify, no tokens, no accounts. The cover is only ever the picture
+ * inside the session (a data: URI), never a link, which the WebView would load from Spotify.
+ *
+ * onStateChangedListener is static, so MainActivity sets it through a WeakReference and clears it in
+ * onDestroy: the service outlives the activity and must not keep it in memory.
  */
 class SpotifyMediaListener : NotificationListenerService() {
 
@@ -134,11 +138,9 @@ class SpotifyMediaListener : NotificationListenerService() {
             }
         }
 
-        // Fallback to URI
-        val uri = metadata.getString(MediaMetadata.METADATA_KEY_ALBUM_ART_URI)
-            ?: metadata.getString(MediaMetadata.METADATA_KEY_ART_URI)
-            ?: metadata.getString(MediaMetadata.METADATA_KEY_DISPLAY_ICON_URI)
-        cachedArtUrl = uri?.takeIf { it.isNotBlank() }
+        // No picture in the session: no cover. A cover given only as a link (METADATA_KEY_ALBUM_ART_URI and the
+        // like) would load from Spotify's servers, and this card sends nothing to Spotify, so it is never used.
+        cachedArtUrl = null
     }
 
     private fun postStateUpdate() {
