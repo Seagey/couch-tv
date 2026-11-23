@@ -23,6 +23,11 @@ Filling a folder, the Dock, an app grid or Games no longer means adding one app 
 
 A widget set in **Jost** or **Cormorant Garamond** in Couch TV Studio drew in the home's own font on the TV, because the home had no copy of either. The home now carries both, and fetches them only when a design uses them.
 
+### Also new
+
+- **Spotify's own Now playing card, thanks TheOfficialTAGM** ([#321](https://github.com/Seagey/couch-tv/pull/321), [#324](https://github.com/Seagey/couch-tv/pull/324)). Switch on Home settings, Spotify, and the home shows the song the Spotify app on your Android TV is playing, with its cover, how far in it is, and buttons to go back, rewind, play or pause, fast forward and skip. It reads the TV's own player: no Spotify account, and nothing is sent to Spotify. The home needs notification access once, which `apply.sh` gives it (docs/CONFIG.md, Spotify). Long titles can scroll, and the card can sit in line with the Dock.
+- **Keep watching as posters in the Night look, thanks atishay-kasliwal** ([#323](https://github.com/Seagey/couch-tv/pull/323)). Home settings, Look, Keep watching as posters shows the row as the Classic look's plain picture tiles, about six across where three cards fit.
+
 ### Fixes
 
 - **No weather line over your widgets.** On a design made of widgets with no date or weather of its own, the standard home's top line (the town, the moon and the weather) was drawn over a smart stack and behind a Wi-Fi tile. It now steps aside with the rest of the home's top, as the date and clock already did. A design without widgets still shows it.
