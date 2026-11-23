@@ -651,6 +651,14 @@
     applySpotifyAlign();
     // the Keep watching row: Home settings win over home.keep_watching; off hides it and stops fetching it
     KW_ON = typeof ST.keep_watching === "boolean" ? ST.keep_watching : HOME.keep_watching !== false;
+    // an Inputs tile first in the dock (#154): Home settings win over home.input_tile; off unless switched on
+    INPUT_TILE = typeof ST.input_tile === "boolean" ? ST.input_tile : HOME.input_tile === true;
+    document.documentElement.classList.toggle("kw-off", !KW_ON && !CARDS.length);
+    // the row follows the app the remote is on: Home settings win over home.shelf_follows_app; off unless switched on
+    SHELF_FOLLOW = typeof ST.shelf_follows_app === "boolean" ? ST.shelf_follows_app : HOME.shelf_follows_app === true;
+    if (!SHELF_FOLLOW) followPkg = null;
+    // the full screen music view is off until it is switched on in Home settings or home.ambient_music
+    AMBIENT_MUSIC = typeof ST.ambient_music === "boolean" ? ST.ambient_music : HOME.ambient_music === true;
     // Home settings win over home.keep_watching_style; "card" (the wide glass cards) unless "poster"
     KW_POSTER = (ST.keep_watching_style || HOME.keep_watching_style) === "poster";
     GLASS_FOCUS = (ST.glass_focus || HOME.glass_focus) === "glass" ? "glass" : "colour";
@@ -2538,10 +2546,12 @@
     return NP_ON && (!OFFLINE || STANDALONE || LOCAL_SPOTIFY);
   }
 
-  function npReach() { return npVisible() && !(NIGHT && expanded); }
+  // reachable with the remote: in the Night look it steps aside with the cards while More apps is open,
+  // and a card with no buttons (a Spotify Web API song on the bridge) is not a stop
+  function npReach() { return npVisible() && !(NIGHT && expanded) && (currentNpBtns.length || npButtons().length) > 0; }
 
   function npButtons() {
-    if (music && music.isSpotify && SPOTIFY.controls) return currentNpBtns;
+    if (music && music.isSpotify) return currentNpBtns;   // the local Spotify card's own buttons (renderNp)
     if (!music) return [];
     if (music.state === "idle") return [["play", t("spotify_open"), "spotify-open"]];
     var b;
@@ -2612,7 +2622,7 @@
         }
         var avgR = count ? Math.round(rSum / count) : 40;
         var avgG = count ? Math.round(gSum / count) : 50;
-        var avgB = count ? Math.round(avgB || 80) : 80;
+        var avgB = count ? Math.round(bSum / count) : 80;
         var col1 = "rgb(" + bestR + ", " + bestG + ", " + bestB + ")";
         var col2 = "rgb(" + avgR + ", " + avgG + ", " + avgB + ")";
         paletteCache[key] = [col1, col2];
@@ -2777,7 +2787,7 @@
       var anyone = rowHasCards();
       $("shelf-section").classList.toggle("empty", !anyone && !on);
       $("np-slot").classList.toggle("on", on);
-      if (!data.shows.length) {
+      if (KW_ON && !data.shows.length && !CARDS.length) {   // renderShelf's empty line, never over custom cards
         var track = $("shelf");
         if (track) {
           var name = (PEOPLE[whoIndex()] && PEOPLE[whoIndex()].name) || "";
@@ -2812,14 +2822,18 @@
       if (canPlay) btns.push({ act: "play_pause", label: playing ? t("np_pause") : t("np_play"), icon: playing ? ICONS.pause : ICONS.play });
       if (canFF) btns.push({ act: "fast_forward", label: t("np_ff", { s: SPOTIFY.seek_seconds }), icon: ICONS.ff });
       if (canNext) btns.push({ act: "next", label: t("np_next"), icon: ICONS.next });
-    } else {
+    } else if (music.isSpotify) {
       btns = [
         { act: "previous", label: t("np_prev"), icon: ICONS.prev },
         { act: "play_pause", label: playing ? t("np_pause") : t("np_play"), icon: playing ? ICONS.pause : ICONS.play },
         { act: "next", label: t("np_next"), icon: ICONS.next }
       ];
+    } else {
+      // any other song: npButtons() as before (media keys, Open Spotify, Play on TV, the full screen view),
+      // the same list npPress acts on
+      btns = npButtons().map(function (b) { return { act: b[0], label: b[1], icon: ICONS[b[0]] }; });
     }
-    currentNpBtns = btns;
+    currentNpBtns = music.isSpotify ? btns : [];
     if (npI >= btns.length) npI = Math.max(0, btns.length - 1);
 
     var curPos = getPlaybackPosition();
@@ -5049,7 +5063,7 @@
       } else if (dy > 0) zone = NIGHT && npReach() ? "np" : cards.length ? "shelf" : "grid";
     } else if (zone === "shelf") {
       if (dx < 0 && s === 0 && footballEnabled && NIGHT && !LOOP) zone = "football";
-      else if (dx < 0 && s === 0 && NIGHT && !LOOP && npReach()) {
+      else if (dx < 0 && s === 0 && NIGHT && !LOOP && npReach() && !LOCAL_SPOTIFY) {   // the TV's Spotify row: Now playing is above, not beside
         zone = "np";
         npI = Math.max(0, (currentNpBtns.length || npButtons().length) - 1);
       }
@@ -5086,7 +5100,10 @@
         if (at < 0) gridItems.forEach(function (x, i) { if (at < 0 && x.kind === "more") at = i; });
         zone = "grid"; g = Math.max(0, at);
       } else if (dy < 0 && row === 0) {
-        if (NIGHT && npReach()) {
+        // the Night look with shows in the row: Up from a tile under the Now playing card goes to its nearest
+        // button, else to the nearest card. Not in the Loop look (a line at the top left), with the football
+        // scores beside it, or the TV's Spotify row; with no shows, Up opens the full screen view as before.
+        if (NIGHT && !LOOP && !footballEnabled && !LOCAL_SPOTIFY && cards.length && npReach()) {
           var nb = $("np") ? $("np").getBoundingClientRect() : null;
           var curTile = gridEls[g] ? gridEls[g].getBoundingClientRect() : null;
           var midTile = curTile ? (curTile.left + curTile.width / 2) : 0;
@@ -5110,7 +5127,8 @@
             }
             s = bestS;
           }
-        } else if (footballEnabled && NIGHT && !LOOP && (!cards.length || (gridEls[g] && gridEls[g].getBoundingClientRect().left < $("football-scores").getBoundingClientRect().right))) zone = "football";
+        } else if (footballEnabled && NIGHT && !LOOP && npReach() && gridEls[g] && gridEls[g].getBoundingClientRect().left < $("np").getBoundingClientRect().right) zone = "np";
+        else if (footballEnabled && NIGHT && !LOOP && (!cards.length || (gridEls[g] && gridEls[g].getBoundingClientRect().left < $("football-scores").getBoundingClientRect().right))) zone = "football";
         else if (cards.length) zone = "shelf";
         else if (npReach()) {
           if (AMBIENT_MUSIC && music) {
@@ -8117,7 +8135,7 @@
     });
     // Apply whitelist if configured
     if (CFG.watch_next_allow && Array.isArray(CFG.watch_next_allow)) {
-      rows = rows.filter(function (r) { return CFG.watch_next_allow.includes(r.package); });
+      rows = rows.filter(function (r) { return CFG.watch_next_allow.indexOf(r.package) >= 0; });   // indexOf: old TV WebViews
     }
     return api("POST", "/api/watch-next", { rows: rows });
   }

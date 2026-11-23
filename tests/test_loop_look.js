@@ -831,7 +831,7 @@ console.log('Loop look version tests passed.');
   const ctx = {
     document: { documentElement: { dir: 'ltr' } }, touched: false,
     LOOP: true, NIGHT: true, footballEnabled: false, LOCAL_SPOTIFY: false, expanded: false, AMBIENT_MUSIC: false, music: { state: 'playing' }, lift: null,
-    zone: 'shelf', s: 0, g: 0, qi: 0, pi: 0, npI: 1, GRID_COLS: 12, people: 1, quick: 2, reach: true,
+    zone: 'shelf', s: 0, g: 0, qi: 0, pi: 0, npI: 1, currentNpBtns: [], GRID_COLS: 12, people: 1, quick: 2, reach: true,
     shelfEls: [1, 2, 3, 4, 5], gridItems: [], PEOPLE: [{ id: 'a' }, { id: 'b' }],
     gridEls: Array.from({ length: 6 }, (_, i) => ({ getBoundingClientRect: () => rect(564 + i * 136, 912, 112, 112) })),
     $: (id) => (id === 'np' ? np : null),
@@ -912,7 +912,7 @@ console.log('Loop look version tests passed.');
   ctx.npFit('a'); ctx.npFit('a'); ctx.npFit(''); ctx.npFit('');
   assert.strictEqual(calls.length, 2, 'once per change, not on every key press');
   ctx.LOOP = false; ctx.npFit('b'); assert.strictEqual(calls.length, 2, 'only in the Loop look');
-  assert(/if \(!on\) \{ el\.innerHTML = ""; npFit\(""\); return; \}/.test(source) && /npFit\(\[music\.title, music\.artist \|\| music\.album \|\| "", btns\.length\]\.join\("\\n"\)\);\n  \}/.test(source), 'renderNp refits the date line');
+  assert(/if \(!on\) \{[^}]*el\.innerHTML = "";[^}]*npFit\(""\);\s*return;\s*\}/.test(source) && /npFit\(\[music\.title, music\.artist \|\| music\.album \|\| "", btns\.length\]\.join\("\\n"\)\);\n  \}/.test(source), 'renderNp refits the date line');
   assert(/renderPop\(\);\n\s*if \(LOOP && npVisible\(\)\) fitDate\(\);/.test(source), 'so does renderPeople');
   console.log('Loop date line and Now playing tests passed.');
 }
