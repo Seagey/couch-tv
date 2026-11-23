@@ -86,6 +86,13 @@ class ReleaseChannelTest {
         assertTrue(ReleaseChannel.newer("v0.13.10", "0.13"))
         assertFalse(ReleaseChannel.newer("v0.13.10", "0.13.10"))
         assertFalse(ReleaseChannel.newer("v0.13.9", "0.13.10"))
+        // 0.13.11 (Add apps in one sheet, Jost and Cormorant on the TV, the on-TV app's own key) reaches 0.13.10
+        // and older TVs, and is never older than 0.13.10
+        assertTrue(ReleaseChannel.newer("v0.13.11", "0.13.10"))
+        assertTrue(ReleaseChannel.newer("v0.13.11", "0.13.9"))
+        assertTrue(ReleaseChannel.newer("v0.13.11", "0.13"))
+        assertFalse(ReleaseChannel.newer("v0.13.11", "0.13.11"))
+        assertFalse(ReleaseChannel.newer("v0.13.10", "0.13.11"))
         assertFalse(ReleaseChannel.newer("v0.13.8", "0.13.9"))
     }
 

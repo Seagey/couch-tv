@@ -2,9 +2,18 @@
 
 Everything that changed in couch-tv, newest first.
 
-The newest release is **0.13.10**. The TV apps come from [the Releases page](https://github.com/Seagey/couch-tv/releases). The bridge, and with option B the home's own screen, run from your copy of this repo, so `git pull` brings their changes.
+The newest release is **0.13.11**. The TV apps come from [the Releases page](https://github.com/Seagey/couch-tv/releases). The bridge, and with option B the home's own screen, run from your copy of this repo, so `git pull` brings their changes.
 
 ## November 2026
+
+### 24 November 2026: release 0.13.11, add many apps at once, Jost and Cormorant on the TV, and the on-TV app's own signing key
+
+0.13.11 is on [the Releases page](https://github.com/Seagey/couch-tv/releases). Option C: Home settings, Updates, Update to. On Android 9 and newer, a TV that skipped 0.13.10 says the file has another key: install 0.13.11 once with Downloader (code 8180170) or over the old app from a computer, and your settings stay. Other Android TVs: Home settings, Updates. Option B: `git pull` and restart the bridge. Full notes: [RELEASE-NOTES-0.13.11.md](../RELEASE-NOTES-0.13.11.md).
+
+- **Add apps:** Hold OK on an app in a folder, the Dock, an app grid or Games, then Add apps: one sheet with every app on the TV, pick as many as you want, Back saves. Also in Home settings, on the widget's page.
+- **Fonts from Couch TV Studio:** widgets set in Jost or Cormorant Garamond now draw in those fonts on the TV.
+- **The on-TV app's own signing key:** from 0.13.11 the on-TV app is signed with its own release key on Android 9 and newer. 0.13.10 knows how to accept it.
+- **Fixes:** no weather line over a widget design's smart stack, the update question comes back when you press Home, and the design code error names Couch TV Studio.
 
 ### 23 November 2026: release 0.13.10, a simpler start on a new TV and widgets set up on your phone
 
