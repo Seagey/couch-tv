@@ -23,17 +23,30 @@ class SetupScreens(val look: SetupLook) {
      */
     fun step(step: Int, title: String, line: String, primary: String, onPrimary: () -> Unit,
              second: String? = null, secondKind: SetupLook.Kind = SetupLook.Kind.GHOST, onSecond: () -> Unit = {},
-             chip: String? = null, note: Pair<String, String>? = null, settings: (() -> Unit)? = null): Step {
+             chip: String? = null, note: Pair<String, String>? = null, settings: (() -> Unit)? = null,
+             of: Int = 2, label: String? = null, primaryKind: SetupLook.Kind = SetupLook.Kind.INK, extra: View? = null,
+             after: String? = null, side: View? = null): Step {
         val card = look.card()
-        if (step > 0) card.addView(look.eyebrow(step), LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply { bottomMargin = look.px(18) })
-        card.addView(look.heading(title))
+        if (step > 0) card.addView(look.eyebrow(step, of, label ?: SetupWords.stepOf(step, of)), LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply { bottomMargin = look.px(18) })
+        // a long heading a size down, so it stays on one line in the card
+        card.addView(look.heading(title, if (title.length > 26) 38f else 42f))
         val words = look.line(line)
         card.addView(words, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply { topMargin = look.px(14) })
-        val main = look.pill(primary, SetupLook.Kind.INK, on = onPrimary)
+        if (line.isEmpty()) words.visibility = View.GONE
+        if (extra != null) card.addView(extra)
+        val main = look.pill(primary, primaryKind, on = onPrimary)
         val other = second?.let { look.pill(it, secondKind, small = secondKind == SetupLook.Kind.LINK, on = onSecond) }
-        card.addView(if (other != null) look.actions(main, other) else look.actions(main))
         val done = chip?.let { look.doneChip(it) }
-        if (done != null) card.addView(done)
+        // a chip with words after it (the key walk-through's end): the chip, the words, then the buttons
+        if (done != null && after != null) {
+            card.addView(done)
+            card.addView(look.line(after), LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply { topMargin = look.px(20) })
+        }
+        val row = if (other != null) look.actions(main, other) else look.actions(main)
+        // something beside the buttons (the walk-through's pairing QR), pushed to the right end
+        if (side != null) { (row.layoutParams as LinearLayout.LayoutParams).width = ViewGroup.LayoutParams.MATCH_PARENT; row.addView(View(look.c), LinearLayout.LayoutParams(0, 1, 1f)); row.addView(side) }
+        card.addView(row)
+        if (done != null && after == null) card.addView(done)
         if (note != null) card.addView(look.note(note.first, note.second))
         val corner = settings?.let { look.pill(SetupWords.SETTINGS, SetupLook.Kind.GHOST, small = true, surface = SetupLook.WALL, on = it) }
         return Step(look.screen(card, corner), words, main, other, done, corner)

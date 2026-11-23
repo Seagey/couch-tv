@@ -24,15 +24,17 @@ and the Android SDK.
 **No computer or a failed home step (issue #98).** If couch-tv installed as an app but is not the
 home (the person came without a computer, or `apply.sh` could not run), on a plain Android TV 10 or
 newer the app asks Android itself: it offers "Make couch-tv your home screen?" the first time it
-opens, and Home settings, About repeats it. The on-TV app does the same from **Use as home screen**,
-except on a TV with Google's Android TV Home (`com.google.android.tvlauncher`) where Couch TV cannot yet press
-keys: there, switching the home on put Google's home in front and the setup screen could not come back (a TCL on
-Android TV 11, 23 Nov 2026), and Home kept opening Google's home by name anyway, so the setup screen stays put and
-says to let Couch TV press keys, then press **Make Home open Couch TV** (on-tv/README.md). A TV that had no
+opens, and Home settings, About repeats it. The on-TV app does the same from its first setup step, **Make Couch
+TV your home** (the Make it my home button), except on a TV with Google's Android TV Home
+(`com.google.android.tvlauncher`) where Couch TV cannot yet press keys: there, switching the home on put Google's
+home in front and the setup screen could not come back (a TCL on Android TV 11, 23 Nov 2026), and Home kept
+opening Google's home by name anyway, so step 1 says so in one line, with More help behind it: let Couch TV press
+keys (Settings, Phone remote, Set it up), then press **Make Home open Couch TV** (on-tv/README.md). A TV that had no
 question to show, or sent the person to its own home once, gets the same kind of note instead of a second try.
 On Google TV that does not hold the Home key: run `apply.sh` from a computer for the Home button
 watch, or, with the on-TV app (0.13.9 or newer) once its own link to the TV is connected, press **Make Home
-open Couch TV** on its setup screen (on-tv/README.md, "Use it as the home screen"): it puts the watch version
+open Couch TV** (step 1 when the link is there, or the end of Settings, Phone remote, Set it up; on-tv/README.md,
+"Use it as the home screen"): it puts the watch version
 on and switches the watch on by itself, with the TCL steps below. Never switch off or uninstall the TV's own home to make this work.
 
 The steps in docs/SETUP.md are numbered 1 to 6. Option A uses steps 1, 2 and 6. Option B uses steps 1 to
@@ -584,7 +586,7 @@ Ask: "Ready for me to set it up? You can undo all of it." Wait for a clear yes.
    by an older couch-tv: with the Google TV home and the setup app switched off, the TV stopped
    showing "Allow USB debugging?" for any new key. The current `apply.sh` leaves both on, but make
    sure each computer that will talk to the TV has been allowed first anyway, and for option C that
-   the on-TV app's **Connect ADB** has been allowed.
+   the on-TV app's key link (Settings, Phone remote, Set it up, then **Connect**) has been allowed.
 5. Follow docs/SETUP.md for their option (A: steps 1, 2 and 6; B: steps 1 to 6;
    C: [on-tv/README.md](on-tv/README.md)). Run `tv-home/tools/survey-tv.py` before `apply.sh`.
    Option A: run `apply.sh` with no `BRIDGE_URL`. Option B: with `BRIDGE_URL`. It copies the app

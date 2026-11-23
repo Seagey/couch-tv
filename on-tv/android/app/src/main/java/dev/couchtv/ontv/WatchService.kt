@@ -67,6 +67,12 @@ class WatchService : AccessibilityService() {
         private val isHisense = android.os.Build.MANUFACTURER.equals("Hisense", ignoreCase = true)
         @Volatile private var instance: WatchService? = null
         /** After "patchwall_replace" changes: start or stop filtering keys straight away. */
+        /** Undo Couch TV (Settings): the running watch switches itself off in Android's own list. False when it is not running. */
+        fun switchOff(): Boolean {
+            val s = instance ?: return false
+            if (android.os.Build.VERSION.SDK_INT < 24) return false
+            return runCatching { s.disableSelf(); true }.getOrDefault(false)
+        }
         fun keyFilterChanged() {
             instance?.let { s -> android.os.Handler(android.os.Looper.getMainLooper()).post { s.applyKeyFilter() } }
         }

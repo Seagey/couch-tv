@@ -2,26 +2,28 @@ package dev.couchtv.ontv
 
 import android.app.Activity
 import android.content.Intent
+import android.net.Uri
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.provider.Settings
-import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
 import android.widget.FrameLayout
-import android.widget.ImageView
 import android.widget.LinearLayout
-import android.widget.ScrollView
 import android.widget.TextView
 
 /**
  * The Couch TV tile. A new TV gets two steps done with the TV remote alone (SetupSteps): make Couch TV the
  * home, then open it, where the home's own first-run welcome offers a design code or Couch Original. Later
- * opens show "Couch TV is ready" with Open the home and Settings. Settings holds everything else, unchanged:
- * the phone remote's QR and code, New phone code, Forget phones, Use as home screen and Stop being the home
- * screen, Make Home open Couch TV, Let the phone press keys, the computer route and every note. Typing
- * (wireless debugging code, API key, names) stays on the phone at /setup.
+ * opens show "Couch TV is ready" with Open the home and Settings.
+ *
+ * Settings (SettingsScreen, SetupSettings; owner approved round 2, 23 Nov 2026) is a list and a panel:
+ * Edit your home (a QR to the phone page, where widgets, the town, calendars and photos are set), Phone
+ * remote (pictures of the real phone remote, the pairing QR and code, New code, Forget phones, and the key
+ * walk-through only on a TV that still needs it), Undo Couch TV (back to the TV's own home, the watch off,
+ * then Android's own uninstall question) and Help (a QR to the help site). Typing (the wireless debugging
+ * code, the API key, names) stays on the phone at /setup.
  */
 class SetupActivity : Activity() {
     private val main = Handler(Looper.getMainLooper())
@@ -33,29 +35,12 @@ class SetupActivity : Activity() {
     private var backTo = SetupSteps.Screen.READY
     private var step: SetupScreens.Step? = null
 
-    // Settings (interim: the owner is choosing its look from mockups; every old part is here, nothing lost)
-    private lateinit var settingsRoot: View
-    private lateinit var settingsScroll: ScrollView
-    private lateinit var phoneCard: View
-    private lateinit var keysCard: View
-    private lateinit var settingsBack: TextView
-    private lateinit var address: TextView
-    private lateinit var code: TextView
-    private lateinit var next: TextView
-    private lateinit var setup: TextView
-    private lateinit var qr: ImageView
-    private var shownUrl: String? = ""
-    private lateinit var adb: TextView
-    private lateinit var homeBtn: TextView
-    private lateinit var homeNote: TextView
-    private lateinit var openHome: TextView
-    private lateinit var connect: TextView
-    private lateinit var watchNote: TextView
-    // Make Home open Couch TV (HomeKey.kt): the button, its line, and the help page's QR code when it needs a computer
-    private lateinit var hkBtn: TextView
-    private lateinit var hkLine: TextView
-    private lateinit var hkQr: ImageView
-    private var hkQrShown = false
+    private lateinit var settings: SettingsScreen
+    private var editShown: String? = ""
+    private var phoneShown: String? = ""
+    /** the key walk-through: which screen of SetupSettings.keySteps, and its status line on the last one */
+    private var keyIndex = 0
+    private var keyStatus: TextView? = null
 
     private val tick = object : Runnable { override fun run() { refresh(); main.postDelayed(this, 1500) } }
     private val pinListener: (String?) -> Unit = { main.post { refresh() } }
@@ -105,10 +90,10 @@ class SetupActivity : Activity() {
         Store.putStr(HomeAsk.PENDING_KEY, null)
         if (!HomeRole.held(this)) { App.setHomeEnabled(this, false); FireHome.poke(); Store.putStr(HomeAsk.BLOCKED_KEY, reason) }
         android.util.Log.w("couchtv.homeask", "use as home screen: gave up asking ($reason)")
-        updateOpenHome(); refresh()
+        refresh()
     }
 
-    /** What a press of Use as home screen does on this TV now (HomeAsk.plan). */
+    /** What a press of Make it my home does on this TV now (HomeAsk.plan). */
     private fun plan() = HomeAsk.plan(HomeRole.googleTv(this), HomeRole.googleHome(this), BuildConfig.BUILD_TYPE == "watch",
         HomeRole.canComeBack(this), Store.str(HomeAsk.BLOCKED_KEY))
     // Something came on top while waiting (Google's home put an empty black screen there on a TCL): bring
@@ -130,23 +115,32 @@ class SetupActivity : Activity() {
         look = SetupLook(this); screens = SetupScreens(look)
         frame = FrameLayout(this).apply { setBackgroundColor(SetupLook.WALL) }
         setContentView(frame)
-        buildSettings()
+        settings = SettingsScreen(look, object : SettingsScreen.Actions {
+            override fun newCode() { Auth.resetLocks(); Auth.newPin(); refresh() }   // someone with the TV remote is here: every pairing lock opens
+            override fun forgetPhones() { Auth.forgetAll(); refresh() }
+            override fun keys() { keyIndex = 0; show(SetupSteps.Screen.KEYS) }
+            override fun undo() { show(SetupSteps.Screen.UNDO_CONFIRM) }
+            override fun accessibility() { runCatching { startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)) } }
+        })
+        settings.helpQr.setImageBitmap(SettingsScreen.helpQr())
         val first = SetupSteps.firstScreen(Store.str(SetupSteps.DONE_KEY) == "1", Auth.phoneCount(), homeIsOn())
-        // a TV set up before this version: remembered, so a later Stop being the home screen never brings the steps back
+        // a TV set up before this version: remembered, so the steps do not come back on their own
         if (first == SetupSteps.Screen.READY) Store.putStr(SetupSteps.DONE_KEY, "1")
         // a phone asked to pair (App.showPin): straight to the phone remote in Settings
-        if (intent?.getBooleanExtra("pin", false) == true) { backTo = first; show(SetupSteps.Screen.SETTINGS, focus = "phone") }
+        if (intent?.getBooleanExtra("pin", false) == true) { backTo = first; show(SetupSteps.Screen.SETTINGS, SetupSettings.Item.PHONE) }
         else show(first)
     }
 
     // ------------------------------------------------------------------------------------------- screens
 
-    /** Puts a screen up. focus: "phone" or "keys" scrolls Settings to that part. */
-    private fun show(s: SetupSteps.Screen, focus: String? = null) {
-        if (s == SetupSteps.Screen.SETTINGS || s == SetupSteps.Screen.HOME_HELP) { if (screen != SetupSteps.Screen.SETTINGS && screen != SetupSteps.Screen.HOME_HELP) backTo = screen }
+    /** Puts a screen up. item: which Settings item is focused when it is Settings. */
+    private fun show(s: SetupSteps.Screen, item: SetupSettings.Item? = null) {
+        val sub = setOf(SetupSteps.Screen.SETTINGS, SetupSteps.Screen.HOME_HELP, SetupSteps.Screen.KEYS, SetupSteps.Screen.KEYS_DONE,
+            SetupSteps.Screen.UNDO_CONFIRM, SetupSteps.Screen.UNDO_DONE)
+        if (s in sub && screen !in sub) backTo = screen
         screen = s
         frame.removeAllViews()
-        step = null
+        step = null; keyStatus = null
         when (s) {
             SetupSteps.Screen.HOME_STEP -> step = buildHomeStep()
             SetupSteps.Screen.OPEN_STEP -> step = screens.step(2, SetupWords.OPEN_TITLE, SetupWords.OPEN_LINE, SetupWords.OPEN_BUTTON, { openTheHome() },
@@ -155,32 +149,35 @@ class SetupActivity : Activity() {
                 second = SetupWords.SETTINGS, onSecond = { show(SetupSteps.Screen.SETTINGS) },
                 note = SetupWords.READY_NOTE_START to SetupWords.SETTINGS)
             SetupSteps.Screen.HOME_HELP -> step = screens.help(explainReason(), SetupScreens.qrBitmap(HomeKeyRules.HELP_URL),
-                onKeys = { show(SetupSteps.Screen.SETTINGS, focus = "keys") }, onBack = { show(SetupSteps.Screen.HOME_STEP) })
+                onKeys = { keyIndex = 0; show(if (Adb.connected) SetupSteps.Screen.KEYS_DONE else SetupSteps.Screen.KEYS) },
+                onBack = { show(SetupSteps.Screen.HOME_STEP) })
+            SetupSteps.Screen.KEYS -> step = buildKeyStep()
+            SetupSteps.Screen.KEYS_DONE -> step = buildKeysDone()
+            SetupSteps.Screen.UNDO_CONFIRM -> step = screens.step(0, SetupWords.UNDO_CONFIRM_TITLE, SetupWords.UNDO_CONFIRM_LINE, SetupWords.UNDO_KEEP,
+                { show(SetupSteps.Screen.SETTINGS, SetupSettings.Item.UNDO) }, primaryKind = SetupLook.Kind.GHOST,
+                second = SetupWords.UNDO_ITEM, secondKind = SetupLook.Kind.INK, onSecond = { undoCouchTv(); show(SetupSteps.Screen.UNDO_DONE) })
+            SetupSteps.Screen.UNDO_DONE -> step = screens.step(0, SetupWords.UNDO_DONE_TITLE, SetupWords.UNDO_DONE_LINE, SetupWords.NOT_NOW,
+                { finish() }, primaryKind = SetupLook.Kind.GHOST,
+                second = SetupWords.UNDO_REMOVE, secondKind = SetupLook.Kind.INK, onSecond = { removeMe() })
             SetupSteps.Screen.SETTINGS -> {
-                if (Auth.currentPin() == null && Auth.phoneCount() == 0) Auth.newPin()
-                (settingsRoot.parent as? ViewGroup)?.removeView(settingsRoot)
-                frame.addView(settingsRoot)
+                (settings.root.parent as? ViewGroup)?.removeView(settings.root)
+                frame.addView(settings.root)
+                editShown = ""; phoneShown = ""
             }
         }
         step?.let { frame.addView(it.root) }
         refresh()
-        when {
-            s == SetupSteps.Screen.SETTINGS -> {
-                val target = when (focus) { "phone" -> phoneCard; "keys" -> keysCard; else -> null }
-                val button = when (focus) { "keys" -> connect; else -> settingsBack }
-                button.requestFocus()
-                target?.let { t -> settingsScroll.post { settingsScroll.smoothScrollTo(0, t.top) } } ?: settingsScroll.scrollTo(0, 0)
-            }
-            else -> step?.primary?.requestFocus()
-        }
+        if (s == SetupSteps.Screen.SETTINGS) {
+            val it = item ?: settings.selected
+            settings.select(it); settings.row(it).requestFocus()
+        } else step?.primary?.requestFocus()
     }
 
     private fun explainReason() = SetupSteps.explainReason(plan(), HomeRole.googleHome(this), Store.str(HomeAsk.BLOCKED_KEY))
+    private fun keyView() = runCatching { org.json.JSONObject(HomeKey.state(this)).optString("view") }.getOrDefault("")
 
-    private fun homeStepNow(): SetupSteps.HomeStep {
-        val v = runCatching { org.json.JSONObject(HomeKey.state(this)).optString("view") }.getOrDefault("")
-        return SetupSteps.homeStep(plan(), HomeRole.googleTv(this), BuildConfig.BUILD_TYPE == "watch", v, askSince > 0 || awaitingRole)
-    }
+    private fun homeStepNow(): SetupSteps.HomeStep =
+        SetupSteps.homeStep(plan(), HomeRole.googleTv(this), BuildConfig.BUILD_TYPE == "watch", keyView(), askSince > 0 || awaitingRole)
     private var shownStep: SetupSteps.HomeStep? = null
 
     private fun buildHomeStep(): SetupScreens.Step {
@@ -208,125 +205,109 @@ class SetupActivity : Activity() {
         startActivity(Intent(this, HomeActivity::class.java))
     }
 
+    // ------------------------------------------------------------------------------------------- the key walk-through
+
+    private fun keySteps() = SetupSettings.keySteps(SetupSettings.menus(HomeRole.googleTv(this), FireHome.isFireTv),
+        SetupSettings.needsPairing(android.os.Build.VERSION.SDK_INT, Adb.state, FireHome.isFireTv))
+
+    private fun buildKeyStep(): SetupScreens.Step {
+        val all = keySteps()
+        keyIndex = keyIndex.coerceIn(0, all.size - 1)
+        val k = all[keyIndex]
+        var extra: View? = null
+        var side: View? = null
+        if (k.action == SetupSettings.Action.CONNECT) {
+            keyStatus = look.line("", 15f, SetupLook.INK_3)
+            extra = keyStatus!!.apply { layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply { topMargin = look.px(10) } }
+        }
+        // Wireless debugging's code is typed on the phone (the phone page's Let the phone press keys): its QR pairs the phone too
+        if (k.phoneQr) side = phoneUrl()?.let { url -> SetupWords.qrLink(url, livePin(), "/setup")?.let { SetupScreens.qrBitmap(it) } }?.let { screens.qrBox(it, 104) }
+        return screens.step(keyIndex + 1, k.title, k.line, k.button, { keyAction(k.action) }, of = all.size,
+            label = SetupWords.keysOf(keyIndex + 1, all.size), second = k.second, onSecond = { keyAction(k.secondAction) }, extra = extra, side = side)
+    }
+
+    private fun keyAction(a: SetupSettings.Action) {
+        when (a) {
+            SetupSettings.Action.OPEN_ABOUT -> if (runCatching { startActivity(Intent(Settings.ACTION_DEVICE_INFO_SETTINGS)) }.isFailure)
+                runCatching { startActivity(Intent(Settings.ACTION_SETTINGS)) }
+            SetupSettings.Action.OPEN_DEVELOPER -> if (runCatching { startActivity(Intent(Settings.ACTION_APPLICATION_DEVELOPMENT_SETTINGS)) }.isFailure)
+                runCatching { startActivity(Intent(Settings.ACTION_SETTINGS)) }
+            SetupSettings.Action.NEXT -> { keyIndex++; show(SetupSteps.Screen.KEYS) }
+            SetupSettings.Action.BACK -> if (keyIndex > 0) { keyIndex--; show(SetupSteps.Screen.KEYS) } else show(SetupSteps.Screen.SETTINGS, SetupSettings.Item.PHONE)
+            SetupSettings.Action.CONNECT -> {
+                keyStatus?.text = "Connecting. If the TV asks \"Allow debugging?\", tick Always allow and press OK."
+                Thread { Adb.ensure(interactive = true); main.post { refresh() } }.start()
+            }
+        }
+    }
+
+    private fun buildKeysDone(): SetupScreens.Step {
+        val offer = SetupSettings.offerHomeKey(keyView(), HomeKeyRules.needed(HomeRole.googleHome(this), FireHome.isFireTv))
+        // with the Home button offer, the heading says the keys work: no second line, so the card fits a TV screen
+        return if (offer) screens.step(0, SetupWords.KEYS_DONE_TITLE, "", HomeKeyRules.BUTTON,
+            { HomeKey.start(this); show(SetupSteps.Screen.HOME_STEP) }, chip = SetupWords.DONE, after = SetupWords.KEYS_DONE_HOME,
+            second = SetupWords.NOT_NOW, onSecond = { show(SetupSteps.Screen.SETTINGS, SetupSettings.Item.PHONE) })
+        else screens.step(0, SetupWords.KEYS_DONE_TITLE, SetupWords.KEYS_DONE_LINE, SetupWords.DONE,
+            { show(SetupSteps.Screen.SETTINGS, SetupSettings.Item.PHONE) }, chip = SetupWords.DONE)
+    }
+
+    // ------------------------------------------------------------------------------------------- Undo Couch TV
+
+    /**
+     * Back to the TV's own home, with no computer: the home alias off (Android's Home goes back to the TV's own
+     * home), and the Home button version's watch off (it switches itself off, or the app takes it out of Android's
+     * list with the secure settings grant). The on-TV app changes nothing else outside itself.
+     */
+    private fun undoCouchTv() {
+        askSince = 0L; awaitingRole = false; main.removeCallbacks(ask); main.removeCallbacks(bringBack)
+        Store.putStr(HomeAsk.PENDING_KEY, null)
+        App.setHomeEnabled(this, false); FireHome.poke()
+        val canWrite = checkSelfPermission("android.permission.WRITE_SECURE_SETTINGS") == android.content.pm.PackageManager.PERMISSION_GRANTED
+        when (SetupSettings.undoWatch(BuildConfig.BUILD_TYPE == "watch", WatchService.connected, canWrite)) {
+            "self" -> if (!WatchService.switchOff() && canWrite) watchOutOfList()
+            "settings" -> watchOutOfList()
+        }
+        // set up again from step 1 next time
+        Store.putStr(SetupSteps.DONE_KEY, null)
+        android.util.Log.i("couchtv.setup", "undo couch tv: home off, watch off")
+    }
+    private fun watchOutOfList() = runCatching {
+        val cur = Settings.Secure.getString(contentResolver, "enabled_accessibility_services")
+        Settings.Secure.putString(contentResolver, "enabled_accessibility_services", HomeKeyRules.withoutWatch(cur, packageName))
+    }
+
+    /** Android's own "Uninstall?" for this app (REQUEST_DELETE_PACKAGES); else its App info page, which has Uninstall. */
+    private fun removeMe() {
+        val pkg = Uri.parse("package:$packageName")
+        if (runCatching { startActivity(Intent(Intent.ACTION_DELETE, pkg)) }.isFailure)
+            runCatching { startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, pkg)) }
+    }
+
     @Deprecated("Back on a TV remote")
     override fun onBackPressed() {
         when (screen) {
             SetupSteps.Screen.SETTINGS -> show(backTo)
             SetupSteps.Screen.HOME_HELP -> show(SetupSteps.Screen.HOME_STEP)
+            SetupSteps.Screen.KEYS -> keyAction(SetupSettings.Action.BACK)
+            SetupSteps.Screen.KEYS_DONE -> show(SetupSteps.Screen.SETTINGS, SetupSettings.Item.PHONE)
+            SetupSteps.Screen.UNDO_CONFIRM -> show(SetupSteps.Screen.SETTINGS, SetupSettings.Item.UNDO)
             SetupSteps.Screen.OPEN_STEP -> if (Store.str(SetupSteps.DONE_KEY) == "1") show(SetupSteps.Screen.READY) else show(SetupSteps.Screen.HOME_STEP)
             else -> @Suppress("DEPRECATION") super.onBackPressed()
         }
     }
 
-    // ------------------------------------------------------------------------------------------- Settings
-
-    private fun buildSettings() {
-        val col = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(look.px(48), look.px(28), look.px(48), look.px(40)); clipChildren = false }
-        val top = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL; clipChildren = false }
-        top.addView(look.brand(), LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
-        settingsBack = look.pill(SetupWords.BACK, SetupLook.Kind.GHOST, small = true, surface = SetupLook.WALL) { show(backTo) }
-        top.addView(settingsBack)
-        col.addView(top)
-        col.addView(look.heading(SetupWords.SETTINGS, 34f).apply { setPadding(look.px(4), look.px(14), 0, look.px(6)) })
-
-        fun section(title: String): LinearLayout = look.card(width = 0, padH = 36, padV = 28).apply {
-            layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply { topMargin = look.px(14) }
-            elevation = 0f
-            addView(look.heading(title, 26f))
-            col.addView(this)
-        }
-        fun small(t: String = "") = look.line(t, 15f).apply { setPadding(0, look.px(8), 0, 0) }
-        fun button(t: String, on: () -> Unit) = look.pill(t, SetupLook.Kind.GHOST, small = true, on = on)
-        fun row(vararg v: View) = look.actions(*v).apply { (layoutParams as LinearLayout.LayoutParams).topMargin = look.px(10) }
-
-        // the phone remote: a QR code to scan, with the code and the address beside it for anyone who would rather type
-        phoneCard = section("Phone remote").apply {
-            val pair = LinearLayout(this@SetupActivity).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL; setPadding(0, look.px(12), 0, 0) }
-            qr = ImageView(this@SetupActivity).apply { setBackgroundColor(android.graphics.Color.WHITE) }
-            pair.addView(qr, LinearLayout.LayoutParams(look.px(150), look.px(150)).apply { rightMargin = look.px(24) })
-            val words = LinearLayout(this@SetupActivity).apply { orientation = LinearLayout.VERTICAL }
-            code = look.heading("", 30f); words.addView(code)
-            next = small(); words.addView(next)
-            address = small().apply { setTextColor(SetupLook.INK) }; words.addView(address)
-            pair.addView(words, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
-            addView(pair)
-            // someone with the TV remote is here: every pairing lock opens (Auth.resetLocks), then a new code
-            addView(row(button("New phone code") { Auth.resetLocks(); Auth.newPin(); refresh() }, button("Forget phones") { Auth.forgetAll(); refresh() }))
-        }
-
-        section("Home button").apply {
-            homeNote = small(); addView(homeNote)
-            // The way to the home page on a TV where Google's home keeps the Home button. Only shows when the Home
-            // button does not already open Couch TV (see homeOpensUs). HomeActivity applies Kids mode itself.
-            openHome = button(SetupWords.OPEN_BUTTON) { startActivity(Intent(this@SetupActivity, HomeActivity::class.java)) }
-            homeBtn = button("") { homeButtonPressed() }
-            addView(row(openHome, homeBtn))
-            // the button (only while one press can do it) and its words, with the help page's QR when it needs a computer
-            val hk = LinearLayout(this@SetupActivity).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL }
-            val hkWords = LinearLayout(this@SetupActivity).apply { orientation = LinearLayout.VERTICAL }
-            hkBtn = button(HomeKeyRules.BUTTON) { HomeKey.start(this@SetupActivity); refresh() }.apply { visibility = View.GONE }
-            hkWords.addView(look.actions(hkBtn))
-            hkLine = small().apply { setTextColor(SetupLook.INK) }; hkWords.addView(hkLine)
-            hk.addView(hkWords, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
-            hkQr = ImageView(this@SetupActivity).apply { visibility = View.GONE }
-            hk.addView(hkQr, LinearLayout.LayoutParams(look.px(130), look.px(130)).apply { leftMargin = look.px(20) })
-            addView(hk)
-            // the phone only download: the exact way to the Home button watch, from a computer (SetupWords.watchSteps)
-            watchNote = small()
-            if (BuildConfig.BUILD_TYPE != "watch") addView(look.heading("Home button from a computer", 20f).apply { setPadding(0, look.px(16), 0, 0) })
-            if (BuildConfig.BUILD_TYPE != "watch") addView(watchNote)
-        }
-
-        // the tools for the arrow keys and typing from the phone, in plain words
-        keysCard = section("Let the phone press keys").apply {
-            adb = small(); addView(adb)
-            connect = button("Let the phone press keys") { adb.text = "Connecting. If the TV asks \"Allow debugging?\", tick Always allow and press OK."; Thread { Adb.ensure(interactive = true); main.post { refresh() } }.start() }
-            val dev = button("Open Developer options") { runCatching { startActivity(Intent(Settings.ACTION_APPLICATION_DEVELOPMENT_SETTINGS)) } }
-            // the home watch is only in couch-tv-ontv-watch.apk (installed from a computer): Play Protect blocks it in a phone only install
-            if (BuildConfig.BUILD_TYPE == "watch") addView(row(connect, dev, button("Keep Couch TV on Home") { runCatching { startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)) } }))
-            else addView(row(connect, dev))
-            addView(small("For the arrow keys and typing from your phone, the TV has to let Couch TV press keys. One time only: " +
-                "on the TV open Settings, then System (or Device Preferences), then About, and press OK on Android TV OS build (on some TVs, Build) seven times. " +
-                "Then in Developer options switch on USB debugging, and Network debugging or Wireless debugging if the TV has one. " +
-                "These let Couch TV press keys on this TV. Only a device you press Allow for can use them. " +
-                "Come back here and press Let the phone press keys, then Allow on the TV. " +
-                (if (android.os.Build.VERSION.SDK_INT >= 33) "This TV runs Android 13 or newer: use Wireless debugging, then Pair device with pairing code, and type that code on your phone, in Home settings, Let the phone press keys. " else "") +
-                "Careful: never press Revoke USB debugging authorizations."))
-        }
-
-        section("Phone or computer setup").apply {
-            setup = small(); addView(setup)
-        }
-        section("Good to know").apply {
-            addView(small("The phone remote runs on this TV. No computer needed."))
-            addView(small("Couch TV cannot turn the TV on: once the TV sleeps, this app sleeps too. Use the TV's own remote."))
-        }
-        settingsScroll = ScrollView(this).apply { setBackgroundColor(SetupLook.WALL); clipChildren = false; addView(col) }
-        settingsRoot = settingsScroll
-        updateOpenHome()
-    }
-
-    /** Settings, Use as home screen / Stop being the home screen: the old button, unchanged. */
-    private fun homeButtonPressed() {
-        if (askSince > 0) return   // already asking
-        // what Android reports now decides (HomeAsk.isOn): a switch left on while the TV's own home is the
-        // default asks again instead of switching off
-        val on = !homeIsOn()
-        declined = false
-        if (on) turnHomeOn() else { App.setHomeEnabled(this, false); FireHome.poke(); refresh(); updateOpenHome() }
-    }
-
     /**
-     * Switches the home on and asks Android where it can. A TV that cannot be asked from here (Google's Android
-     * TV Home without "draw over apps", or a TV that had no question before): change nothing and stay here, step 1
-     * says what to do (TCL, 23 Nov 2026: switching the home on put Google's home in front and this screen never came back).
+     * Step 1's Make it my home: switches the home on and asks Android where it can. A TV that cannot be asked from
+     * here (Google's Android TV Home without "draw over apps", or a TV that had no question before): change nothing
+     * and stay here, step 1 says what to do (TCL, 23 Nov 2026: switching the home on put Google's home in front and
+     * this screen never came back).
      */
     private fun turnHomeOn() {
         if (askSince > 0) return
         declined = false
         val plan = plan()
         android.util.Log.i("couchtv.homeask", "use as home screen pressed: $plan")
-        if (plan == HomeAsk.Plan.EXPLAIN) { if (App.homeEnabled(this)) App.setHomeEnabled(this, false); refresh(); updateOpenHome(); return }
+        if (plan == HomeAsk.Plan.EXPLAIN) { if (App.homeEnabled(this)) App.setHomeEnabled(this, false); refresh(); return }
         App.setHomeEnabled(this, true); FireHome.poke()
         // No computer: Android's own "default home app" request (plain Android TV 10+), else its Home settings.
         // Not at once: Android needs a moment to take in the alias just switched on (HomeAsk.kt).
@@ -336,14 +317,14 @@ class SetupActivity : Activity() {
             Store.putStr(HomeAsk.PENDING_KEY, askSince.toString())
             main.post(ask)
         }
-        refresh(); updateOpenHome()
+        refresh()
     }
 
     // ------------------------------------------------------------------------------------------- Android
 
     override fun onResume() {
         super.onResume(); inFront = true
-        Auth.onPin(pinListener); main.post(tick); updateOpenHome()
+        Auth.onPin(pinListener); main.post(tick)
         if (askSince > 0) {
             // back in front: brought back (or Back on a black screen) soon enough asks; much later, the person found
             // their own way back from the TV's home, so asking again would only send them there again
@@ -385,14 +366,13 @@ class SetupActivity : Activity() {
                 HomeAsk.Answer.NO_QUESTION -> giveUp(HomeAsk.NO_QUESTION)
                 HomeAsk.Answer.DECLINED -> if (!HomeAsk.keepAliasOn(held)) { App.setHomeEnabled(this, false); FireHome.poke(); declined = true }
             }
-            updateOpenHome()
         }
         refresh()
     }
     override fun onNewIntent(i: Intent) {
         super.onNewIntent(i)
         if (backFromUpdate(i)) return
-        if (i.getBooleanExtra("pin", false)) show(SetupSteps.Screen.SETTINGS, focus = "phone") else refresh()
+        if (i.getBooleanExtra("pin", false)) show(SetupSteps.Screen.SETTINGS, SetupSettings.Item.PHONE) else refresh()
     }
 
     /** Opens the home when the intent comes from the update's shell line, once (the extra goes). */
@@ -405,29 +385,26 @@ class SetupActivity : Activity() {
 
     private fun homeIsOn(): Boolean = HomeAsk.isOn(App.homeEnabled(this), HomeRole.held(this), homeOpensUs(), HomeRole.googleTv(this))
 
-    /** True when the TV's Home button already opens this app (the HomeAlias), so Open the home in Settings would be redundant. */
+    /** True when the TV's Home button already opens this app (the HomeAlias). */
     private fun homeOpensUs(): Boolean {
         val home = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME)
         val pkg = runCatching { packageManager.resolveActivity(home, android.content.pm.PackageManager.MATCH_DEFAULT_ONLY)?.activityInfo?.packageName }.getOrNull()
         return pkg == packageName
     }
 
-    /** Settings shows Open the home only when Home does not open Couch TV; GONE keeps the D pad order gap free. */
-    private fun updateOpenHome() {
-        if (!::openHome.isInitialized) return
-        val show = !homeOpensUs()
-        val hadFocus = openHome.hasFocus()
-        openHome.visibility = if (show) View.VISIBLE else View.GONE
-        if (!show && hadFocus) homeBtn.requestFocus()
-    }
+    private fun phoneUrl(): String? = App.lanAddress()?.let { "http://$it:${Store.port}" }
+    /** A live code while the phone's QR is on screen (renewed before it runs out), none while pairing is locked. */
+    private fun livePin(): String? = if (Auth.lockedEverywhere() > 0) null else Auth.pinForQr()
 
     private fun refresh() {
         if (!::frame.isInitialized) return
-        refreshStep()
-        refreshSettings()
+        when (screen) {
+            SetupSteps.Screen.SETTINGS -> refreshSettings()
+            else -> refreshStep()
+        }
     }
 
-    /** The step screen's words and buttons, from what Android and HomeKey report now. */
+    /** The step screen's words and buttons, from what Android, the key link and HomeKey report now. */
     private fun refreshStep() {
         val s = step ?: return
         when (screen) {
@@ -448,63 +425,35 @@ class SetupActivity : Activity() {
             }
             SetupSteps.Screen.OPEN_STEP -> s.chip?.visibility = if (homeIsOn()) View.VISIBLE else View.GONE
             SetupSteps.Screen.READY -> s.line.text = SetupWords.readyLine(homeOpensUs())
+            SetupSteps.Screen.KEYS -> {
+                // the link came up: the walk-through is done
+                if (Adb.connected) { show(SetupSteps.Screen.KEYS_DONE); return }
+                val st = Adb.status()
+                if (keyStatus != null && (st["state"] != "off" || Adb.unanswered))
+                    keyStatus?.text = SetupWords.keysLine(false, st["state"] == "waiting_for_allow" || st["state"] == "connecting", st["state"] == "needs_pairing", Adb.unanswered)
+                        .let { if (it.startsWith("The phone remote opens apps")) "" else it }
+            }
             else -> {}
         }
     }
 
     private fun refreshSettings() {
-        val ip = App.lanAddress()
-        val phoneUrl = if (ip != null) "http://$ip:${Store.port}" else null
-        // locked for every phone (Auth.lockedEverywhere): no code that would be refused, the lock and its time instead
+        val url = phoneUrl()
         val locked = Auth.lockedEverywhere()
-        val p = if (locked > 0) null else Auth.currentPin()
-        // one scan pairs: while a code is live it rides in the QR's #fragment (never sent to the TV in
-        // a request line, so never in a log); the phone page pairs with it at once (shim.js)
-        val qrText = SetupWords.qrLink(phoneUrl, p)
-        if (qrText != shownUrl) {
-            shownUrl = qrText
-            qr.setImageBitmap(qrText?.let { SetupScreens.qrBitmap(it) })
-            qr.visibility = if (qrText != null) View.VISIBLE else View.GONE
-        }
-        address.text = if (phoneUrl != null) "Or type  $phoneUrl" else "This TV is not on a network yet. Connect it to Wi-Fi first."
-        setup.text = if (phoneUrl != null) "Home settings on your phone or computer, on the same Wi-Fi:  $phoneUrl/setup" else "This TV is not on a network yet. Connect it to Wi-Fi first."
-        val ago = Auth.lastPairedAt.takeIf { it > 0 }?.let { System.currentTimeMillis() - it }
-        code.text = SetupWords.pairLine(p, Auth.phoneCount(), ago, locked)
-        next.text = SetupWords.nextLine(p, Auth.phoneCount(), homeOpensUs(), locked)
-        val s = Adb.status()
-        adb.text = SetupWords.keysLine(Adb.connected, s["state"] == "waiting_for_allow" || s["state"] == "connecting", s["state"] == "needs_pairing", Adb.unanswered)
-        val google = HomeRole.googleTv(this)
-        val watchApk = BuildConfig.BUILD_TYPE == "watch"
-        val asking = askSince > 0 || awaitingRole
-        // read from Android on every refresh (each 1.5 s and on resume), never from a saved flag alone
-        val held = HomeRole.held(this)
-        val opensUs = homeOpensUs()
-        homeBtn.text = HomeAsk.buttonLabel(HomeAsk.isOn(App.homeEnabled(this), held, opensUs, google), asking)
-        homeBtn.visibility = if (HomeAsk.showButton(google, watchApk, App.homeEnabled(this))) View.VISIBLE else View.GONE
-        val googleHome = HomeRole.googleHome(this)
-        val blocked = Store.str(HomeAsk.BLOCKED_KEY)
-        homeNote.text = SetupWords.homeNote(App.homeEnabled(this), held, google, watchApk = watchApk,
-            googleHome = googleHome, asking = asking, declined = declined && !App.homeEnabled(this), opensUs = opensUs,
-            noAsk = HomeAsk.noAskReason(plan(), googleHome, blocked))
-        if (!watchApk) watchNote.text = SetupWords.watchSteps(ip)
-        showHomeKey()
-    }
-
-    /** Make Home open Couch TV: the button while one press can do it, the words, and the help page's QR when it needs a computer. */
-    private fun showHomeKey() {
-        val s = org.json.JSONObject(HomeKey.state(this))
-        val v = s.optString("view")
-        val hadFocus = hkBtn.hasFocus()
-        hkBtn.visibility = if (v == "ready" || v == "busy") View.VISIBLE else View.GONE
-        // never disabled: a disabled button loses the D pad focus. Dimmed while busy; HomeKey.start ignores a second press.
-        hkBtn.alpha = if (v == "ready") 1f else 0.5f
-        if (hadFocus && hkBtn.visibility != View.VISIBLE) homeBtn.requestFocus()
-        val err = s.optString("error_words")
-        // a failed press on the ready view: the reason alone (with the ready words too it runs to four lines)
-        hkLine.text = if (err.isNotEmpty() && v == "ready") err else listOf(err, s.optString("words")).filter { it.isNotEmpty() }.joinToString(" ")
-        hkLine.visibility = if (hkLine.text.isEmpty()) View.GONE else View.VISIBLE
-        val wantQr = v == "steps"
-        if (wantQr && !hkQrShown) SetupScreens.qrBitmap(HomeKeyRules.HELP_URL)?.let { hkQr.setImageBitmap(it); hkQrShown = true }
-        hkQr.visibility = if (wantQr && hkQrShown) View.VISIBLE else View.GONE
+        val pin = if (settings.selected == SetupSettings.Item.EDIT || settings.selected == SetupSettings.Item.PHONE) livePin() else Auth.currentPin()
+        // one scan pairs: while a code is live it rides in the QR's #fragment (never sent to the TV in a request
+        // line, so never in a log); the phone page pairs with it at once (shim.js)
+        val editLink = SetupWords.qrLink(url, pin, "/setup")
+        if (editLink != editShown) { editShown = editLink; settings.editQr.setImageBitmap(editLink?.let { SetupScreens.qrBitmap(it) }) }
+        settings.editType.text = SetupWords.editType(url?.let { "$it/setup" }, pin)
+        val phoneLink = SetupWords.qrLink(url, pin)
+        if (phoneLink != phoneShown) { phoneShown = phoneLink; settings.phoneQr.setImageBitmap(phoneLink?.let { SetupScreens.qrBitmap(it) }) }
+        settings.phoneCode.text = SetupWords.phoneCode(pin, locked)
+        settings.phoneType.text = SetupWords.phoneType(url)
+        settings.setPhones(Auth.phoneCount())
+        val fireBlocked = FireHome.isFireTv && (Adb.lastError ?: "").contains(Adb.FIRE_BLOCKED)
+        settings.setStrip(SetupSettings.keyStrip(Adb.connected, fireBlocked))
+        settings.setWatchLine(SetupSettings.showWatchLine(BuildConfig.BUILD_TYPE == "watch",
+            HomeKeyRules.watching(WatchService.connected, FireHome.isFireTv, android.os.Build.VERSION.SDK_INT, FireHome.usageAllowed)))
     }
 }

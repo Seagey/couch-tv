@@ -148,7 +148,7 @@ const tick = () => new Promise((r) => setTimeout(r, 20));
   ok(z(".design-offer") > z(".onboard") && z(".toast") > z(".onboard"), "the design offer and its toast show above the first run screen");
 }
 const setup = fs.readFileSync(path.join(root, "on-tv/android/app/src/main/java/dev/couchtv/ontv/SetupActivity.kt"), "utf8");
-ok(setup.includes("SetupWords.qrLink(phoneUrl, p)"), "the TV's QR holds the live code");
+ok(setup.includes("SetupWords.qrLink(url, pin)"), "the TV's QR holds the live code");
 
 // ---------------- the TV home: Get a design from your phone ----------------
 function home(cfg, fetchAnswer) {

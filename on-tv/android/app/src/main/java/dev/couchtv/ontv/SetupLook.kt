@@ -50,13 +50,13 @@ class SetupLook(val c: Context) {
     }
 
     /** "Step 1 of 2" with the two bars: done steps leaf green, this one ink, the rest pale. */
-    fun eyebrow(step: Int, of: Int = 2) = LinearLayout(c).apply {
+    fun eyebrow(step: Int, of: Int = 2, text: String = SetupWords.stepOf(step, of)) = LinearLayout(c).apply {
         orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL
         for (i in 1..of) addView(View(c).apply {
             background = round(when { i < step -> LEAF; i == step -> INK; else -> PALE }, 3f)
             layoutParams = LinearLayout.LayoutParams(px(26), px(6)).apply { rightMargin = px(6) }
         })
-        addView(label(SetupWords.stepOf(step, of)), LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply { leftMargin = px(4) })
+        addView(label(text), LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply { leftMargin = px(4) })
     }
 
     fun label(t: String) = TextView(c).apply { text = t; typeface = semiFace; sizeDp(14f); setTextColor(INK_3) }

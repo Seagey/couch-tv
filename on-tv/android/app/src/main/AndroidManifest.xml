@@ -14,6 +14,8 @@
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <!-- to tell which streaming apps are installed (sideloaded app, not for the Play Store) -->
     <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES" tools:ignore="QueryAllPackagesPermission" />
+    <!-- Settings, Undo Couch TV: Android's own "Uninstall?" question for this app only (a normal permission, no prompt) -->
+    <uses-permission android:name="android.permission.REQUEST_DELETE_PACKAGES" />
     <!-- Granted over ADB once, by the app itself, after "Allow debugging?":
          draw over apps lets it open apps from the background with plain intents;
          write secure settings lets it switch wireless debugging back on after a reboot. -->

@@ -44,9 +44,9 @@ class HomeAskTest {
         // Google TV: the switch is the truth (the watch only acts while it is on)
         assertTrue(HomeAsk.isOn(aliasOn = true, held = false, opensUs = false, googleTv = true))
         val src = File("src/main/java/dev/couchtv/ontv/SetupActivity.kt").readText()
-        assertTrue(src.contains("HomeAsk.buttonLabel(HomeAsk.isOn(App.homeEnabled(this), held, opensUs, google), asking)"))
-        val press = src.substringAfter("homeBtn = button(\"\")").substringBefore("main1.addView(homeBtn)")
-        assertTrue(press.contains("val on = !homeIsOn()"))
+        // step 1 moves on only when Android reports Couch TV is the home (HomeAsk.isOn), never from a saved switch
+        assertTrue(src.contains("private fun homeIsOn(): Boolean = HomeAsk.isOn(App.homeEnabled(this), HomeRole.held(this), homeOpensUs(), HomeRole.googleTv(this))"))
+        assertTrue(src.contains("if (SetupSteps.stepOneDone(homeIsOn()))"))
     }
 
     @Test fun googleTvWithTheWatchApkShowsTheButton() {
@@ -57,7 +57,8 @@ class HomeAskTest {
         assertTrue(HomeAsk.showButton(googleTv = true, watchApk = false, aliasOn = true))
         assertTrue(HomeAsk.showButton(googleTv = false, watchApk = false, aliasOn = false))
         val src = File("src/main/java/dev/couchtv/ontv/SetupActivity.kt").readText()
-        assertTrue(src.contains("HomeAsk.showButton(google, watchApk, App.homeEnabled(this))"))
+        // what step 1 offers depends on Google TV and the watch version (SetupSteps.homeStep, SetupStepsTest)
+        assertTrue(src.contains("SetupSteps.homeStep(plan(), HomeRole.googleTv(this), BuildConfig.BUILD_TYPE == \"watch\""))
         // and nothing reopens the setup screen once it is gone
         val destroy = src.substringAfter("override fun onDestroy()").substringBefore("override fun ")
         assertTrue(destroy.contains("main.removeCallbacks(bringBack)") && destroy.contains("main.removeCallbacks(ask)"))
@@ -113,10 +114,11 @@ class HomeAskTest {
 
     @Test fun theSetupScreenNeverLeavesThePersonOnAnotherHome() {
         val src = File("src/main/java/dev/couchtv/ontv/SetupActivity.kt").readText()
-        // step 1's big button and Settings' Use as home screen both switch the home on through turnHomeOn
+        // step 1's big button switches the home on through turnHomeOn
         val press = src.substringAfter("private fun turnHomeOn()").substringBefore("override fun onResume()")
         assertTrue(src.contains("HomeStep.ASK, SetupSteps.HomeStep.SWITCH -> turnHomeOn()"))
-        assertTrue(src.substringAfter("private fun homeButtonPressed()").substringBefore("private fun turnHomeOn()").contains("if (on) turnHomeOn()"))
+        // Settings has no Use as home screen switch any more: Undo Couch TV switches the home off
+        assertTrue(src.substringAfter("private fun undoCouchTv()").substringBefore("private fun watchOutOfList()").contains("App.setHomeEnabled(this, false)"))
         // EXPLAIN returns before the home alias is switched on
         assertTrue(press.indexOf("plan == HomeAsk.Plan.EXPLAIN") in 0 until press.indexOf("App.setHomeEnabled(this, true)"))
         assertTrue(press.contains("Store.putStr(HomeAsk.PENDING_KEY"))
@@ -126,7 +128,7 @@ class HomeAskTest {
         val result = src.substringAfter("override fun onActivityResult").substringBefore("override fun ")
         assertTrue(result.contains("HomeAsk.Answer.NO_QUESTION -> giveUp(HomeAsk.NO_QUESTION)"))
         assertTrue(src.contains("HomeRole.Asked.NONE -> giveUp(HomeAsk.NO_QUESTION)"))
-        assertTrue(src.contains("noAsk = HomeAsk.noAskReason(plan(), googleHome, blocked)"))
+        assertTrue(src.contains("SetupSteps.explainReason(plan(), HomeRole.googleHome(this), Store.str(HomeAsk.BLOCKED_KEY))"))
         // the Home intent in a chooser opened Google's home at once and never set a default: gone
         val role = File("src/main/java/dev/couchtv/ontv/HomeRole.kt").readText()
         assertFalse(role.contains("createChooser("))
@@ -139,9 +141,8 @@ class HomeAskTest {
         val result = src.substringAfter("override fun onActivityResult").substringBefore("override fun ")
         assertTrue(result.contains("val held = HomeRole.held(this)") && result.contains("HomeAsk.keepAliasOn(held)"))
         assertTrue(result.contains("App.setHomeEnabled(this, false)"))
-        val press = src.substringAfter("homeBtn = button(\"\")").substringBefore("main1.addView(homeBtn)")
+        val press = src.substringAfter("private fun turnHomeOn()").substringBefore("override fun onResume()")
         assertFalse("the button never asks Android straight away", press.contains("HomeRole.request("))
         assertTrue(press.contains("main.post(ask)"))
-        assertTrue(src.contains("HomeAsk.buttonLabel("))
     }
 }

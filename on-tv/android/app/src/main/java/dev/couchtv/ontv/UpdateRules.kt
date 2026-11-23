@@ -178,9 +178,9 @@ object UpdateRules {
     /** The exact steps, one per row on the TV. */
     fun steps(watch: Boolean): List<String> =
         if (watch) listOf(
-            "Easiest: on the TV, open Couch TV, press Settings, then Let the phone press keys, and follow the steps. Then come back here and press Update to. It keeps the Home button.",
+            "Easiest: on the TV, open Couch TV, press Settings, Phone remote, then Set it up, and follow the steps. Then come back here and press Update to. It keeps the Home button.",
             "Or with Downloader: type $CODE in Downloader and press Install. Downloader gets the plain version, so Home opens Google TV again: open Couch TV and press Make Home open Couch TV once more. Your settings stay.",
-            "Or on a computer: download $WATCH_ASSET from github.com/$REPO/releases/latest and put it on the same way as before, over this one. On the TV, Couch TV, Settings, Home button from a computer, has every step.",
+            "Or on a computer: download $WATCH_ASSET from github.com/$REPO/releases/latest and put it on the same way as before, over this one. The help page, couchtv.joshuaseage.com/help/home-button, has every step.",
             "Open Couch TV again from your apps.")
         else listOf(
             "Press Home, then open Downloader from your apps. Not there? Find Downloader by AFTVnews in the TV's app store and install it first.",
@@ -194,5 +194,5 @@ object UpdateRules {
             "If it says App not installed, the TV is usually short of space. In Downloader, open Files, delete the old couch-tv-ontv files, then type $CODE again.",
             "Open Couch TV again from your apps.",
             "If the code gives the version you already have, type this address in the box instead: github.com/$REPO/releases/latest/download/$ASSET",
-            "Next time it is one button: open Couch TV, press Settings, then Let the phone press keys. After that, Home settings, Updates, Update to.")
+            "Next time it is one button: open Couch TV, press Settings, Phone remote, then Set it up. After that, Home settings, Updates, Update to.")
 }

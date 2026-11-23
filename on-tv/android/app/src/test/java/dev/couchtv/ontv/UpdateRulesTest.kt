@@ -117,7 +117,7 @@ class UpdateRulesTest {
         val computer = UpdateRules.steps(watch = true).joinToString(" ")
         // plain words (WORDING-PROPOSAL-0139 3c): the commands stay behind More help on the TV, not here
         assertTrue(computer.contains("couch-tv-ontv-watch.apk"))
-        assertTrue(computer.contains("Settings, Home button from a computer"))
+        assertTrue(computer.contains("couchtv.joshuaseage.com/help/home-button"))
         assertFalse(computer.contains("adb "))
         assertTrue(UpdateRules.how(true).startsWith("This is the Home button version of Couch TV."))
         for (s in UpdateRules.steps(false) + UpdateRules.steps(true) + UpdateRules.how(false) + UpdateRules.how(true)) {
@@ -135,7 +135,7 @@ class UpdateRulesTest {
         assertTrue(how.contains("Make Home open Couch TV again after a Downloader update"))
         val w = UpdateRules.steps(watch = true)
         assertTrue(w.first().startsWith("Easiest:"))
-        assertTrue(w.first().contains("Let the phone press keys") && w.first().contains("Update to"))
+        assertTrue(w.first().contains("Phone remote, then Set it up") && w.first().contains("Update to"))
         // Downloader's code gives the plain app (no Home button watch): its row warns and says what to press
         val dl = w.first { it.contains("8180170") }
         assertTrue(dl.contains("Home opens Google TV again") && dl.contains("Make Home open Couch TV"))
@@ -149,7 +149,7 @@ class UpdateRulesTest {
         assertTrue(phone.contains("press Up again and again until the Downloader button at the top left turns light"))
         assertTrue(phone.contains("Right twice, to the # button"))
         // and the way to one button updates next time
-        assertTrue(UpdateRules.steps(watch = false).last().contains("Let the phone press keys"))
+        assertTrue(UpdateRules.steps(watch = false).last().contains("Phone remote, then Set it up"))
     }
 
     // ---------------------------------------------------------------- Matter: one APK, every processor inside

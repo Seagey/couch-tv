@@ -184,4 +184,68 @@ object SetupWords {
         "Let Couch TV press keys, then press ${HomeKeyRules.BUTTON}.",
         "Or do it once from a computer. Scan the code for the steps.")
     const val HELP_KEYS_BUTTON = "Let the phone press keys"
+
+    // ---------------------------------------------------------------------------------------------
+    // Settings (owner approved round 2, 23 Nov 2026): Edit your home, Phone remote, Undo Couch TV, Help.
+
+    const val EDIT_ITEM = "Edit your home"
+    const val EDIT_SUB = "On your phone"
+    const val EDIT_LINE = "Change widgets, your town, calendar and photos on your phone."
+    const val SCAN = "Scan with your phone camera."
+    fun editType(setupUrl: String?, pin: String?): String = when {
+        setupUrl == null -> NO_NETWORK
+        pin != null -> "Or type ${setupUrl.removePrefix("http://")} on a phone or computer on this WiFi, then the code ${pin.take(3)} ${pin.drop(3)}."
+        else -> "Or type ${setupUrl.removePrefix("http://")} on a phone or computer on this WiFi."
+    }
+    const val NO_NETWORK = "This TV is not on a network yet. Connect it to WiFi first."
+
+    const val PHONE_ITEM = "Phone remote"
+    fun phoneSub(phones: Int) = when (phones) { 0 -> "No phone yet"; 1 -> "1 phone paired"; else -> "$phones phones paired" }
+    const val PHONE_TITLE = "Use your phone as a TV remote?"
+    const val PHONE_LINE = "Scan the code and your phone is the remote. No app to install."
+    const val PHONE_REMOTE_PAGE = "Remote"
+    const val PHONE_WATCH_PAGE = "Watch"
+    /** Under the QR: the live code, or why there is none. */
+    fun phoneCode(pin: String?, lockedSecs: Int): String = when {
+        lockedSecs > 0 -> "Locked for ${(lockedSecs + 59) / 60} min"
+        pin != null -> "${pin.take(3)} ${pin.drop(3)}"
+        else -> ""
+    }
+    fun phoneType(phoneUrl: String?) = if (phoneUrl == null) NO_NETWORK else "Or type ${phoneUrl.removePrefix("http://")}"
+    const val NEW_CODE = "New code"
+    const val FORGET_PHONES = "Forget phones"
+    /** The yellow strip, only on a TV where the phone cannot press keys yet (SetupSettings.keyStrip). */
+    const val KEYS_STRIP = "For the arrow keys and typing, this TV needs one more step."
+    const val KEYS_STRIP_BUTTON = "Set it up"
+    const val KEYS_STRIP_FIRE = "On this Fire TV the phone remote opens apps and changes the volume. Arrow keys and typing need a home computer."
+
+    const val UNDO_ITEM = "Undo Couch TV"
+    const val UNDO_SUB = "Back to normal"
+    const val UNDO_TITLE = "Put this TV back to normal"
+    const val UNDO_LINE = "Couch TV stops being your home and its Home button watch turns off. Then you can remove the app."
+    const val UNDO_NOTE = "Your shows, apps and the TV's own settings are not touched."
+    const val UNDO_CONFIRM_TITLE = "Undo Couch TV?"
+    const val UNDO_CONFIRM_LINE = "Your TV's own home comes back on the Home button. You can set Couch TV up again any time."
+    const val UNDO_KEEP = "Keep Couch TV"
+    const val UNDO_DONE_TITLE = "Your TV is back to normal"
+    const val UNDO_DONE_LINE = "Press Home to see your TV's own home. Want to remove the Couch TV app too?"
+    const val UNDO_REMOVE = "Remove Couch TV"
+    const val NOT_NOW = "Not now"
+
+    const val HELP_ITEM = "Help"
+    const val HELP_LINE = "Scan for help with Couch TV, step by step."
+    const val HELP_SITE = "couchtv.joshuaseage.com/help"
+    const val HELP_URL = "https://couchtv.joshuaseage.com/help/"
+    /** Only the Home button version, while its watch is not on: where to switch it on. */
+    const val WATCH_LINE = "The Couch TV home watch is off. Switch it on in the TV's Accessibility settings."
+    const val WATCH_BUTTON = "Open Accessibility"
+
+    // the key walk-through (SetupSettings.keySteps)
+    fun keysOf(n: Int, of: Int) = "Arrow keys and typing, $n of $of"
+    const val DONE_NEXT = "Done, next"
+    const val CONNECT = "Connect"
+    const val KEYS_DONE_TITLE = "Your phone can press every key"
+    const val KEYS_DONE_LINE = "Arrow keys, OK and typing now work from the phone remote."
+    const val DONE = "Done"
+    const val KEYS_DONE_HOME = "This TV keeps Google's home on the Home button. One press can change that too."
 }

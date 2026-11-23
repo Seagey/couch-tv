@@ -334,6 +334,7 @@ gains a permission these tables do not explain.
 | `POST_NOTIFICATIONS` | Not asked for by the app | Lets the notice Android shows while that server runs appear on Android 13 and newer |
 | `RECEIVE_BOOT_COMPLETED` | On install | Starts the server again after a restart or an update |
 | `QUERY_ALL_PACKAGES` | On install | To tell which streaming apps are installed, so the remote can open them. This app is sideloaded, not from a store |
+| `REQUEST_DELETE_PACKAGES` | On install | Settings, Undo Couch TV: lets the app bring up Android's own "Uninstall?" question for itself. It removes nothing on its own |
 | `SYSTEM_ALERT_WINDOW` | By the app over the TV's own ADB, after you press Allow | Lets it open apps from the background when you pick one on the phone |
 | `WRITE_SECURE_SETTINGS` | The same way | Switches wireless debugging back on after a restart, and the Home button watch on a Fire TV |
 | `READ_TV_LISTINGS`, `READ_EPG_DATA` | The same way | Keep watching: reads Android's Watch Next rows to name what is playing when an app does not say. Read only |

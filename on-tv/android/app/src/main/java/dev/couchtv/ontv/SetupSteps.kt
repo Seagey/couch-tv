@@ -13,7 +13,7 @@ package dev.couchtv.ontv
  * link, the computer route and every note moved to Settings; nothing was taken away.
  */
 object SetupSteps {
-    enum class Screen { HOME_STEP, OPEN_STEP, READY, SETTINGS, HOME_HELP }
+    enum class Screen { HOME_STEP, OPEN_STEP, READY, SETTINGS, HOME_HELP, KEYS, KEYS_DONE, UNDO_CONFIRM, UNDO_DONE }
 
     /** Store key: "1" once Open the home was pressed on step 2 (or the TV was set up before this version). */
     const val DONE_KEY = "setup_done"
