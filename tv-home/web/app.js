@@ -6675,7 +6675,9 @@
   }
   // The home came to the front. On an Android TV that is the launcher's tv.resume() (back from an app) or
   // tv.home() (Home pressed with the home already in front, no visibility change at all: the emulator test of
-  // 0.13.10 never got the question back), and the page's own visibilitychange elsewhere.
+  // 0.13.10 never got the question back), and the page's own visibilitychange elsewhere. Only those: a tv.resume()
+  // with no tv.pause() before it is the on-TV app redrawing after a phone or setup save (HomeActivity.refresh), and
+  // a phone save right after the welcome must not bring the question up.
   var updWait = 0;
   function updFront() {
     if (!updLater) return;
@@ -8594,7 +8596,9 @@
     settingsKey: function () { blip(0, 0); settingsKey(); },
     // the phone code changed (HomeActivity, Auth.onPin): the QR and computer line draw the new one
     phoneLink: function () { PHONE_QR.url = ""; phoneQr(); if (typeof CouchDesign !== "undefined" && CouchDesign.nav && CouchDesign.nav.phoneAgain) CouchDesign.nav.phoneAgain(); },
-    resume: function () { PAGE_PAUSED = false; clock(); designVideo("away", false); toggleScreenOff(false); setIdleAmbient(false); resetSmartIdle(); okReset(); refresh(); if (!OFFLINE) refreshQuick(); refreshWeather(); startVideo(); clipWake(); sceneVideos(true); refreshMusic(); refreshCards(true); if (window.AmbientWeather) window.AmbientWeather.resume(); resetIdlePhoto(); kwArtAgain(); updFront(); },
+    // also the on-TV app's HomeActivity.refresh() after a phone or setup save, with the home already in front
+    // and never paused: that redraws, but only a resume after tv.pause() is the home coming to the front
+    resume: function () { var front = PAGE_PAUSED; PAGE_PAUSED = false; clock(); designVideo("away", false); toggleScreenOff(false); setIdleAmbient(false); resetSmartIdle(); okReset(); refresh(); if (!OFFLINE) refreshQuick(); refreshWeather(); startVideo(); clipWake(); sceneVideos(true); refreshMusic(); refreshCards(true); if (window.AmbientWeather) window.AmbientWeather.resume(); resetIdlePhoto(); kwArtAgain(); if (front) updFront(); },
     // an app is in front: the video background stops until the home is back
     // (and a design's video background lets go of the TV's decoder, which the app may need)
     pause: function () { saveFocusNow(); PAGE_PAUSED = true; pauseVideo(); designVideo("away", true); },

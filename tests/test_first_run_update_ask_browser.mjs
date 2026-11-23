@@ -7,7 +7,8 @@
 //  5. (emulator test of 0.13.10) The home coming to the front on an Android TV is the launcher's tv.home() (Home
 //     pressed with the home in front, no visibility change at all) or tv.pause() then tv.resume() (back from an
 //     app): each brings the question back. Never behind "Use this design?": a real design code from the
-//     welcome, the question up, Home pressed under it, then Use this design and its new start.
+//     welcome, the question up, Home pressed under it, then Use this design and its new start. A tv.resume() with
+//     no tv.pause() before it (the on-TV app redrawing after a phone save) is not the home coming to the front.
 // Needs Playwright (Chromium). Without it the test says so and passes:
 //   COUCHTV_PLAYWRIGHT=<a folder whose node_modules has playwright> node tests/test_first_run_update_ask_browser.mjs
 import { createRequire } from "node:module";
@@ -168,6 +169,11 @@ try {
   await page.reload(); await ready();
   await page.waitForTimeout(3500);
   ok(!(await updAsk()), "a start straight after the welcome holds it back");
+  // a phone or setup save on the on-TV app redraws with tv.resume() while the home is in front (HomeActivity.refresh,
+  // no tv.pause before it): not the home coming to the front, so no question
+  await page.evaluate(() => window.tv.resume());
+  await page.waitForTimeout(4500);
+  ok(!(await updAsk()), "a refresh after a phone save (tv.resume with no tv.pause): no question");
   await page.evaluate(() => window.tv.pause());
   await page.waitForTimeout(3500);
   ok(!(await updAsk()), "not while an app is in front (tv.pause)");
