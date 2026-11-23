@@ -765,6 +765,13 @@
       var anyone = PEOPLE.some(function (p) { return (data.showsBy[p.id] || []).length; });
       $("shelf-section").classList.toggle("empty", !anyone && !on);
       $("np-slot").classList.toggle("on", on);
+      if (!data.shows.length) {
+        var track = $("shelf");
+        if (track) {
+          var name = (PEOPLE[whoIndex()] && PEOPLE[whoIndex()].name) || "";
+          track.innerHTML = on ? "" : ('<p class="shelf-none">' + esc(peopleCount() < 2 ? t("nothing_yet") : t("nothing_for", { name: name })) + "</p>");
+        }
+      }
     }
     if (!on) {
       clearInterval(npProgressTimer);
@@ -1260,7 +1267,7 @@
     renderPeople();
     if (!data.shows.length) {
       var name = PEOPLE[whoIndex()].name;
-      track.innerHTML = '<p class="shelf-none">' + esc(peopleCount() < 2 ? t("nothing_yet") : t("nothing_for", { name: name })) + "</p>";
+      track.innerHTML = (NIGHT && npVisible()) ? "" : ('<p class="shelf-none">' + esc(peopleCount() < 2 ? t("nothing_yet") : t("nothing_for", { name: name })) + "</p>");
       shelfEls = [];
       return;
     }
@@ -1600,6 +1607,13 @@
       // the dock is as wide as what is in it; More apps uses all twelve columns
       GRID_COLS = expanded ? 12 : Math.max(1, Math.min(12, gridItems.length));
       $("grid").style.gridTemplateColumns = "repeat(" + GRID_COLS + ", 7rem)";
+      if (NIGHT) {
+        var gEl = $("grid"), sEl = $("shelf-section");
+        if (gEl && sEl) {
+          var gw = gEl.offsetWidth;
+          if (gw > 0) sEl.style.width = gw + "px";
+        }
+      }
     }
     $("grid").innerHTML = gridItems.map(appHTML).join("");
     gridEls = Array.prototype.slice.call($("grid").children);
@@ -1746,8 +1760,10 @@
         else if (dx) npI = Math.max(0, Math.min(maxNp, npI + dx));
         else if (dy < 0) { if (peopleOn()) toPeople(); else if (hasQuick()) { zone = "quick"; qi = 0; } }
         else if (dy > 0 && gridEls.length) {
-          var nb = $("np").getBoundingClientRect();
-          g = nearestInRow(0, nb.left + nb.width / 2);
+          var btns = $("np") ? $("np").querySelectorAll(".nb") : [];
+          var bEl = btns[npI];
+          var midX = bEl ? (bEl.getBoundingClientRect().left + bEl.getBoundingClientRect().width / 2) : ($("np").getBoundingClientRect().left + $("np").getBoundingClientRect().width / 2);
+          g = nearestInRow(0, midX);
           zone = "grid";
         }
       } else {
@@ -1797,10 +1813,39 @@
         var nx = g + dx;
         if (nx >= 0 && nx < gridEls.length && Math.floor(nx / GRID_COLS) === row) g = nx;
       } else if (dy < 0 && row === 0) {
-        if (cards.length) zone = "shelf";
-        else if (npReach()) zone = "np";
-        else if (peopleOn()) toPeople();
-        else if (hasQuick()) zone = "quick";   // offline the sleep and picture buttons are hidden
+        if (NIGHT && npReach()) {
+          var nb = $("np") ? $("np").getBoundingClientRect() : null;
+          var curTile = gridEls[g] ? gridEls[g].getBoundingClientRect() : null;
+          var midTile = curTile ? (curTile.left + curTile.width / 2) : 0;
+          if (!cards.length || !nb || midTile <= nb.right + 20) {
+            zone = "np";
+            var btns = $("np") ? $("np").querySelectorAll(".nb") : [];
+            var bestI = 0, bestD = Infinity;
+            for (var bi = 0; bi < btns.length; bi++) {
+              var br = btns[bi].getBoundingClientRect();
+              var d = Math.abs(midTile - (br.left + br.width / 2));
+              if (d < bestD) { bestD = d; bestI = bi; }
+            }
+            npI = bestI;
+          } else {
+            zone = "shelf";
+            var bestS = 0, bestSD = Infinity;
+            for (var si = 0; si < shelfEls.length; si++) {
+              var sr = shelfEls[si].getBoundingClientRect();
+              var sd = Math.abs(midTile - (sr.left + sr.width / 2));
+              if (sd < bestSD) { bestSD = sd; bestS = si; }
+            }
+            s = bestS;
+          }
+        } else if (cards.length) {
+          zone = "shelf";
+        } else if (npReach()) {
+          zone = "np";
+        } else if (peopleOn()) {
+          toPeople();
+        } else if (hasQuick()) {
+          zone = "quick";
+        }   // offline the sleep and picture buttons are hidden
       } else if (dy < 0) {
         g -= GRID_COLS;
       } else if (row < lastRow) {

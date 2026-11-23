@@ -314,7 +314,16 @@ html.still .tile.focus .face, html.still .tile.focus .face::after { animation: n
 .theme-night .qbtn.focus { background: #fff; color: #111; }
 
 /* Keep watching: three glass cards */
-.theme-night .shelf { top: 40rem; left: var(--safe-x); right: var(--safe-x); }
+.theme-night .shelf {
+  top: 40rem;
+  left: 50%;
+  right: auto;
+  transform: translateX(-50%);
+  width: calc(12 * 7rem + 11 * 1.625rem + 3.5rem);
+  max-width: calc(100vw - 2 * var(--safe-x));
+  box-sizing: border-box;
+  padding: 0 1.75rem;
+}
 .theme-night .shelf-head { height: 2.25rem; margin-bottom: 1rem; }
 .theme-night .shelf-head h2 { font-size: 1.5625rem; font-weight: 600; color: rgba(255, 255, 255, 0.78); }
 .theme-night .shelf-track { gap: 1.375rem; }
