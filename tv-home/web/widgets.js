@@ -3447,15 +3447,21 @@
     if (want) for (var i = 0; i < o.items.length; i++) if (want.indexOf(o.items[i].kind) >= 0) return i;
     return dayIndex(n, 20);
   }
+  var STACK_DOTS_W = 30;   // the dots' strip: 12 px dots with 9 px either side
   function stack(o, b, env) {
     var items = o.items || [], root = E("div", "cw cw-bare cw-stack", "width:" + px(b.w) + ";height:" + px(b.h) + ";position:relative");
     root.setAttribute("data-kind", "stack"); root.setAttribute("data-stack", String(items.length)); root.setAttribute("data-turn", String(stackTurn(o, env)));
+    // the page dots get a strip of their own on the right, so they never sit on an item's words (a 4 by 2 stack's
+    // dots covered the weather's temperature on the TCL, 23 Nov 2026); each item is drawn that much narrower
+    var gut = items.length > 1 ? STACK_DOTS_W : 0, bi = {};
+    for (var bk in b) if (Object.prototype.hasOwnProperty.call(b, bk)) bi[bk] = b[bk];
+    bi.w = Math.max(60, b.w - gut);
     // each item keeps an id of its own ("<stack id>/<index>"), so its settings on this TV are its own
-    var slots = items.map(function (it, i) { var s = E("div", "cw-slot", "", [one({ id: o.id !== undefined ? o.id + "/" + i : undefined, kind: it.kind, opts: it.opts, style: it.style, w: b.w, h: b.h }, b, env)]); return s; });
+    var slots = items.map(function (it, i) { var s = E("div", "cw-slot", gut ? "right:" + px(b.w - bi.w) : "", [one({ id: o.id !== undefined ? o.id + "/" + i : undefined, kind: it.kind, opts: it.opts, style: it.style, w: bi.w, h: bi.h }, bi, env)]); return s; });
     // the designer can hold a stack on the item being edited (CW.stackAt[id]); on the TV it turns by time
     var held = env.designer && CW.stackAt && CW.stackAt[o.id] != null ? CW.stackAt[o.id] : null;
     var at = held != null ? held % Math.max(1, items.length) : stackIndex(o, items.length, env), manual = held != null ? 1e15 : 0;
-    var dots = E("div", "cw-dots", "color:#fff", items.map(function () { return E("i"); }));
+    var dots = E("div", "cw-dots", "color:#fff;right:" + px(Math.round((b.w - bi.w - 12) / 2)), items.map(function () { return E("i"); }));
     var show = function (i) {
       at = (i + items.length) % items.length;
       slots.forEach(function (s, k) { s.style.opacity = k === at ? "1" : "0"; s.style.visibility = k === at ? "visible" : "hidden"; s.className = "cw-slot" + (k === at ? " on" : ""); });

@@ -247,6 +247,28 @@ const ROOMS = [{ entity: "climate.living", name: "Living", unit: "°C", ok: true
   // world clock with no cities: this TV's own town first
   r = await draw({ id: "wc", kind: "worldclock", opts: {}, w: 460, h: 460 }, { data: { place: HOME } });
   has(r.text, "Hillside", "world clock: this TV's town first, by its name"); hasNot(r.text, "Brisbane", "world clock: no stranger's default");
+  // a stack's page dots never sit on an item's words (the TCL: a 4 by 2 stack's dots covered the temperature)
+  for (const [w, h] of [[360, 160], [460, 260], [760, 360]]) {
+    const hit = await page.evaluate(([w, h, data]) => {
+      document.querySelectorAll(".ws-host").forEach((x) => x.remove());
+      const host = document.createElement("div"); host.className = "ws-host cw-o"; host.style.cssText = "position:absolute;left:80px;top:60px";
+      document.body.appendChild(host);
+      const root = window.CouchWidgets.render({ id: "sk", kind: "stack", turn: 0, w, h, items: [{ kind: "weather", opts: {} }, { kind: "bigtemp", opts: {} }, { kind: "clock", opts: {} }] }, { data });
+      host.appendChild(root);
+      const dots = root.querySelector(".cw-dots").getBoundingClientRect(), box = root.getBoundingClientRect(), bad = [];
+      for (const slot of root.querySelectorAll(".cw-slot")) {
+        slot.style.visibility = "visible";
+        const walker = document.createTreeWalker(slot, NodeFilter.SHOW_TEXT); let nd;
+        while ((nd = walker.nextNode())) {
+          if (!nd.textContent.trim()) continue;
+          const rg = document.createRange(); rg.selectNodeContents(nd);
+          for (const q of rg.getClientRects()) if (q.width && q.right > dots.left && q.left < dots.right && q.bottom > dots.top && q.top < dots.bottom) bad.push(nd.textContent.trim());
+        }
+      }
+      return { bad, inside: dots.right <= box.right + 0.5 && dots.left >= box.left };
+    }, [w, h, { weather: wx(24), place: HOME }]);
+    ok(hit.bad.length === 0 && hit.inside, "stack " + w + "x" + h + ": the dots sit clear of every item's words, inside the stack (" + hit.bad.join(", ") + ")");
+  }
 }
 
 // ================= 8. Headlines and Scores headings; plain empty words =================
