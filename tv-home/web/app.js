@@ -2824,7 +2824,7 @@
     if (!music) return;
     var btn = npButtons()[npI];
     if (!btn) return;
-    if (btn[2] === "spotify-open") { TV.launch(SPOTIFY_TV); return; }
+    if (btn[2] === "spotify-open") { tvLaunch(SPOTIFY_TV); return; }
     if (btn[2] === "here") { window.CouchSpotify.playHere(note); return; }   // Play on TV (standalone)
     if (btn[0] === "expand") {
       ambientOpen = true;
@@ -3240,6 +3240,17 @@
   }
   // a design's video background (design.js, bg-video.js) stops while the home is not on screen
   function designVideo(why, held) { if (typeof CouchDesign !== "undefined" && CouchDesign.hold) CouchDesign.hold(why, held); }
+  // Opening an app lets go of the video's decoder and memory at once, before Android pauses the home
+  // (a 1 GB TCL, 0.13.10): the app gets them while it starts. If no app came up after 4 s, it plays again.
+  var openingT = null;
+  function videoOpening(done) {
+    clearTimeout(openingT);
+    designVideo("opening", !!done);
+    if (done) openingT = setTimeout(function () { designVideo("opening", false); }, 4000);
+    return done;
+  }
+  function tvLaunch(pkg) { designVideo("opening", true); return videoOpening(TV.launch(pkg)); }
+  function tvWatchNext(id) { designVideo("opening", true); return videoOpening(TV.openWatchNext(id)); }
   function soundscapePlaying() {
     try { return !!(window.Soundscape && window.Soundscape.current && window.Soundscape.current() !== "off"); } catch (e) { return false; }
   }
@@ -3598,7 +3609,7 @@
       installed: function (pkg) { return !(data.apps || []).length || (data.apps || []).some(function (x) { return x.package === pkg; }); },
       launch: function (pkg) {
         opened(pkg);
-        if (TV && TV.launch(pkg)) return;
+        if (TV && tvLaunch(pkg)) return;
         api("POST", "/api/launch", { app: pkg }).catch(function (e) { status(tBridge(e.key, e.vars, e.message)); });
       },
       isOk: isOk, isBack: isBack, isMenu: isMenu, isSettings: isSettings, arrowOf: arrowOf,
@@ -3796,7 +3807,7 @@
   }
   function openCard(c) {
     if (!c || (!c.app && !c.url)) return;
-    if (c.app && TV && TV.launch && TV.launch(c.app)) return;
+    if (c.app && TV && TV.launch && tvLaunch(c.app)) return;
     if (c.url && TV && TV.openUrl) {
       if (TV.openUrl(c.url)) return;
       status(t("err_philips_no_browser") || "No browser installed");
@@ -4084,7 +4095,7 @@
       // /api/restart-app only knows the apps the bridge lists: quit any other one and open it again here
       if (early && e && e.key === "err_unknown_app" && TV && TV.launch) {
         api("POST", "/api/quit-app", { package: a.package }, 30000).then(function () {
-          setTimeout(function () { try { TV.launch(a.package); } catch (x) {} }, 600);
+          setTimeout(function () { try { tvLaunch(a.package); } catch (x) {} }, 600);
         }).catch(function (e2) { flash(t(failKey, { name: a.name }) + (e2 && e2.message ? ": " + e2.message : "")); });
         return;
       }
@@ -5099,7 +5110,7 @@
       if (!it) return;
       status(it.app ? t("opening_in", { title: it.title, app: it.app.name }) : t("opening", { title: it.title }), true);
       if (it.wn && TV && TV.openWatchNext) {
-        if (!TV.openWatchNext(String(it.id)) && it.app) TV.launch(it.app.package);
+        if (!tvWatchNext(String(it.id)) && it.app) tvLaunch(it.app.package);
         status("");
         return;
       }
@@ -5108,7 +5119,7 @@
         .catch(function (e) {
           // the bridge can't help: at least open the app it was in (and when the bridge has lost its
           // link to this TV, say how to fix it)
-          if (TV && it.app && TV.launch(it.app.package)) { status(linkLost(e)); return; }
+          if (TV && it.app && tvLaunch(it.app.package)) { status(linkLost(e)); return; }
           status(tBridge(e.key, e.vars, e.message));
         });
       return;
@@ -5137,14 +5148,14 @@
       api("POST", "/api/screens/open", { id: a.id }, 10000)
         .then(function (res) { status(res.note ? tBridge(res.note_key, res.note_vars, res.note) : ""); })
         .catch(function (e) {
-          if (TV && TV.launch("com.limelight")) { status(""); return; }
+          if (TV && tvLaunch("com.limelight")) { status(""); return; }
           status(tBridge(e.key, e.vars, e.message));
         })
         .then(function () { el.classList.remove("busy"); });
       return;
     }
     opened(a.package);
-    if (TV && TV.launch(a.package)) return;
+    if (TV && tvLaunch(a.package)) return;
     api("POST", "/api/launch", { app: a.id || a.package }).catch(function (e) { status(tBridge(e.key, e.vars, e.message)); });
   }
 
@@ -5179,7 +5190,7 @@
   // up straight after someone has just extended it themselves.
   function openDevMode() {
     keep("tvhome.devmode.asked", String(Date.now()));
-    if (TV && TV.launch) TV.launch("com.palmdts.devmode");
+    if (TV && TV.launch) tvLaunch("com.palmdts.devmode");
   }
   // the gear tile if the dock shows one, else the tile the focus is on
   function gearAnchor() {
@@ -5215,7 +5226,7 @@
     closeGear();
     paintFocus();
     var done = false;
-    try { done = !!(TV && ((TV.launch && TV.launch(SETTINGS_PKG)) || (TV.openSettings && TV.openSettings()))); } catch (e) {}
+    try { done = !!(TV && ((TV.launch && tvLaunch(SETTINGS_PKG)) || (TV.openSettings && TV.openSettings()))); } catch (e) {}
     if (done) return;
     if (OFFLINE) { status(t("tv_settings_none")); return; }
     api("POST", "/api/launch", { app: "settings" }).catch(function () { status(t("tv_settings_none")); });
@@ -8720,13 +8731,13 @@
     if (!it) return;
     status(it.app ? t("opening_in", { title: it.title, app: it.app.name }) : t("opening", { title: it.title }), true);
     if (it.wn && TV && TV.openWatchNext) {
-      if (!TV.openWatchNext(String(it.id)) && it.app) TV.launch(it.app.package);
+      if (!tvWatchNext(String(it.id)) && it.app) tvLaunch(it.app.package);
       status("");
       return;
     }
     api("POST", "/api/continue/open", { id: it.id, who: p.owner }, 60000)
       .then(function (res) { status(res.note ? tBridge(res.note_key, res.note_vars, res.note) : ""); })
-      .catch(function (e) { if (TV && it.app && TV.launch(it.app.package)) { status(linkLost(e)); return; } status(tBridge(e.key, e.vars, e.message)); });
+      .catch(function (e) { if (TV && it.app && tvLaunch(it.app.package)) { status(linkLost(e)); return; } status(tBridge(e.key, e.vars, e.message)); });
   }
   // after a Keep watching card opened only its app: the bridge's words when it has lost its link to
   // the TV (err_tv_link_lost: adb is down and so is the remote protocol), else nothing
@@ -9370,7 +9381,7 @@
           var it = arrangeItems().items.filter(function (x) { return x.package === arg; })[0];
           if (it && it.kind && it.kind !== "app") { var i = gridItems.indexOf(it); if (i >= 0) { zone = "grid"; g = i; activate(); } return; }
           opened(arg);
-          if (TV && TV.launch(arg)) return;
+          if (TV && tvLaunch(arg)) return;
           api("POST", "/api/launch", { app: (it && it.id) || arg }).catch(function (e) { status(tBridge(e.key, e.vars, e.message)); });
         } else if (what === "show") { zone = "shelf"; s = Math.max(0, parseInt(arg, 10) || 0); activate(); zone = "grid"; }
         else if (what === "pick") playPick(parseInt(arg, 10) || 0);

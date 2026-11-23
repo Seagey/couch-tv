@@ -174,7 +174,9 @@
     if (env.powerSave) return { tier: "still", why: "the TV is saving power" };
     if (env.saveData) return { tier: "still", why: "the TV is saving data" };
     if (env.reducedMotion) return { tier: "still", why: "the TV asks for less motion" };
-    if (env.memory && env.memory <= 1) return { tier: "still", why: "this TV has little memory" };
+    // under 1 GB: the still picture. A 1 GB TV plays it (a 939 MB TCL played the Aquarium video at
+    // about 27 frames a second, 0.13.10), always the 720p copy, never the long loop (LIMIT.long.memory)
+    if (env.memory && env.memory < 1) return { tier: "still", why: "this TV has under 1 GB of memory" };
     if (env.slow) return { tier: "still", why: "this TV could not keep up with the video" };
     return env.memory >= 4 && env.screenPx >= 1920 ? "1080" : "720";
   }

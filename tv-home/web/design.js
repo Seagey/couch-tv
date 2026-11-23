@@ -1981,6 +1981,16 @@
       memory: Number(nav.deviceMemory) || 0, screenPx: ((window.screen && window.screen.width) || innerWidth) * (window.devicePixelRatio || 1),
       slow: !DESIGNER && window.CouchVideo.slowMarked() };
   }
+  // Home settings, Designs: why the video shows only its still picture, or, on a 1 GB TV, that it plays
+  // the smaller copy and how to get the still picture instead ("" otherwise)
+  function videoNote() {
+    var vs = VP ? VP.state() : null;
+    if (!vs) return "";
+    if (vs.why && (vs.state === "still" || vs.state === "failed")) return ". Video background: its still picture shows, " + vs.why;
+    var mem = Number((window.navigator || {}).deviceMemory) || 0;
+    if (vs.ref && mem >= 1 && mem < 2 && !DESIGNER && vs.state !== "off") return ". Video background: plays a smaller copy, as this TV has 1 GB of memory. Turn on Lighter home to show the still picture instead";
+    return "";
+  }
   function vidWanted() { return ON && BG.ok && !document.hidden && !Object.keys(HOLD).some(function (k) { return HOLD[k]; }); }
   function video(d) {
     var ref = vidRef(d);
@@ -3077,11 +3087,11 @@
     held: function () { return offNow() || !!(PENDING && store("couchtv.design.no") === hashOf(PENDING)); },
     resume: function () { setOff(false); if (PENDING && store("couchtv.design.no") === hashOf(PENDING)) { store("couchtv.design.ok", hashOf(PENDING)); store("couchtv.design.no", null); } },
     // an honest line when the design's video shows only its still picture, and why ("" when it plays)
-    videoNote: function () { var vs = VP ? VP.state() : null; return vs && vs.why && (vs.state === "still" || vs.state === "failed") ? ". Video background: its still picture shows, " + vs.why : ""; },
+    videoNote: videoNote,
     settingsRow: function (restart) {
       var off = offNow() || (PENDING && store("couchtv.design.no") === hashOf(PENDING));
       // an honest line when the design's video shows only its still picture, and why
-      var vs = VP ? VP.state() : null, vnote = vs && vs.why && (vs.state === "still" || vs.state === "failed") ? ". Video background: its still picture shows, " + vs.why : "";
+      var vnote = videoNote();
       return { kind: "toggle", key: "design-on", label: "Your design", value: off ? "Off" : "On",
         sub: off ? "Switched off, or not chosen yet. Turn it on to see it." : "Hold Back for 5 seconds to switch it off" + vnote,
         act: function () { if (off) { setOff(false); if (PENDING) { store("couchtv.design.ok", hashOf(PENDING)); store("couchtv.design.no", null); } } else setOff(true); if (restart) restart(); } };
