@@ -48,7 +48,9 @@ console.log("Running design font browser tests...");
 const design = { v: 1, background: { colour: "#26303f" }, objects: [
   { id: "t1", type: "text", text: "Hello there", font: "Playfair Display", size: 90, x: 100, y: 100 },
   { id: "t2", type: "text", text: "Never loads", font: "Pacifico", size: 90, x: 100, y: 300 },
-  { id: "f", type: "widget", kind: "folder", x: 1100, y: 100, w: 160, h: 160, opts: { label: "Apps", apps: ["netflix", "stan", "iview"] } }
+  { id: "f", type: "widget", kind: "folder", x: 1100, y: 100, w: 160, h: 160, opts: { label: "Apps", apps: ["netflix", "stan", "iview"] } },
+  // a folder in Jost: its name must draw in Jost, the home's own file (not Inter)
+  { id: "fj", type: "widget", kind: "folder", x: 1100, y: 500, w: 460, h: 360, style: { panel: "paper", font: "jost" }, opts: { label: "Free to air", apps: ["iview", "sbs", "9now"] } }
 ] };
 await page.goto(BASE + "?mock=1&reset=1");
 await page.evaluate((d) => { localStorage.clear(); localStorage.setItem("tvdesigner.design", JSON.stringify(d)); }, design);
@@ -60,6 +62,14 @@ ok(!outside.some((u) => /google|gstatic/.test(u)), "nothing goes to Google (" + 
 ok(await page.evaluate(() => [...document.fonts].some((f) => f.family.replace(/"/g, "") === "Playfair Display" && f.status === "loaded")), "a font that arrives is added and used");
 ok(await page.evaluate(() => ![...document.fonts].some((f) => f.family.replace(/"/g, "") === "Pacifico" && f.status === "loaded")), "a font that never arrives is not used: the home's own font stays");
 ok(await page.evaluate(() => /Playfair Display/.test(getComputedStyle([...document.querySelectorAll("[data-obj=t1]")][0] || document.body).fontFamily + " " + ([...document.querySelectorAll("[data-obj=t1] *")].map((e) => getComputedStyle(e).fontFamily).join(" ")))), "the text draws with it, the home's font behind it");
+const jost = await page.evaluate(async () => {
+  const lab = [...document.querySelectorAll(".cw-k-folder .cw-lab")].find((e) => /Free to air/.test(e.textContent));
+  await document.fonts.ready;
+  return { family: lab ? getComputedStyle(lab).fontFamily : "", loaded: [...document.fonts].some((f) => f.family.replace(/"/g, "") === "Jost" && f.status === "loaded"),
+    check: document.fonts.check('650 25px "Jost"', "Free to air") };
+});
+ok(/^"?Jost/.test(jost.family) && jost.loaded && jost.check, "a Jost folder's name draws in Jost, from the home's own file (" + JSON.stringify(jost) + ")");
+ok(!asked.some((u) => /jost/i.test(u)), "Jost is the home's own: never asked of the store");
 
 // Hold OK in the folder's full screen layer
 await page.evaluate(() => window.CouchDesign.nav.focus("f", -1));
