@@ -36,7 +36,7 @@ object HomeKey {
     @Volatile var listener: ((String) -> Unit)? = null
 
     val working: Boolean get() = phase.isNotEmpty()
-    private fun watchApk() = BuildConfig.BUILD_TYPE == "watch"
+    private fun watchApk() = Variant.hasWatch
     private fun store(c: Context) = c.applicationContext.getSharedPreferences(STORE, Context.MODE_PRIVATE)
     private fun tcl() = HomeKeyRules.isTcl(Build.MANUFACTURER, Build.BRAND)
     private fun canWriteSecure(c: Context) = c.checkSelfPermission("android.permission.WRITE_SECURE_SETTINGS") == android.content.pm.PackageManager.PERMISSION_GRANTED
@@ -56,17 +56,19 @@ object HomeKey {
         val app = c.applicationContext
         // the update that was in the way is over: its words go
         if (error == "update_busy" && !Update.working) error = ""
-        val v = viewNow(app, working)
+        // Play: never the GitHub or computer steps, one press that shows the disclosure first (PlayRules)
+        val v = if (Variant.play) PlayRules.view(watchOn(), App.homeEnabled(app)) else viewNow(app, working)
         val fire = fireBlocked()
         val words = when (v) {
             "busy" -> HomeKeyRules.busyWords(phase, progress)
             "done" -> HomeKeyRules.DONE
-            "ready" -> if (watchApk()) HomeKeyRules.READY_WATCH else HomeKeyRules.READY
+            "ready" -> if (Variant.play) PlayRules.READY else if (watchApk()) HomeKeyRules.READY_WATCH else HomeKeyRules.READY
             "steps" -> if (fire) HomeKeyRules.STEPS_FIRE else HomeKeyRules.STEPS
             else -> ""
         }
         // the phone page has no More button and no code to scan: its own section and the steps under it
-        val phoneWords = if (v == "steps") (if (fire) HomeKeyRules.STEPS_FIRE_PHONE else HomeKeyRules.STEPS_PHONE) else words
+        val phoneWords = if (v == "steps") (if (fire) HomeKeyRules.STEPS_FIRE_PHONE else HomeKeyRules.STEPS_PHONE)
+            else if (Variant.play && v == "ready") PlayRules.READY_PHONE else words
         return JSONObject()
             .put("view", v)
             .put("phase", phase).put("progress", progress)
@@ -93,6 +95,8 @@ object HomeKey {
      */
     fun start(c: Context) {
         val app = c.applicationContext
+        // Play: no download, no ADB, no writing Android's list. The disclosure, then Android's own settings.
+        if (Variant.play) { DisclosureActivity.openAccessibility(app); changed(app); return }
         synchronized(Update) {
             if (working) return
             if (Update.working) { error = "update_busy"; changed(app); return }
@@ -137,6 +141,7 @@ object HomeKey {
     }
 
     private fun fetchAndInstall(app: Context) {
+        if (!PlayRules.gitHubDownloads(BuildConfig.FLAVOR)) return fail(app, "")   // Play: Google Play installs it
         val f = try { UpdateRules.read(Update.fetch("https://api.github.com/repos/${UpdateRules.REPO}/releases/latest"), true) }
             catch (x: Exception) { return fail(app, "net") }
         if (f == null || !f.installable) return fail(app, "net")
@@ -252,6 +257,7 @@ object HomeKey {
     }
 
     private fun switchOn(app: Context, rebind: Boolean): Boolean {
+        if (!PlayRules.switchesWatchOnItself(BuildConfig.FLAVOR)) return watchOn()   // Play: the person switches it on
         if (watchOn() && !rebind) { reassertHome(app); return true }
         val pkg = app.packageName
         val cr = app.contentResolver

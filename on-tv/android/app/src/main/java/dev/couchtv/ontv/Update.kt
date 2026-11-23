@@ -64,6 +64,10 @@ object Update {
     }
 
     fun state(c: Context): String {
+        // Play: Google Play updates it. supported false: the home and the phone page show no update rows.
+        if (!PlayRules.gitHubDownloads(BuildConfig.FLAVOR)) return JSONObject().put("supported", false)
+            .put("current", BuildConfig.VERSION_NAME).put("available", false).put("can_install", false)
+            .put("self", false).put("manual", false).put("how", PlayRules.UPDATES).put("steps", JSONArray()).toString()
         val s = store(c)
         val latest = s.getString("latest", "") ?: ""
         val w = watch()
@@ -121,7 +125,7 @@ object Update {
 
     @Synchronized fun check(c: Context, manual: Boolean) {
         val app = c.applicationContext
-        if (busy.isNotEmpty()) return
+        if (busy.isNotEmpty() || !PlayRules.gitHubDownloads(BuildConfig.FLAVOR)) return
         busy = "checking"
         if (manual) { error = ""; failed = false }
         changed(app)
@@ -161,7 +165,7 @@ object Update {
         val s = store(app)
         val latest = s.getString("latest", "") ?: ""
         val available = UpdateRules.offered(latest, BuildConfig.VERSION_NAME, s.getBoolean("has_asset", false))
-        if (busy.isNotEmpty() || HomeKey.working || !canInstall(app, available)) return
+        if (busy.isNotEmpty() || HomeKey.working || !canInstall(app, available) || !PlayRules.gitHubDownloads(BuildConfig.FLAVOR)) return
         val url = s.getString("url", "") ?: ""
         val digest = s.getString("digest", "") ?: ""
         val size = s.getLong("size", 0L)

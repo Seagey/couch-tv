@@ -54,6 +54,10 @@ d=$2
 mkdir -p "$d/app/build/outputs/apk/release" "$d/app/build/outputs/apk/watch"
 echo "$d release" > "$d/app/build/outputs/apk/release/app-release.apk"
 echo "$d watch" > "$d/app/build/outputs/apk/watch/app-watch.apk"
+# the on-TV app has store flavours (github, play): its GitHub APKs are under apk/github/
+mkdir -p "$d/app/build/outputs/apk/github/release" "$d/app/build/outputs/apk/github/watch"
+echo "$d release" > "$d/app/build/outputs/apk/github/release/app-github-release.apk"
+echo "$d watch" > "$d/app/build/outputs/apk/github/watch/app-github-watch.apk"
 exit "${FAKE_GRADLE_RC:-0}"
 """
 FAKE_SAMSUNG = """#!/bin/bash

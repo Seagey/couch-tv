@@ -102,7 +102,7 @@ class SetupActivity : Activity() {
     }
 
     /** What a press of Make it my home does on this TV now (HomeAsk.plan). */
-    private fun plan() = HomeAsk.plan(HomeRole.googleTv(this), HomeRole.googleHome(this), BuildConfig.BUILD_TYPE == "watch",
+    private fun plan() = HomeAsk.plan(HomeRole.googleTv(this), HomeRole.googleHome(this), Variant.hasWatch,
         HomeRole.canComeBack(this), Store.str(HomeAsk.BLOCKED_KEY))
     // Something came on top while waiting (Google's home put an empty black screen there on a TCL): bring
     // this screen back once, so the question is not left behind it. If Android does not allow that, step 1
@@ -128,7 +128,8 @@ class SetupActivity : Activity() {
             override fun forgetPhones() { Auth.forgetAll(); refresh() }
             override fun keys() { keyIndex = firstKeyStep(); show(SetupSteps.Screen.KEYS) }
             override fun undo() { show(SetupSteps.Screen.UNDO_CONFIRM) }
-            override fun accessibility() { runCatching { startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)) } }
+            // Play: the Home button watch disclosure first (DisclosureActivity); other builds: Android's settings
+            override fun accessibility() { DisclosureActivity.openAccessibility(this@SetupActivity) }
         })
         settings.helpQr.setImageBitmap(SettingsScreen.helpQr())
         val first = SetupSteps.firstScreen(Store.str(SetupSteps.DONE_KEY) == "1", Auth.phoneCount(), homeIsOn())
@@ -185,7 +186,7 @@ class SetupActivity : Activity() {
     private fun keyView() = runCatching { org.json.JSONObject(HomeKey.state(this)).optString("view") }.getOrDefault("")
 
     private fun homeStepNow(): SetupSteps.HomeStep =
-        SetupSteps.homeStep(plan(), HomeRole.googleTv(this), BuildConfig.BUILD_TYPE == "watch", keyView(), askSince > 0 || awaitingRole)
+        SetupSteps.homeStep(plan(), HomeRole.googleTv(this), BuildConfig.BUILD_TYPE == "watch" || Variant.play, keyView(), askSince > 0 || awaitingRole)
     private var shownStep: SetupSteps.HomeStep? = null
 
     private fun buildHomeStep(): SetupScreens.Step {
@@ -300,7 +301,7 @@ class SetupActivity : Activity() {
         Store.putStr(HomeAsk.PENDING_KEY, null)
         App.setHomeEnabled(this, false); FireHome.poke()
         val canWrite = checkSelfPermission("android.permission.WRITE_SECURE_SETTINGS") == android.content.pm.PackageManager.PERMISSION_GRANTED
-        when (SetupSettings.undoWatch(BuildConfig.BUILD_TYPE == "watch", WatchService.connected, canWrite)) {
+        when (SetupSettings.undoWatch(Variant.hasWatch, WatchService.connected, canWrite)) {
             "self" -> if (!WatchService.switchOff() && canWrite) watchOutOfList()
             "settings" -> watchOutOfList()
         }
@@ -501,7 +502,7 @@ class SetupActivity : Activity() {
         settings.setPhones(Auth.phoneCount())
         val fireBlocked = FireHome.isFireTv && (Adb.lastError ?: "").contains(Adb.FIRE_BLOCKED)
         settings.setStrip(SetupSettings.keyStrip(Adb.connected, fireBlocked))
-        settings.setWatchLine(SetupSettings.showWatchLine(BuildConfig.BUILD_TYPE == "watch",
+        settings.setWatchLine(SetupSettings.showWatchLine(Variant.hasWatch,
             HomeKeyRules.watching(WatchService.connected, FireHome.isFireTv, android.os.Build.VERSION.SDK_INT, FireHome.usageAllowed)))
     }
 }

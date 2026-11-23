@@ -508,8 +508,18 @@
       answer.appendChild(E("div", "cask-a" + (last.err ? " err" : ""), last.pending ? "Thinking..." : last.err || last.a));
     }
     draw();
-    field(b, "Your question", "", function (text) { if (!text.trim()) return; ask(text).then(draw, draw); draw(); }, { caps: true, go: "send", placeholder: "Type or say it" });
+    field(b, "Your question", "", function (text) { if (!text.trim()) return; ask(text).then(function () { draw(); if (W.TVPLAY && sheet && sheet.view === "ask") show("ask"); }, draw); draw(); }, { caps: true, go: "send", placeholder: "Type or say it" });
     b.appendChild(answer);
+    // the Google Play build of the on-TV app (window.TVPLAY, AskReport.kt): Report this answer, without leaving the app
+    var rp = W.TVPLAY;
+    if (rp && typeof rp.report === "function" && last && last.a && !last.pending && !last.err) {
+      var rw = {}; try { rw = JSON.parse(rp.words()); } catch (e) {}
+      var q = last.q, a = last.a;
+      button(b, rw.report || "Report this answer", function () {
+        var ok = false; try { ok = rp.report(q, a); } catch (e) {}
+        if (ok) answer.appendChild(E("div", "cask-hint", rw.done || "Thanks. This answer is reported."));
+      });
+    }
     button(b, "Set up", function () { show("setup"); }, "Who answers: " + s.by);
     sheet.redraw = draw;
     void v;

@@ -139,9 +139,9 @@ do_build() {
   # M4: every release home carries the example settings, never this computer's own config.json
   gradle_run tv-home/android clean assembleRelease "-PconfigJson=$ROOT/config.example.json"
   cp "$ROOT/tv-home/android/app/build/outputs/apk/release/app-release.apk" "$DIST/couch-tv-home.apk"
-  gradle_run on-tv/android clean assembleRelease assembleWatch
-  cp "$ROOT/on-tv/android/app/build/outputs/apk/release/app-release.apk" "$DIST/couch-tv-ontv.apk"
-  cp "$ROOT/on-tv/android/app/build/outputs/apk/watch/app-watch.apk" "$DIST/couch-tv-ontv-watch.apk"
+  gradle_run on-tv/android clean assembleGithubRelease assembleGithubWatch
+  cp "$ROOT/on-tv/android/app/build/outputs/apk/github/release/app-github-release.apk" "$DIST/couch-tv-ontv.apk"
+  cp "$ROOT/on-tv/android/app/build/outputs/apk/github/watch/app-github-watch.apk" "$DIST/couch-tv-ontv-watch.apk"
   gradle_run sync/android clean assembleRelease
   cp "$ROOT/sync/android/app/build/outputs/apk/release/app-release.apk" "$DIST/couch-tv-sync.apk"
   echo "=== samsung/build.py --release"

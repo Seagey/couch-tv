@@ -48,7 +48,7 @@ whether wireless debugging is on.
 ## 2. Install alongside, not instead
 
 ```
-python3 scripts/real-tv.py --ip <TV_IP> install android/app/build/outputs/apk/release/app-release.apk
+python3 scripts/real-tv.py --ip <TV_IP> install android/app/build/outputs/apk/github/release/app-github-release.apk
 python3 scripts/real-tv.py --ip <TV_IP> check        # home app must be unchanged
 python3 scripts/real-tv.py --ip <TV_IP> open         # Couch TV setup screen
 python3 scripts/real-tv.py --ip <TV_IP> shot test-output/real-1-setup.png

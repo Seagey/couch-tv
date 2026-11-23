@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Shown by Android under Accessibility, Couch TV home watch. The Play build has no key filtering. -->
+    <string name="watch_desc">Brings your Couch TV home back when the Home button opens the TV\'s own home. It only sees which app\'s window has just come forward. It does not read what is on the screen, what you type or what you watch, and it sends nothing off this TV. It does nothing until you agree to it in Couch TV.</string>
+</resources>

@@ -63,10 +63,10 @@ if [ -f "$ROOT/on-tv/android/settings.gradle.kts" ] || [ -f "$ROOT/on-tv/android
   fi
   if [ -f "$ROOT/remote/dist/index.html" ]; then
     echo "Building the on-TV app (option C)"
-    "$GW" -p "$ROOT/on-tv/android" --no-daemon -q clean assembleRelease assembleWatch
-    cp "$ROOT/on-tv/android/app/build/outputs/apk/release/app-release.apk" "$ROOT/dist/couch-tv-ontv.apk"
+    "$GW" -p "$ROOT/on-tv/android" --no-daemon -q clean assembleGithubRelease assembleGithubWatch
+    cp "$ROOT/on-tv/android/app/build/outputs/apk/github/release/app-github-release.apk" "$ROOT/dist/couch-tv-ontv.apk"
     # the same app plus the home watch, for Fire TV and TVs set up from a computer (on-tv/README.md)
-    cp "$ROOT/on-tv/android/app/build/outputs/apk/watch/app-watch.apk" "$ROOT/dist/couch-tv-ontv-watch.apk"
+    cp "$ROOT/on-tv/android/app/build/outputs/apk/github/watch/app-github-watch.apk" "$ROOT/dist/couch-tv-ontv-watch.apk"
     OUT="$OUT
 $ROOT/dist/couch-tv-ontv.apk
 $ROOT/dist/couch-tv-ontv-watch.apk"

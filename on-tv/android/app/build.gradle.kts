@@ -116,3 +116,30 @@ android.sourceSets.getByName("test").java.srcDir(File(repoRoot, "tv-home/android
 
 // -PsetupShots=<folder>: SetupShotsTest saves PNGs of the setup screens there (skipped without it).
 tasks.withType<Test>().configureEach { systemProperty("setupShots", (project.findProperty("setupShots") as String?) ?: "") }
+
+// ------------------------------------------------------------------------------------------- Google Play
+// Product flavours, dimension "store" (coord/GOOGLE-PLAY-PLAN.md section 4, coord/GOOGLE-PLAY-BUILD.md):
+//  github  today's builds, unchanged: githubRelease is couch-tv-ontv.apk, githubWatch couch-tv-ontv-watch.apk.
+//  play    the Google Play App Bundle, TV only: bundlePlayRelease. src/play/ (manifest overlay, the watch's
+//          accessibility config without key filtering) and PlayRules.kt (BuildConfig.FLAVOR == "play").
+// versionCode play = 1,000,000 + 100 x the GitHub versionCode of the same source + PLAY_REBUILD (0 to 99, for
+// Play only rebuilds): always above every GitHub build, so a TV can move from GitHub to Play once both share a
+// signing key, and a GitHub APK can never replace a Play install. PlayRules.versionCode is the same formula.
+// targetSdk 34 for both: Google Play's floor for Android TV apps (since 31 Aug 2025); the Play build is TV only.
+val PLAY_REBUILD = 0
+val PLAY_VERSION_NAME = "0.13.10"   // the GitHub versionName of the same source once 0.13.10 is merged
+android.flavorDimensions += "store"
+android.productFlavors.create("github") { dimension = "store"; isDefault = true }
+android.productFlavors.create("play") {
+    dimension = "store"
+    versionCode = 1_000_000 + 100 * (android.defaultConfig.versionCode ?: 0) + PLAY_REBUILD
+    versionName = PLAY_VERSION_NAME
+}
+androidComponents {
+    // the watch build type is a GitHub APK only: the Play build has the watch inside
+    beforeVariants(selector().withFlavor("store" to "play").withBuildType("watch")) { it.enable = false }
+}
+// -PplayAssets=<folder>: PlayAssetsTest (testPlayDebugUnitTest) draws the draft Play graphics there (skipped without it).
+tasks.withType<Test>().configureEach { systemProperty("playAssets", (project.findProperty("playAssets") as String?) ?: "") }
+// testDebugUnitTest (CI, the docs) runs both flavours' unit tests, as it ran the one build before.
+tasks.register("testDebugUnitTest") { dependsOn("testGithubDebugUnitTest", "testPlayDebugUnitTest") }
