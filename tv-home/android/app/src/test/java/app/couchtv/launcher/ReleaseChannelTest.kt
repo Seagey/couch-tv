@@ -92,6 +92,12 @@ class ReleaseChannelTest {
         assertTrue(ReleaseChannel.newer("v0.13.11", "0.13.9"))
         assertTrue(ReleaseChannel.newer("v0.13.11", "0.13"))
         assertFalse(ReleaseChannel.newer("v0.13.11", "0.13.11"))
+        // 0.13.12 (the TV reports its version and memory with a design fetch, Spotify tidy-ups) reaches 0.13.11 and
+        // older TVs, and is never older than 0.13.11
+        assertTrue(ReleaseChannel.newer("v0.13.12", "0.13.11"))
+        assertTrue(ReleaseChannel.newer("v0.13.12", "0.13.10"))
+        assertFalse(ReleaseChannel.newer("v0.13.12", "0.13.12"))
+        assertFalse(ReleaseChannel.newer("v0.13.11", "0.13.12"))
         assertFalse(ReleaseChannel.newer("v0.13.10", "0.13.11"))
         assertFalse(ReleaseChannel.newer("v0.13.8", "0.13.9"))
     }
