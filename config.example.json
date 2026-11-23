@@ -58,6 +58,9 @@
   "spotify": {
     "enabled": false,
     "seek_seconds": 10,
-    "hide_idle": false
+    "hide_idle": false,
+    "title_mode": "pingpong",
+    "show_app": true,
+    "align": "classic"
   }
 }

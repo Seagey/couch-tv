@@ -567,8 +567,9 @@ html.who-gentle.scene-fog .mood:not(.dark) .mood-hi { text-shadow: 0 0 0.5rem rg
 .theme-night .qbtn.focus { background: #fff; color: #111; }
 
 /* Keep watching: three glass cards */
-.theme-night .shelf {
-  top: 40rem;
+.theme-night .shelf { top: 40rem; left: var(--safe-x); right: var(--safe-x); }
+html.spotify-align-center .theme-night .shelf,
+html.spotify-align-center.theme-night .shelf {
   left: 50%;
   right: auto;
   transform: translateX(-50%);

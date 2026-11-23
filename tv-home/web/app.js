@@ -133,7 +133,7 @@
   var WX_AMBIENT = true, WX_SUN_GRADE = true;
   // Now playing (#31), on unless switched off; the navigation sound: system, soft or off (#32)
   var NP_ON = true, KW_ON = true, SOUND_STYLE = "system", START_FOCUS = "people",
-    SPOTIFY = { enabled: false, show_card: true, controls: true, seek_seconds: 10, hide_idle: false, title_mode: "pingpong", show_app: true };
+    SPOTIFY = { enabled: false, show_card: true, controls: true, seek_seconds: 10, hide_idle: false, title_mode: "pingpong", show_app: true, align: "classic" };
   var KW_POSTER = false;   // Night: Keep watching as Classic poster tiles, not wide cards (home.keep_watching_style, #192)
   // Keep watching follows the app the remote is on (home.shelf_follows_app), off unless switched on
   var SHELF_FOLLOW = false;
@@ -645,8 +645,10 @@
       seek_seconds: [5, 10, 15, 30].indexOf(spRaw.seek_seconds) >= 0 ? spRaw.seek_seconds : 10,
       hide_idle: typeof spRaw.hide_idle === "boolean" ? spRaw.hide_idle : false,
       title_mode: ["dots", "pingpong", "continuous"].indexOf(spRaw.title_mode) >= 0 ? spRaw.title_mode : "pingpong",
-      show_app: typeof spRaw.show_app === "boolean" ? spRaw.show_app : true
+      show_app: typeof spRaw.show_app === "boolean" ? spRaw.show_app : true,
+      align: ["classic", "center"].indexOf(spRaw.align) >= 0 ? spRaw.align : "classic"
     };
+    applySpotifyAlign();
     // the Keep watching row: Home settings win over home.keep_watching; off hides it and stops fetching it
     KW_ON = typeof ST.keep_watching === "boolean" ? ST.keep_watching : HOME.keep_watching !== false;
     // Home settings win over home.keep_watching_style; "card" (the wide glass cards) unless "poster"
@@ -740,6 +742,21 @@
   function clockShown() {
     var off = !SHOW_CLOCK && !(typeof CouchDesign !== "undefined" && CouchDesign.on());
     if (document.documentElement.classList.contains("no-clock") !== off) document.documentElement.classList.toggle("no-clock", off);
+  }
+  function applySpotifyAlign() {
+    var isCenter = (SPOTIFY.align || "classic") === "center";
+    document.documentElement.classList.toggle("spotify-align-center", isCenter);
+    if (NIGHT) {
+      var sEl = $("shelf-section");
+      if (sEl) {
+        if (isCenter) {
+          var gEl = $("grid");
+          if (gEl && gEl.offsetWidth > 0) sEl.style.width = gEl.offsetWidth + "px";
+        } else {
+          sEl.style.width = "";
+        }
+      }
+    }
   }
   var DATE_BARS = false;   // home.date_bars: thin vertical bars between the day, the place and the weather
   // Lighter home: ask for the 640 px size of a Keep watching picture, not the 1440 px one (a card is about 500 px wide)
@@ -4710,8 +4727,12 @@
       if (NIGHT) {
         var gEl = $("grid"), sEl = $("shelf-section");
         if (gEl && sEl) {
-          var gw = gEl.offsetWidth;
-          if (gw > 0) sEl.style.width = gw + "px";
+          if ((SPOTIFY.align || "classic") === "center") {
+            var gw = gEl.offsetWidth;
+            if (gw > 0) sEl.style.width = gw + "px";
+          } else {
+            sEl.style.width = "";
+          }
         }
       }
     }
@@ -6741,6 +6762,23 @@
           ST.spotify.title_mode = SPOTIFY.title_mode;
           saveSettings();
           renderNp();
+        }
+      });
+      rows.push({
+        kind: "cycle",
+        key: "spotify-align",
+        label: t("spotify_align"),
+        value: t("spotify_align_" + (SPOTIFY.align || "classic")),
+        act: function () {
+          var choices = ["classic", "center"];
+          var idx = choices.indexOf(SPOTIFY.align || "classic");
+          SPOTIFY.align = choices[(idx + 1) % choices.length];
+          ST.spotify = ST.spotify || {};
+          ST.spotify.align = SPOTIFY.align;
+          saveSettings();
+          applySpotifyAlign();
+          renderGrid();
+          renderShelf();
         }
       });
     }
