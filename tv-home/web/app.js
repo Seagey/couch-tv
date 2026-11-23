@@ -2795,7 +2795,7 @@
 
     var playing = music.state === "playing";
     var cover = music.art || (music.source === "spotify-tv" ? iconUrl(SPOTIFY_TV) : "");
-    var art = cover ? '<img class="np-art" src="' + esc(cover) + '" alt="" decoding="async" onerror="this.className=\'np-art gone\'">' :
+    var art = cover ? '<img class="np-art" src="' + esc(cover) + '" alt="" decoding="async" data-err="np">' :
       '<span class="np-art">' + ICONS.note + "</span>";
 
     var btns = [];
