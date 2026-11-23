@@ -6647,7 +6647,7 @@
     renderAsk();
   }
   // Something on top of the home: a design's "Use this design?", its widget sheets and details, Share this
-  // home, Home settings, or a question already up (the gear pop up).
+  // home, the Ask AI sheet, Home settings, or a question already up (the gear pop up).
   function updSheetUp() {
     var CD = typeof CouchDesign !== "undefined" ? CouchDesign : null;
     try {
@@ -6655,6 +6655,7 @@
       if (CD && CD.nav && CD.nav.sheetOpen && CD.nav.sheetOpen()) return true;
       if (window.CouchDetail && window.CouchDetail.isOpen && window.CouchDetail.isOpen()) return true;
       if (typeof CouchShare !== "undefined" && CouchShare.isOpen && CouchShare.isOpen()) return true;
+      if (window.CouchAsk && window.CouchAsk.isOpen && window.CouchAsk.isOpen()) return true;
     } catch (e) { return true; }
     var s = $("settings"), w = $("welcome"), g = $("gear-pop");
     return !!((s && s.classList.contains("on")) || (w && w.classList.contains("on")) || (g && g.classList.contains("on")));

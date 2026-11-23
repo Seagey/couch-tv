@@ -9,6 +9,7 @@
 //     app): each brings the question back. Never behind "Use this design?": a real design code from the
 //     welcome, the question up, Home pressed under it, then Use this design and its new start. A tv.resume() with
 //     no tv.pause() before it (the on-TV app redrawing after a phone save) is not the home coming to the front.
+//     The question also waits while the Ask AI sheet is up.
 // Needs Playwright (Chromium). Without it the test says so and passes:
 //   COUCHTV_PLAYWRIGHT=<a folder whose node_modules has playwright> node tests/test_first_run_update_ask_browser.mjs
 import { createRequire } from "node:module";
@@ -216,6 +217,19 @@ try {
   await page.evaluate(() => { document.querySelector(".cd-ask").remove(); window.CouchDesign.asking = window.__realAsking; });
   await askUp();
   ok(await updAsk(), "and comes once the sheet has gone");
+
+  // the Ask AI sheet up when the home comes back: the same wait
+  await freshTv();
+  await press("Escape", 500);
+  await page.reload(); await ready();
+  await page.evaluate(() => window.CouchAsk.open("ask"));
+  ok(await page.evaluate(() => window.CouchAsk.isOpen()), "the Ask AI sheet is up");
+  await page.evaluate(() => window.tv.home());
+  await page.waitForTimeout(6500);
+  ok(!(await updAsk()), "Ask AI up when the home comes back: the question waits");
+  await page.evaluate(() => window.CouchAsk.close());
+  await askUp();
+  ok(await updAsk(), "and comes once Ask AI has closed");
 
   // 4. no welcome on this TV (set up before): asked as before, once the home is up
   await freshTv(FRESH, { "mock:tvhome.apps.seen": JSON.stringify(["com.netflix.ninja"]) });
