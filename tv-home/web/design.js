@@ -394,6 +394,8 @@
     align: function (v) { return SAN.pick(v, ["left", "center", "right"]); },
     show: function (v) { return SAN.pick(v, ["date", "weather", "both"]); }, dfmt: function (v) { return SAN.pick(v, DATE_KEYS); },
     cities: function (v) { return SAN.list(v, 4, tzOk); },
+    // a clock's own time zone (an IANA id, checked like the world clock's cities); left out, the TV's own
+    zone: tzOk,
     month: function (v) { return SAN.n(v, 1, 12, true); }, day: function (v) { return SAN.n(v, 1, 31, true); },
     unit: function (v) { return SAN.pick(v, ["sleeps", "days", "weeks"]); }, icon: iconName,
     // apps in a dock, row, folder or app tile: catalogue ids (app-catalogue.js). An old design's package
@@ -443,8 +445,8 @@
   var WEB_LEAGUES = ["afl", "nrl", "aleague", "epl", "nba", "bbl", "cricket"];
   var WEB_FEEDS = ["abc", "abc-justin", "abc-sport", "abc-business", "sbs", "guardian", "bbc", "rnz"];
   var WOPT = {
-    clock: "format ampm seconds date align", tallclock: "format align", glassclock: "format scene", analog: "seconds numbers", flipclock: "format",
-    wordclock: "precise dayline", solar: "", worldclock: "label cities format", countdown: "label month day year unit icon", date: "show dfmt align place", month: "wstart", timer: "label minutes",
+    clock: "format ampm seconds date align zone", tallclock: "format align zone", glassclock: "format scene zone", analog: "seconds numbers zone", flipclock: "format zone",
+    wordclock: "precise dayline zone", solar: "", worldclock: "label cities format", countdown: "label month day year unit icon", date: "show dfmt align place", month: "wstart", timer: "label minutes",
     weather: "place hilo night", bigtemp: "place", hourly: "place hours", week: "place", rain: "label", uv: "label", sun: "label", moon: "", air: "label", surf: "label",
     photo: "image fit caption sub", slideshow: "seconds_each caption sub shuffle", mosaic: "count", artframe: "image mat caption sub", memory: "align range ago",
     keep: "", keeprow: "label shows", upnext: "apps sport", picks: "label align",

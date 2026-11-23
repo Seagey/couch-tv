@@ -23,6 +23,11 @@
      "key": "ampm",
      "label": "Show am and pm",
      "type": "toggle"
+    },
+    {
+     "key": "zone",
+     "label": "Time zone",
+     "type": "zone"
     }
    ]
   },
@@ -38,6 +43,11 @@
      "key": "align",
      "label": "Line up",
      "type": "choice"
+    },
+    {
+     "key": "zone",
+     "label": "Time zone",
+     "type": "zone"
     }
    ]
   },
@@ -53,6 +63,11 @@
      "key": "scene",
      "label": "Glass from",
      "type": "choice"
+    },
+    {
+     "key": "zone",
+     "label": "Time zone",
+     "type": "zone"
     }
    ]
   },
@@ -68,6 +83,11 @@
      "key": "numbers",
      "label": "Show the numbers",
      "type": "toggle"
+    },
+    {
+     "key": "zone",
+     "label": "Time zone",
+     "type": "zone"
     }
    ]
   },
@@ -78,6 +98,11 @@
      "key": "format",
      "label": "12 or 24 hour",
      "type": "choice"
+    },
+    {
+     "key": "zone",
+     "label": "Time zone",
+     "type": "zone"
     }
    ]
   },
@@ -93,6 +118,11 @@
      "key": "dayline",
      "label": "Show the day",
      "type": "toggle"
+    },
+    {
+     "key": "zone",
+     "label": "Time zone",
+     "type": "zone"
     }
    ]
   },

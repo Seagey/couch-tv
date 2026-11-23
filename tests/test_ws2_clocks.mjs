@@ -135,7 +135,7 @@ const probe = (page, id) => page.evaluate((id) => {
   const divs = [...r.querySelectorAll("div")];
   return { text: r.textContent.replace(/\s+/g, " ").trim(), bg: (divs.find((e) => /glass\.jpg/.test(e.style.backgroundImage)) || { style: {} }).style.backgroundImage || "",
     align: divs.map((e) => e.style.textAlign).filter(Boolean)[0] || "", hand: !!r.querySelector('[data-hand="seconds"]'), nums: r.querySelectorAll("[data-num]").length,
-    head0: (r.querySelector(".cw-month span.h") || {}).textContent || "" };
+    head0: (r.querySelector(".cw-month span.h") || {}).textContent || "", hh: (r.querySelector('line[stroke-width="4.4"]') || { getAttribute: () => "" }).getAttribute("transform") || "" };
 }, id);
 const edit = (page, key, values) => page.evaluate(([key, values]) => tv.atHomeEdit({ widget_set: { key, values } }), [key, values]);
 async function settle(page, id, before) {
@@ -169,8 +169,8 @@ async function holdOn(page, id, again) {
 }
 
 // the settings each kind must have, all wired (pre: true) and offered on the TV and the phone
-const WANT = { clock: ["format", "seconds", "date", "ampm"], tallclock: ["format", "align"], glassclock: ["format", "scene"], analog: ["seconds", "numbers"], flipclock: ["format"],
-  wordclock: ["precise", "dayline"], worldclock: ["cities", "format", "label"], date: ["show", "dfmt", "place"], month: ["wstart"], week: ["town", "place"],
+const WANT = { clock: ["format", "seconds", "date", "ampm", "zone"], tallclock: ["format", "align", "zone"], glassclock: ["format", "scene", "zone"], analog: ["seconds", "numbers", "zone"], flipclock: ["format", "zone"],
+  wordclock: ["precise", "dayline", "zone"], worldclock: ["cities", "format", "label"], date: ["show", "dfmt", "place"], month: ["wstart"], week: ["town", "place"],
   countdown: ["label", "day", "month", "year", "unit"], timer: ["minutes", "label"] };
 
 let tvp = await tvPage(designOf());
@@ -242,6 +242,13 @@ const CASES = [
   ["f", "format=12h", null, { format: "12h" }, (a) => /0742/.test(a.text.replace(/\s/g, ""))],
   ["wc", "precise", null, { precise: true }, (a, b) => /Eighteen minutes to eight/.test(a.text) && /Twenty to eight/.test(b.text)],
   ["wc", "dayline", null, { dayline: false }, (a, b) => /Friday evening/.test(b.text) && !/Friday/.test(a.text)],
+  // a clock's own time zone (from the phone or Studio): 7:42pm in Sydney is 10:42pm Thursday in Honolulu, 5:42pm in Tokyo
+  ["c", "zone", null, { zone: "Pacific/Honolulu" }, (a, b) => /10:42/.test(a.text) && /Thu/.test(a.text) && /7:42/.test(b.text) && /Fri/.test(b.text)],
+  ["t", "zone", null, { zone: "Asia/Tokyo" }, (a, b) => /5:42/.test(a.text) && !/7:42/.test(a.text) && /7:42/.test(b.text)],
+  ["g", "zone", null, { zone: "Asia/Tokyo" }, (a, b) => /5:42/.test(a.text) && /7:42/.test(b.text)],
+  ["a", "zone", null, { zone: "Asia/Tokyo" }, (a, b) => /^rotate\(171 /.test(a.hh) && /^rotate\(231 /.test(b.hh)],
+  ["f", "zone", null, { zone: "Asia/Tokyo" }, (a, b) => /0542/.test(a.text.replace(/\s/g, "")) && /0742/.test(b.text.replace(/\s/g, ""))],
+  ["wc", "zone", null, { zone: "Asia/Tokyo" }, (a, b) => /Twenty to six/.test(a.text) && /Twenty to eight/.test(b.text)],
   ["wo", "cities", null, { cities: ["Asia/Tokyo", "Europe/London"] }, (a, b) => /Tokyo/.test(a.text) && /London/.test(a.text) && !/Sydney/.test(a.text) && /Sydney/.test(b.text) && !/Tokyo/.test(b.text)],
   ["wo", "format=24h", { cities: ["Asia/Tokyo"] }, { format: "24h" }, (a, b) => /17:42/.test(a.text) && /5:42\s*pm/.test(b.text)],
   ["wo", "label", null, { label: "Family" }, (a, b) => /Family/.test(a.text) && /World clock/.test(b.text) && !/World clock/.test(a.text)],
@@ -304,6 +311,27 @@ for (const [id, what, pre, vals, check] of CASES) {
   ok(/Sydney/.test(back.text) && /22°/.test(back.text), "week: cleared, the home's town again: " + back.text, "week");
 }
 for (const kind of Object.keys(WANT)) for (const k of WANT[kind]) ok(tested[kind + "." + k], kind + "." + k + " has a test that changes it and clears it");
+// ---- a time zone this TV does not know: refused from the phone, and ignored in a design ----
+{
+  for (const z of ["Mars/Olympus", "Europe/Nowhere", "not a zone"]) {
+    const r = await edit(tvp, "c|clock", { zone: z });
+    ok(r.ok === false, "clock zone " + z + ": refused from the phone (" + (r.error || "") + ")", "clock");
+  }
+  ok(/7:42/.test((await probe(tvp, "c")).text), "and the clock keeps the TV's time");
+  // in a design: Studio's zone draws, an unknown one keeps the TV's own time, none is today's clock
+  const zd = designOf();
+  zd.objects.filter((o) => o.id === "c")[0].opts = { zone: "Europe/Nowhere" };
+  zd.objects.filter((o) => o.id === "t")[0].opts = { zone: "Asia/Tokyo" };
+  zd.objects.filter((o) => o.id === "a")[0].opts = { zone: "Mars/Olympus" };
+  const zp = await tvPage(zd);
+  ok(/7:42/.test((await probe(zp, "c")).text), "a design's unknown zone: the clock shows the TV's own time: " + (await probe(zp, "c")).text, "clock");
+  ok(/5:42/.test((await probe(zp, "t")).text) && !/7:42/.test((await probe(zp, "t")).text), "a design's Tokyo zone: the tall clock shows Tokyo's time: " + (await probe(zp, "t")).text, "tallclock");
+  ok(/^rotate\(231 /.test((await probe(zp, "a")).hh), "a zone design.js drops (not a zone id): the analogue clock keeps the TV's time", "analog");
+  ok(/7:42/.test((await probe(zp, "f")).text.replace(/\s/g, "").replace("0742", "7:42")), "no zone (an old design): the TV's own time", "flipclock");
+  ok(!zp.errors.length, "no page errors with zones in the design: " + zp.errors.join("; "));
+  await zp.close();
+  TV = tvp;
+}
 
 // ================= 3. the layers OK opens =================
 {

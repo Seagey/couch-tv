@@ -35,11 +35,15 @@ Fields:
 - `private`: `true` for anything personal (calendar links, a home address). Private values never
   leave the TV and the home Wi-Fi.
 
-Two more types:
+Three more types:
 
 - `tvlist`: one of the things kept on this TV, named by `from`: `"lists"`, `"photos"`, `"people"` or
   `"calendars"` (stored as that thing's id; `"first"`, `"all"` or `"auto"` as the default)
 - `image`: one photo put in the widget in couch-tv Studio (Studio only, kept in the design)
+- `zone`: a time zone, stored as an IANA id (`"Europe/London"`), picked from a city search in Studio or
+  on the phone. `""` (the default) means the TV's own time zone; a zone the TV does not know is treated
+  the same. The clocks (`clock`, `tallclock`, `glassclock`, `flipclock`, `analog`, `wordclock`) have one
+  as `zone`, kept in the design.
 
 Every record also says where it lives and who shows it (WIDGET-SETTINGS-SPEC.md section 5):
 

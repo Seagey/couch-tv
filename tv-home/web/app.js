@@ -9230,6 +9230,7 @@
         }
         else if (s.type === "calendar") { v = String(v).trim().slice(0, 600); v = window.CouchAtHome ? CouchAtHome.calUrl(v) : ""; if (!v) { bad = "That is not a calendar link. It starts with https://."; return; } }
         else if (s.type === "apps") { bad = "Change that on the TV."; return; }
+        else if (s.type === "zone") { v = window.CouchWidgets && CouchWidgets.zoneOk ? CouchWidgets.zoneOk(String(v).trim()) : ""; if (!v) { bad = "That time zone is not one this TV knows."; return; } }
         else if (s.type !== "choice" && s.type !== "tvlist") v = String(v).replace(/[\u0000-\u001f]/g, "").trim().slice(0, 80);
         wsSave(w, s, v);
       });
