@@ -122,9 +122,11 @@
         </intent>
     </queries>
 
+    <!-- The app's name in the TV's app list and to the TV's voice assistant ("Hey Google, open Couch TV"):
+         Couch TV, as the on-TV app is called; "Home" was too plain for the assistant to find (23 Nov 2026) -->
     <application
         android:name=".App"
-        android:label="Home"
+        android:label="Couch TV"
         android:icon="@drawable/icon"
         android:banner="@drawable/banner"
         android:theme="@style/Home"

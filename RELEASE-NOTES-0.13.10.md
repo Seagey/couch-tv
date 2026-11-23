@@ -71,6 +71,11 @@ A design with a video background, such as Aquarium, now plays its video on a TV 
 - **More widget settings come with the design**: temperature units, where the moon is seen from, the air quality scale, surf heights and wind, the soundscape's volume, the doorbell and energy headings, and Guest Wi-Fi's Hide the password. Your town, beach, Home Assistant and other private settings stay on the TV. A setting changed on the TV still wins.
 - **Up next says what it shows** in plain words: Your next show, Your last game, or Last game when Scores is on.
 
+### Voice
+
+- **The remote's mic and search button open your TV's own voice assistant from the Couch TV home.** The home no longer keeps the key for itself: it asks the TV for its own assistant.
+- **The home app is called Couch TV** in the TV's app list (it said Home), so "Hey Google, open Couch TV" finds it.
+
 ### Clocks in another time zone
 
 The digital, tall, glass, flip, analogue and word clocks in a Studio design can show another time zone, for family overseas. Leave it out and the clock shows the TV's own time, as before.

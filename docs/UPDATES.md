@@ -15,6 +15,7 @@ The newest release is **0.13.10**. The TV apps come from [the Releases page](htt
 - **Widgets set up on your phone:** a widget waiting for your town, calendar, photos or another private thing says what it is and shows a code; Hold OK puts the phone first, with No phone? Set it up here under it. The phone page starts with Widgets on your screen.
 - **App folders in rows**, a Dock and Games that show "+N" instead of dropping apps, and the remote stopping on every app.
 - **Video backgrounds play on 1 GB TVs**, with Show the still picture instead in Home settings, Designs.
+- **Voice:** the remote's mic and search button open your TV's own voice assistant from the Couch TV home, and the home app is called Couch TV in the app list, so "Hey Google, open Couch TV" finds it.
 - **Countdowns to Easter, Mother's Day and Father's Day**, clocks in another time zone, and more widget settings carried in the design.
 - **Fixes:** the town shows as just its own name, the home opens faster after the first time on the on-TV app, the update question waits for the welcome, a hidden Allow box is noticed, Use as home screen on a TV with Google's Android TV Home, the date over the clock, the screensaver after a scene clip, "Tomorrow" in full on the bins tile, and a design sent again from Studio wins.
 
