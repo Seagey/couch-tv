@@ -53,6 +53,24 @@ r = CD.nav.step(S2, r.cur, r.last, 1, 0);
 ok(r.cur.id === "g", "and leaves the folder when its apps run out that way");
 r = CD.nav.step(S2, r.cur, r.last, -1, 0);
 ok(same(r.cur, { id: "f", i: 1 }), "coming back lands on the app it left from");
+// apps in rows (a folder or app grid, grid: true): 3 across then 1, the remote goes 0, 1, 2, 3 by Right
+// (0.13.10: Right from the third skipped the fourth, one row down, and went to the Settings button)
+const app = (c, r) => ({ l: 104 + c * 180, t: 84 + r * 180, r: 264 + c * 180, b: 244 + r * 180 });
+const S3 = [{ id: "f", grid: true, box: { l: 80, t: 60, r: 680, b: 460 }, inner: [app(0, 0), app(1, 0), app(2, 0), app(0, 1)] }, { id: "g", box: { l: 800, t: 60, r: 1160, b: 420 }, inner: [] }];
+let at = { id: "f", i: 0 }, last3 = null;
+const walk = [];
+for (let k = 0; k < 4; k++) { r = CD.nav.step(S3, at, last3, 1, 0); at = r.cur; last3 = r.last; walk.push(at.id + ":" + at.i); }
+ok(walk.join() === "f:1,f:2,f:3,g:-1", "Right goes through every app in rows, then leaves: " + walk.join());
+r = CD.nav.step(S3, { id: "f", i: 3 }, null, -1, 0);
+ok(same(r.cur, { id: "f", i: 2 }), "Left at the start of a row goes back to the end of the row above");
+r = CD.nav.step(S3, { id: "f", i: 2 }, null, 1, 0);
+const back = CD.nav.step(S3, r.cur, r.last, -1, 0);
+ok(same(r.cur, { id: "f", i: 3 }) && same(back.cur, { id: "f", i: 2 }), "and the opposite press undoes it");
+r = CD.nav.step(S3, { id: "f", i: 0 }, null, 0, 1);
+ok(same(r.cur, { id: "f", i: 3 }), "Down still goes down a column");
+const S4 = [Object.assign({}, S3[0], { grid: false }), S3[1]];
+r = CD.nav.step(S4, { id: "f", i: 2 }, null, 1, 0);
+ok(r.cur.id === "g", "items not in rows of apps (no grid) keep plain geometry");
 
 // 2. every preset: reach, undo, no wrap, no jump over a nearer widget in the way
 const presets = JSON.parse(fs.readFileSync(path.join(__dirname, "fixtures/design-presets.json"), "utf8"));

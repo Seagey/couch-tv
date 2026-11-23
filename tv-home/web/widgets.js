@@ -112,7 +112,7 @@
   var DEMO_APPS = ["com.google.android.youtube.tv", "com.netflix.ninja", "au.net.abc.iview", "com.disney.disneyplus", "au.com.stan.and", "com.amazon.amazonvideo.livingroom", "com.sbs.ondemand.tv", "au.com.streamotion.ares.tv", "com.apple.atve.androidtv.appletv", "com.spotify.tv.android"];
   var GAME_APPS = ["com.microsoft.xcloud", "com.nvidia.geforcenow", "com.valvesoftware.steamlink", "com.retroarch"];
   // the containers of apps a person can change on the TV (Hold OK): their most apps
-  var APP_KINDS = ["app", "folder", "dock", "appgrid", "games"], APP_MAX = { app: 1, folder: 12, dock: 12, appgrid: 16, games: 4 };
+  var APP_KINDS = ["app", "folder", "dock", "appgrid", "games"], APP_MAX = { app: 1, folder: 12, dock: 12, appgrid: 16, games: 8 };
   function dataOf(env) { return (env && env.data) || {}; }
   function demoImg(k) { return CW.base + "demo/" + k + ".jpg"; }
   function bgImg(k) { return CW.base + "backgrounds/" + k + ".jpg"; }
@@ -1467,11 +1467,32 @@
     nodes.forEach(function (n, i) { if (i && i % cols === 0) out.push(E("div", "cw-rowbreak", "flex-basis:100%;width:0;height:0;margin:0")); out.push(n); });
     return out;
   }
+  // The gap between apps, a whole even number of pixels, so each app's two half gaps add up exactly and
+  // "N across" is always N (a rounded half gap made 4 across wrap as 3, 1, 3, 1: FOLDER-ROWS-TV-1123)
+  function gridGap(b) { return 2 * Math.floor(clamp(Math.min(b.w, b.h) / 18, 14, 28) / 2); }
+  // the app size for n apps, cols across, in a box w by h (top: the label's height above them)
+  function gridSize(n, cols, b, top) {
+    var gap = gridGap(b), rows = Math.ceil(n / cols);
+    return Math.floor(Math.min((b.w - (cols - 1) * gap) / cols, (b.h - top - (rows - 1) * gap) / rows));
+  }
+  // As many as fit: every column count from 1 to 6 (and no more than the apps), keeping the one with the
+  // biggest apps; on a tie, more across. So a wide box makes one row, and rows stack when that makes
+  // the apps bigger. Answers { cols, a }.
+  function bestCols(n, b, top, most) {
+    var best = { cols: 1, a: -1 };
+    for (var c = 1; c <= Math.min(n, most || 6); c++) { var a = gridSize(n, c, b, top); if (a >= best.a) best = { cols: c, a: a }; }
+    return best;
+  }
   function appGrid(list, b, cols, env, top) {
-    var rows = Math.ceil(list.length / cols), gap = clamp(Math.min(b.w, b.h) / 18, 14, 28);
-    var a = Math.floor(Math.min((b.w - (cols - 1) * gap) / cols, (b.h - top - (rows - 1) * gap) / rows));
+    var gap = gridGap(b), a = gridSize(list.length, cols, b, top);
     var g = E("div", "cw-grow", "display:flex;flex-wrap:wrap;align-content:center;justify-content:center;margin:" + px(-gap / 2), rowBreaks(list.map(function (p) { var n = appNode(p, a, env); n.style.margin = px(gap / 2); return n; }), cols));
+    g.setAttribute("data-cols", String(cols));
     return g;
+  }
+  // the last place in a row that cannot show every app: "+3", and OK opens them all (the folder layer)
+  function moreApps(n, a, env) {
+    var t = E("div", "cw-app cw-more cw-plus", "width:" + px(a) + ";height:" + px(a) + ";border-radius:" + px(a * 0.24) + ";display:flex;align-items:center;justify-content:center;color:#fff;font-weight:760;font-size:" + px(clamp(a * 0.3, 23, 64)), ["+" + n]);
+    return stop(t, "detail", "folder", tl(n === 1 ? "1 more app" : "{n} more apps", { n: n }));
   }
   R.app = function (root, o, b, env) {
     var list = appsFor(o, env, 1);
@@ -1498,18 +1519,30 @@
       stop(root, "detail", "folder", q.label || "Apps");
       return;
     }
-    var cols = colsOf(o, env) || clamp(Math.round(Math.sqrt(list.length * b.w / b.h)), 1, 6);
-    add(root, [label, appGrid(list, b.w > 0 ? { w: b.w - 48, h: b.h - 48 } : b, cols, env, label ? 50 : 0)]);
+    var inner = b.w > 0 ? { w: b.w - 48, h: b.h - 48 } : b, top = label ? 50 : 0, fixed = colsOf(o, env);
+    var cols = fixed || bestCols(list.length, inner, top).cols;
+    // a short box (2 high) where the name above leaves the apps tiny: the name goes (it shows on OK, in
+    // the folder layer) so the apps get the whole height, one row or stacked, whichever is bigger
+    if (label && b.h < 300 && gridSize(list.length, cols, inner, top) < 72) {
+      var bare = fixed ? { cols: fixed, a: gridSize(list.length, fixed, inner, 0) } : bestCols(list.length, inner, 0);
+      if (bare.a > gridSize(list.length, cols, inner, top)) { label = null; top = 0; cols = bare.cols; }
+    }
+    add(root, [label, appGrid(list, inner, cols, env, top)]);
     root.setAttribute("data-detail", "folder");
   };
   R.dock = function (root, o, b, env) {
-    var q = op(o), list = appsFor(o, env, 12);
+    var q = op(o), list = appsFor(o, env, 12), named = (q.apps || []).length > 0;
     if (!list.length && !canAdd(env)) return noApps(root, b, (q.apps || []).length);
     var a = Math.min(112, b.h - 40), gap = 30, cap = Math.max(1, Math.floor((b.w - 40 + gap) / (a + gap))), more = setting(o, env, "more") !== false;
-    var shown = list.slice(0, Math.max(1, cap - (more ? 1 : 0)));
-    if (canAdd(env) && list.length < 12 && shown.length < cap - (more ? 1 : 0)) shown.push("add:");
+    var room = Math.max(1, cap - (more ? 1 : 0));
+    // one row by design; apps past what fits are never dropped without a word: a "+3" place opens them
+    // all (with the TV's own apps and All apps at the end, All apps already has them)
+    var over = list.length > room && !(more && !named);
+    var shown = list.slice(0, over ? Math.max(1, room - 1) : room);
+    if (canAdd(env) && list.length < 12 && shown.length < room) shown.push("add:");
     root.style.padding = "20px";
     var row = E("div", "cw-row cw-center", "height:100%", shown.map(function (p, i) { var n = appNode(p, a, env); if (i) n.style.marginLeft = px(gap); return n; }));
+    if (over) { var plus = moreApps(list.length - shown.length, a, env); plus.style.marginLeft = px(gap); row.appendChild(plus); }
     if (more) row.appendChild(stop(E("div", "cw-app cw-more", "width:" + px(a) + ";height:" + px(a) + ";border-radius:" + px(a * 0.24) + ";margin-left:" + px(gap), [ic("more", a * 0.4, "#fff")]), "more", "", "All apps"));
     add(root, row);
   };
@@ -1521,28 +1554,41 @@
     // sized in the box inside the padding; Apps across, then as many rows as fit (at least 72 px an app),
     // more across when the rows would not fit
     var W0 = Math.max(1, b.w - 48), H0 = Math.max(1, b.h - 48), names = !small && setting(o, env, "names") !== false;
-    var cols = small ? colsOf(o, env) || 2 : colsOf(o, env) || clamp(Math.round(Math.sqrt(list.length * W0 / H0)), 1, 8);
     var gx = 40, gy = H0 < 400 ? 16 : 40, nameH = names ? 52 : 0, maxRows = Math.max(1, Math.floor(H0 / (72 + gy + nameH)));
-    cols = Math.min(list.length, Math.max(cols, Math.ceil(list.length / maxRows)));
-    var rows = Math.ceil(list.length / cols), a = Math.floor(Math.min((W0 - cols * gx) / cols, (H0 - rows * gy - rows * nameH) / rows));
-    add(root, E("div", "", "display:flex;flex-wrap:wrap;justify-content:center;align-content:center;height:100%", rowBreaks(list.map(function (p, i) {
+    var size = function (c) { var r = Math.ceil(list.length / c); return Math.floor(Math.min((W0 - c * gx) / c, (H0 - r * gy - r * nameH) / r)); };
+    var cols = small ? colsOf(o, env) || 2 : colsOf(o, env);
+    if (cols) cols = Math.min(list.length, Math.max(cols, Math.ceil(list.length / maxRows)));
+    else {
+      // As many as fit: the column count that makes the apps biggest (on a tie, more across)
+      cols = 1;
+      for (var c = 1; c <= Math.min(list.length, 8); c++) if (size(c) >= size(cols)) cols = c;
+    }
+    var a = size(cols);
+    var grid = E("div", "", "display:flex;flex-wrap:wrap;justify-content:center;align-content:center;height:100%", rowBreaks(list.map(function (p, i) {
       var n = appNode(p, a, env);
       return E("div", "cw-col", "align-items:center;width:" + px(a) + ";margin:" + px(gy / 2) + " " + px(gx / 2), [n, names ? fitT(E("div", "", WRAP + "font-size:25px;line-height:1.2;color:var(--ink);margin-top:12px;max-width:" + px(a + gx) + ";text-align:center;font-weight:650" + (root.classList.contains("cw-bare") ? ";text-shadow:0 2px 10px rgba(0,0,0,.3)" : ""), [p === "add:" ? "Add app" : appName(String(p).replace(/^missing:/, ""), env)])) : null]);
-    }), cols)));
+    }), cols));
+    grid.setAttribute("data-cols", String(cols));
+    add(root, grid);
     if (names) fitLater(root);
   };
   var GAMES = { "com.microsoft.xcloud": ["#107c10", "#0b4f0b", "Xbox Cloud", "cloud", "Last played: Forza"], "com.nvidia.geforcenow": ["#76b900", "#3f6400", "GeForce NOW", "bolt", "Fortnite, 2h ago"],
     "com.valvesoftware.steamlink": ["#2a475e", "#13202c", "Steam Link", "tv", "From the study PC"], "com.retroarch": ["#e60012", "#7a0009", "RetroArch", "games", "Mario Kart 64"] };
   R.games = function (root, o, b, env) {
-    var list = appsFor(o, env, 4);
+    var list = appsFor(o, env, APP_MAX.games);
     if (!list.length) return noApps(root, b, (op(o).apps || []).length);
-    var n = clamp(Math.floor(b.w / 240), 2, list.length);
-    add(root, [lab("games", op(o).label || "Play"), E("div", "cw-row cw-grow", "margin-top:16px;align-items:stretch", list.slice(0, n).map(function (p, i) {
+    // one row of tall tiles, as many as fit (240 px each); the rest are never dropped without a word:
+    // the last place says "+2" and OK opens every game (the folder layer)
+    var fit = clamp(Math.floor(b.w / 240), 2, 6), n = Math.min(fit, list.length), over = list.length > n ? list.length - (n - 1) : 0;
+    var tiles = list.slice(0, over ? n - 1 : n).map(function (p, i) {
       var miss = String(p).indexOf("missing:") === 0, key = miss ? p.slice(8) : p, gp = GAMES[key] || (cat() && cat().get(key) ? GAMES[cat().get(key).packages.android[0]] : null), g = gp || ["#3a3a46", "#1d1d24", appName(key, env), "games"];
       var t = E("div", "cw-col", "flex:1;position:relative;overflow:hidden;border-radius:28px;background:linear-gradient(165deg," + g[0] + "," + g[1] + ");padding:24px;justify-content:space-between;" + (i ? "margin-left:20px" : ""), [
         ic(g[3], clamp(b.h / 5, 56, 96), "#fff", "solid"), E("div", "", "min-width:0", [fitT(E("div", "", WRAP + "font-size:25px;line-height:1.15;color:#fff;font-weight:740", [g[2]])), env.demo && g[4] && b.h >= 400 ? E("div", "cw-t23 cw-ell", "color:rgba(255,255,255,.86)", [g[4]]) : null])]);
       if (miss) { t.style.opacity = "0.42"; t.appendChild(E("div", "cw-t23", "color:#fff", ["Not on this TV"])); } return stop(t, miss ? "missing" : "app", key, g[2]);
-    }))]);
+    });
+    if (over) tiles.push(stop(E("div", "cw-col cw-plus", "flex:1;position:relative;overflow:hidden;border-radius:28px;background:rgba(255,255,255,.16);padding:24px;align-items:center;justify-content:center;color:#fff;margin-left:20px", [
+      E("div", "", "font-size:" + px(clamp(b.h / 4, 40, 96)) + ";font-weight:760;line-height:1", ["+" + over])]), "detail", "folder", tl(over === 1 ? "1 more game" : "{n} more games", { n: over })));
+    add(root, [lab("games", op(o).label || "Play"), E("div", "cw-row cw-grow", "margin-top:16px;align-items:stretch", tiles)]);
     fitLater(root);
   };
 

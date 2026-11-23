@@ -66,17 +66,17 @@ const SAME = {
   "folder tile cols 4 vs 3": "a folder tile always shows four small apps (the help says so)",
   "folder small cols 2": "As many as fit is 2 across here, which is what it shows already",
   "folder tall cols 2": "As many as fit is 2 across here, which is what it shows already",
-  "folder medium cols 3": "As many as fit is 3 across here, which is what it shows already",
+  "folder medium cols 4": "As many as fit is 4 across here (the size that makes the apps biggest), which is what it shows already",
   "folder large cols 2": "As many as fit is 2 across here, which is what it shows already",
   // App grid: rows only where an app keeps 72 px and its name; a small grid has no names (the help says so)
   "appgrid small cols 1": "a small grid fits 2 rows, so its 4 apps go 2 across",
   "appgrid small cols 2": "a small grid fits 2 rows, so its 4 apps go 2 across, which is what it shows already",
   "appgrid small cols 2 vs 1": "a small grid fits 2 rows, so its 4 apps go 2 across",
   "appgrid small names off": "a small grid shows no names (the help says so)",
-  "appgrid medium cols 3": "As many as fit is 3 across on a medium grid, which is what it shows already",
+  "appgrid medium cols 4": "As many as fit is 4 across on a medium grid (the size that makes the apps biggest), which is what it shows already",
   "appgrid medium cols 2 vs 1": "a medium grid fits 2 rows with names, so its 4 apps go at least 2 across",
   "appgrid large cols 2": "As many as fit is 2 across here, which is what it shows already",
-  "appgrid xl cols 2": "As many as fit is 2 across here, which is what it shows already",
+  "appgrid xl cols 3": "As many as fit is 3 across here (the size that makes the apps biggest), which is what it shows already",
   // Quick buttons: a tile holds one button
   "quick tile quick six": "a tile holds one button, and the first is the sleep timer either way"
 };

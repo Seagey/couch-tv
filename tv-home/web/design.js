@@ -2433,7 +2433,7 @@
           var root = wrap.querySelector(".cw");
           if (!root) return;
           var inner = root.hasAttribute("data-stack") ? [] : [].slice.call(root.querySelectorAll("[data-act]")).filter(function (n) { return n !== root && n.offsetWidth > 0 && getComputedStyle(n).visibility !== "hidden"; });
-          var s = { id: wrap.getAttribute("data-obj"), wrap: wrap, el: root, box: rectOf(root), inner: inner };
+          var s = { id: wrap.getAttribute("data-obj"), wrap: wrap, el: root, box: rectOf(root), inner: inner, grid: !!root.querySelector("[data-cols]") };
           if (!inner.length && !root.hasAttribute("data-act")) {
             // a widget only to look at, with settings of its own (a Countdown, the Welcome words): a stop on
             // the TV too, and OK on it opens the Hold OK menu with Edit on the TV (0.13.9, the owner:
@@ -2513,7 +2513,12 @@
       if (s.inner.length && cur.i >= 0 && s.inner[cur.i]) {
         var ib = s.inner[cur.i];
         var ic = s.inner.map(function (bx, k) { return { k: k, box: bx }; }).filter(function (x) { return x.k !== cur.i; });
-        var p = pick(ib, ic, dx, dy);
+        // in rows of apps, Left and Right stay in the row (never a slant to the row above)
+        var p = pick(ib, s.grid && dx ? ic.filter(function (x) { return overlap(ib, x.box, dx) > 1; }) : ic, dx, dy);
+        // apps in rows (a folder, an app grid): Right at the end of a row goes on to the first app of the
+        // next row, and Left at the start of one back to the last app of the row above, so every app is
+        // a stop on the way across (0.13.10: Right from the third app skipped the fourth, one row down)
+        if (!p && dx && s.grid && s.inner[cur.i + dx]) p = { k: cur.i + dx };
         if (p) { var c1 = { id: s.id, i: p.k }; return { cur: c1, last: { dir: dir, from: from, to: c1 }, moved: true }; }
       }
       var t = pick(s.box, S.filter(function (x) { return x !== s; }), dx, dy);
@@ -2528,7 +2533,7 @@
       var c2 = { id: t.id, i: i };
       return { cur: c2, last: { dir: dir, from: from, to: c2 }, moved: true };
     }
-    function boxesOf(S) { return S.map(function (x) { return { id: x.id, box: x.box, inner: x.inner.map(rectOf), el: x.el }; }); }
+    function boxesOf(S) { return S.map(function (x) { return { id: x.id, box: x.box, inner: x.inner.map(rectOf), el: x.el, grid: x.grid }; }); }
     function move(dx, dy) {
       var S = stops();
       if (!S.length) return false;
@@ -2600,7 +2605,12 @@
       while (root && !(root.classList && root.classList.contains("cw"))) root = root.parentNode;
       if (!root || !window.CouchDetail) return;
       paint();
-      window.CouchDetail.open(root, wenv(), detailApi());
+      // a place inside the widget that names its own layer (the Dock's "+3": the folder layer with every
+      // app): the layer is read from the widget's data-arg, so it carries that name while it opens
+      var arg = el !== root && el.getAttribute("data-arg"), had = root.getAttribute("data-arg");
+      if (arg) root.setAttribute("data-arg", arg);
+      try { window.CouchDetail.open(root, wenv(), detailApi()); }
+      finally { if (arg) { if (had === null) root.removeAttribute("data-arg"); else root.setAttribute("data-arg", had); } }
     }
     // a sheet over the home: a folder opened full screen, or the hold OK menu. The remote stays in it.
     function openSheet(title, items, hint) {
