@@ -252,14 +252,16 @@ for (const [kind, layer, size] of [["energy", "energy", [8, 4]], ["sensor", "sen
   await page.close();
   page = await home([["queue", 0, 0, 4, 6]], "");
   await page.waitForFunction(() => document.querySelector('.cw-o[data-obj="w0"] .cw').getAttribute("data-setup"), null, { timeout: 9000 });
-  ok(/Needs Spotify connected/.test(await text(page)), "queue: not connected says what it needs");
+  // (0.13.10) the setup face: its line says what it shows, then how to set it up (no phone page here)
+  ok(/Your Spotify queue/.test(await text(page)) && /Press OK to set it up|Set up on your phone/.test(await text(page)), "queue: not connected says what it is and how to set it up: " + await text(page));
   await page.close();
 }
 { // no Home Assistant on this TV: every smart home widget is its setup card, and nothing is asked
   const page = await home([["controls", 0, 0, 4, 4], ["camera", 4, 0, 4, 4], ["doorbell", 8, 0, 4, 4], ["energy", 12, 0, 4, 4], ["sensor", 0, 4, 4, 4], ["speakers", 4, 4, 4, 4]], "");
   await page.waitForTimeout(1500);
   const cards = await page.evaluate(() => [...document.querySelectorAll(".cw-o .cw")].map((c) => c.getAttribute("data-setup") + ":" + c.textContent));
-  ok(cards.length === 6 && cards.every((c) => /Needs Home Assistant/.test(c)), "no Home Assistant: six setup cards (" + cards.join(" | ") + ")");
+  // (0.13.10) each is its setup face: its name, its line, and how to set it up
+  ok(cards.length === 6 && cards.every((c) => /^[a-z]+:/.test(c) && !/^null:/.test(c) && /Press OK to set it up|Set up on your phone/.test(c)), "no Home Assistant: six setup cards (" + cards.join(" | ") + ")");
   await page.close();
 }
 

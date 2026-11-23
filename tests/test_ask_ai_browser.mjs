@@ -69,7 +69,8 @@ console.log("Running Ask AI browser tests...");
 // 1. nothing set up: a setup card each
 ok(/pick who answers/i.test(await text("w0")), "Ask AI says to pick who answers: " + await text("w0"));
 ok(/Connect your AI|Nothing from your AI/i.test(await text("w1")), "From your AI says how to connect: " + await text("w1"));
-ok(/Batteries/.test(await text("w2")) || /nearby/i.test(await text("w2")), "Batteries draws: " + await text("w2"));
+// (0.13.10) in a browser it says Not on this TV, never which TVs it needs
+ok((/Batteries/.test(await text("w2")) || /nearby|Not on this TV/i.test(await text("w2"))) && !/Google TV|Android TV|Fire TV/.test(await text("w2")), "Batteries draws: " + await text("w2"));
 if (SHOTS) await page.screenshot({ path: path.join(SHOTS, "ask-1-unset.png") });
 
 // 2. with the remote only

@@ -75,7 +75,8 @@ console.log("Running at home browser tests...");
 // 1. typed in Home settings with the remote
 {
   const page = await home([["note", 0, 0, 4, 4], ["list", 4, 0, 4, 4], ["wifi", 8, 0, 8, 4], ["guide", 0, 4, 4, 4], ["agenda", 4, 4, 8, 4]]);
-  for (const k of ["note", "list", "wifi", "guide", "agenda"]) ok(/Write a note|Add a list|Add your guest Wi-Fi|Write your house guide|Add your calendar/.test(await text(page, "w" + ["note", "list", "wifi", "guide", "agenda"].indexOf(k))), k + ": with nothing typed, the widget says what to do, never pretend words");
+  for (const k of ["note", "list", "wifi", "guide", "agenda"]) // (0.13.10) a widget waiting for its words shows its name, its line and Press OK to set it up (no phone page here)
+  ok(/Write a note|Add a list|Add your guest Wi-Fi|Write your house guide|Add your calendar|Press OK to set it up|Set up on your phone/.test(await text(page, "w" + ["note", "list", "wifi", "guide", "agenda"].indexOf(k))), k + ": with nothing typed, the widget says what to do, never pretend words");
   await page.evaluate(() => window.tv.settingsKey()); await page.waitForTimeout(300); await press(page, "Enter", 300);   // the gear menu, then Home settings
   await page.waitForTimeout(400);
   // down the sections to couch-tv Studio, into its rows, down to At home
@@ -254,7 +255,8 @@ console.log("Running at home browser tests...");
         const tag = kind + " " + id + " " + en + ": ", b = el.getBoundingClientRect(), words = el.textContent;
         if ((en === "tv" || en === "long" || en === "hindi") && el.getAttribute("data-empty")) bad.push(tag + "a setup card with data (" + words + ")");
         if (en === "unset" && !el.getAttribute("data-empty")) bad.push(tag + "shows something with nothing set (" + words + ")");
-        if (en === "unset" && /Feed Max|Shopping|salt-and-sun|Swimming|years ago|Milk/.test(words)) bad.push(tag + "pretend words (" + words + ")");
+        // (0.13.10) the list's setup face says what it is for, "Shopping or to do": a description, not a pretend item
+        if (en === "unset" && /Feed Max|Shopping(?! or to do)|salt-and-sun|Swimming|years ago|Milk/.test(words)) bad.push(tag + "pretend words (" + words + ")");
         if (el.scrollWidth > el.clientWidth + 1 || el.scrollHeight > el.clientHeight + 1) bad.push(tag + "the widget scrolls (" + el.scrollWidth + "x" + el.scrollHeight + " in " + el.clientWidth + "x" + el.clientHeight + ")");
         el.querySelectorAll("*").forEach((node) => {
           if (node.classList.contains("cw-bg") || node.closest("svg")) return;

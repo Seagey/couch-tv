@@ -670,7 +670,25 @@
       return box;
     };
     if (strip) { add(root, E("div", "cw-row", "height:100%;justify-content:center", [ic(iconName, 40, "currentColor"), E("div", "cw-col", "margin-left:18px;min-width:0", [name, cta])])); root.classList.add("cw-strip"); return root; }
-    if (tiny) { add(root, [ic(iconName, 34, "currentColor"), name, cta]); root.classList.add("cw-tiny"); return root; }
+    if (tiny) {
+      // a small tile: the name and the call to action each as big as fits, never cut or scrolled (a 2 by 2
+      // Control Centre showed "Control Ce...", a Note tile ran 20 px past its box). What gives way, in order:
+      // the icon, then the call to action; the name always stays, so the tile says what it is, and OK sets it up.
+      // a tighter edge than the usual 24 px (.cw --pad), so the name and its call to action both fit a 2 by 2 tile
+      root.style.padding = "12px";
+      var inner = Math.max(60, b.w - 24), room = b.h - 26, fam = famOf(root);
+      var one = fitPxText(f.name, inner, 26, 1, 720, fam), nLines = one ? 1 : 2;
+      var nPx = fitPxText(f.name, inner, 26, nLines, 720, fam) || 23, gLines = 2, gPx = 0;
+      for (; gLines <= 3 && !gPx; gLines++) gPx = fitPxText(go, inner, 24, gLines, 700, fam);
+      gLines--;
+      var tall = function (t, px, wt) { var m = measureBox(); m.style.width = Math.floor(inner) + "px"; m.style.fontSize = px + "px"; m.style.fontWeight = wt; m.style.lineHeight = "1.2"; m.style.fontFamily = fam; m.textContent = wl(String(t)); return m.scrollHeight; };
+      var hN = tall(f.name, nPx, 720), hG = gPx ? tall(go, gPx, 700) + 4 : 0;
+      var withIcon = !!one && 40 + hN + hG <= room, withGo = !!gPx && (withIcon ? 40 : 0) + hN + hG <= room;
+      var nm = fitWords(root, f.name, inner, 26, nLines, 720, "margin-top:4px;text-align:center") || name;
+      var go2 = withGo ? fitWords(root, go, inner, 24, gLines, 700, "margin-top:2px;text-align:center") : null;
+      if (go2) go2.className += " cw-f3";
+      add(root, [withIcon ? ic(iconName, 34, "currentColor") : null, nm, go2]); root.classList.add("cw-tiny"); return root;
+    }
     if (wide) {
       var q = qr(Math.min(b.h - 56, 320, Math.round(b.w * 0.45)));
       add(root, E("div", "cw-row", "width:100%;height:100%;justify-content:center", [E("div", "cw-col", "min-width:0;flex:0 1 auto;align-items:flex-start;text-align:left", [ic(iconName, 46, "currentColor"), name, line, cta]),
