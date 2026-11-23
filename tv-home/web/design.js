@@ -447,15 +447,15 @@
   var WOPT = {
     clock: "format ampm seconds date align zone", tallclock: "format align zone", glassclock: "format scene zone", analog: "seconds numbers zone", flipclock: "format zone",
     wordclock: "precise dayline zone", solar: "", worldclock: "label cities format", countdown: "label month day year unit icon", date: "show dfmt align place", month: "wstart", timer: "label minutes",
-    weather: "place hilo night", bigtemp: "place", hourly: "place hours", week: "place", rain: "label", uv: "label", sun: "label", moon: "", air: "label", surf: "label",
+    weather: "place hilo night degrees", bigtemp: "place degrees", hourly: "place hours degrees", week: "place", rain: "label", uv: "label", sun: "label", moon: "hemi", air: "label scale", surf: "label units wind",
     photo: "image fit caption sub", slideshow: "seconds_each caption sub shuffle", mosaic: "count", artframe: "image mat caption sub", memory: "align range ago",
     keep: "", keeprow: "label shows", upnext: "apps sport", picks: "label align",
     app: "apps", folder: "label apps cols", dock: "apps more", appgrid: "apps cols names", games: "label apps",
-    nowplaying: "", soundscape: "sound", queue: "", speakers: "",
+    nowplaying: "", soundscape: "sound volume", queue: "", speakers: "",
     aircon: "entity others", scenes: "label", controls: "label controls cols", camera: "label", doorbell: "", energy: "", sensor: "label", battery: "low",
     bins: "label weekday alt anchor lid_a lid_b bin_a bin_b", people: "names", agenda: "label align days", note: "align byline", list: "label icon align done",
     card: "label text icon", quote: "text sub mood", word: "lang meaning", news: "feed label align count", sports: "label league team align games", stocks: "label tickers align price", commute: "label arrive_h arrive_m buffer weekdays align",
-    welcome: "kicker text sub align source times", quick: "quick align", wifi: "align", guide: "align", screentime: "align appcount", ask: "label align keep", agent: "label align keep who", stack: ""
+    welcome: "kicker text sub align source times", quick: "quick align", wifi: "align hidepass", guide: "align", screentime: "align appcount", ask: "label align keep", agent: "label align keep who", stack: ""
   };
   // The smart home and music widgets: which of the TV's own Home Assistant things a widget shows,
   // named by entity id only (never a reading, a state or an address). A TV shows one only when it is
@@ -486,6 +486,18 @@
   OPT.mix = function (v) { return SAN.pick(v, ["all", "others", "mine"]); }; OPT.buttons = SAN.b; OPT.cover = SAN.b;
   OPT.turn = function (v) { return SAN.pick(v, [0, 10, 20, 30, 60]); };
   WOPT.picks = "label align mix"; WOPT.nowplaying = "buttons cover"; WOPT.queue = "label align count"; WOPT.stack = "turn";
+  // settings that were kept on the TV only, with nothing private in them, now in the design too (0.13.10,
+  // widget-caps.js store "design"), so couch-tv Studio can set them; a TV's own choice still wins:
+  // temperature in, the moon's half of the world, the air quality scale, the surf's units, the
+  // soundscape's volume, the doorbell's and energy's heading (label, already kept) and the guest Wi-Fi's
+  // password hidden (each named in WOPT above)
+  OPT.degrees = function (v) { return SAN.pick(v, ["auto", "c", "f"]); };
+  OPT.hemi = function (v) { return SAN.pick(v, ["auto", "south", "north"]); };
+  OPT.scale = function (v) { return SAN.pick(v, ["auto", "eu", "us"]); };
+  OPT.units = function (v) { return SAN.pick(v, ["auto", "m", "ft"]); };
+  OPT.wind = function (v) { return SAN.pick(v, ["auto", "kmh", "kn", "mph"]); };
+  OPT.volume = function (v) { return SAN.n(v, 10, 100, true); };
+  OPT.hidepass = SAN.b;
   function sanWStyle(src) {
     src = obj(src);
     var out = {};

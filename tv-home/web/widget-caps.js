@@ -558,14 +558,16 @@
   var HEADING = function (help, pre) { return st("label", "Heading", "text", "", help, "design", ALL, pre !== false, { max: 40 }); };
   var PHOTO = function () { return st("photo", "Photo", "tvlist", "first", "Which of this TV's photos shows here. A photo put in the widget in couch-tv Studio shows instead. Add photos in Home settings, Look and scenes, Your photos.", "tv", ON_TV, true, { from: "photos", "private": true }); };
   var IMAGE = function () { return st("image", "Photo in the widget", "image", "", "Put one photo in the widget itself. It shows on every TV this design goes to.", "design", STUDIO, true); };
-  var HEADING_TV = function (help) { return st("label", "Heading", "text", "", help, "tv", ON_TV, true, { max: 40 }); };
+  // a heading that is not private: kept in the design since 0.13.10, so couch-tv Studio can set it too
+  var HEADING_TV = function (help) { return st("label", "Heading", "text", "", help, "design", ALL, true, { max: 40 }); };
   var HA = { ha: true };
   var LIDS = [["#ffd60a", "Yellow"], ["#30d158", "Green"], ["#ff453a", "Red"], ["#0a84ff", "Blue"], ["#8e8e93", "Grey"], ["#1d1b18", "Black"], ["#a2845e", "Brown"], ["#bf5af2", "Purple"]];
 
   // a weather widget's own place (kept on this TV: Hold OK, Home settings or the phone) and its own
-  // temperature unit (kept on this TV: Roku and Apple TV draw designs in the home's own unit)
+  // temperature unit (a design choice since 0.13.10, so Studio can set it; the TV can still change it for
+  // itself; Roku and Apple TV draw designs in the home's own unit)
   var WX_TOWN = function (what, are) { return st("town", "Place", "place", "", "Where " + what + (are ? " are" : " is") + " for. Empty uses this home's town.", "tv", ON_TV, true, { "private": true }); };
-  var DEGREES = function () { return st("degrees", "Temperature in", "choice", "auto", "Follow this TV uses Home settings, Weather, Units.", "tv", ON_TV, true,
+  var DEGREES = function () { return st("degrees", "Temperature in", "choice", "auto", "Follow this TV uses Home settings, Weather, Units.", "design", ALL, true,
     { options: [["auto", "Follow this TV"], ["c", "Celsius (°C)"], ["f", "Fahrenheit (°F)"]] }); };
 
   // before launch (WIDGET-SETTINGS-SPEC.md section 2, the P items)
@@ -588,14 +590,14 @@
     rain: [WX_TOWN("the rain")],
     uv: [WX_TOWN("the UV")],
     sun: [WX_TOWN("sunrise and sunset", true)],
-    moon: [st("hemi", "Moon seen from", "choice", "auto", "The moon looks the other way round south of the equator.", "tv", ON_TV, true,
+    moon: [st("hemi", "Moon seen from", "choice", "auto", "The moon looks the other way round south of the equator.", "design", ALL, true,
       { options: [["auto", "This home's town"], ["south", "The south"], ["north", "The north"]] })],
-    air: [WX_TOWN("the air quality"), st("scale", "Scale", "choice", "auto", "Best for your country uses the American scale in the United States and the European one elsewhere.", "tv", ON_TV, true,
+    air: [WX_TOWN("the air quality"), st("scale", "Scale", "choice", "auto", "Best for your country uses the American scale in the United States and the European one elsewhere.", "design", ALL, true,
       { options: [["auto", "Best for your country"], ["eu", "European"], ["us", "American"]] })],
     surf: [st("place", "Beach", "place", "", "Where the swell is read. Empty uses this home's town.", "tv", ON_TV, true, { coast: true, "private": true }),
-      st("units", "Wave height in", "choice", "auto", "Best for your country uses feet in the United States and metres elsewhere.", "tv", ON_TV, true,
+      st("units", "Wave height in", "choice", "auto", "Best for your country uses feet in the United States and metres elsewhere.", "design", ALL, true,
         { options: [["auto", "Best for your country"], ["m", "Metres"], ["ft", "Feet"]] }),
-      st("wind", "Wind in", "choice", "auto", "Best for your country uses miles an hour in the United States and kilometres an hour elsewhere.", "tv", ON_TV, true,
+      st("wind", "Wind in", "choice", "auto", "Best for your country uses miles an hour in the United States and kilometres an hour elsewhere.", "design", ALL, true,
         { options: [["auto", "Best for your country"], ["kmh", "Kilometres an hour"], ["kn", "Knots"], ["mph", "Miles an hour"]] })],
     aircon: [st("entity", "Room", "device", "", "Which aircon shows here. Empty shows the first one picked in Smart home.", "tv", ON_TV, true, { domain: "climate", needs: HA, "private": true }),
       st("others", "Show the other rooms", "toggle", true, "In a big widget, the other aircon rooms show beside this one.", "design", ALL, true)],
@@ -605,9 +607,9 @@
       HEADING("A heading for this widget. Empty shows the camera's own name.")],
     sensor: [st("reading", "Sensor", "device", "", "Which sensor shows here. Empty shows the first one picked in Smart home.", "tv", ON_TV, true, { domain: "sensor", needs: HA, "private": true }),
       HEADING("A heading for this widget. Empty shows the sensor's own name.")],
-    doorbell: [HEADING_TV("Type a heading for this TV. Empty shows the doorbell's own name."),
+    doorbell: [HEADING_TV("Empty shows the doorbell's own name."),
       st("picture", "Show the door camera", "toggle", true, "Off shows only when the doorbell last rang.", "design", ALL, true)],
-    energy: [HEADING_TV("Type a heading for this TV. Empty shows the name from your smart home."),
+    energy: [HEADING_TV("Empty shows the name from your smart home."),
       st("now", "Show power now", "toggle", true, "The power being made or used right now, beside today's total, in a big widget.", "design", ALL, true)],
     speakers: [st("players", "Speakers", "device", [], "Which speakers show here. None picked shows every one picked in Smart home.", "tv", ON_TV, true,
       { domain: "media_player", many: true, max: 6, needs: HA, "private": true })],
@@ -726,8 +728,9 @@
     keep: [WHOSE()],
     keeprow: [HEADING("Empty shows Keep watching."),
       st("shows", "How many shows", "choice", "auto", "At most what fits in the widget.", "design", ALL, true, { options: [["auto", "As many as fit"], [2, "2"], [3, "3"], [4, "4"], [5, "5"]] }), WHOSE()],
-    upnext: [st("sport", "Game mode", "choice", "auto", "On shows the last game watched in a sport app on this TV. Automatic turns it on when the home also shows scores.", "design", ALL, true,
-      { options: [["auto", "Automatic"], [true, "On"], [false, "Off"]], needs: { apps: SPORT_APP_PKGS.slice() } }),
+    // what it shows (the design key is still "sport", the game mode: false, true or auto), in plain words
+    upnext: [st("sport", "What it shows", "choice", "auto", "Your next show is the show you were watching. Your last game is the last game watched in a sport app here, like Kayo or 7plus. The third choice shows it only beside Scores.", "design", ALL, true,
+      { options: [[false, "Your next show"], [true, "Your last game"], ["auto", "Last game when Scores is on"]], needs: { apps: SPORT_APP_PKGS.slice() } }),
       st("apps", "Only from these apps", "choice", [], "None picked takes shows from any app.", "design", ALL, true, { options: SHOW_APPS, many: true, max: 6 })],
     picks: [HEADING("Empty shows Picks for you."),
       st("mix", "Picks from", "choice", "all", "Your own shows are the ones you left part way.", "design", ALL, true,
@@ -736,7 +739,7 @@
       st("cover", "Show the cover", "toggle", true, "Off shows the song and artist only.", "design", ALL, true)],
     soundscape: [st("sound", "Sound", "choice", "rain", "OK on the widget plays it, and OK again stops it.", "design", ALL, true,
       { options: [["rain", "Rain"], ["fire", "Fire"], ["waves", "Waves"], ["brown", "Brown noise"]] }),
-      st("volume", "Volume", "number", 50, "How loud this widget plays its sound.", "tv", ON_TV, true, { min: 10, max: 100, step: 10 })],
+      st("volume", "Volume", "number", 50, "How loud this widget plays its sound.", "design", ALL, true, { min: 10, max: 100, step: 10 })],
     queue: [HEADING("Empty shows Up next."),
       st("count", "How many songs", "choice", "auto", "At most this many.", "design", ALL, true, { options: [["auto", "As many as fit"], [3, "3"], [5, "5"], [8, "8"]] })],
     games: [APPS_IN("Games", "Hold OK on a game to change, move or remove it."), HEADING("Empty shows Play.")],
@@ -792,7 +795,7 @@
       st("done", "Show ticked items", "toggle", true, "Off hides what is already ticked.", "design", ALL, true)],
     guide: [st("sections", "Parts of the guide", "tvlist", [], "Which parts show here. None picked shows them all. Write the guide in Home settings, Designs, At home.", "tv", ON_TV, true,
       { from: "guide", many: true, max: 8, "private": true })],
-    wifi: [st("hidepass", "Hide the password", "toggle", false, "On shows only the code to scan.", "tv", ON_TV, true)],
+    wifi: [st("hidepass", "Hide the password", "toggle", false, "On shows only the code to scan.", "design", ALL, true)],
     screentime: [st("appcount", "Apps shown", "choice", "auto", "Apps show beside the total on a Medium widget or bigger.", "design", ALL, true,
       { options: [["auto", "As many as fit"], [0, "None, only the total"], [3, "3"], [5, "5"]] })],
     welcome: [

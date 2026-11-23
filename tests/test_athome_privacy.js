@@ -50,7 +50,8 @@ const WOPT = CD.wopts();
 // ws2-home (0.13.9) added settings a design may carry: note byline, list done, memory range and ago,
 // screentime appcount. They are allowed only because the gate turns each into a yes/no or one of a few
 // fixed choices, so no household words or numbers can ride in them; this is checked on the gate itself.
-const SAFE_OPTS = { byline: "yes/no", done: "yes/no", ago: "yes/no", range: ["day", "week"], appcount: ["auto", 0, 1, 2, 3, 4, 5, 6, 7, 8] };
+// hidepass: the guest Wi-Fi hides its password, a yes or no in the design since 0.13.10 (never the password)
+const SAFE_OPTS = { byline: "yes/no", done: "yes/no", ago: "yes/no", hidepass: "yes/no", range: ["day", "week"], appcount: ["auto", 0, 1, 2, 3, 4, 5, 6, 7, 8] };
 const PROBES = [true, false, "Dinner at six then bath", "summer-swell-42", "Granny Smith", 95, 120, 4471, -3, 2.5, "week", "day", "auto", 3, null, ["Milk"], { t: "Milk" }];
 const kindOf = (o) => KINDS.filter((k) => String(WOPT[k] || "").split(" ").indexOf(o) >= 0)[0];
 Object.keys(SAFE_OPTS).forEach((o) => {
