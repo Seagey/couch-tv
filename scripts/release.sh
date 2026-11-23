@@ -255,6 +255,8 @@ do_setup() {
         echo "Setup app run $id ended $conclusion: running its failed jobs again"
         gh run rerun "$id" --repo "$REPO" --failed || true
         done_reruns=$((done_reruns + 1))
+        # give the rerun time to show as queued, so the next look does not spend another rerun on the old result
+        sleep $((wait * 4)); waited=$((waited + wait * 4))
       elif [ "${conclusion:-}" = success ] || [ "$done_reruns" -ge "$reruns" ]; then
         # one more look: the upload may have landed between the two calls
         missing=$(setup_missing "$tag")

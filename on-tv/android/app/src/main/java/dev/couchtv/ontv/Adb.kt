@@ -169,7 +169,7 @@ object Adb {
                 // Update to, the box came back again and again). Not again from the background: the next box waits for
                 // Let the phone press keys, Connect.
                 Store.putBool(AdbPolicy.BG_UNANSWERED, true)
-                note("No answer to \"Allow USB debugging?\". Press Let the phone press keys, then Connect, to try again.")
+                note("No answer to \"Allow USB debugging?\". Press Let the phone press keys, then Connect.")
             } else if (r == "tcp" && allowSeconds >= 120 && AdbPolicy.ranOut(System.currentTimeMillis() - started, allowSeconds)) {
                 unanswered = true
                 note(SetupWords.NOT_ASKED)
