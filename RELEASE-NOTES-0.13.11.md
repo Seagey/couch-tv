@@ -4,7 +4,7 @@ Filling a folder, the Dock, an app grid or Games no longer means adding one app 
 
 ### Do this after updating
 
-- **Option C (the on-TV app):** Home settings, Updates, Update to. Your settings stay. On Android 9 and newer, a TV still on 0.13.9 or older should take 0.13.10 first; see "The on-TV app's own signing key" below.
+- **Option C (the on-TV app):** Home settings, Updates, Update to. Your settings stay. 0.13.11 is signed with a new key: a TV on 0.13.10 updates as normal, but on Android 9 and newer a TV on 0.13.9 or older must take 0.13.10 first, or install 0.13.11 once with Downloader (code 8180170). See "The on-TV app's own signing key" below.
 - **Every other Android TV:** Home settings, Updates, check now, or install `couch-tv-home.apk` over the old one.
 - **Option B (a computer at home):** `git pull`, then restart the bridge. Nothing new to install.
 - **Samsung, LG and the other TVs a computer at home runs:** nothing to do on the TV. The computer at home hands out the new home after `git pull` and a restart.
@@ -33,8 +33,10 @@ A widget set in **Jost** or **Cormorant Garamond** in Couch TV Studio drew in th
 
 ### The on-TV app's own signing key
 
-0.13.11 is the first release where the on-TV app (`couch-tv-ontv.apk` and `couch-tv-ontv-watch.apk`) is signed with its own release key on TVs with Android 9 and newer. 0.13.10 knows how to accept it, so a TV on 0.13.10 takes this update the usual way with Update to. A TV on Android 6, 7 or 8 keeps seeing the old key and updates the usual way.
+0.13.11 is signed with a new key. The on-TV app (`couch-tv-ontv.apk` and `couch-tv-ontv-watch.apk`) now carries its own release key on TVs with Android 9 and newer.
 
-A TV on Android 9 or newer that skipped 0.13.10 says the file has another key in Update to. Install 0.13.11 once with Downloader (code 8180170) or over the old app from a computer instead, and your settings stay. Android checks the new key itself.
+- **A TV on 0.13.10** updates as normal: Home settings, Updates, Update to. 0.13.10 knows how to accept the new key.
+- **A TV on 0.13.9 or older** (Android 9 or newer) must take 0.13.10 first, then 0.13.11. Or install 0.13.11 once with Downloader (code 8180170), or over the old app from a computer. Your settings stay, and Android checks the new key itself. If you press Update to on 0.13.9 or older, it says the file has another key: that is this, and nothing is wrong with the file.
+- **A TV on Android 6, 7 or 8** keeps seeing the old key and updates as normal from any version.
 
 For people who build their own releases: `scripts/release.sh` now signs 0.13.11 and later with the new key by default (ONTV_SIGN defaults to 1), and refuses ONTV_SIGN=0 when publishing 0.13.11 or later to couch-tv. Test builds with ONTV_SIGN=0 and a fork's own releases work as before.
