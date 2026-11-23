@@ -40,11 +40,18 @@ case "$3" in
 esac
 exit 0
 """
+SETUP = ["couch-tv-Setup-mac-apple-silicon.zip", "couch-tv-Setup-mac-intel.zip", "couch-tv-Setup-windows.zip", "SHA256SUMS-setup.txt"]
+# release view --json assets: the asset names (FAKE_ASSETS, default every Setup file; after a rerun FAKE_ASSETS_AFTER);
+# run list: "id status conclusion" (FAKE_RUN)
 FAKE_GH = """#!/bin/bash
 echo "gh $*" >> "$CALLS"
 [ "$1" = auth ] && exit "${FAKE_GH_AUTH:-0}"
+if [ "$1 $2" = "release view" ] && [ "$7" = assets ]; then
+  if [ -n "${FAKE_ASSETS_AFTER+x}" ] && grep -q "^gh run rerun" "$CALLS"; then printf "%b" "$FAKE_ASSETS_AFTER"; else printf "%b" "${FAKE_ASSETS-SETUP_DEFAULT}"; fi
+fi
+[ "$1 $2" = "run list" ] && printf "%s" "${FAKE_RUN:-}"
 exit 0
-"""
+""".replace("SETUP_DEFAULT", "\\\\n".join(SETUP) + "\\\\n")
 # called as: gradlew -p <dir> --no-daemon -q <tasks...>  or  gradlew -p <dir> --stop
 FAKE_GRADLEW = """#!/bin/bash
 [ "$3" = --stop ] && exit 0
@@ -371,6 +378,74 @@ class ReleaseScript(unittest.TestCase):
         self.assertTrue(create[0].endswith(" ".join(FILES) + " SHA256SUMS.txt"), create[0])
         self.assertNotIn("stray.apk", create[0])
         self.assertFalse(any("tag -d" in l for l in log))
+
+    # --- couch-tv Setup's zips on the release (0.13.11 shipped without them: the Apple silicon job never got a
+    # runner, so the Setup app workflow skipped its upload job)
+    def setup_step(self, **env):
+        return self.run_step("setup", "--version", "9.9.9", SETUP_WAIT="0", **env)
+
+    def test_publish_ends_by_checking_the_setup_files(self):
+        self.built()
+        rc, out = self.publish(SETUP_WAIT="0")
+        self.assertEqual(rc, 0, out)
+        self.assertIn("SETUP FILES OK on v9.9.9", out)
+        log = self.log()
+        create = next(i for i, l in enumerate(log) if l.startswith("gh release create"))
+        look = next(i for i, l in enumerate(log) if l.startswith("gh release view v9.9.9 --repo Seagey/couch-tv --json assets"))
+        self.assertLess(create, look)
+
+    def test_publish_exits_7_when_the_setup_files_never_come(self):
+        self.built()
+        rc, out = self.publish(SETUP_WAIT="0", SETUP_TIMEOUT="0", FAKE_ASSETS="couch-tv-home.apk\n")
+        self.assertEqual(rc, 7, out)
+        self.assertIn("SETUP FILES MISSING on v9.9.9", out)
+        for f in SETUP:
+            self.assertIn(f, out)
+
+    def test_setup_needs_no_previous_and_passes_when_all_four_are_there(self):
+        rc, out = self.setup_step()
+        self.assertEqual(rc, 0, out)
+        self.assertEqual([l for l in self.log() if " run " in l], [])
+
+    def test_setup_names_the_one_missing_file(self):
+        have = "\n".join(f for f in SETUP if "apple-silicon" not in f) + "\n"
+        rc, out = self.setup_step(SETUP_TIMEOUT="0", FAKE_ASSETS=have)
+        self.assertEqual(rc, 7, out)
+        self.assertIn("couch-tv-Setup-mac-apple-silicon.zip", out.split("MISSING", 1)[1])
+        self.assertNotIn("couch-tv-Setup-windows.zip", out.split("MISSING", 1)[1])
+
+    def test_setup_reruns_a_failed_workflow_run_and_then_passes(self):
+        rc, out = self.setup_step(SETUP_TIMEOUT="60", FAKE_ASSETS="", FAKE_RUN="4242 completed failure",
+                                  FAKE_ASSETS_AFTER="\n".join(SETUP) + "\n")
+        self.assertEqual(rc, 0, out)
+        reruns = [l for l in self.log() if l.startswith("gh run rerun")]
+        self.assertEqual(reruns, ["gh run rerun 4242 --repo Seagey/couch-tv --failed"])
+        runs = [l for l in self.log() if l.startswith("gh run list")]
+        self.assertTrue(runs and "--workflow setup-app.yml --event release --branch v9.9.9" in runs[0], runs)
+
+    def test_setup_gives_up_after_its_reruns(self):
+        rc, out = self.setup_step(SETUP_TIMEOUT="60", SETUP_RERUNS="2", FAKE_ASSETS="", FAKE_RUN="4242 completed failure")
+        self.assertEqual(rc, 7, out)
+        self.assertEqual(len([l for l in self.log() if l.startswith("gh run rerun")]), 2)
+        self.assertIn("gh run rerun 4242 --failed", out)
+
+    def test_setup_fails_when_the_run_succeeded_but_the_files_are_not_there(self):
+        rc, out = self.setup_step(SETUP_TIMEOUT="60", FAKE_ASSETS="", FAKE_RUN="4242 completed success")
+        self.assertEqual(rc, 7, out)
+        self.assertEqual([l for l in self.log() if l.startswith("gh run rerun")], [])
+
+    def test_setup_needs_a_version(self):
+        rc, out = self.run_step("setup")
+        self.assertEqual(rc, 2, out)
+
+    def test_the_workflow_uploads_and_checks_all_four(self):
+        wf = (ROOT / ".github/workflows/setup-app.yml").read_text()
+        for name in ("mac-apple-silicon", "mac-intel", "windows"):
+            self.assertIn("- name: " + name, wf)
+        self.assertIn("gh release upload \"$TAG\" couch-tv-Setup-*.zip SHA256SUMS-setup.txt", wf)
+        check = wf.split("- name: Check the release has all four", 1)[1]
+        for f in SETUP:
+            self.assertIn(f, check)
 
     def test_a_refused_push_leaves_no_tag_and_no_release(self):
         self.built()

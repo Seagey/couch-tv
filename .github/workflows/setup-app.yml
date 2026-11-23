@@ -121,3 +121,17 @@ jobs:
           sha256sum couch-tv-Setup-*.zip > SHA256SUMS-setup.txt
           cat SHA256SUMS-setup.txt
           gh release upload "$TAG" couch-tv-Setup-*.zip SHA256SUMS-setup.txt --repo "$GITHUB_REPOSITORY" --clobber
+      # The website links releases/latest/download/couch-tv-Setup-*.zip, so a release without all four is broken.
+      # If a build job fails (0.13.11: the Apple silicon Mac job never got a runner), this job is skipped and the
+      # run fails; scripts/release.sh setup (which publish ends with) runs the failed jobs again and checks.
+      - name: Check the release has all four
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.event.release.tag_name }}
+        run: |
+          have=$(gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json assets --jq '.assets[].name')
+          missing=0
+          for f in couch-tv-Setup-mac-apple-silicon.zip couch-tv-Setup-mac-intel.zip couch-tv-Setup-windows.zip SHA256SUMS-setup.txt; do
+            printf '%s\n' "$have" | grep -qxF "$f" || { echo "::error::$f is not on $TAG"; missing=1; }
+          done
+          exit $missing

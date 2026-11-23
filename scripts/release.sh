@@ -6,6 +6,7 @@
 #   bash scripts/release.sh sums    --previous /abs/old/dist/couch-tv-ontv.apk [--signer SHA256] [--version 0.13.9]
 #   bash scripts/release.sh publish --previous /abs/old/dist/couch-tv-ontv.apk [--signer SHA256] --version 0.13.9
 #   bash scripts/release.sh play
+#   bash scripts/release.sh setup   --version 0.13.9
 #
 # build    from a clean, committed tree only: builds the four APKs (home, on-TV, on-TV watch, sync) one
 #          gradle run at a time and the two Samsung files into dist/ (the two on-TV APKs signed by
@@ -24,6 +25,13 @@
 # play     from a clean, committed tree only: the Google Play App Bundle (bundlePlayRelease), signed with the
 #          upload key by scripts/sign-ontv.sh, to dist-play/couch-tv-play.aab (with BUILT-FROM). Nothing is uploaded:
 #          the owner uploads it in Play Console (coord/GOOGLE-PLAY-BUILD.md).
+# setup    the release check for couch-tv Setup: the published release must carry the three Setup zips and
+#          SHA256SUMS-setup.txt, which the "Setup app" workflow (.github/workflows/setup-app.yml) builds and adds
+#          when a release is published. publish ends with it. It waits for that workflow's run for the tag, runs
+#          its failed jobs again when GitHub gave up on one (0.13.11 shipped without the zips because the Apple
+#          silicon Mac job never got a runner, so the upload job was skipped), and exits 7 if the four files are
+#          still not on the release. SETUP_WAIT (seconds between looks, default 30), SETUP_TIMEOUT (default 3600)
+#          and SETUP_RERUNS (default 2) change how long it tries.
 #
 # Always checked against the key TVs already have (4e): --signer defaults to the couch-tv release
 # certificate below and is always passed; for Seagey/couch-tv no other is accepted. --previous (last
@@ -45,7 +53,7 @@ FILES="couch-tv-home.apk couch-tv-ontv.apk couch-tv-ontv-watch.apk couch-tv-sync
 REPO=${REPO:-Seagey/couch-tv}
 REMOTE=${REMOTE:-origin}
 
-usage() { sed -n '5,8p' "$0" | sed 's/^# //'; exit 2; }
+usage() { sed -n '5,9p' "$0" | sed 's/^# //'; exit 2; }
 [ $# -ge 1 ] || usage
 STEP=$1; shift
 SIGNER=$CERT; PREVIOUS=""; VERSION=""
@@ -57,7 +65,7 @@ while [ $# -gt 0 ]; do
     *) echo "Unknown argument: $1"; usage ;;
   esac
 done
-case "$STEP" in build|sums|publish|play) ;; *) usage ;; esac
+case "$STEP" in build|sums|publish|play|setup) ;; *) usage ;; esac
 echo "$SIGNER" | grep -Eq '^[0-9a-f]{64}$' || { echo "--signer must be a SHA-256 (64 hex characters)"; exit 2; }
 # L2: couch-tv's own releases take only its own certificate, however REPO is spelt and whatever the
 # remote's name: also when the git remote points at Seagey/couch-tv
@@ -69,7 +77,7 @@ case "$(lower "$REMOTE_URL")" in *seagey/couch-tv*) OURS=1 ;; esac
 if [ $OURS = 1 ] && [ "$SIGNER" != "$CERT" ]; then
   echo "--signer must be couch-tv's own certificate ($CERT) for Seagey/couch-tv: TVs refuse any other"; exit 2
 fi
-[ "$STEP" = play ] || { case "$PREVIOUS" in
+[ "$STEP" = play ] || [ "$STEP" = setup ] || { case "$PREVIOUS" in
   /*) [ -f "$PREVIOUS" ] || { echo "--previous $PREVIOUS: no such file"; exit 2; } ;;
   "") echo "--previous is required: last release's couch-tv-ontv.apk, an absolute path"; exit 2 ;;
   *) echo "--previous must be an absolute path (the check runs from another folder): $PREVIOUS"; exit 2 ;;
@@ -219,6 +227,50 @@ do_publish() {
   (cd "$DIST" && gh release create "$tag" --repo "$REPO" --title "couch-tv $VERSION" --notes-file "$notes" --verify-tag \
     $FILES SHA256SUMS.txt) || exit 1
   gh release view "$tag" --repo "$REPO" --json url,assets --jq '.url, (.assets | length)'
+  echo "=== waiting for the Setup app workflow to add couch-tv Setup to $tag"
+  do_setup
+}
+
+# couch-tv Setup's files on every release (the website links releases/latest/download/couch-tv-Setup-*.zip)
+SETUP_FILES="couch-tv-Setup-mac-apple-silicon.zip couch-tv-Setup-mac-intel.zip couch-tv-Setup-windows.zip SHA256SUMS-setup.txt"
+setup_missing() {  # <tag>: the Setup files the release does not have, one a line (all of them when it cannot be read)
+  local have
+  have=$(gh release view "$1" --repo "$REPO" --json assets --jq '.assets[].name' 2>/dev/null) || have=""
+  for f in $SETUP_FILES; do printf '%s\n' "$have" | grep -qxF "$f" || echo "$f"; done
+}
+do_setup() {
+  [ -n "$VERSION" ] || { echo "setup needs --version, for example --version 0.13.9"; exit 2; }
+  local tag="v$VERSION" wait=${SETUP_WAIT:-30} limit=${SETUP_TIMEOUT:-3600} reruns=${SETUP_RERUNS:-2}
+  local waited=0 done_reruns=0 missing run id status conclusion
+  while :; do
+    missing=$(setup_missing "$tag")
+    [ -z "$missing" ] && { echo "SETUP FILES OK on $tag: $SETUP_FILES"; return 0; }
+    # the Setup app workflow's run for this release (a release event runs on the tag)
+    run=$(gh run list --repo "$REPO" --workflow setup-app.yml --event release --branch "$tag" --limit 1 \
+      --json databaseId,status,conclusion --jq '.[0] | "\(.databaseId) \(.status) \(.conclusion)"' 2>/dev/null) || run=""
+    read -r id status conclusion <<< "$run"
+    if [ "${status:-}" = completed ]; then
+      if [ "${conclusion:-}" != success ] && [ "$done_reruns" -lt "$reruns" ]; then
+        # GitHub gave up on a job (0.13.11: the Apple silicon Mac job never got a runner) and so skipped the upload
+        echo "Setup app run $id ended $conclusion: running its failed jobs again"
+        gh run rerun "$id" --repo "$REPO" --failed || true
+        done_reruns=$((done_reruns + 1))
+      elif [ "${conclusion:-}" = success ] || [ "$done_reruns" -ge "$reruns" ]; then
+        # one more look: the upload may have landed between the two calls
+        missing=$(setup_missing "$tag")
+        [ -z "$missing" ] && { echo "SETUP FILES OK on $tag: $SETUP_FILES"; return 0; }
+        echo "SETUP FILES MISSING on $tag after the Setup app run $id ($conclusion):" $missing
+        echo "Run its failed jobs again (gh run rerun $id --failed), then: bash scripts/release.sh setup --version $VERSION"
+        exit 7
+      fi
+    fi
+    if [ "$waited" -ge "$limit" ]; then
+      echo "SETUP FILES MISSING on $tag after ${limit}s:" $missing
+      echo "When the Setup app workflow has run: bash scripts/release.sh setup --version $VERSION"
+      exit 7
+    fi
+    sleep "$wait"; waited=$((waited + wait))
+  done
 }
 
 do_play() {
@@ -242,4 +294,5 @@ case "$STEP" in
   play) do_play ;;
   sums) do_sums ;;
   publish) do_publish ;;
+  setup) do_setup ;;
 esac

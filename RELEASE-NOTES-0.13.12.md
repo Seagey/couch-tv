@@ -32,3 +32,8 @@ When you get a design by code on an Android TV, the TV now tells Couch TV Studio
 - **Skip step:** 5, 10, 15 or 30 seconds everywhere, in config.json as in Home settings. Any other number is 10.
 - **Fixes for people who run a computer at home:** `/api/spotify/control` answers 400 for an action it does not know or that is not text, and 503 when the TV cannot be reached, instead of a 500 for each.
 - **Fixes in the TV home app:** the Spotify listener no longer keeps a closed home screen in memory, and Android lists it as "Couch TV Spotify Now playing".
+
+### couch-tv Setup on every release
+
+- **0.13.11 went out without the couch-tv Setup zips** for a while, because GitHub never found a Mac to build one of them on. They are on 0.13.11 now, and 0.13.12 has its own.
+- For people who build their own releases: `scripts/release.sh publish` now ends by waiting for the Setup app workflow, runs its failed jobs again if GitHub gave up on one, and stops with exit 7 if the three zips and `SHA256SUMS-setup.txt` are not on the release. `scripts/release.sh setup --version 0.13.12` runs that check on its own, and the workflow checks the four files itself.
