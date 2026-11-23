@@ -159,5 +159,31 @@ for (const q of ["", "&ontv=1"]) {
   ok(!(await p2.$(".cw-sheet.cw-arrive")), "a design with nothing to set up shows no card");
   await p2.close();
 }
+// ---- 5. a word with a hyphen never breaks at it (the TCL: "Guest Wi-" over "Fi" on a 2 by 2 tile) ----
+{
+  const page = await home([["clock", 0, 0, 4, 2]], "&ontv=1");
+  const r = await page.evaluate(() => {
+    const out = [];
+    for (const [w, h] of [[160, 160], [160, 260], [260, 160]]) {
+      const root = window.CouchWidgets.render({ id: "t", kind: "wifi", w: w, h: h }, { data: {}, phone: true, phoneUrl: "http://tv.example:5400/setup#pin=482913", look: {} });
+      const holder = document.createElement("div"); holder.className = "cd-layer cw-o"; holder.style.cssText = "position:fixed;left:0;top:0;width:" + w + "px;height:" + h + "px"; holder.appendChild(root); document.body.appendChild(holder);
+      const text = root.textContent;
+      // every "Wi-Fi" drawn: its letters all on one line
+      const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT); let broken = 0, seen = 0, nd;
+      while ((nd = walker.nextNode())) {
+        const at = nd.textContent.indexOf("Wi-Fi"); if (at < 0) continue;
+        seen++;
+        const rg = document.createRange(); rg.setStart(nd, at); rg.setEnd(nd, at + 5);
+        const tops = new Set([...rg.getClientRects()].filter((q) => q.width > 0).map((q) => Math.round(q.top)));
+        if (tops.size > 1) broken++;
+      }
+      out.push({ size: w + "x" + h, has: /Guest Wi-Fi/.test(text), seen, broken });
+      holder.remove();
+    }
+    return out;
+  });
+  for (const x of r) ok(x.has && x.seen > 0 && x.broken === 0, "Guest Wi-Fi at " + x.size + ": the name is there and Wi-Fi is on one line (" + JSON.stringify(x) + ")");
+  await page.close();
+}
 await browser.close(); server.close();
 console.log("widget setup TV: " + n + " checks passed");

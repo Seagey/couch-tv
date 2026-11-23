@@ -681,7 +681,7 @@
       var nPx = fitPxText(f.name, inner, 26, nLines, 720, fam) || 23, gLines = 2, gPx = 0;
       for (; gLines <= 3 && !gPx; gLines++) gPx = fitPxText(go, inner, 24, gLines, 700, fam);
       gLines--;
-      var tall = function (t, px, wt) { var m = measureBox(); m.style.width = Math.floor(inner) + "px"; m.style.fontSize = px + "px"; m.style.fontWeight = wt; m.style.lineHeight = "1.2"; m.style.fontFamily = fam; m.textContent = wl(String(t)); return m.scrollHeight; };
+      var tall = function (t, px, wt) { var m = measureBox(); m.style.width = Math.floor(inner) + "px"; m.style.fontSize = px + "px"; m.style.fontWeight = wt; m.style.lineHeight = "1.2"; m.style.fontFamily = fam; measureText(m, wl(String(t))); return m.scrollHeight; };
       var hN = tall(f.name, nPx, 720), hG = gPx ? tall(go, gPx, 700) + 4 : 0;
       var withIcon = !!one && 40 + hN + hG <= room, withGo = !!gPx && (withIcon ? 40 : 0) + hN + hG <= room;
       var nm = fitWords(root, f.name, inner, 26, nLines, 720, "margin-top:4px;text-align:center") || name;
@@ -1757,6 +1757,26 @@
     return MEASURE;
   }
   // the largest size, max down to 23 px, at which `text` fits `width` on at most `lines` lines; 0 if none
+  // A word with a hyphen never breaks at it: "Guest Wi-Fi" on a 2 by 2 tile showed "Guest Wi-" over "Fi" (the
+  // TCL, 23 Nov 2026). Such a word is drawn (and measured) in a span that does not wrap; the text stays the
+  // same, so it reads and copies as before. Text nodes, not strings, so add() does not look the pieces up in
+  // the TV's language again.
+  function keepHyphens(text) {
+    text = String(text);
+    if (text.indexOf("-") < 0) return [document.createTextNode(text)];
+    var parts = text.split(/(\S+-\S+)/), out = [];
+    for (var i = 0; i < parts.length; i++) {
+      if (!parts[i]) continue;
+      if (i % 2) { var s = document.createElement("span"); s.style.whiteSpace = "nowrap"; s.textContent = parts[i]; out.push(s); }
+      else out.push(document.createTextNode(parts[i]));
+    }
+    return out;
+  }
+  function measureText(m, text) {
+    m.textContent = "";
+    var n = keepHyphens(text);
+    for (var i = 0; i < n.length; i++) m.appendChild(n[i]);
+  }
   function fitPxText(text, width, max, lines, weight, family, spacing) {
     text = wl(String(text == null ? "" : text));   // measured as it is drawn: in the TV's language (add() swaps the same way)
     if (!text) return max;
@@ -1765,7 +1785,7 @@
     if (++MCOUNT > 3000) { MCACHE = {}; MCOUNT = 0; }
     var m = measureBox(), got = 0, lh = 1.2;
     m.style.width = Math.max(1, Math.floor(width)) + "px"; m.style.fontWeight = weight || 600; m.style.fontFamily = family || '"Inter", sans-serif';
-    m.style.letterSpacing = spacing || "normal"; m.style.lineHeight = String(lh); m.textContent = text;
+    m.style.letterSpacing = spacing || "normal"; m.style.lineHeight = String(lh); measureText(m, text);
     for (var px = Math.round(max); px >= 23; px -= px > 40 ? 3 : 1) {
       m.style.fontSize = px + "px";
       if (m.scrollWidth <= Math.floor(width) && m.scrollHeight <= Math.ceil(px * lh * lines) + 1) { got = px; break; }
@@ -1783,7 +1803,7 @@
     text = wl(String(text));
     var px = fitPxText(text, width, max, lines || 1, weight || 600, famOf(root));
     if (!px) return null;
-    return E("div", "cw-fit", "font-size:" + px + "px;font-weight:" + (weight || 600) + ";line-height:1.2;max-width:" + Math.floor(width) + "px;overflow-wrap:normal;flex:none;" + (css || ""), [String(text)]);
+    return E("div", "cw-fit", "font-size:" + px + "px;font-weight:" + (weight || 600) + ";line-height:1.2;max-width:" + Math.floor(width) + "px;overflow-wrap:normal;flex:none;" + (css || ""), keepHyphens(text));
   }
   // a big number on one line, as big as fits
   function fitNum(root, text, width, max, css) {
