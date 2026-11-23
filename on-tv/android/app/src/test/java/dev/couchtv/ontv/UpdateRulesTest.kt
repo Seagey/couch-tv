@@ -24,7 +24,7 @@ class UpdateRulesTest {
     @Test fun takesTheRotatedReleaseKeyButNoStranger() {
         val debug = setOf("debug"); val release = setOf("release")
         assertTrue("same key", UpdateRules.signerOk(debug, debug, emptyList()))
-        // 0.13.10: v3 signed by the release key, with the proof of rotation from the debug key
+        // 0.13.11: v3 signed by the release key, with the proof of rotation from the debug key
         assertTrue("rotated from ours", UpdateRules.signerOk(debug, release, listOf("debug", "release")))
         // after the move, later releases carry the release key (with or without the history)
         assertTrue(UpdateRules.signerOk(release, release, listOf("debug", "release")))
