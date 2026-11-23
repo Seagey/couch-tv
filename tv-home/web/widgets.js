@@ -2875,7 +2875,9 @@
     var lid = function (k, dflt) { var v = setting(o, env, k, dflt); return typeof v === "string" && /^#[0-9a-f]{6}$/i.test(v) ? v : dflt; };
     var A = lid("lid_a", "#ffd60a"), B = lid("lid_b", "#30d158"), lids = q.alt ? ["#ff453a", week % 2 === 0 ? A : B] : [A, B];
     var bin = function (c) { return svg("0 0 62 72", 40, 46, [S("rect", { x: 6, y: 14, width: 50, height: 56, rx: 8, fill: "#3a3a40" }), S("rect", { x: 2, y: 6, width: 58, height: 12, rx: 5, fill: c })], "margin-left:8px"); };
-    if (b.w < 300) { root.style.padding = "18px"; add(root, [E("div", "cw-t23", "font-weight:700;color:var(--sub)", [op(o).label || "Bins"]), E("div", "cw-grow"), E("div", "cw-row", "margin-left:-8px", lids.map(bin)), E("div", "cw-t25 cw-ell", "font-weight:720;color:var(--ink);margin-top:6px", [when])]); return; }
+    if (b.w < 300) { root.style.padding = "18px"; add(root, [E("div", "cw-t23", "font-weight:700;color:var(--sub)", [op(o).label || "Bins"]), E("div", "cw-grow"), E("div", "cw-row", "margin-left:-8px", lids.map(bin)),
+      // the night as big as fits on one line: "Tomorrow" at 25 px was cut to "Tomorro" in a 160 px tile
+      fitWords(root, when, b.w - 36, 25, 1, 720, "color:var(--ink);margin-top:6px") || E("div", "cw-t25 cw-ell", "font-weight:720;color:var(--ink);margin-top:6px", [when])]); return; }
     // a wide tile: the night on top, then each bin with its name (a tile has room only for the lids)
     var names = q.alt ? ["Rubbish", week % 2 === 0 ? (q.bin_a || "Recycling") : (q.bin_b || "Garden")] : [q.bin_a || "Recycling", q.bin_b || "Garden"], half = (b.w - 48) / 2;
     add(root, E("div", "cw-col", "height:100%;justify-content:space-between;align-items:center", [E("div", "cw-row", "min-width:0;max-width:100%", [ic("calendar", 30, "currentColor"), fitWords(root, (op(o).label ? op(o).label + ", " : "") + when, b.w - 48 - 40, 29, 1, 720, "margin-left:10px") || fitWords(root, when, b.w - 48 - 40, 29, 1, 720, "margin-left:10px")]),
