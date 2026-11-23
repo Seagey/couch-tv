@@ -17,7 +17,7 @@ The TV no longer asks you to type into a widget with the remote.
 - **Hold OK puts the phone first.** "Calendar: set up on your phone" or "Edit on your phone" is the first choice, a smart stack included ("Edit the stack on your phone"). Under the code, **No phone? Set it up here** still opens the widget's page in Home settings.
 - **A new design brings one code.** When a design arrives with widgets still to set up, the TV shows "Set up your widgets" and one code for 2 minutes. The phone walks through each widget, then says "All set. Look at your TV."
 - **The agenda widget is called Calendar** while it waits, the word people know.
-- **The TV never names kinds of TV** on a widget or in the Ask AI sheet. Whether a widget works on your TV is for couch-tv Studio to say before you place it.
+- **The TV never names kinds of TV** on a widget or in the Ask AI sheet. Whether a widget works on your TV is for Couch TV Studio to say before you place it.
 
 ### The phone page: Widgets on your screen
 
@@ -26,14 +26,14 @@ The TV's phone page (the QR code in Home settings) now starts with **Widgets on 
 - **Edit** opens that widget's settings as plain buttons and lists.
 - **Connect** walks through the private parts: your calendar (Google, Apple, Outlook, Airbnb or a bookings calendar), your town, your photos, Spotify and the rest, in a few short steps each.
 - **An apps card** shows the apps on your TV with their own icons.
-- **Your town from couch-tv Studio:** Studio's "Set up my widgets" link can carry your town. The phone asks "Use this town for the weather?" and saves it only on Yes. The town is only ever in the link itself, never sent to a server.
+- **Your town from Couch TV Studio:** Studio's "Set up my widgets" link can carry your town. The phone asks "Use this town for the weather?" and saves it only on Yes. The town is only ever in the link itself, never sent to a server.
 
 ### The on-TV app: setup in two steps
 
 - **Step 1 of 2, Make Couch TV your home.** One big button where Android can ask. On a TV that keeps Google's own home on the Home button, one plain line says what to do instead, with Next and More help behind it.
 - **Step 2 of 2, Open your new home.** It opens the home, where the new welcome takes over.
 - **Later opens** say Couch TV is ready, with Open the home and Settings.
-- **The couch-tv Studio look:** the same light blue wall, white cards and rounded fonts as the Studio website.
+- **The Couch TV Studio look:** the same light blue wall, white cards and rounded fonts as the Studio website.
 
 ### The on-TV app: Settings
 
@@ -50,7 +50,7 @@ The More button is gone. Everything it had is in Settings. Words everywhere that
 
 A TV nobody has set up yet (the on-TV app, or the home app with no computer) now opens on one full screen question instead of the classic home:
 
-- **I have a design code** goes straight to the box where you type the code from couch-tv Studio.
+- **I have a design code** goes straight to the box where you type the code from Couch TV Studio.
 - **Use Couch Original** gives you the standard home. Back does the same.
 
 It is asked once. A TV that was already set up before this update never sees it. It is in all 16 languages the home speaks, and it looks like the Studio website.
@@ -65,7 +65,7 @@ It is asked once. A TV that was already set up before this update never sees it.
 
 A design with a video background, such as Aquarium, now plays its video on a TV with 1 GB of memory, Lighter home or not, using a smaller copy. It lets go of the video the moment you open an app. Under 1 GB, power saver, data saver and less motion still show the still picture. To keep the still picture on any TV: Home settings, Designs, **Show the still picture instead**.
 
-### More from couch-tv Studio
+### More from Couch TV Studio
 
 - **Countdowns to Easter, Mother's Day and Father's Day.** The TV works out the date each year (Mother's Day the second Sunday in May; Father's Day the first Sunday in September, or the third Sunday in June).
 - **More widget settings come with the design**: temperature units, where the moon is seen from, the air quality scale, surf heights and wind, the soundscape's volume, the doorbell and energy headings, and Guest Wi-Fi's Hide the password. Your town, beach, Home Assistant and other private settings stay on the TV. A setting changed on the TV still wins.
@@ -85,7 +85,13 @@ The digital, tall, glass, flip, analogue and word clocks in a Studio design can 
 - **The town is just the town.** A town picked by search showed its whole name, such as "Town, Shire, State, Country", on the date line and in a design's weather, and on the Aquarium design it ran off the right edge. Now only the town's own name shows, and a very long one ends in "...". Home settings, Location still shows the full name.
 - **The home opens faster the second time (on-TV app).** On a 1 GB TCL the home was nearly blank for about 5 seconds on every open, while the TV loaded 3 MB of the home's files again. Now the TV keeps its copy until the app is updated. The very first open after installing or updating still loads everything.
 
-- **The update question no longer pops up over a new TV.** "Tell you when a new Couch TV version is out?" came up over the home about 5 seconds after the first open on the TCL. It now waits until the welcome is answered, and asks at a calm moment later: the next time you come back to the home.
+- **The update question no longer pops up over a new TV.** "Tell you when a new Couch TV version is out?" came up over the home about 5 seconds after the first open on the TCL. It now waits until the welcome is answered, and asks at a calm moment later: the next time you come back to the home. That includes I have a design code: the home starting again with your design no longer has the question behind "Use this design?".
+- **"Guest Wi-Fi" stays whole** on a small tile, instead of "Guest Wi-" over "Fi".
+- **A smart stack's dots no longer cover its words.** They have a thin strip of their own on the right, so a 4 by 2 stack's weather shows its temperature in full.
+- **No thin line round the screen** on the welcome. The TV's own focus line round the whole home is off; the home shows where you are itself.
+- **A video background gets another try after an update.** A TV that once could not keep up kept the still picture for a week, even after an update. Now an update tries the video again.
+- **The Couch TV name everywhere.** The banner in the TV's app list says Couch TV, and Home settings says Couch TV Studio, like the welcome.
+- **Share this home points to Couch TV Studio's own address,** couchtv.joshuaseage.com/design.
 - **A hidden "Allow USB debugging?" box.** On the TCL an old Allow box was left open behind Couch TV after an earlier try ran out, and the TV would not show a new one, so Connect seemed to do nothing. Now, if no Allow box comes up over Couch TV within a few seconds, the screen says "The TV's Allow box may be hidden. Press Back once to see it, or switch USB debugging off and on." and Couch TV steps out of the way once, so the box can show. Couch TV never presses anything in that box. The screen stays on while it waits, so the screensaver can't cover the box, and when Couch TV gives up waiting it closes its link cleanly.
 - **Use as home screen on a TV with Google's Android TV Home.** On the TCL it closed Couch TV and showed Google's home with no question. Now that kind of TV changes nothing and says what to do instead, and every other TV still gets Android's own question, with a fallback if Android shows nothing.
 - **The date sits over the clock again.** On the Night and Golden scenes with four quick buttons, the date slid left onto the people switch. It now stays centred over the clock and moves down with the clock if there is no room.
