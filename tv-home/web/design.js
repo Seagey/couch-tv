@@ -2554,7 +2554,9 @@
     function shown() { return ON && ROOT.classList.contains("cd-wmode") && !(DESIGNER && ROOT.classList.contains("cd-edit")); }
     function paint() {
       [].forEach.call(document.querySelectorAll(".cw-focus, .cw-ifocus, .cw-hasfocus"), function (n) { n.classList.remove("cw-focus", "cw-ifocus", "cw-hasfocus"); if (n.classList.contains("cw")) n.style.removeProperty("transform"); });
-      if (!cur || !shown() || sheet) return;
+      // a sheet open: its own focus stays (a redraw behind it, new data or a save, cleared it)
+      if (sheet) { paintSheet(); return; }
+      if (!cur || !shown()) return;
       var S = stops(), s = find(S, cur.id);
       if (!s) { cur = null; return; }
       s.wrap.classList.add("cw-hasfocus");
@@ -2647,7 +2649,7 @@
       if (what === "wtv" && !DESIGNER) { tvEdit(arg); return; }
       if (what === "gear") tipUsed();
       if (what === "edit" || what === "pick") { edit(what === "pick" ? "pick" : arg, arg); return; }
-      if (what === "addapp" && !DESIGNER) { EDIT = appCtx(); if (EDIT) picker("add"); return; }
+      if (what === "addapp" && !DESIGNER) { EDIT = appCtx(); if (EDIT) { if (EDIT.max > 1) appSheet(EDIT); else picker("add"); } return; }
       if (what === "missing" && !DESIGNER) { say("Not on this TV. Install it from the App Store in More apps, or hold OK to change it."); return; }
       if (DESIGNER) { try { window.parent.postMessage({ type: "couchtv:open", name: el.getAttribute("data-name") || "" }, location.origin); } catch (x) {} return; }
       if (hooks.act) hooks.act(what, arg);
@@ -2727,7 +2729,10 @@
           if (ctx.max > 1 && ctx.keys.length > 1) eds.push(mk("Move", "edit", "move"));
           eds.push(mk(folder ? "Remove from folder" : "Remove", "edit", "remove"));
         }
-        if (room && (ctx.slot !== 0 || ctx.max > 1)) eds.push(mk(folder ? "Add app to folder" : "Add app", "edit", "add"));
+        // a folder, dock, app grid or games: Add apps, the sheet with every app on this TV (0.13.11), full or
+        // not, since OK there also takes one out; a one app tile with nothing in it: Add app, as before
+        if (ctx.max > 1) eds.push(mk("Add apps", "edit", "apps"));
+        else if (room && ctx.slot !== 0) eds.push(mk(folder ? "Add app to folder" : "Add app", "edit", "add"));
         // Settings stays first on an app too: one more OK from the hold lands on Settings, never on Change app
         nodes = [nodes[0]].concat(eds, nodes.slice(1));
       }
@@ -2853,10 +2858,143 @@
       });
       openSheet(op === "add" ? (EDIT.kind === "folder" ? "Add app to folder" : "Add app") : "Change app", { nodes: nodes }, "Pick an app. Back to close");
     }
+    // ---- Add apps (0.13.11, owner approved in round 4): one sheet with every app on this TV. OK adds an
+    // app to the folder, dock, app grid or games, or takes it out; Hold OK on a picked app moves it along
+    // the picked ones; Back saves (kept on this TV, like every Hold OK change). The picked ones come first,
+    // numbered in their order. A picked app that is not on this TV stays in the list, dimmed, so OK can
+    // take it out. Reached from Hold OK, Add apps, from the Add app place, and from Home settings (the
+    // widget's page, Add apps), where it opens over the settings and Back goes back to them.
+    function appSheetCtx(key) {
+      var W = window.CouchWidgets, m = /^([A-Za-z0-9_-]{1,60})\|([a-z]{1,20})$/.exec(String(key || ""));
+      if (!m || DESIGNER || !W || !W.appKinds || W.appKinds().indexOf(m[2]) < 0 || !(D && ON)) return null;
+      var o = list(D.objects).map(obj).filter(function (x) { return x.id === m[1] && x.type === "widget" && x.kind === m[2]; })[0];
+      return o ? { o: o, id: o.id, kind: o.kind, slot: null, keys: W.appKeys(o, wenv()), max: W.appMax(o.kind), name: "" } : null;
+    }
+    function appSheet(c, done) {
+      var W = window.CouchWidgets, A = window.CouchApps, env = wenv(), have = W ? W.installedApps(env) : [];
+      if (!c || c.max < 2) return false;
+      if (!have.length) { say("No apps found on this TV yet."); return false; }
+      var keyOf = function (pkg) { return (A && A.idOf(pkg)) || pkg; };
+      var pkgOf = function (k) { var hit = A && A.get(k) ? A.resolve(k, have) : have.filter(function (a) { return a.package === k; })[0]; return hit ? hit.package : ""; };
+      var S = { c: c, done: done, order: c.keys.slice(0, c.max), was: JSON.stringify(c.keys.slice(0, c.max)), tiles: [], moving: null, down: false, held: false, t: null, soon: null, start: 0 };
+      S.order.forEach(function (k) { S.tiles.push({ key: k, pkg: pkgOf(k) }); });
+      have.forEach(function (a) { var k = keyOf(a.package); if (!S.tiles.some(function (x) { return x.key === k || x.pkg === a.package; })) S.tiles.push({ key: k, pkg: a.package }); });
+      S.tiles = S.tiles.slice(0, 160);
+      S.tiles.forEach(function (x) {
+        var app = W.appNode(x.pkg || "missing:" + x.key, 184, env);
+        app.removeAttribute("data-act");
+        x.el = h("div", "cw-as-tile", null, [app]);
+        x.el.setAttribute("data-key", x.key); if (x.pkg) x.el.setAttribute("data-pkg", x.pkg);
+      });
+      var Caps = window.CouchWidgetCaps, title = String(obj(c.o.opts).label || ((Caps && Caps.get && Caps.get(c.kind)) || {}).name || "Apps");
+      closeSheet();
+      S.count = h("span", "cw-as-count", null, [""]);
+      S.grid = h("div", "cw-sheet-apps cw-as-grid", null, []);
+      S.hint = h("div", "cw-hint cw-as-hint", null, []);
+      var el = h("div", "cw-sheet cw-appsheet", { transform: "scale(" + innerWidth / 1920 + ")" }, [h("div", "cw-as-head", null, [h("h2", "", null, [title]), S.count]), S.grid, S.hint]);
+      document.body.appendChild(el);
+      sheet = { el: el, nodes: [], i: 0, apps: S };
+      asDraw(S, 0);
+      return true;
+    }
+    function asPicked(S, x) { return S.order.indexOf(x.key) >= 0; }
+    // the tiles in their places: while moving, the picked ones first in their order (the rest as they were)
+    function asDraw(S, focusKey) {
+      if (S.moving) S.tiles = S.order.map(function (k) { return S.tiles.filter(function (x) { return x.key === k; })[0]; }).filter(Boolean).concat(S.tiles.filter(function (x) { return !asPicked(S, x); }));
+      while (S.grid.firstChild) S.grid.removeChild(S.grid.firstChild);
+      S.tiles.forEach(function (x) {
+        var n = S.order.indexOf(x.key), b = x.el.querySelector(".cw-as-badge");
+        if (b) x.el.removeChild(b);
+        if (n >= 0) x.el.appendChild(h("div", "cw-as-badge", null, [String(n + 1)]));
+        x.el.classList.toggle("cw-as-on", n >= 0);
+        x.el.classList.toggle("cw-as-moving", S.moving === x.key);
+        S.grid.appendChild(x.el);
+      });
+      sheet.nodes = S.tiles.map(function (x) { return x.el; });
+      if (typeof focusKey === "string") { var at = S.tiles.map(function (x) { return x.key; }).indexOf(focusKey); if (at >= 0) sheet.i = at; }
+      else if (typeof focusKey === "number") sheet.i = Math.max(0, Math.min(focusKey, S.tiles.length - 1));
+      S.count.textContent = S.order.length + " of " + S.c.max + " picked";
+      while (S.hint.firstChild) S.hint.removeChild(S.hint.firstChild);
+      if (S.moving) S.hint.appendChild(document.createTextNode("Left and Right move it. OK when it is in place."));
+      else [["OK", "adds or takes it out"], ["Hold OK", "moves it"], ["Back", "saves"]].forEach(function (p) { S.hint.appendChild(h("span", "", null, [h("b", "", null, [p[0]]), " ", p[1]])); });
+      paintSheet();
+    }
+    function asSay(text) { say(text); var t = document.querySelector(".cw-tip.cw-say"); if (t) t.style.zIndex = "61"; }
+    function asToggle(S) {
+      var x = S.tiles[sheet.i];
+      if (!x) return;
+      if (S.moving) { S.moving = null; asDraw(S, x.key); return; }
+      var n = S.order.indexOf(x.key);
+      if (n >= 0) S.order.splice(n, 1);
+      else if (S.order.length >= S.c.max) { asSay("That holds " + S.c.max + " apps. Take one out first."); return; }
+      else S.order.push(x.key);
+      asDraw(S, x.key);
+    }
+    function asHold(S) {
+      var x = S.tiles[sheet.i];
+      if (!x || S.moving) return;
+      if (!asPicked(S, x)) {
+        if (S.order.length >= S.c.max) { asSay("That holds " + S.c.max + " apps. Take one out first."); return; }
+        S.order.push(x.key);
+      }
+      S.moving = x.key;
+      asDraw(S, x.key);
+    }
+    function asMove(S, d) {
+      var at = S.order.indexOf(S.moving), to = at + d;
+      if (at < 0 || to < 0 || to >= S.order.length) return;
+      S.order[at] = S.order[to]; S.order[to] = S.moving;
+      asDraw(S, S.moving);
+    }
+    function asCols() {
+      var ns = sheet.nodes, top = ns.length ? ns[0].offsetTop : 0, n = 0;
+      for (var i = 0; i < ns.length && ns[i].offsetTop === top; i++) n++;
+      return Math.max(1, n);
+    }
+    // Back: saved when anything changed (EDITS, like Hold OK's other changes), then back where it came from
+    function asDone(S) {
+      clearTimeout(S.t); clearTimeout(S.soon);
+      var changed = JSON.stringify(S.order) !== S.was, c = S.c;
+      closeSheet();
+      if (changed) { saveKeys(c, S.order); if (!S.done) { cur = { id: c.id, i: 0 }; paint(); } say("Saved."); }
+      if (S.done) try { S.done(changed); } catch (e) {}
+    }
+    function asKeydown(e) {
+      var S = sheet.apps, a = arrowOf(e);
+      if (backKey(e)) { if (e.repeat) return; if (S.moving) { var mk = S.moving; S.moving = null; asDraw(S, mk); } else asDone(S); return; }
+      if (a) {
+        if (S.moving) { asMove(S, a[0] || a[1]); return; }
+        var cols = asCols(), ni = sheet.i + (a[0] || a[1] * cols);
+        if (a[1] && ni >= sheet.nodes.length && Math.floor(sheet.i / cols) < Math.floor((sheet.nodes.length - 1) / cols)) ni = sheet.nodes.length - 1;
+        if (ni >= 0 && ni < sheet.nodes.length) { sheet.i = ni; paintSheet(); }
+        return;
+      }
+      if (!okKey(e)) return;
+      // the same hold rules as the home: a repeat, or a second down with no up between, is a hold; a TV
+      // that sends a held OK as quick down and up pairs still counts as held
+      // the same held OK still coming in after the hold (repeats, or quick down and up pairs): not a choice
+      var now = Date.now();
+      if (S.swallow) { if (now - S.last < 260) { S.last = now; return; } S.swallow = false; }
+      if (e.repeat || S.down) { if (S.down && !S.held) { clearTimeout(S.t); S.held = true; asHeld(S); } return; }
+      if (S.soon) { clearTimeout(S.soon); S.soon = null; S.down = true; if (now - S.start >= 650) { clearTimeout(S.t); S.held = true; asHeld(S); } return; }
+      S.down = true; S.held = false; S.start = now;
+      S.t = setTimeout(function () { if (!sheet || sheet.apps !== S) return; S.held = true; if (S.soon) { clearTimeout(S.soon); S.soon = null; } asHeld(S); }, 650);
+    }
+    function asHeld(S) { S.swallow = true; S.last = Date.now(); asHold(S); }
+    function asKeyup() {
+      var S = sheet.apps;
+      if (S.swallow) { S.last = Date.now(); S.down = false; clearTimeout(S.t); return; }
+      if (!S.down) return;   // the OK that opened the sheet, let go here: not a choice
+      S.down = false;
+      if (S.held) { clearTimeout(S.t); S.held = false; return; }
+      var heldFor = Date.now() - S.start;
+      S.soon = setTimeout(function () { S.soon = null; clearTimeout(S.t); if (sheet && sheet.apps === S && !S.held) asToggle(S); S.held = false; }, heldFor < 400 ? 140 : 90);
+    }
     function edit(op, arg) {
       var c = EDIT;
       if (!c) return;
       var keys = c.keys.slice(), A = window.CouchApps;
+      if (op === "apps") { appSheet(c); return; }
       if (op === "change" || op === "add") { picker(op); return; }
       if (op === "remove" && typeof c.slot === "number") { keys.splice(c.slot, 1); saveKeys(c, keys); cur = { id: c.id, i: Math.max(0, Math.min(c.slot, keys.length - 1)) }; paint(); say(c.kind === "folder" ? "Removed from the folder." : "Removed. Hold OK, Add app, to put one back."); return; }
       if (op === "move" && typeof c.slot === "number") { MOVING = c; say("Left and Right move it. OK when it is in place."); return; }
@@ -2915,11 +3053,12 @@
     function backKey(e) { return ["Escape", "Esc", "Backspace", "GoBack", "BrowserBack"].indexOf(e.key) >= 0 || e.keyCode === 27 || e.keyCode === 8 || e.keyCode === 10009 || e.keyCode === 461; }
     function ours() { return shown() && !ASK && (DESIGNER || !hooks.free || hooks.free()); }
     function keydown(e) {
-      if (window.CouchDetail && window.CouchDetail.isOpen()) { e.preventDefault(); e.stopPropagation(); window.CouchDetail.keydown(e); return; }
+      if (window.CouchDetail && window.CouchDetail.isOpen() && !(sheet && sheet.apps)) { e.preventDefault(); e.stopPropagation(); window.CouchDetail.keydown(e); return; }
       // trying it in the designer: Back with nothing open goes back to editing
       if (!sheet && DESIGNER && backKey(e) && shown()) { e.preventDefault(); e.stopPropagation(); try { window.parent.postMessage({ type: "couchtv:exit-remote" }, location.origin); } catch (x) {} return; }
       if (sheet) {
         e.preventDefault(); e.stopPropagation();
+        if (sheet.apps) { asKeydown(e); return; }
         if (backKey(e)) { closeSheet(); return; }
         var a = arrowOf(e);
         if (a) sheetKey(e, a);
@@ -2964,6 +3103,7 @@
       }
     }
     function keyup(e) {
+      if (sheet && sheet.apps) { if (okKey(e)) { e.preventDefault(); e.stopPropagation(); asKeyup(); } return; }
       if (okSwallow && okKey(e)) okLast = Date.now();
       if (window.CouchDetail && window.CouchDetail.isOpen() && !okDown) { e.preventDefault(); e.stopPropagation(); window.CouchDetail.keyup(e); return; }
       if (!okDown || !okKey(e)) return;
@@ -2990,6 +3130,8 @@
       focus: function (id, i) { cur = { id: String(id), i: typeof i === "number" ? i : -1 }; last = null; paint(); },
       moving: function () { return !!MOVING; },
       sheetOpen: function () { return !!sheet; },
+      // Add apps for one container by "<object id>|<kind>" (Home settings); done(changed) after Back
+      appSheet: function (key, done) { return appSheet(appSheetCtx(key), done); },
       // the phone code changed (the on-TV app, Auth.onPin): an open Edit on your phone draws its new QR
       phoneAgain: function () { if (document.querySelector('.cw[data-face="1"]')) { PLINK.at = 0; askPhone(); } if (sheet && sheet.phone) { if (sheet.arrive) setupCard(); else phoneSheet(sheet.phone); } },
       // a design that needs setting up has just arrived: "Set up your widgets" and the phone page's code
@@ -3075,6 +3217,8 @@
     },
     // the design's containers of apps, and changing one's apps the way Hold OK does (null: its own apps again)
     appWidgets: function () { return appWidgets(); },
+    // Add apps, the sheet with every app on this TV, for one of them (Home settings opens it over itself)
+    appSheet: function (key, done) { return NAV.appSheet(key, done); },
     setApps: function (key, keys) {
       var w = appWidgets().filter(function (a) { return a.key === key; })[0];
       if (!w) return { ok: false, error: "That app row is not on this design any more." };

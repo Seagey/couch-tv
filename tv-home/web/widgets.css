@@ -146,6 +146,25 @@ html.cd-wmode #grid .app.focus { outline: none; }
 .cw-sheet .cw-hint { margin-top: 40px; font-size: 25px; color: rgba(255, 255, 255, 0.72); }
 .cw-menu .cw-mi { width: 640px; padding: 26px 34px; margin: 10px 0; border-radius: 28px; font-size: 34px; font-weight: 650; background: rgba(255, 255, 255, 0.1); }
 .cw-menu .cw-mi.cw-ifocus { background: #fff; color: #111; outline: none; }
+/* Add apps (design.js appSheet): every app on this TV, seven across, the picked ones numbered in their
+   order; the focus is a thick white ring with a dark gap, so it reads on any icon colour from the couch */
+.cw-appsheet { -webkit-align-items: flex-start; align-items: flex-start; padding: 0 160px; box-sizing: border-box; }
+.cw-appsheet .cw-as-head { display: -webkit-flex; display: flex; -webkit-align-items: baseline; align-items: baseline; margin: 0 0 44px; }
+.cw-appsheet .cw-as-head h2 { margin: 0 32px 0 0; font-size: 60px; }
+.cw-appsheet .cw-as-count { font-size: 34px; font-weight: 560; color: rgba(255, 255, 255, 0.68); }
+.cw-appsheet .cw-as-grid { -webkit-justify-content: flex-start; justify-content: flex-start; max-width: 1630px; width: 1630px; max-height: 720px; padding: 30px 0 0 30px; margin: -30px 0 0 -30px; }
+.cw-appsheet .cw-as-tile { position: relative; width: 184px; height: 184px; margin: 0 42px 46px 0; border-radius: 44px;
+  -webkit-transition: -webkit-transform 0.12s ease-out; transition: transform 0.12s ease-out; }
+.cw-appsheet .cw-as-tile .cw-app { margin: 0; }
+.cw-appsheet .cw-as-tile.cw-ifocus { outline: none; box-shadow: 0 0 0 7px rgba(8, 9, 12, 0.95), 0 0 0 14px #fff, 0 18px 44px rgba(0, 0, 0, 0.55);
+  -webkit-transform: scale(1.07); transform: scale(1.07); z-index: 2; }
+.cw-appsheet .cw-as-badge { position: absolute; top: -14px; right: -14px; width: 56px; height: 56px; border-radius: 50%; background: #30c75a; color: #fff;
+  border: 5px solid #0c0d10; box-sizing: border-box; font: 760 26px/46px "Inter", sans-serif; text-align: center; z-index: 3; }
+.cw-appsheet .cw-as-tile.cw-as-moving { -webkit-transform: scale(1.12); transform: scale(1.12); }
+.cw-appsheet .cw-as-tile.cw-as-moving .cw-as-badge { background: #fff; color: #111; }
+.cw-appsheet .cw-as-hint { margin-top: 34px; font-size: 30px; color: rgba(255, 255, 255, 0.78); }
+.cw-appsheet .cw-as-hint span { margin-right: 48px; }
+.cw-appsheet .cw-as-hint b { color: #fff; font-weight: 720; }
 /* the Settings button on a design (design.js gearChip): top right on every design, so settings are always
    one press away; it grows into a labelled pill while it has the focus */
 .cw-gearchip { display: none; position: fixed; top: 28px; right: 28px; z-index: 58; height: 64px; min-width: 64px; padding: 0 12px; box-sizing: border-box;
