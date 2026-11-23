@@ -289,7 +289,31 @@ await page.evaluate(() => document.querySelectorAll(".cw-say").forEach((e) => e.
 await press("Escape", 500);
 ok(await page.evaluate(() => (document.querySelector(".cw-say") || {}).textContent || "") === "Guardado.", "Saved. in Spanish: " + await page.evaluate(() => (document.querySelector(".cw-say") || {}).textContent || ""));
 ok(JSON.stringify((await edits())["f|folder"]) === '["kayo","iview","youtube"]', "and the move was saved");
+
+// Hebrew (right to left): the tiles run from the right, so Left goes on to the next app and a move follows
+await page.evaluate(() => window.I18N.set("he"));
+ok(await page.evaluate(() => document.documentElement.dir) === "rtl", "Hebrew turns the page right to left");
+await focus("f", 0); await hold(); await choose("הוספת אפליקציות");
+s = await sheet();
+ok(s && s.tiles[0].key === "kayo" && s.tiles[1].key === "iview" && s.tiles[0].left > s.tiles[1].left, "the first app is on the right: " + (s && s.tiles[0].left) + " > " + (s && s.tiles[1].left));
+await press("ArrowRight", 100);
+ok((await sheet()).at === 0, "Right at the first app (the right edge) stays on it");
+await press("ArrowLeft", 150);
+ok((await sheet()).at === 1, "Left goes on to the next app, ABC iview, to its left");
+await hold();
+ok((await sheet()).tiles.find((t) => t.key === "iview").focus, "Hold OK picks ABC iview up to move");
+await press("ArrowRight", 300);
+s = await sheet();
+ok(s.tiles[0].key === "iview" && s.tiles[0].badge === "1" && s.tiles[s.at].key === "iview" && s.tiles[0].left > s.tiles[1].left, "while moving, Right carries ABC iview to the right, to 1");
+await press("ArrowRight", 300);
+ok((await sheet()).tiles[0].key === "iview", "Right at the start stays there");
+await press("ArrowLeft", 300);
+ok((await sheet()).tiles[1].key === "iview", "and Left carries it back to the left, to 2");
+await press("ArrowRight", 300);
+await press("Enter", 400); await press("Escape", 500);
+ok(JSON.stringify((await edits())["f|folder"]) === '["iview","kayo","youtube"]', "Back saves the move: " + JSON.stringify((await edits())["f|folder"]));
 await page.evaluate(() => window.I18N.set("en"));
+ok(await page.evaluate(() => document.documentElement.dir) === "ltr", "English turns it back");
 
 ok(!errors.length, "no page errors " + errors.join(" | "));
 await browser.close();

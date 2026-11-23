@@ -2961,6 +2961,9 @@
     }
     function asKeydown(e) {
       var S = sheet.apps, a = arrowOf(e);
+      // Hebrew and Arabic: the tiles run from the right (the grid is a flex row in an rtl page), so Left and Right
+      // swap, as for the home's own arrows in keydown; moving an app follows the tiles the same way
+      if (a && a[0] && document.documentElement.dir === "rtl") a = [-a[0], a[1]];
       if (backKey(e)) { if (e.repeat) return; if (S.moving) { var mk = S.moving; S.moving = null; asDraw(S, mk); } else asDone(S); return; }
       if (a) {
         if (S.moving) { asMove(S, a[0] || a[1]); return; }
