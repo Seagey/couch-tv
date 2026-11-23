@@ -37,6 +37,7 @@ const KEEP = {
   "Inter, sans-serif": "a font name in an svg, never words",
   "Twenty seven minutes past\neleven": "the Word clock in couch-tv Studio's demo: the Word clock writes the time in English words",
   "Pizza": "a timer's name in couch-tv Studio's demo",
+  "Ask AI": "the feature's own name, kept in every language as i18n.js keeps it (the Play build's Ask AI layer, widget-detail.js)",
   "H:": "the day's high and low as H: and L:, written the way weather apps write them"
 };
 // a literal that only starts a line made with tl() or the table (a fragment of one of its lines)
