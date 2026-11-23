@@ -35,7 +35,7 @@ When you get a design by code on an Android TV, the TV now tells Couch TV Studio
 
 ### Fixes from a beginner run of the TV install
 
-- **The "Allow USB debugging?" box no longer comes back again and again** on the on-TV app, after Update to or a restart. A background check now waits long enough for you to press Allow, and if nobody answers it does not ask again until you press Let the phone press keys, then Connect, in Couch TV's Settings.
+- **The "Allow USB debugging?" box no longer comes back again and again** on the on-TV app, after Update to or a restart. A background check now waits long enough for you to press Allow, and if nobody answers it does not ask again until you press Connect in Couch TV's Settings, Phone remote, Set it up.
 - **The on-TV app says the box's own name**, "Allow USB debugging?", and how to reach its Allow button: tick Always allow, then Down, Left, press Allow.
 - **The Settings menu on the home has Phone remote** on the on-TV app, with the code to scan, as the steps on couchtv.joshuaseage.com/get say. Back takes you home again.
 - **Hold OK on a design:** the menu is solid, so a big clock no longer shows through it, its title and hint fit on the screen, and an app folder lists All apps once, with no Open Apps beside it.
