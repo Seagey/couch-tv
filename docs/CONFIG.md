@@ -796,7 +796,7 @@ The integration reads local media sessions via a `NotificationListenerService` b
 ```sh
 adb shell cmd notification allow_listener app.couchtv.launcher/app.couchtv.launcher.SpotifyMediaListener
 ```
-`apply.sh` grants this automatically when setting up the TV. The TV app will indicate whether the permission is active under **Home settings &rarr; Spotify**.
+`apply.sh` grants this automatically when setting up the TV. The TV app will indicate whether the permission is active under **Home settings, Look, Spotify**.
 
 *Note:* Media sessions are an Android system feature and are not available on Samsung (Tizen).
 

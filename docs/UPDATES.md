@@ -12,7 +12,7 @@ The newest release is **0.13.11**. The TV apps come from [the Releases page](htt
 
 - **Add apps:** Hold OK on an app in a folder, the Dock, an app grid or Games, then Add apps: one sheet with every app on the TV, pick as many as you want, Back saves. Also in Home settings, on the widget's page.
 - **Fonts from Couch TV Studio:** widgets set in Jost or Cormorant Garamond now draw in those fonts on the TV.
-- **Spotify's Now playing card and Night posters:** Home settings, Spotify shows what the Spotify app on the TV is playing, read on the TV with no account; Home settings, Look, Keep watching as posters gives the Night look the Classic look's tiles.
+- **Spotify's Now playing card and Night posters:** Home settings, Look, Spotify shows what the Spotify app on the TV is playing, read on the TV with no account; Home settings, Look, Keep watching as posters gives the Night look the Classic look's tiles.
 - **The on-TV app's own signing key:** 0.13.11 is signed with a new key, the on-TV app's own release key, on Android 9 and newer. 0.13.10 knows how to accept it; 0.13.9 and older do not.
 - **Fixes:** no weather line over a widget design's smart stack, the update question comes back when you press Home, Back on an Android TV closes the Ask AI sheet, and the design code error names Couch TV Studio.
 

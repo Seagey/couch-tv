@@ -5516,7 +5516,7 @@
   // also on the computer (/api/settings), so the phone and the TV agree.
   var ST_KEY = "tvhome.settings";
   var SECS = [["language", "globe"], ["location", "pin"], ["weather", "cloud"], ["look", "look"],
-    ["spotify", "spotify"], ["apps", "apps"], ["people", "person"], ["quick", "bolt"], ["designer", "designer"], ["about", "info"]];
+    ["apps", "apps"], ["people", "person"], ["quick", "bolt"], ["designer", "designer"], ["about", "info"]];
   var SET = { col: "secs", sec: 0, ri: 0, keyFocus: null, sub: null, lift: null, confirm: null, dirty: false, typing: null,
     msg: "", geo: { q: "", list: null, busy: false, err: false } };
   var REPO_URL = "github.com/Seagey/couch-tv";
@@ -6522,6 +6522,9 @@
       AMBIENT_MUSIC = !AMBIENT_MUSIC; ST.ambient_music = AMBIENT_MUSIC; saveSettings(); renderAmbientMusic();
     } });
     rows.push(info("np-note", t(OFFLINE ? "np_note_offline" : "np_note")));
+    // the local Spotify card (#321) sits under Now playing here, not in a section of its own: one more
+    // section pushed the last one off a 1080 screen
+    rows = rows.concat(spotifyRows());
     rows.push(head(t("photos_head")));
     rows.push(info("photos-count", photoCountText()));
     if (canPick()) rows.push({ kind: "action", key: "photo-pick", label: t("photos_pick"), sub: t("photos_pick_sub"), act: pickPhotos });
