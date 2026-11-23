@@ -2,9 +2,21 @@
 
 Everything that changed in couch-tv, newest first.
 
-The newest release is **0.13.9**. The TV apps come from [the Releases page](https://github.com/Seagey/couch-tv/releases). The bridge, and with option B the home's own screen, run from your copy of this repo, so `git pull` brings their changes.
+The newest release is **0.13.10**. The TV apps come from [the Releases page](https://github.com/Seagey/couch-tv/releases). The bridge, and with option B the home's own screen, run from your copy of this repo, so `git pull` brings their changes.
 
 ## November 2026
+
+### 23 November 2026: release 0.13.10, a simpler start on a new TV and widgets set up on your phone
+
+0.13.10 is on [the Releases page](https://github.com/Seagey/couch-tv/releases). From setting up a TCL from scratch with Downloader, the way a new person would. Option C: Home settings, Updates, Update to, or Downloader's code 8180170 again; please take this one before 0.13.11, which moves the on-TV app to its own signing key. Other Android TVs: Home settings, Updates. Option B: `git pull` and restart the bridge. Full notes: [RELEASE-NOTES-0.13.10.md](../RELEASE-NOTES-0.13.10.md).
+
+- **Setup in two steps (on-TV app):** Make Couch TV your home, then Open your new home. Everything else is in one Settings screen; the More button is gone.
+- **A first-run welcome:** a TV nobody set up asks once: I have a design code, or Use Couch Original.
+- **Widgets set up on your phone:** a widget waiting for your town, calendar, photos or another private thing says what it is and shows a code; Hold OK puts the phone first, with No phone? Set it up here under it. The phone page starts with Widgets on your screen.
+- **App folders in rows**, a Dock and Games that show "+N" instead of dropping apps, and the remote stopping on every app.
+- **Video backgrounds play on 1 GB TVs**, with Show the still picture instead in Home settings, Designs.
+- **Countdowns to Easter, Mother's Day and Father's Day**, clocks in another time zone, and more widget settings carried in the design.
+- **Fixes:** the town shows as just its own name, the home opens faster after the first time on the on-TV app, the update question waits for the welcome, a hidden Allow box is noticed, Use as home screen on a TV with Google's Android TV Home, the date over the clock, the screensaver after a scene clip, "Tomorrow" in full on the bins tile, and a design sent again from Studio wins.
 
 ### 20 November 2026: release 0.13.9, one button updates, Home settings on your phone, settings for each widget, and plain words
 

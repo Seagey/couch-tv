@@ -10,8 +10,8 @@ android {
         applicationId = "dev.couchtv.ontv"
         minSdk = 23          // Android 6.0. Wireless debugging pairing needs Android 11+ on the TV.
         targetSdk = 34
-        versionCode = 22
-        versionName = "0.13.9"
+        versionCode = 23
+        versionName = "0.13.10"
     }
     buildFeatures { buildConfig = true }
     // Test builds: when COUCHTV_KEYSTORE names a keystore (a debug-style key, alias androiddebugkey,

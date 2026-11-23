@@ -80,6 +80,12 @@ class ReleaseChannelTest {
         assertTrue(ReleaseChannel.newer("v0.13.9", "0.13.8"))
         assertTrue(ReleaseChannel.newer("v0.13.9", "0.13"))
         assertFalse(ReleaseChannel.newer("v0.13.9", "0.13.9"))
+        // 0.13.10 (setup in two steps, the first-run welcome, widgets set up on the phone): two digits after the
+        // last dot still count as a number, so it reaches 0.13.9 and older TVs, and is never older than 0.13.9
+        assertTrue(ReleaseChannel.newer("v0.13.10", "0.13.9"))
+        assertTrue(ReleaseChannel.newer("v0.13.10", "0.13"))
+        assertFalse(ReleaseChannel.newer("v0.13.10", "0.13.10"))
+        assertFalse(ReleaseChannel.newer("v0.13.9", "0.13.10"))
         assertFalse(ReleaseChannel.newer("v0.13.8", "0.13.9"))
     }
 
