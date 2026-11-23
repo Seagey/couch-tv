@@ -1,8 +1,11 @@
 // Getting a design by code (Home settings, Look, Get a design). The TV PULLS a design from couch-tv
 // Studio's store: it asks one server, the one in config.json "design_store", and nothing ever
 // connects to the TV. The store never learns anything about this home (no address it keeps, no
-// Wi-Fi, no devices, no names): the request carries the code and nothing else (no cookies, no
-// referrer).
+// Wi-Fi, no devices, no names): the request carries the code and, on the Android apps, two numbers
+// about the TV and nothing else (no cookies, no referrer): tv { v: the Couch TV version x.y.z,
+// mem: the total memory Android sees, in MB }. Couch TV Studio keeps them on the person's TV in My TVs
+// so "Will it play on your TV?" can answer for the real TV (tvReport below). No ids, no model, no
+// location. A store that does not know "tv" reads only "code" and ignores it.
 //
 // What comes back is untrusted. Only its "design" is kept; the only picture allowed is a JPEG
 // inside it (the store re-draws every upload as a clean JPEG), checked by its first bytes; then
@@ -125,6 +128,30 @@
   };
   function fail(k) { var e = new Error(MSG[k]); e.kind = k; return e; }
 
+  // What the TV says about itself with a fetch (Try before you buy, 24 Nov 2026): only the Couch TV
+  // version (its x.y.z part, so a beta "0.13.12-beta.1" says "0.13.12") and the total memory in whole MB
+  // (64 to 65536, from the app's TVOS.memoryMb, ActivityManager.MemoryInfo.totalMem). Either may be
+  // missing; null when there is neither (a browser preview, or an app too old to say). The store's
+  // own check is the same (tvs.mjs tvReport).
+  function tvReport() {
+    var T = window.TVOS, out = {}, any = false;
+    if (!T) return null;
+    try {
+      var m = /^(\d{1,3}\.\d{1,3}\.\d{1,4})(?:$|[^\d.])/.exec(String(T.version ? T.version() || "" : ""));
+      if (m) { out.v = m[1]; any = true; }
+    } catch (e) {}
+    try {
+      var mb = T.memoryMb ? Number(T.memoryMb()) : 0;
+      if (mb % 1 === 0 && mb >= 64 && mb <= 65536) { out.mem = mb; any = true; }
+    } catch (e) {}
+    return any ? out : null;
+  }
+  function fetchBody(code) {
+    var body = { code: code }, t = tvReport();
+    if (t) body.tv = t;
+    return JSON.stringify(body);
+  }
+
   function get(typed) {
     var code = readCode(typed), b = base();
     if (!code) return Promise.reject(fail("nocode"));
@@ -133,7 +160,7 @@
     var timer = setTimeout(function () { if (ctl) ctl.abort(); }, TIMEOUT);
     return fetch(b + "/v1/designs/fetch", {
       method: "POST", mode: "cors", credentials: "omit", cache: "no-store", referrerPolicy: "no-referrer", redirect: "error",
-      headers: { "content-type": "application/json" }, body: JSON.stringify({ code: code }), signal: ctl ? ctl.signal : undefined
+      headers: { "content-type": "application/json" }, body: fetchBody(code), signal: ctl ? ctl.signal : undefined
     }).then(function (r) {
       clearTimeout(timer);
       if (r.status === 404) throw fail("notfound");
@@ -251,5 +278,5 @@
   }
 
   window.CouchDesignCode = { base: base, readCode: readCode, checkCode: checkCode, get: get, kept: kept, forget: forget, accept: accept, lockImages: lockImages, mediaSources: mediaSources,
-    openInbox: openInbox, takeInbox: takeInbox };
+    openInbox: openInbox, takeInbox: takeInbox, tvReport: tvReport };
 })();

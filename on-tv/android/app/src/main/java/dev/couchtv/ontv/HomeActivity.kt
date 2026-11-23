@@ -250,6 +250,8 @@ class HomeActivity : Activity() {
         /** A Keep watching card from Android's Watch Next rows (#122): the page opens it here, as the TV home app does. */
         @JavascriptInterface fun openWatchNext(id: String): Boolean = runCatching { WatchNext.open(id) }.getOrDefault(false)
         @JavascriptInterface fun version(): String = BuildConfig.VERSION_NAME
+        /** Total memory in MB (0 if unknown), sent with a design fetch only (design-code.js, TvReport.kt). */
+        @JavascriptInterface fun memoryMb(): Int = TvReport.memoryMb(this@HomeActivity)
         @JavascriptInterface fun keep(key: String, value: String) { getSharedPreferences("page", MODE_PRIVATE).edit().putString(key, value).apply() }
         @JavascriptInterface fun kept(key: String): String? = getSharedPreferences("page", MODE_PRIVATE).getString(key, null)
         @JavascriptInterface fun setScreenOff(off: Boolean): Boolean {

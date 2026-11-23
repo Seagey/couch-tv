@@ -503,8 +503,9 @@ the design pointing at it. Not yet tried on a real TV.
 **Getting a design by code (`design_store`).** With `"design_store": "https://designs.example"`
 (https only, no path; `http://127.0.0.1` or `localhost` for development), Home settings, Look has
 **Get a design**: type the code couch-tv Studio's Send to my TV shows (`ABCDE-FGHJK`, or the long
-`CTV1-...` one from its QR code). The TV asks that one server, with the code and nothing else (no
-cookies, no referrer), and keeps the design in its own storage (`couchtv.design.fetched`); it wins
+`CTV1-...` one from its QR code). The TV asks that one server, with the code and nothing else but, from the Android apps, its
+Couch TV version and total memory in MB (`tv: { v, mem }`, so Couch TV Studio can say whether a design will
+play on that TV; no ids, no model, no location; no cookies, no referrer), and keeps the design in its own storage (`couchtv.design.fetched`); it wins
 over a `design` in this file until **Delete this design** (Home settings, Designs). The only picture it takes is a JPEG
 inside the answer. A design got this way always shows "Use this design?" first: getting one clears
 the TV's record of any design it said yes to. Without `design_store` the rows do not show. The

@@ -259,7 +259,10 @@ short code. It also has a gallery of designs other people made.
 - **Off until you turn it on.** Installing or updating couch-tv never switches it on. Until someone
   at the TV turns it on (Home settings, Designs; couch-tv Studio before 0.13.9) or types a code there, the TV asks Studio
   for nothing. Turning **Your design** off (before 0.13.9, Back to my classic home) switches it off again in one step.
-- **What the TV sends to Studio:** the code you typed, with no cookies and no referrer. While a
+- **What the TV sends to Studio:** the code you typed, with no cookies and no referrer. From
+  0.13.12 the Android apps add two numbers with it: the Couch TV version and the TV's total memory in
+  MB, so Studio's "Will it play on your TV?" can answer for a TV you added in My TVs. No ids, no
+  model, no location. While a
   design is on, the TV also fetches the fonts the design names from Studio, and the design's
   background video, if it has one, by the video's id and a size (720p or 1080p, short clip or long
   loop), with no cookies and no referrer; once it has played, the TV keeps its own copy and does

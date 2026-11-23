@@ -108,4 +108,49 @@ sb.C.get("abcde-fghjk").then((got) => {
 }).then(() => {
   sb.sandbox.fetch = () => Promise.resolve({ status: 404, ok: false, headers: { get: () => null }, text: () => Promise.resolve("{}") });
   return sb.C.get("ABCDE-FGHJK").then(() => assert.fail("404"), (e) => assert.strictEqual(e.kind, "notfound"));
+}).then(() => {
+  // Try before you buy (24 Nov 2026): a browser (no TVOS) sends the code and nothing else
+  let sent = null;
+  const ok = () => Promise.resolve({ status: 200, ok: true, headers: { get: () => null }, text: () => Promise.resolve(json) });
+  sb.sandbox.fetch = (u, o) => { sent = JSON.parse(o.body); return ok(); };
+  assert.strictEqual(sb.C.tvReport(), null, "no app, nothing to say");
+  return sb.C.get("abcde-fghjk").then(() => {
+    assert.deepStrictEqual(Object.keys(sent), ["code"], "a browser sends only the code");
+    // the Android app: its version and total memory, nothing else
+    sb.sandbox.TVOS = { version: () => "0.13.12", memoryMb: () => 2048, deviceId: () => "x", model: () => "TCL Ballarat" };
+    assert.deepStrictEqual(JSON.parse(JSON.stringify(sb.C.tvReport())), { v: "0.13.12", mem: 2048 });
+    return sb.C.get("abcde-fghjk");
+  }).then(() => {
+    assert.deepStrictEqual(sent, { code: "ABCDE-FGHJK", tv: { v: "0.13.12", mem: 2048 } }, "only v and mem go with the code");
+    assert.ok(JSON.stringify(sent).length < 200, "far under the store's 1 KB body limit");
+    const T = sb.sandbox;
+    const rep = () => { const r = sb.C.tvReport(); return r ? JSON.parse(JSON.stringify(r)) : r; };
+    // a beta says its x.y.z part (the store accepts only x.y.z)
+    T.TVOS = { version: () => "0.13.12-beta.1", memoryMb: () => 912 };
+    assert.deepStrictEqual(rep(), { v: "0.13.12", mem: 912 });
+    // an older app with no memoryMb: the version alone
+    T.TVOS = { version: () => "0.13.11" };
+    assert.deepStrictEqual(rep(), { v: "0.13.11" });
+    // memory Android would not give (0), or out of the store's range, or not whole: left out
+    for (const bad of [0, 10, 63, 65537, 1.5, NaN, "lots", null]) {
+      T.TVOS = { version: () => "0.13.12", memoryMb: () => bad };
+      assert.deepStrictEqual(rep(), { v: "0.13.12" }, "mem " + bad);
+    }
+    T.TVOS = { version: () => "0.13.12", memoryMb: () => 64 }; assert.strictEqual(rep().mem, 64);
+    T.TVOS = { version: () => "0.13.12", memoryMb: () => 65536 }; assert.strictEqual(rep().mem, 65536);
+    // versions that are not x.y.z: left out
+    for (const bad of ["", "0.13", "dev", "<script>", "0.13.12.4", "1234.1.1"]) {
+      T.TVOS = { version: () => bad, memoryMb: () => 4096 };
+      assert.deepStrictEqual(rep(), { mem: 4096 }, "v " + bad);
+    }
+    // neither: no tv key at all; a bridge that throws never stops the fetch
+    T.TVOS = { version: () => "nope", memoryMb: () => 0 };
+    assert.strictEqual(sb.C.tvReport(), null);
+    T.TVOS = { version: () => { throw new Error("x"); }, memoryMb: () => { throw new Error("y"); } };
+    assert.strictEqual(sb.C.tvReport(), null);
+    return sb.C.get("abcde-fghjk");
+  }).then(() => {
+    assert.deepStrictEqual(Object.keys(sent), ["code"], "nothing to say: only the code");
+    delete sb.sandbox.TVOS;
+  });
 }).then(() => { console.log("design code tests passed"); }).catch((e) => { console.error(e); process.exit(1); });
