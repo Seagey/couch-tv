@@ -33,6 +33,13 @@ When you get a design by code on an Android TV, the TV now tells Couch TV Studio
 - **Fixes for people who run a computer at home:** `/api/spotify/control` answers 400 for an action it does not know or that is not text, and 503 when the TV cannot be reached, instead of a 500 for each.
 - **Fixes in the TV home app:** the Spotify listener no longer keeps a closed home screen in memory, and Android lists it as "Couch TV Spotify Now playing".
 
+### Fixes from a beginner run of the TV install
+
+- **The "Allow USB debugging?" box no longer comes back again and again** on the on-TV app, after Update to or a restart. A background check now waits long enough for you to press Allow, and if nobody answers it does not ask again until you press Let the phone press keys, then Connect, in Couch TV's Settings.
+- **The on-TV app says the box's own name**, "Allow USB debugging?", and how to reach its Allow button: tick Always allow, then Down, Left, press Allow.
+- **The Settings menu on the home has Phone remote** on the on-TV app, with the code to scan, as the steps on couchtv.joshuaseage.com/get say. Back takes you home again.
+- **Hold OK on a design:** the menu is solid, so a big clock no longer shows through it, its title and hint fit on the screen, and an app folder lists All apps once, with no Open Apps beside it.
+
 ### couch-tv Setup on every release
 
 - **0.13.11 went out without the couch-tv Setup zips** for a while, because GitHub never found a Mac to build one of them on. They are on 0.13.11 now, and 0.13.12 has its own.
