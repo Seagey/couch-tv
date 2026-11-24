@@ -429,6 +429,10 @@ Everything else: [docs/](docs/README.md).
   [couch-tv-setup](https://github.com/killy10o10/couch-tv-setup) by killy10o10 (MIT); the reused
   parts and their notice are in `setup-app/THIRD-PARTY.md`.
 
+## Who made it
+
+couch-tv is made by [Joshua Seage](https://joshuaseage.com), who builds with AI and runs [in house AI training for businesses](https://joshuaseage.com/in-house-ai-training).
+
 ## Shout me a coffee
 
 couch-tv is free. If it made your day a bit easier and you'd like to say thanks, you can [shout me a coffee](https://buy.stripe.com/14A14m5Mk6cndtNeax6Vq0t), any amount you like.
