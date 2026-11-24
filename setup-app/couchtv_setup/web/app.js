@@ -1,12 +1,25 @@
-// couch-tv Setup page. Everything that comes from the network or the TV is put on the page with
+// Couch TV Setup page. Everything that comes from the network or the TV is put on the page with
 // textContent, never as HTML.
 (function () {
   "use strict";
   var KEY = document.querySelector('meta[name="setup-key"]').content;
   var OS = document.querySelector('meta[name="setup-os"]').content;
   var $ = function (id) { return document.getElementById(id); };
+  var NS = "http://www.w3.org/2000/svg";
   var state = { mode: "setup", ip: null, kind: null, facts: null, route: null, weather: null, remote: false,
-                look: null, tried: 0, devStep: "dev-classic" };
+                look: null, tried: 0, devStep: "dev-classic",
+                accountMode: "off", studio: null, features: [], session: [], linked: null, design: null, tvName: "" };
+
+  // Hooks that other pieces plug into. A hook is shown only when the server lists its feature in /api/info
+  // ("features"), so a Setup without it simply hides it.
+  //   link-tv: the finish screen's "Link it to your account" (HOOKS.linkNow runs it)
+  //   tidy:    the finish screen's "Tidy up your TV" (fires the "setup:tidy" event on window)
+  var HOOKS = {
+    linkNow: function (onProgress) {
+      return job("/api/link-tv", {}, onProgress).then(function (r) { return (r && r.account) || {}; });
+    }
+  };
+  function hasFeature(name) { return state.features.indexOf(name) >= 0; }
 
   // An error from this app's own server: plain words, a code, and the technical part as detail.
   function problem(j) {
@@ -15,8 +28,8 @@
     return e;
   }
 
-  // The page could not reach couch-tv Setup on this computer at all (the app was closed).
-  var LOST = "This page lost touch with couch-tv Setup on this computer. Open the app again, then start over.";
+  // The page could not reach Couch TV Setup on this computer at all (the app was closed).
+  var LOST = "This page lost touch with Couch TV Setup on this computer. Open the app again, then start over.";
 
   function api(path, body) {
     return fetch(path, {
@@ -47,10 +60,72 @@
     });
   }
 
-  function show(step) {
+  // ---- screens, the top bar and Back ----
+
+  // The screens in the order the person walked them. Back goes to the one before, skipping screens that
+  // only make sense while something is running (the Allow wait, the progress screen, the blocked screen).
+  var nav = [], current = null, flow = 0;
+  var TRANSIENT = { allow: 1, work: 1, blocked: 1, closed: 1 };
+  var STAGE = { done: 2, extras: 2, "helper-on": 2 };   // tidy counts as part of Set up your TV
+  var NO_STEPS = { closed: 1, undo: 1, undone: 1 };
+  var workKind = "setup";
+
+  function show(step, opts) {
     document.querySelectorAll("section").forEach(function (s) { s.hidden = s.dataset.step !== step; });
     $("error").hidden = true;
+    current = step;
+    if (!(opts && opts.back)) {
+      var at = nav.lastIndexOf(step);
+      if (at >= 0) nav.length = at + 1; else nav.push(step);
+    }
+    chrome(step);
     window.scrollTo(0, 0);
+    var h = document.querySelector('section[data-step="' + step + '"] h1');
+    if (h) { h.tabIndex = -1; h.focus({ preventScroll: true }); }
+  }
+
+  function chrome(step) {
+    var locked = step === "work";
+    var back = $("back");
+    back.disabled = locked || step === "welcome" || step === "closed";
+    back.classList.toggle("locked", locked);
+    $("back-note").hidden = !locked;
+    if (locked) text("back-note", workKind === "setup" ? "Back is off while Couch TV installs." : "Back is off while this runs.");
+    var bar = $("steps");
+    bar.hidden = state.accountMode === "off" || state.mode === "undo" || !!NO_STEPS[step];
+    var stage = STAGE[step] || 1;
+    for (var i = 0; i < 3; i++) {
+      var s = $("st-" + i), n = s.querySelector(".n");
+      var done = i < stage && (i > 0 || !!state.account);
+      s.className = "s" + (done ? " done" : "") + (i === stage ? " on1" : "");
+      n.textContent = "";
+      if (done) n.appendChild(icon("check")); else n.textContent = String(i + 1);
+    }
+  }
+
+  function goBack() {
+    if ($("back").disabled) return;
+    var cur = nav.pop();
+    while (nav.length && TRANSIENT[nav[nav.length - 1]]) nav.pop();
+    var prev = nav[nav.length - 1];
+    if (!prev) { nav.push(cur); return; }
+    flow += 1;                      // an answer still on its way for the screen we leave is ignored
+    clearInterval(countdown);
+    if (cur === "find") { clearTimeout(poll); poll = null; }
+    show(prev, { back: true });
+    if (prev === "find") lookAgain();
+  }
+  $("back").addEventListener("click", goBack);
+  $("plan-back").addEventListener("click", goBack);
+
+  function icon(id, cls) {
+    var s = document.createElementNS(NS, "svg");
+    s.setAttribute("aria-hidden", "true");
+    if (cls) s.setAttribute("class", cls);
+    var u = document.createElementNS(NS, "use");
+    u.setAttribute("href", "#" + id);
+    s.appendChild(u);
+    return s;
   }
 
   // Plain words on the page; the technical part only behind Details. This computer blocking the app
@@ -71,17 +146,22 @@
 
   document.querySelectorAll("[data-os]").forEach(function (el) { el.hidden = el.dataset.os !== OS; });
   document.querySelectorAll("[data-go]").forEach(function (b) {
-    b.addEventListener("click", function () { show(b.dataset.go); });
+    b.addEventListener("click", function () { if (b.dataset.go === "find") return scan(); show(b.dataset.go); });
   });
   setInterval(function () { api("/api/ping").catch(function () {}); }, 20000);
+
+  // Enter in a box does what its button does
+  function enter(id, btn) {
+    $(id).addEventListener("keydown", function (ev) { if (ev.key === "Enter") { ev.preventDefault(); $(btn).click(); } });
+  }
 
   // ---- find ----
 
   // The list finds TVs by itself and keeps looking while it is on screen, so a TV turns Ready on its own
   // once its switch is on (the person never comes back to press Next).
-  var poll = null, openRow = null, rows = {};
-  var PILL = { ready: ["Ready", "ready"], code: ["Type the code", "step"], pair: ["1 step on the TV", "step"],
-               "switch": ["1 step on the TV", "step"], other: ["Found. Can't install from here yet", "other"] };
+  var poll = null, openRow = null, rows = {}, detailsOpen = {};
+  var PILL = { ready: ["Ready", "ok"], code: ["Type the code", "warn"], pair: ["One step on the TV", "warn"],
+               "switch": ["One step on the TV", "warn"], other: ["Found. Can't install from here yet", "dim"] };
 
   function onFind() { return !document.querySelector('[data-step="find"]').hidden; }
 
@@ -140,46 +220,79 @@
     return ({ Tizen: "samsung", webOS: "lg", "Roku OS": "roku" })[t.other] || null;
   }
 
+  function pillEl(label, cls) {
+    var pill = document.createElement("span");
+    pill.className = "pill " + cls;
+    if (cls === "ok") { var tk = document.createElement("span"); tk.className = "tick-icon sm"; tk.appendChild(icon("check")); pill.appendChild(tk); }
+    else if (cls === "warn") { var d = document.createElement("span"); d.className = "dot"; pill.appendChild(d); }
+    pill.appendChild(document.createTextNode(label));
+    return pill;
+  }
+
   function drawRows(tvs) {
     var box = $("found");
     var before = rows; rows = {};
     box.textContent = "";
     var usable = tvs.filter(function (t) { return t.android || t.status === "other"; });
-    text("find-status", usable.length ? (usable.length === 1 ? "Found your TV." : "Found " + usable.length + " TVs. Which one?") : "No TV found yet.");
+    text("find-status", usable.length === 0 ? "No TV found yet." : usable.length === 1 ? "This one is on your Wi-Fi right now." : "These are on your Wi-Fi right now.");
     $("find-help").hidden = usable.length > 0;
     $("find-watch").hidden = !usable.length;
     usable.forEach(function (t) {
       rows[t.ip] = t;
-      var row = document.createElement("div");
-      row.className = "tvrow" + (openRow === t.ip ? " open" : "");
-      var who = document.createElement("div"); who.className = "who";
-      var b = document.createElement("b"); b.textContent = t.label;
-      var small = document.createElement("small");
-      small.textContent = [t.model && t.model !== t.label ? t.model : "", t.ip].filter(Boolean).join(", ");
-      who.appendChild(b); who.appendChild(small);
-      var pill = document.createElement("span");
-      var p = t.stale ? ["Looking for it again", "step"] : (PILL[t.status] || PILL["switch"]);
-      pill.className = "pill " + p[1]; pill.textContent = p[0];
-      row.appendChild(who); row.appendChild(pill);
+      var card = document.createElement("div");
+      card.className = "card tvc" + (openRow === t.ip ? " open" : "");
+      // the TV, drawn small, with its own name on the screen
+      var mini = document.createElement("div"); mini.className = "tvmini";
+      var tv = document.createElement("div"); tv.className = "tv stand";
+      var scr = document.createElement("div"); scr.className = "scr";
+      var nm = document.createElement("span"); nm.textContent = t.label;
+      scr.appendChild(nm); tv.appendChild(scr); mini.appendChild(tv); card.appendChild(mini);
+      var h = document.createElement("h3"); h.textContent = t.label; card.appendChild(h);
+      var kind = helperKind(t);
+      var p = t.stale ? ["Looking for it again", "warn"] : t.status === "other" && kind ? ["Needs the Helper", "dim"] : (PILL[t.status] || PILL["switch"]);
+      var state_ = document.createElement("div"); state_.appendChild(pillEl(p[0], p[1])); card.appendChild(state_);
       if (t.status === "other") {
-        var note = document.createElement("small");
-        var kind = helperKind(t);
+        var note = document.createElement("p"); note.className = "small";
         note.textContent = kind ? "Needs the helper." : "Couch TV goes on this TV another way. See the guide on GitHub.";
-        who.appendChild(document.createElement("br")); who.appendChild(note);
+        card.appendChild(note);
         if (kind) {
-          var hb = document.createElement("button");
+          var hb = document.createElement("button"); hb.type = "button"; hb.className = "btn ghost";
           hb.textContent = "Set up the helper";
           hb.addEventListener("click", function () { state.helperTv = { ip: t.ip, kind: kind, name: t.label }; text("helper-tv-title", "Your " + HELPER_NAMES[kind] + " TV needs the helper."); show("helper-tv"); });
-          row.appendChild(hb);
+          card.appendChild(hb);
+        } else {
+          var ga = document.createElement("a"); ga.className = "btn ghost"; ga.target = "_blank"; ga.rel = "noopener";
+          ga.href = "https://github.com/Seagey/couch-tv#will-it-work-on-my-tv"; ga.textContent = "Open the guide";
+          card.appendChild(ga);
         }
       } else {
-        var go = document.createElement("button");
-        go.className = t.status === "ready" ? "primary" : "";
-        go.textContent = t.status === "ready" ? "Set up" : t.status === "code" ? "Type the code" : "Show me how";
+        var go = document.createElement("button"); go.type = "button";
+        var undo = state.mode === "undo";
+        // a TV a scan missed, or one whose debugging did not answer the check, is never offered as ready
+        var sure = !t.stale && !t.adb_unconfirmed;
+        var runs = sure && (t.status === "ready" || t.status === "code");
+        go.className = "btn " + (runs ? "go" : "ghost");
+        go.textContent = t.stale ? "Looking for it again…" : undo ? (runs && t.status === "ready" ? "Choose this TV" : runs ? "Type the code" : "Show me how") :
+          runs && t.status === "ready" ? "Set up this TV" : runs ? "Type the code" : "Show me how";
+        if (t.stale) go.disabled = true;
         go.addEventListener("click", function () { rowAction(t.ip); });
-        row.appendChild(go);
+        card.appendChild(go);
       }
-      box.appendChild(row);
+      // Details: what the TV said it is, and where it is
+      var det = document.createElement("button"); det.type = "button"; det.className = "det";
+      det.setAttribute("aria-expanded", detailsOpen[t.ip] ? "true" : "false");
+      det.appendChild(icon("chev")); det.firstChild.setAttribute("viewBox", "0 0 12 12");
+      det.appendChild(document.createTextNode("Details"));
+      var more = document.createElement("div"); more.className = "detail"; more.hidden = !detailsOpen[t.ip];
+      if (t.model) { more.appendChild(document.createTextNode("Reported as ")); var mb = document.createElement("b"); mb.textContent = t.model; more.appendChild(mb); more.appendChild(document.createElement("br")); }
+      more.appendChild(document.createTextNode("Address " + t.ip));
+      det.addEventListener("click", function () {
+        detailsOpen[t.ip] = !detailsOpen[t.ip];
+        det.setAttribute("aria-expanded", detailsOpen[t.ip] ? "true" : "false");
+        more.hidden = !detailsOpen[t.ip];
+      });
+      card.appendChild(det); card.appendChild(more);
+      box.appendChild(card);
     });
     // the TV whose steps are open just became ready, or its pairing screen just opened
     if (openRow && rows[openRow] && before[openRow] && rows[openRow].status !== before[openRow].status) openGuide(rows[openRow]);
@@ -187,15 +300,14 @@
 
   function rowAction(ip) {
     var t = rows[ip];
-    if (!t) return;
-    if (t.status === "ready" || t.status === "code") return setUpRow(t);
+    if (!t || t.stale) return;
+    if ((t.status === "ready" || t.status === "code") && !t.adb_unconfirmed) return setUpRow(t);
     openGuide(t);
   }
 
   function setUpRow(t) {
     state.ip = t.ip; state.look = t; state.tried = 0;
     state.kind = (t.known && t.known.kind) || state.kind || "google";
-    state.devStep = "find";
     if (state.mode === "undo" && !t.adb_5555 && !t.wireless_debugging) return pick(t.ip, t);
     stopLooking(function () {
       if (t.adb_5555) return allow();
@@ -206,16 +318,21 @@
       }
       // Wireless debugging, paired with this computer before: straight in, no code
       text("find-status", "Connecting to " + t.label + "…");
-      job("/api/connect-tls", { ip: t.ip, port: t.wireless_debugging }).then(connected, function (e) {
+      var ok = guard();
+      job("/api/connect-tls", { ip: t.ip, port: t.wireless_debugging }).then(function (r) { if (ok()) connected(r); }, function (e) {
+        if (!ok()) return;
         fail(e); show("find"); lookAgain();
       });
     });
   }
 
+  // An answer that arrives after the person pressed Back or started something else is ignored.
+  function guard() { var s = ++flow; return function () { return s === flow; }; }
+
   // The few steps on the TV for this TV's Android version, as little TV screens.
   function openGuide(t, extra) {
     openRow = t.ip;
-    document.querySelectorAll(".tvrow").forEach(function (r) { r.classList.remove("open"); });
+    document.querySelectorAll(".tvc").forEach(function (r) { r.classList.remove("open"); });
     var body = { row: t };
     if (extra) Object.keys(extra).forEach(function (k) { body[k] = extra[k]; });
     api("/api/guide", body).then(function (g) {
@@ -243,7 +360,9 @@
       var next = $("guide-next");
       next.hidden = g.route === "choose";
       next.textContent = g.route === "pair" ? "I see the code" : g.route === "ready" ? "Set up" : "Done, connect";
+      var first = !$("guide").hidden;
       $("guide").hidden = false;
+      if (!first) $("guide").scrollIntoView({ block: "nearest" });
     }, fail);
   }
 
@@ -258,7 +377,7 @@
   $("guide-next").addEventListener("click", function () {
     var t = rows[openRow]; if (!t) return;
     var g = state.guide || {};
-    state.ip = t.ip; state.look = t; state.tried = 0; state.devStep = "find";
+    state.ip = t.ip; state.look = t; state.tried = 0;
     if (g.route === "ready") return setUpRow(t);
     if (g.route === "pair") {
       return stopLooking(function () {
@@ -288,8 +407,8 @@
       if (r.kind === "samsung" || r.kind === "lg" || r.kind === "roku") {
         var names = { samsung: "Samsung", lg: "LG", roku: "Roku" };
         text("stop-title", "A " + names[r.kind] + " needs another way");
-        text("stop-text", "couch-tv can go on a " + names[r.kind] + ", but not from this app: it needs a computer at home " +
-          "that stays on and opens couch-tv each time the TV is switched on, and the Home button still opens " +
+        text("stop-text", "Couch TV can go on a " + names[r.kind] + ", but not from this app: it needs a computer at home " +
+          "that stays on and opens Couch TV each time the TV is switched on, and the Home button still opens " +
           names[r.kind] + "'s own menu. The guide on GitHub walks through it.");
         text("stop-more", "Or plug a Google TV box (for example the Google TV Streamer) into the TV's HDMI: this app can set that up, and it gets everything.");
         return show("stop");
@@ -320,7 +439,10 @@
   }
 
   $("ip-go").addEventListener("click", function () { stopLooking(function () { pick($("ip").value.trim(), null); }); });
+  enter("ip", "ip-go");
   $("rescan").addEventListener("click", scan);
+  $("nohere-go").addEventListener("click", function () { stopLooking(function () { show("nohere"); }); });
+  $("nohere-look").addEventListener("click", scan);
 
   document.querySelectorAll("[data-kind]").forEach(function (b) {
     b.addEventListener("click", function () {
@@ -329,7 +451,6 @@
       var look = state.look || {};
       // Already answering on the network debugging port: no steps needed, straight to the Allow question.
       if (state.kind !== "fire" && look.adb_5555) {
-        state.devStep = state.kind === "google" ? "dev-google" : "dev-classic";
         if (state.kind === "android") classicSteps("android");
         return allow();
       }
@@ -344,7 +465,6 @@
     $("howto-fire").hidden = which !== "fire";
     $("fire-note").hidden = which !== "fire";
     text("classic-title", which === "fire" ? "Switch on ADB debugging" : "Switch on USB debugging");
-    state.devStep = "dev-classic";
     show("dev-classic");
   }
 
@@ -352,13 +472,12 @@
   var ROUTE_WORDS = {
     pair: "This TV has Wireless debugging, so you will type a 6 number code from the TV. First, Developer options.",
     usb: "This TV runs Android 11, so it has no Wireless debugging: you will switch on USB debugging, and the TV asks to allow this computer. No cable is needed. First, Developer options.",
-    unknown: "Google TVs on Android 12 or newer have Wireless debugging. Google TVs on Android 11 (many 2021 and 2022 Hisense, Toshiba and TCL TVs) only have USB debugging, and that works too, with no cable. Switch on Developer options, then pick what your TV shows."
+    unknown: "Google TVs on Android 12 or newer have Wireless debugging. Google TVs on Android 11 only have USB debugging, and that works too, with no cable. Switch on Developer options, then pick what your TV shows."
   };
 
   function startGoogle() {
     var route = (state.look && state.look.route) || "unknown";
     text("route-line", ROUTE_WORDS[route] || ROUTE_WORDS.unknown);
-    state.devStep = "dev-google";
     show("dev-google");
   }
 
@@ -394,33 +513,30 @@
     if (code.length !== 6) return fail(new Error("The code is the 6 numbers under Wi-Fi pairing code on the TV."));
     if (!port) return fail(new Error("Type the port too: the numbers after the colon under IP address & Port."));
     text("pair-status", "Pairing…");
-    job("/api/pair", { ip: state.ip, code: code, port: Number(port) }, function (f, m) { if (m) text("pair-status", m + "…"); })
+    var ok = guard();
+    job("/api/pair", { ip: state.ip, code: code, port: Number(port) }, function (f, m) { if (m && ok()) text("pair-status", m + "…"); })
       .then(function (r) {
+        if (!ok()) return;
         clearInterval(portTimer);
         if (r.need_port) return show("tls-port");
         connected(r);
-      }, function (e) { text("pair-status", ""); fail(e); });
+      }, function (e) { if (!ok()) return; text("pair-status", ""); fail(e); });
   });
+  enter("code", "pair-go"); enter("pair-port", "pair-go");
 
   $("tls-go").addEventListener("click", function () {
     text("tls-status", "Connecting…");
+    var ok = guard();
     job("/api/connect-tls", { ip: state.ip, port: Number($("tls-port").value.replace(/\D/g, "")) })
-      .then(connected, function (e) { text("tls-status", ""); fail(e); });
+      .then(function (r) { if (ok()) connected(r); }, function (e) { if (!ok()) return; text("tls-status", ""); fail(e); });
   });
+  enter("tls-port", "tls-go");
 
   // ---- Android TV and Fire TV: the Allow prompt ----
 
   $("connect-go").addEventListener("click", function () { state.tried = 0; allow(); });
-  $("classic-back").addEventListener("click", function () {
-    if (state.kind === "google") { state.devStep = "dev-google"; return show("dev-google"); }
-    show("kind");
-  });
   $("allow-retry").addEventListener("click", allow);
-  $("allow-back").addEventListener("click", function () { clearInterval(countdown); show(state.devStep); if (state.devStep === "find") lookAgain(); });
   document.querySelectorAll(".fix-try").forEach(function (b) { b.addEventListener("click", allow); });
-  document.querySelectorAll(".fix-back").forEach(function (b) {
-    b.addEventListener("click", function () { show(state.devStep); });
-  });
   $("fix-again").addEventListener("click", function () { state.tried = 0; allow(); });
   $("blocked-again").addEventListener("click", scan);
 
@@ -435,6 +551,7 @@
   var countdown = null;
   function allow() {
     var wait = state.tried ? 30 : 45;
+    var ok = guard();
     show("allow");
     $("allow-retry").hidden = true;
     var left = wait;
@@ -444,41 +561,54 @@
     say();
     clearInterval(countdown);
     countdown = setInterval(function () { if (left > 1) { left -= 1; say(); } }, 1000);
-    job("/api/connect", { ip: state.ip, kind: state.kind, tried: state.tried, wait: wait }).then(function (r) {
-      clearInterval(countdown);
-      connected(r);
-    }, function (e) {
-      clearInterval(countdown);
-      if (e.fix) {
-        state.tried += 1;
-        tvKindWords();
-        return show(e.fix);
-      }
-      if (e.code === "local_network_blocked") return fail(e);
-      text("allow-status", "");
-      $("allow-retry").hidden = false;
-      fail(e);
+    // an earlier try that was left with Back may still be running: wait for it first
+    stopLooking(function () {
+      if (!ok()) return;
+      job("/api/connect", { ip: state.ip, kind: state.kind, tried: state.tried, wait: wait }).then(function (r) {
+        if (!ok()) return;
+        clearInterval(countdown);
+        connected(r);
+      }, function (e) {
+        if (!ok()) return;
+        clearInterval(countdown);
+        if (e.fix) {
+          state.tried += 1;
+          tvKindWords();
+          return show(e.fix);
+        }
+        if (e.code === "local_network_blocked") return fail(e);
+        text("allow-status", "");
+        $("allow-retry").hidden = false;
+        fail(e);
+      });
     });
   }
 
   // ---- connected: the plan, or the undo plan ----
+
+  function tvName() { return $("tv-room").value.trim() || state.tvName || "this TV"; }
+  function syncName() { text("plan-name", tvName()); }
+  $("tv-room").addEventListener("input", syncName);
+  enter("tv-room", "setup-go");
 
   function connected(r) {
     state.facts = r.facts; state.route = r.route;
     var f = r.facts;
     if (!f.supported) {
       text("stop-title", "This TV is too old");
-      text("stop-text", "This app needs Android 7.1 or newer, and this TV has Android " + f.android + ". A Google TV box plugged into the TV can run couch-tv.");
-      text("stop-more", "On Android 6 (for example the Xiaomi Mi TV 4A), couch-tv is set up from a computer with the guide on GitHub. Nothing was changed on the TV.");
+      text("stop-text", "This app needs Android 7.1 or newer, and this TV has Android " + f.android + ". A Google TV box plugged into the TV can run Couch TV.");
+      text("stop-more", "On Android 6 (for example the Xiaomi Mi TV 4A), Couch TV is set up from a computer with the guide on GitHub. Nothing was changed on the TV.");
       return show("stop");
     }
     if (state.mode === "undo") return undoPlan();
     state.ontvTakes = !!(f.ontv_home && f.ontv_home.takes_home);
     $("ontv-row").hidden = !state.ontvTakes;
-    text("device-line", "Connected to your " + f.name + " (" + (f.fire ? "Fire OS " + (f.fire_os || "") : "Android " + f.android) + ").");
+    text("device-line", "Connected to your " + f.name + " (" + (f.fire ? "Fire OS " + (f.fire_os || "") : "Android " + f.android) + "). We will put Couch TV on it and make it the home screen.");
     $("tcl-note").hidden = !f.tcl;
     var t = rows[state.ip];
-    if (t && !$("tv-room").value && t.known && t.known.room) $("tv-room").value = t.known.room;
+    state.tvName = (t && t.known && t.known.room) || (t && t.label) || f.name || "";
+    $("tv-room").value = state.tvName;
+    syncName();
     if (state.account) {
       $("plan-account").textContent = signedInWords(state.account.name) + ". Couch TV gets your home details" +
         (state.account.design ? " and \"" + state.account.design + "\"" : "") + " as it goes on.";
@@ -497,7 +627,7 @@
   $("ambient").addEventListener("change", refreshPlan);
   $("ontv-off").addEventListener("change", refreshPlan);
 
-  // What to say after a check: couch-tv in front or not, the Home button watch running or not, and
+  // What to say after a check: Couch TV in front or not, the Home button watch running or not, and
   // any other launcher whose own Home override would fight it.
   function homeWords(r) {
     var w = [];
@@ -508,7 +638,7 @@
         "The Home button watch is switched on, but the TV has not started it yet. Restart the TV once. If Home still opens " +
         "the TV's own home after that, open this app again and set it up again.");
     } else if (!r.ok && r.other_front === "ontv") {
-      w.push("couch-tv's other app (the on-TV app) was in front, not the TV's own home. It still has Home switched on: " +
+      w.push("Couch TV's other app (the on-TV app) was in front, not the TV's own home. It still has Home switched on: " +
         "open it and press Stop being the home screen, or run Setup again and let it switch that off.");
     } else if (!r.ok) {
       w.push("The TV's own home was in front when this looked. Press Home on the remote once more.");
@@ -517,86 +647,323 @@
     return w.join(" ");
   }
 
-  $("place-go").addEventListener("click", function () {
-    var box = $("places"); box.textContent = "Looking…";
-    api("/api/place", { q: $("place-q").value }).then(function (r) {
-      box.textContent = "";
-      if (!r.places.length) box.textContent = "No place by that name. Try the nearest town.";
-      r.places.forEach(function (p) {
-        var b = document.createElement("button");
-        b.textContent = p.place + (p.area ? ", " + p.area : "");
-        b.addEventListener("click", function () {
-          state.weather = p;
-          box.textContent = "Weather for " + p.place + (p.area ? ", " + p.area : "") + ".";
-        });
-        box.appendChild(b);
-      });
-    }, function (e) { box.textContent = ""; fail(e); });
-  });
+  // ---- progress ----
 
-  function working(title) {
+  // The steps the person sees, in the order the setup really runs them. The server reports one number
+  // (0 to 1) and a line of words; this turns them into which step is busy.
+  var MILES = [
+    { id: "found", t: "Found your TV" },
+    { id: "allowed", t: "Allowed on the TV" },
+    { id: "download", t: "Downloaded and checked" },
+    { id: "link", t: "Linking it to your account" },
+    { id: "install", t: "Installing Couch TV" },
+    { id: "home", t: "Making it your home screen" },
+    { id: "smooth", t: "Checking the picture is smooth" }
+  ];
+  var miles = [];
+
+  function milestoneAt(p, msg) {
+    var ids = miles.map(function (m) { return m.id; });
+    var now;
+    if (/Measuring/i.test(msg || "")) now = "smooth";
+    else if (p < 0.25) now = "download";
+    else if (p < 0.27 && ids.indexOf("link") >= 0) now = "link";
+    else if (p < 0.78) now = "install";
+    else now = "home";
+    return ids.indexOf(now);
+  }
+
+  function drawMiles(active) {
+    var ul = $("work-steps");
+    Array.prototype.forEach.call(ul.children, function (li, i) {
+      li.className = i < active ? "done" : i === active ? "now" : "todo";
+    });
+    return active;
+  }
+
+  function working(title, kind, label) {
+    workKind = kind || "generic";
     text("work-title", title);
     $("work-bar").style.width = "0%";
+    $("work-mini").style.width = "0%";
     text("work-status", "Starting…");
+    var ul = $("work-steps"); ul.textContent = "";
+    miles = [];
+    if (workKind === "setup") {
+      miles = MILES.filter(function (m) { return m.id !== "link" || !!state.account; });
+      miles.forEach(function (m) {
+        var li = document.createElement("li");
+        var mk = document.createElement("span"); mk.className = "mk"; mk.appendChild(icon("check"));
+        li.appendChild(mk); li.appendChild(document.createTextNode(m.t)); ul.appendChild(li);
+      });
+      drawMiles(2);
+    }
+    ul.hidden = workKind !== "setup";
+    text("work-label", label || (workKind === "setup" ? "Installing Couch TV" : title));
+    text("work-sub", "Keep the TV on. We will tell you when it is done.");
     show("work");
     return function (f, m) {
-      $("work-bar").style.width = Math.round(f * 100) + "%";
+      var pct = Math.round(f * 100) + "%";
+      $("work-bar").style.width = pct;
+      $("work-mini").style.width = pct;
       if (m) text("work-status", m + "…");
+      if (workKind === "setup") {
+        var a = drawMiles(milestoneAt(f, m));
+        text("work-label", miles[a] ? miles[a].t : "Installing Couch TV");
+      }
     };
   }
 
+  // ---- the setup itself ----
+
   $("setup-go").addEventListener("click", function () {
-    var people = $("people").value.split(",").map(function (s) { return s.trim(); }).filter(Boolean);
     var room = $("tv-room").value.trim();
+    var name = tvName();
     var named = room ? api("/api/name-tv", { ip: state.ip, room: room }).catch(function () {}) : Promise.resolve();
     named.then(function () {
-      return job("/api/setup", { ambient_off: $("ambient").checked, ontv_home_off: $("ontv-off").checked, people: people, weather: state.weather }, working("Setting it up"));
+      // names and a weather place are not asked here any more: an account's home details still go on the TV
+      return job("/api/setup", { ambient_off: $("ambient").checked, ontv_home_off: $("ontv-off").checked, people: [], weather: null },
+        working("Setting up " + name, "setup"));
     })
-      .then(function (r) {
-        var ul = $("done-account"); ul.textContent = "";
-        if (r.account) {
-          var lines = ["Couch TV installed and checked"];
-          if (r.account.linked) lines.push("Linked to your Couch TV account");
-          if (r.account.people) lines.push("Added " + r.account.people + (r.account.people === 1 ? " person" : " people") + " from your home details");
-          if (r.account.town) lines.push("Weather for " + r.account.town);
-          if (r.account.design) lines.push("Sent \"" + r.account.design + "\" to the TV");
-          lines.forEach(function (l) { var li = document.createElement("li"); li.textContent = l; ul.appendChild(li); });
-        }
-        ul.hidden = !r.account;
-        $("health-box").hidden = false;
-        if (r.speed && r.speed.cls) {
-          var sp = document.createElement("li");
-          sp.textContent = "Measured how smoothly it draws: " + ({ a: "Slow", b: "Everyday", c: "Quick", d: "Fast" })[r.speed.cls] + " (Couch TV Studio uses this)";
-          ul.appendChild(sp); ul.hidden = false;
-        }
-        if (r.kept_ontv) {
-          text("done-title", "Left as it was");
-          text("done-line", "couch-tv's other app (the on-TV app) is still your home screen, and nothing was installed.");
-        } else {
-          text("done-title", r.front ? "Couch TV is your home screen" : "Couch TV is on the TV");
-          text("done-line", (r.front ? "It is on the screen now. " : "It is installed. ") +
-            "Version " + r.apk.version + ", checked against " + r.apk.checked + ". " +
-            homeWords({ ok: r.front, watch_bound: r.watch_bound, warning: r.warning, other_front: r.other_front }));
-        }
-        $("remote-done").hidden = true;
-        $("remote-adb-google").hidden = state.facts.fire;
-        $("remote-adb-fire").hidden = !state.facts.fire;
-        text("debug-why", state.route === "tls" ?
-          "this switches Wireless debugging off. Skip it if you add the phone remote: that needs it on." :
-          "this switches debugging off. Skip it if you add the phone remote and want it to press keys.");
-        show("done");
-      }, function (e) { show("plan"); fail(e); });
+      .then(function (r) { finish(r, name); }, function (e) { show("plan"); fail(e); });
+  });
+
+  function finish(r, name) {
+    var ul = $("done-account"); ul.textContent = "";
+    var accountOn = state.accountMode !== "off";
+    var lines = [];
+    // Linked only when the server says so
+    var linked = !!(r.account && r.account.linked);
+    if (r.account) {
+      lines.push("Couch TV installed and checked");
+      if (linked) lines.push("Linked to your Couch TV account");
+      if (r.account.people) lines.push("Added " + r.account.people + (r.account.people === 1 ? " person" : " people") + " from your home details");
+      if (r.account.town) lines.push("Weather for " + r.account.town);
+      if (r.account.design) lines.push("Sent \"" + r.account.design + "\" to the TV");
+    }
+    if (r.speed && r.speed.cls) {
+      lines.push("Measured how smoothly it draws: " + ({ a: "Slow", b: "Everyday", c: "Quick", d: "Fast" })[r.speed.cls] + " (Couch TV Studio uses this)");
+    }
+    if (r.apk && !r.kept_ontv) lines.push("Version " + r.apk.version + ", checked against " + r.apk.checked);
+    lines.forEach(function (l) { var li = document.createElement("li"); li.textContent = l; ul.appendChild(li); });
+    ul.hidden = !lines.length;
+    $("health-box").hidden = true;
+    $("health-show").hidden = true;
+    state.kept = !!r.kept_ontv;
+    state.linked = accountOn && !state.kept ? linked : null;
+    state.design = (r.account && r.account.design) || null;
+    state.finishName = name;
+    var notice = r.kept_ontv ? "Couch TV's other app (the on-TV app) is still your home screen, and nothing was installed." :
+      homeWords({ ok: r.front, watch_bound: r.watch_bound, warning: r.warning, other_front: r.other_front });
+    text("done-line", notice);
+    $("done-line").hidden = !notice;
+    if (!state.kept) addSession(name, state.linked);
+    $("remote-done").hidden = true;
+    $("remote-adb-google").hidden = state.facts.fire;
+    $("remote-adb-fire").hidden = !state.facts.fire;
+    text("debug-why", state.route === "tls" ?
+      "this switches Wireless debugging off. Skip it if you add the phone remote: that needs it on." :
+      "this switches debugging off. Skip it if you add the phone remote and want it to press keys.");
+    renderFinish();
+    show("done");
+    if (tidyOn() && !state.kept) openTidy("done");   // the optional step between progress and Finish
+  }
+
+  // The finish screen follows what is true: ready, installed but not linked, or (no account on this Setup) just ready.
+  function renderFinish() {
+    var name = state.finishName || "Your TV";
+    var accountOn = state.accountMode !== "off" && !state.kept;
+    var linked = state.linked === true;
+    var cta = $("studio-cta"), lk = $("link-cta");
+    cta.hidden = true; lk.hidden = true;
+    $("fin-cap").hidden = true;
+    $("fl-panel").hidden = true;
+    var badge = $("fin-badge");
+    var finish = $("finish-go");
+    if (state.kept) {
+      badge.className = "pill dim";
+      $("fin-badge-tick").hidden = true; $("fin-badge-dot").hidden = true;
+      text("fin-badge-text", "Left as it was");
+      text("done-title", "Left as it was");
+      text("fin-lede", "Nothing was installed.");
+      finish.className = "btn go big"; text("finish-text", "Finish");
+    } else if (!accountOn) {
+      badge.className = "pill ok";
+      $("fin-badge-tick").hidden = false; $("fin-badge-dot").hidden = true;
+      text("fin-badge-text", name + " is ready");
+      text("done-title", "Couch TV is on your TV");
+      text("fin-lede", "Couch TV is your home screen. Press Home on your TV remote to see it.");
+      finish.className = "btn go big"; text("finish-text", "Finish");
+    } else if (linked) {
+      badge.className = "pill ok";
+      $("fin-badge-tick").hidden = false; $("fin-badge-dot").hidden = true;
+      text("fin-badge-text", name + " is ready");
+      text("done-title", "Couch TV is on your TV");
+      text("fin-lede", state.design ? "You now have the " + state.design + " design on your TV." : "Couch TV is your home screen.");
+      if (state.studio) {
+        cta.href = state.studio + "/design/"; cta.hidden = false;
+        text("fin-cap", "Opens the editor with " + name + " already linked."); $("fin-cap").hidden = false;
+      }
+      finish.className = "q"; text("finish-text", "Keep this one");
+    } else {
+      badge.className = "pill warn";
+      $("fin-badge-tick").hidden = true; $("fin-badge-dot").hidden = false;
+      text("fin-badge-text", "Installed. Not linked to your account");
+      text("done-title", "Couch TV is on your TV");
+      var can = hasFeature("link-tv");
+      text("fin-lede", can ? "Link it to your account so Send and designs work." : "Couch TV is installed. It was not linked to your account.");
+      if (can) { lk.hidden = false; text("fin-cap", "Nothing on the TV is installed again."); $("fin-cap").hidden = false; }
+      finish.className = "q"; text("finish-text", "Not now");
+    }
+    $("design-tag").hidden = !(linked && state.design);
+    if (state.design) text("design-tag", state.design);
+    $("tidy-go").hidden = !tidyOn();
+    drawSession();
+  }
+
+  // ---- the TVs set up in this session ----
+
+  function addSession(name, linked) {
+    var hit = state.session.filter(function (s) { return s.ip === state.ip; })[0];
+    if (hit) { hit.name = name; hit.linked = linked; } else state.session.push({ ip: state.ip, name: name, linked: linked });
+  }
+
+  function drawSession() {
+    var ul = $("session-list"); ul.textContent = "";
+    state.session.forEach(function (s) {
+      var li = document.createElement("li");
+      var n = document.createElement("span"); n.textContent = s.name;
+      li.appendChild(n);
+      li.appendChild(s.linked === null ? pillEl("Set up", "ok") : s.linked ? pillEl("Linked", "ok") : pillEl("Installed, not linked", "warn"));
+      ul.appendChild(li);
+    });
+    $("session-box").hidden = !state.session.length;
+  }
+
+  // ---- link it to the account, from the finish screen ----
+
+  $("link-cta").addEventListener("click", function () {
+    if (state.account) return linkRun();
+    $("fl-panel").hidden = false;
+    $("fl-code").focus();
+  });
+
+  function linkRun() {
+    var st = $("link-status");
+    text("link-status", "Linking…"); st.hidden = false;
+    $("link-cta").disabled = true;
+    HOOKS.linkNow(function (f, m) { if (m) text("link-status", m + "…"); }).then(function (a) {
+      $("link-cta").disabled = false;
+      if (a.linked) {
+        state.linked = true;
+        if (a.design) state.design = a.design;
+        var hit = state.session.filter(function (s) { return s.ip === state.ip; })[0];
+        if (hit) hit.linked = true;
+        var ul = $("done-account");
+        ["Linked to your Couch TV account"].concat(a.design ? ["Sent \"" + a.design + "\" to the TV"] : []).forEach(function (l) {
+          var li = document.createElement("li"); li.textContent = l; ul.appendChild(li);
+        });
+        ul.hidden = false;
+        st.hidden = true;
+        renderFinish();
+      } else {
+        text("link-status", "It is still not linked. Try again.");
+      }
+    }, function (e) {
+      $("link-cta").disabled = false;
+      text("link-status", (e && e.message) || "That did not work. Try again.");
+    });
+  }
+
+  $("fl-go").addEventListener("click", function () {
+    text("fl-status", "Signing in…");
+    api("/api/handoff", { code: $("fl-code").value }).then(function (r) {
+      signedIn(r.account); text("fl-status", ""); $("fl-panel").hidden = true; linkRun();
+    }, function (e) { text("fl-status", (e && e.message) || "That code did not work."); });
+  });
+  enter("fl-code", "fl-go");
+
+  var linkTimer = null;
+  $("fl-device").addEventListener("click", function () {
+    api("/api/device/start").then(function (d) {
+      var p = $("fl-device-code"); p.textContent = "";
+      p.appendChild(document.createTextNode("On the Couch TV website, press Allow for the code "));
+      var b = document.createElement("b"); b.textContent = d.user_code; p.appendChild(b);
+      p.appendChild(document.createTextNode(". "));
+      var a = document.createElement("a"); a.href = d.verify; a.target = "_blank"; a.rel = "noopener";
+      a.textContent = "Open the website"; p.appendChild(a);
+      p.hidden = false;
+      window.open(d.verify, "_blank", "noopener");
+      clearInterval(linkTimer);
+      linkTimer = setInterval(function () {
+        api("/api/device/poll").then(function (r) {
+          if (r.account) { clearInterval(linkTimer); $("fl-device-code").hidden = true; signedIn(r.account); $("fl-panel").hidden = true; linkRun(); }
+        }, function (e) { clearInterval(linkTimer); text("fl-status", (e && e.message) || "That did not work. Try again."); });
+      }, d.interval * 1000);
+    }, function (e) { text("fl-status", (e && e.message) || "That did not work. Try again."); });
+  });
+
+  // ---- Tidy up your TV (optional; its own screen and code are in tidy.js, which this only opens) ----
+  // It comes after the progress screen and before Finish, and can be skipped. window.CouchTidy exists
+  // only when tidy.js is part of this Setup, so without it nothing here shows.
+  function tidyOn() { return !!(window.CouchTidy && window.CouchTidy.open); }
+  function openTidy(returnStep) { window.CouchTidy.open(returnStep || "done"); }
+  $("tidy-go").addEventListener("click", function () { if (tidyOn()) openTidy("done"); });
+
+  // Tidy shows and hides screens itself; keep Back and the step bar in line with whatever is on screen.
+  new MutationObserver(function () {
+    var vis = document.querySelector("section:not([hidden])");
+    var step = vis && vis.dataset.step;
+    if (!step || step === current) return;
+    current = step;
+    var at = nav.lastIndexOf(step);
+    if (at >= 0) nav.length = at + 1; else nav.push(step);
+    chrome(step);
+  }).observe(document.querySelector("main"), { subtree: true, attributes: true, attributeFilter: ["hidden"] });
+
+  // ---- set up another TV: a real reset of what belongs to the TV just done ----
+
+  function resetTv() {
+    flow += 1;
+    clearInterval(countdown); clearInterval(portTimer); clearInterval(linkTimer);
+    clearTimeout(poll); poll = null;
+    state.ip = null; state.kind = null; state.facts = null; state.route = null; state.weather = null; state.remote = false;
+    state.look = null; state.tried = 0; state.guide = null; state.helperTv = null; state.ontvTakes = false;
+    state.linked = null; state.design = null; state.tvName = ""; state.finishName = ""; state.kept = false;
+    state.mode = "setup";
+    openRow = null; rows = {}; detailsOpen = {};
+    ["tv-room", "ip", "code", "pair-port", "tls-port", "fl-code", "undo-details-x"].forEach(function (id) { if ($(id)) $(id).value = ""; });
+    $("ambient").checked = false; $("ontv-off").checked = true; $("undo-debug").checked = false;
+    $("helper-tv-autostart").checked = true;
+    ["plan-list", "done-account", "undo-list", "guide-steps", "found", "fl-device-code", "session-list-x"].forEach(function (id) { if ($(id)) $(id).textContent = ""; });
+    text("plan-name", "this TV"); text("done-line", ""); text("link-status", ""); text("fl-status", ""); text("pair-status", ""); text("tls-status", "");
+    text("health-text", ""); text("health-status", ""); text("undo-details", "");
+    ["done-line", "done-account", "remote-done", "health-box", "health-show", "link-status", "fl-panel", "guide", "ontv-row", "tcl-note", "plan-account", "fl-device-code"].forEach(function (id) { $(id).hidden = true; });
+    $("health-send").hidden = false;
+    ["remote-go", "health-look", "debug-off"].forEach(function (id) { $(id).hidden = false; });
+    $("link-cta").disabled = false;
+    text("debug-line", "Couch TV does not need debugging any more. Switching it off is safest: ");
+    var why = document.createElement("span"); why.id = "debug-why"; $("debug-line").appendChild(why);
+  }
+
+  $("another-go").addEventListener("click", function () {
+    api("/api/reset-tv").then(function () {
+      resetTv();
+      nav = ["welcome"];
+      scan();
+    }, fail);
   });
 
   $("check-go").addEventListener("click", function () {
     job("/api/check").then(function (r) {
-      text("done-line", (r.ok && r.watch_bound !== false ? "couch-tv came up when Home was pressed. " : "") + homeWords(r));
+      var said = (r.ok && r.watch_bound !== false ? "Couch TV came up when Home was pressed. " : "") + homeWords(r);
+      text("done-line", said); $("done-line").hidden = !said;
     }, fail);
   });
 
   $("remote-go").addEventListener("click", function () {
     var back = function () { show("done"); };
-    job("/api/remote", {}, working("Adding the phone remote")).then(function (r) {
+    job("/api/remote", {}, working("Adding the phone remote", "remote", "Adding the phone remote")).then(function (r) {
       state.remote = true;
       text("remote-addr", r.address);
       text("remote-setup", r.setup);
@@ -606,13 +973,14 @@
   });
 
   $("remote-code").addEventListener("click", function () {
-    api("/api/remote/code").then(function () { text("done-line", "The code is on the TV now. It lasts 3 minutes."); }, fail);
+    api("/api/remote/code").then(function () { text("done-line", "The code is on the TV now. It lasts 3 minutes."); $("done-line").hidden = false; }, fail);
   });
 
   $("debug-off").addEventListener("click", function () {
     api("/api/debug-off").then(function () {
-      text("debug-line", "Debugging is off. couch-tv keeps working.");
-      $("debug-off").hidden = true;
+      text("debug-line", "Debugging is off. Couch TV keeps working.");
+      ["debug-off", "remote-go", "health-look"].forEach(function (id) { $(id).hidden = true; });
+      $("remote-done").hidden = true; $("health-box").hidden = true;
     }, fail);
   });
 
@@ -623,7 +991,9 @@
       text("health-text", JSON.stringify(r.report, null, 2));
       $("health-send").hidden = !r.can_send;
       text("health-status", r.can_send ? "" : "Link your Couch TV account to send it.");
+      $("health-box").hidden = false;
       $("health-show").hidden = false;
+      $("health-box").scrollIntoView({ block: "nearest" });
     }, fail);
   });
   $("health-send").addEventListener("click", function () {
@@ -642,13 +1012,18 @@
 
   function signedIn(acct) {
     state.account = acct;
-    text("acct-top", signedInWords(acct.name));
+    text("acct-name", acct.name || "Signed in");
+    text("acct-av", acct.name ? acct.name.charAt(0).toUpperCase() : "✓");
     $("acct-top").hidden = false;
     text("acct-line", signedInWords(acct.name) + ". Your design and home details go on the TV too.");
     $("acct-ask").hidden = true;
+    $("acct-box").hidden = true;   // the chip at the top says it now
+    chrome(current || "welcome");
   }
 
   api("/api/account").then(function (a) {
+    state.accountMode = a.mode || "off";
+    chrome(current || "welcome");
     if (a.mode === "off") return;
     $("acct-box").hidden = false;
     if (a.account) return signedIn(a.account);
@@ -674,6 +1049,7 @@
   $("acct-go").addEventListener("click", function () {
     api("/api/handoff", { code: $("acct-code").value }).then(function (r) { signedIn(r.account); }, fail);
   });
+  enter("acct-code", "acct-go");
 
   var devicePoll = null;
   $("acct-device").addEventListener("click", function () {
@@ -704,11 +1080,11 @@
     api("/api/undo/plan").then(function (p) {
       var ul = $("undo-list"); ul.textContent = "";
       var items = [];
-      if (p.switch_back_on.length) items.push("Switch back on what couch-tv switched off (" + p.switch_back_on.length + ").");
-      items.push("Switch off couch-tv's Home button watch and make " + (p.home_name || "the TV's own home") + " the home again.");
-      if (p.home_installed) items.push("Remove the couch-tv home app.");
-      if (p.ontv_installed) items.push("Remove the couch-tv phone remote app.");
-      if (!p.home_installed && !p.ontv_installed) items.push("couch-tv is not on this TV, so there is nothing to remove.");
+      if (p.switch_back_on.length) items.push("Switch back on what Couch TV switched off (" + p.switch_back_on.length + ").");
+      items.push("Switch off Couch TV's Home button watch and make " + (p.home_name || "the TV's own home") + " the home again.");
+      if (p.home_installed) items.push("Remove the Couch TV home app.");
+      if (p.ontv_installed) items.push("Remove the Couch TV phone remote app.");
+      if (!p.home_installed && !p.ontv_installed) items.push("Couch TV is not on this TV, so there is nothing to remove.");
       items.forEach(function (t) { var li = document.createElement("li"); li.textContent = t; ul.appendChild(li); });
       text("undo-details", p.home && p.home.indexOf("/") > 0 ? "Details: the home it goes back to is " + p.home + "." : "");
       show("undo");
@@ -717,7 +1093,7 @@
 
   $("undo-go").addEventListener("click", function () {
     var off = $("undo-debug").checked;
-    job("/api/undo", {}, working("Taking couch-tv off")).then(function () {
+    job("/api/undo", {}, working("Taking Couch TV off", "undo", "Taking Couch TV off")).then(function () {
       var next = off ? api("/api/debug-off") : Promise.resolve();
       return next.then(function () { show("undone"); });
     }, function (e) { show("undo"); fail(e); });
@@ -743,7 +1119,6 @@
   function closeSetup() {
     api("/api/quit").then(function () { show("closed"); }, fail);
   }
-  $("close-go").addEventListener("click", closeSetup);
   $("close-go2").addEventListener("click", closeSetup);
   $("close-go3").addEventListener("click", closeSetup);
   $("close-top").addEventListener("click", closeSetup);
@@ -752,6 +1127,9 @@
   // Turn on later: Setup reopened while extra features are off, or opened by couchtv://helper/on
   api("/api/info").then(function (i) {
     var h = i.helper || {};
+    state.features = i.features || [];
+    state.studio = i.studio || null;
+    if (state.studio) { $("studio-top").href = state.studio + "/"; $("studio-top").hidden = false; }
     $("helper-later").hidden = h.mode === "helper";
     if (h.intent === "helper" && h.mode !== "helper") show("extras");
   }, function () {});

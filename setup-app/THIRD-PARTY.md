@@ -61,3 +61,12 @@ SOFTWARE.
 - `couchtv_setup/tv.py`: couch-tv's own `tv-home/tools/tvadb.py`.
 
 Google's `adb` and platform-tools are not included.
+
+## Fonts (bundled in `couchtv_setup/web/fonts/`, nothing is fetched from the network)
+
+| Font | Licence | What for |
+|---|---|---|
+| Nunito (variable, latin subset), Copyright 2016 The Nunito Project Authors | SIL Open Font License 1.1 | headings on the Setup page |
+| Inter (variable, latin subset), Copyright 2020 The Inter Project Authors | SIL Open Font License 1.1 | text on the Setup page |
+
+The SIL Open Font License 1.1 is at https://openfontlicense.org/. The fonts are used unmodified, as web fonts.

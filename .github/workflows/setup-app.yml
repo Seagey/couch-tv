@@ -90,7 +90,16 @@ jobs:
             for m in aiohttp androidtvremote2 zeroconf airtouch5py; do HELPER="$HELPER --copy-metadata $m"; done
             if [ "$RUNNER_OS" = "macOS" ]; then HELPER="$HELPER --hidden-import rumps"; else HELPER="$HELPER --hidden-import pystray"; fi
           fi
-          pyinstaller --noconfirm --windowed --name "couch-tv Setup" $ARGV \
+          # The app's icon (the sofa on a TV, setup-app/assets/icon). PyInstaller uses .icns on a Mac and .ico on
+          # Windows; on Linux it ignores an icon, and the png goes into the folder (see Package (Linux)).
+          ICON=""
+          [ "$RUNNER_OS" = "macOS" ] && ICON="--icon assets/icon/couch-tv-setup.icns"
+          [ "$RUNNER_OS" = "Windows" ] && ICON="--icon assets/icon/couch-tv-setup.ico"
+          # The program and its folder keep the file name "couch-tv Setup" on purpose: the helper's updater puts the
+          # new copy where the old one was and starts it by the old program name, the helper's start with the computer
+          # entry holds that path, and the Windows link registration points at it. The name people read is
+          # "Couch TV Setup" (set below on a Mac, in the file details on Windows, in the desktop file on Linux).
+          pyinstaller --noconfirm --windowed --name "couch-tv Setup" $ARGV $ICON \
             --version-file version.txt \
             --osx-bundle-identifier app.couchtv.setup \
             --add-data "couchtv_setup/web${SEP}couchtv_setup/web" \
@@ -107,6 +116,13 @@ jobs:
         if: runner.os == 'macOS'
         run: |
           APP="dist/couch-tv Setup.app"
+          # The name people see is Couch TV Setup (Finder, Dock if shown, System Settings): the file name stays
+          # "couch-tv Setup.app" so the helper's updater and start with the computer entry keep finding it.
+          plutil -replace CFBundleName -string "Couch TV Setup" "$APP/Contents/Info.plist"
+          plutil -replace CFBundleDisplayName -string "Couch TV Setup" "$APP/Contents/Info.plist"
+          plutil -replace CFBundleLocalizations -json '["en"]' "$APP/Contents/Info.plist"
+          mkdir -p "$APP/Contents/Resources/en.lproj"
+          printf '"CFBundleName" = "Couch TV Setup";\n"CFBundleDisplayName" = "Couch TV Setup";\n' > "$APP/Contents/Resources/en.lproj/InfoPlist.strings"
           # No Dock icon or window of its own: the setup is the browser page, and the app stops by
           # itself on Close setup or a few minutes after the page is closed.
           plutil -insert LSUIElement -bool true "$APP/Contents/Info.plist"
@@ -134,6 +150,11 @@ jobs:
         run: |
           # A folder with the "couch-tv Setup" program in it, as on Windows; tar keeps its run permission.
           echo "PROGRAM=dist/couch-tv Setup/couch-tv Setup" >> "$GITHUB_ENV"
+          # Called Couch TV Setup in a file manager: a desktop file beside the program (it opens the program in
+          # its own folder) and the icon. The program keeps its file name: see the note at the Build step.
+          cp "assets/linux/Couch TV Setup.desktop" "dist/couch-tv Setup/"
+          chmod +x "dist/couch-tv Setup/Couch TV Setup.desktop"
+          cp assets/icon/couch-tv-setup-linux.png "dist/couch-tv Setup/couch-tv-setup.png"
           tar -czf "dist/couch-tv-Setup-${{ matrix.name }}.tar.gz" -C dist "couch-tv Setup"
 
       - name: Smoke test the built app

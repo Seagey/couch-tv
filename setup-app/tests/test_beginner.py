@@ -68,7 +68,7 @@ class LocalNetworkBlock(unittest.TestCase):
         msg, code, detail = self.explain(oserror(errno.EHOSTUNREACH, "224.0.0.251"))
         self.assertEqual(code, "local_network_blocked")
         self.assertEqual(msg, "Your Mac blocked this app from finding the TV. Open System Settings, Privacy and "
-                              "Security, Local Network, switch on couch-tv Setup, then press Look again.")
+                              "Security, Local Network, switch on Couch TV Setup, then press Look again.")
         self.assertIn("OSError", detail)   # the technical part is kept, for Details only
 
     @unittest.skipUnless(sys.platform == "darwin", "errno 65 is EHOSTUNREACH on a Mac")
@@ -253,9 +253,9 @@ class NeverADeadEnd(unittest.TestCase):
 
     def test_every_fix_is_a_screen_with_try_again(self):
         for fix in set(steps.no_allow_fixes("google", False) + steps.no_allow_fixes("fire", False)) - {"phone-route"}:
-            m = re.search(r'<section data-step="%s">(.*?)</section>' % fix, self.page, re.S)
+            m = re.search(r'<section data-step="%s"[^>]*>(.*?)</section>' % fix, self.page, re.S)
             self.assertIsNotNone(m, fix)
-            self.assertIn('class="primary fix-try">Try again</button>', m.group(1), fix)
+            self.assertRegex(m.group(1), r'class="primary fix-try"[^>]*>Try again</button>', fix)
 
     def test_the_fixes_say_what_the_owner_asked(self):
         p = html.unescape(re.sub(r"<[^>]+>", "", self.page))
@@ -268,9 +268,9 @@ class NeverADeadEnd(unittest.TestCase):
         self.assertIn("unplug the TV at the wall for 10 seconds", p)
 
     def test_phone_route_is_complete(self):
-        m = re.search(r'<section data-step="phone-route">(.*?)</section>', self.page, re.S).group(1)
+        m = re.search(r'<section data-step="phone-route"[^>]*>(.*?)</section>', self.page, re.S).group(1)
         words = re.sub(r"\s+", " ", re.sub(r"<[^>]+>", "", m))
-        self.assertIn("This TV will not let a computer in over Wi-Fi. You can still put couch-tv on it with just your phone", words)
+        self.assertIn("This TV will not let a computer in over Wi-Fi. You can still put Couch TV on it with just your phone", words)
         self.assertIn("Downloader", words)
         self.assertIn("8180170", words)
         self.assertIn("open that address and type the code", words)
@@ -311,7 +311,7 @@ class RouteBeforeTheSteps(unittest.TestCase):
 
     def test_google_steps_offer_both_menu_names_and_both_switches(self):
         page = read("index.html")
-        m = re.search(r'<section data-step="dev-google">(.*?)</section>', page, re.S).group(1)
+        m = re.search(r'<section data-step="dev-google"[^>]*>(.*?)</section>', page, re.S).group(1)
         self.assertIn("System, About", m)
         self.assertIn("Device Preferences, About", m)
         self.assertIn('data-dev="wireless"', m)

@@ -1,0 +1,481 @@
+"""The Setup page in a real browser (Playwright's Chromium), with the TV, the network scan, the download and
+Couch TV Studio all faked (tests/ui_harness.py). Skipped when Playwright or its browser is not installed.
+
+What it proves: Back on every screen and off while installing; Set up another TV resets the per TV state;
+the finish screen never says Linked unless the server did; no TVs and many TVs; stale and unconfirmed rows
+are never offered as ready; the keyboard alone gets through; no sideways scroll at 390, 768 and 1440;
+nothing is fetched from outside this computer; the words follow the text rules.
+"""
+import os
+import re
+import sys
+import unittest
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, HERE)
+
+import ui_harness as uh  # noqa: E402
+
+PW, BROWSER = uh.chromium()
+WIDTHS = (390, 768, 1440)
+
+
+def step(pg):
+    return pg.evaluate("(document.querySelector('section:not([hidden])') || {dataset: {}}).dataset.step")
+
+
+def visible_text(pg):
+    return pg.evaluate("document.body.innerText")
+
+
+@unittest.skipUnless(BROWSER, "Playwright and its Chromium are not installed")
+class Page(unittest.TestCase):
+    @classmethod
+    def tearDownClass(cls):
+        pass
+
+    def open(self, harness, width=1440, height=900):
+        harness.start()
+        self.addCleanup(harness.stop)
+        self.h = harness
+        ctx = BROWSER.new_context(viewport={"width": width, "height": height})
+        self.addCleanup(ctx.close)
+        pg = ctx.new_page()
+        self.requests = []
+        pg.on("request", lambda r: self.requests.append(r.url))
+        self.errors = []
+        pg.on("pageerror", lambda e: self.errors.append(str(e)))
+        pg.goto(harness.url)
+        pg.wait_for_selector("#setup-start")
+        self.addCleanup(lambda: self.assertEqual(self.errors, []))
+        return pg
+
+    def sign_in(self, pg):
+        pg.wait_for_selector("#acct-box:not([hidden])")
+        pg.fill("#acct-code", "ABCD-EFGH")
+        pg.click("#acct-go")
+        pg.wait_for_selector("#acct-top:not([hidden])")
+
+    def to_plan(self, pg, which=0):
+        pg.click("#setup-start")
+        pg.wait_for_selector("#found .tvc")
+        pg.locator("#found .tvc").nth(which).get_by_role("button", name="Set up this TV").click()
+        pg.wait_for_selector('section[data-step="plan"]:not([hidden])', timeout=20000)
+
+    def install(self, pg, name=None):
+        if name:
+            pg.fill("#tv-room", name)
+        pg.click("#setup-go")
+        pg.wait_for_selector('section[data-step="done"]:not([hidden])', timeout=30000)
+
+    def no_sideways_scroll(self, pg, label):
+        over = pg.evaluate("document.documentElement.scrollWidth - document.documentElement.clientWidth")
+        self.assertLessEqual(over, 0, f"{label}: the page scrolls sideways by {over}px")
+
+    # ---- Back ----
+
+    def test_back_goes_one_screen_at_a_time(self):
+        pg = self.open(uh.Harness())
+        self.assertTrue(pg.is_disabled("#back"), "nothing is before the welcome screen")
+        pg.click("#setup-start")
+        pg.wait_for_selector("#found .tvc")
+        self.assertEqual(step(pg), "find")
+        pg.click("#nohere-go")
+        pg.wait_for_selector('section[data-step="nohere"]:not([hidden])')
+        self.assertTrue(pg.is_enabled("#back"))
+        pg.click("#back")
+        self.assertEqual(step(pg), "find")
+        pg.wait_for_selector("#found .tvc")          # the list is looking again after Back
+        self.to_plan_from_find(pg)
+        pg.click("#back")
+        self.assertEqual(step(pg), "find")
+        pg.click("#back")
+        self.assertEqual(step(pg), "welcome")
+
+    def to_plan_from_find(self, pg):
+        pg.locator("#found .tvc").nth(0).get_by_role("button", name="Set up this TV").click()
+        pg.wait_for_selector('section[data-step="plan"]:not([hidden])', timeout=20000)
+
+    def test_back_on_the_plan_page_button_too(self):
+        pg = self.open(uh.Harness())
+        self.to_plan(pg)
+        pg.click("#plan-back")
+        self.assertEqual(step(pg), "find")
+
+    def test_back_is_off_while_installing(self):
+        pg = self.open(uh.Harness(slow=5.0))
+        self.to_plan(pg)
+        pg.click("#setup-go")
+        pg.wait_for_selector('section[data-step="work"]:not([hidden])')
+        self.assertTrue(pg.is_disabled("#back"))
+        self.assertIn("Back is off while Couch TV installs.", visible_text(pg))
+        pg.keyboard.press("Alt+ArrowLeft")           # the browser's own back does not leave either
+        self.assertEqual(step(pg), "work")
+        pg.wait_for_selector('section[data-step="done"]:not([hidden])', timeout=30000)
+        self.assertTrue(pg.is_enabled("#back"))
+
+    def test_back_from_finish_does_not_install_again(self):
+        pg = self.open(uh.Harness())
+        self.to_plan(pg)
+        self.install(pg)
+        installs = sum(1 for t in self.h.tvs for l in t.log if l.startswith("INSTALL"))
+        pg.click("#back")
+        self.assertEqual(step(pg), "plan")           # not the progress screen
+        self.assertEqual(installs, sum(1 for t in self.h.tvs for l in t.log if l.startswith("INSTALL")))
+
+    def test_back_on_every_instruction_screen(self):
+        pg = self.open(uh.Harness(rows=[uh.row("192.0.2.23", "Garage TV", "switch", adb_5555=False)]))
+        pg.click("#setup-start")
+        pg.wait_for_selector("#found .tvc")
+        pg.get_by_role("button", name="Show me how").click()
+        pg.wait_for_selector("#guide:not([hidden])")
+        pg.click("#back")
+        self.assertEqual(step(pg), "welcome")
+        # and each legacy screen has the header Back
+        for name in ("kind", "dev-google", "dev-google-pair", "dev-classic", "fix-home", "phone-route", "extras", "undo"):
+            pg.evaluate("(n) => document.querySelectorAll('section').forEach(s => s.hidden = s.dataset.step !== n)", name)
+            self.assertTrue(pg.is_visible("#back"), name)
+
+    # ---- set up another TV ----
+
+    def test_set_up_another_tv_resets_what_belongs_to_the_first(self):
+        pg = self.open(uh.Harness(stub=uh.stub_account()))
+        self.sign_in(pg)
+        self.to_plan(pg, 0)
+        self.install(pg, "Lounge")
+        pg.click("#remote-go")
+        pg.wait_for_selector('section[data-step="done"]:not([hidden])')
+        pg.click("#another-go")
+        pg.wait_for_selector("#found .tvc")
+        self.assertEqual(step(pg), "find")
+        info = pg.evaluate("fetch('/api/info', {method:'POST', headers:{'X-Setup-Key': document.querySelector('meta[name=setup-key]').content}, body:'{}'}).then(r => r.json())")
+        self.assertFalse(info["connected"])
+        self.assertIsNone(info["facts"])
+        self.assertIsNone(info["ip"])
+        acct = pg.evaluate("fetch('/api/account', {method:'POST', headers:{'X-Setup-Key': document.querySelector('meta[name=setup-key]').content}, body:'{}'}).then(r => r.json())")
+        self.assertIsNone(acct["tv"], "the first TV's account row must not leak into the next TV")
+        self.assertTrue(pg.is_visible("#acct-top"), "the sign in stays")
+        self.assertEqual(pg.input_value("#tv-room"), "")
+        self.assertTrue(pg.is_hidden("#remote-done"))
+        self.assertEqual(pg.evaluate("document.getElementById('done-account').children.length"), 0)
+        self.assertEqual(pg.evaluate("document.getElementById('plan-list').children.length"), 0)
+        # the second TV starts from the plan again, with its own name
+        pg.locator("#found .tvc").nth(1).get_by_role("button", name="Set up this TV").click()
+        pg.wait_for_selector('section[data-step="plan"]:not([hidden])', timeout=20000)
+        self.assertEqual(pg.input_value("#tv-room"), "Guest Room TV")
+        pg.click("#setup-go")
+        pg.wait_for_selector('section[data-step="done"]:not([hidden])', timeout=30000)
+        items = pg.locator("#session-list li")
+        self.assertEqual(items.count(), 2)
+        self.assertIn("Lounge", items.nth(0).inner_text())
+        self.assertIn("Guest Room TV", items.nth(1).inner_text())
+        self.assertEqual(len(self.h.tvs), 2)
+
+    def test_set_up_another_is_refused_while_a_step_runs(self):
+        from couchtv_setup import server
+        pg = self.open(uh.Harness())
+        self.to_plan(pg)
+        self.install(pg)
+        server.S.job = {"running": True}
+        try:
+            pg.click("#another-go")
+            pg.wait_for_selector("#error:not([hidden])")
+            self.assertEqual(step(pg), "done")
+        finally:
+            server.S.job = {"running": False}
+
+    # ---- linked or not ----
+
+    def test_linked_only_when_the_server_says_so(self):
+        pg = self.open(uh.Harness(stub=uh.stub_account()))
+        self.sign_in(pg)
+        self.to_plan(pg)
+        self.install(pg)
+        self.assertIn("Linked", pg.inner_text("#session-list"))
+        self.assertTrue(pg.is_visible("#studio-cta"))
+        self.assertIn("already linked", pg.inner_text("#fin-cap"))
+
+    def test_installed_not_linked_says_so_and_never_linked(self):
+        stub = dict(uh.stub_account(), **{"/v1/setup/tv": {"error": "no", "message": "No."}})
+        pg = self.open(uh.Harness(stub=stub, features=["reset-tv", "link-tv"]))
+        self.sign_in(pg)
+        self.to_plan(pg)
+        self.install(pg)
+        body = visible_text(pg)
+        self.assertIn("Installed. Not linked to your account", body)
+        self.assertNotIn("Linked to your Couch TV account", body)
+        self.assertNotIn("already linked", body)
+        self.assertTrue(pg.is_hidden("#studio-cta"))
+        self.assertTrue(pg.is_visible("#link-cta"))
+        self.assertIn("Installed, not linked", pg.inner_text("#session-list"))
+
+    def test_link_it_hook_is_hidden_when_absent(self):
+        stub = dict(uh.stub_account(), **{"/v1/setup/tv": {"error": "no"}})
+        pg = self.open(uh.Harness(stub=stub))          # no "link-tv" in features
+        self.sign_in(pg)
+        self.to_plan(pg)
+        self.install(pg)
+        self.assertTrue(pg.is_hidden("#link-cta"))
+        self.assertTrue(pg.is_hidden("#tidy-go"))
+        self.assertNotIn("Linked to your Couch TV account", visible_text(pg))
+
+    def test_link_it_runs_the_hook_and_trusts_only_its_answer(self):
+        from couchtv_setup import server
+        stub = dict(uh.stub_account(), **{"/v1/setup/tv": {"error": "no"}})
+        pg = self.open(uh.Harness(stub=stub, features=["reset-tv", "link-tv"]))
+        self.sign_in(pg)
+        self.to_plan(pg)
+        self.install(pg)
+        seen = []
+
+        def fake(path, body, token=None, timeout=15):
+            seen.append(path)
+            if path == "/v1/setup/tv":
+                return {"tv_id": "tv_1", "link": uh.LINK, "code": "CTV1-ABCD", "design": "Couch Original", "home": None}
+            return {"ok": True}
+        # a link step that says "not linked": the page must not claim it
+        orig = server.api
+
+        def api(method, path, body):
+            if path == "/api/link-tv":
+                return server.run_job("link", lambda p: {"account": {"linked": False}})
+            return orig(method, path, body)
+        from unittest import mock
+        with mock.patch.object(server, "api", api):
+            pg.click("#link-cta")
+            pg.wait_for_selector("#link-status:not([hidden])")
+            pg.wait_for_selector("#link-status:has-text('still not linked')")
+        self.assertNotIn("Linked to your Couch TV account", visible_text(pg))
+        self.assertIn("Installed, not linked", pg.inner_text("#session-list"))
+
+    def test_no_account_on_this_setup_says_nothing_about_linking(self):
+        pg = self.open(uh.Harness())
+        self.to_plan(pg)
+        self.install(pg)
+        body = visible_text(pg).lower()
+        self.assertNotIn("linked", body)
+        self.assertNotIn("account", body.replace("send it to my couch tv account", ""))
+        self.assertTrue(pg.is_hidden("#steps"))
+        self.assertTrue(pg.is_hidden("#link-cta"))
+
+    # ---- the list ----
+
+    def test_no_tvs_found(self):
+        pg = self.open(uh.Harness(rows=[]))
+        pg.click("#setup-start")
+        pg.wait_for_selector("#find-help:not([hidden])")
+        self.assertEqual(pg.locator("#found .tvc").count(), 0)
+        self.assertIn("No TV found yet.", visible_text(pg))
+        pg.click("#nohere-go")
+        pg.wait_for_selector('section[data-step="nohere"]:not([hidden])')
+        self.assertTrue(pg.is_visible("#ip"))
+
+    def test_many_tvs(self):
+        rows = [uh.row(f"192.0.2.{40 + i}", f"Room {i + 1} TV", "ready") for i in range(9)]
+        pg = self.open(uh.Harness(rows=rows))
+        pg.click("#setup-start")
+        pg.wait_for_selector("#found .tvc")
+        self.assertEqual(pg.locator("#found .tvc").count(), 9)
+        self.assertEqual(pg.get_by_role("button", name="Set up this TV").count(), 9)
+        for w in WIDTHS:
+            pg.set_viewport_size({"width": w, "height": 900})
+            self.no_sideways_scroll(pg, f"find with 9 TVs at {w}")
+
+    def test_details_shows_model_and_address(self):
+        pg = self.open(uh.Harness())
+        pg.click("#setup-start")
+        pg.wait_for_selector("#found .tvc")
+        card = pg.locator("#found .tvc").nth(0)
+        self.assertTrue(card.locator(".detail").is_hidden())
+        card.get_by_role("button", name="Details").click()
+        self.assertIn("Reported as AI PONT", card.locator(".detail").inner_text())
+        self.assertIn("Address 192.0.2.21", card.locator(".detail").inner_text())
+
+    def test_stale_and_unconfirmed_rows_are_never_offered_as_ready(self):
+        rows = [uh.row("192.0.2.51", "Missed TV", "switch", adb_5555=False, stale=True),
+                uh.row("192.0.2.52", "Silent TV", "switch", adb_5555=False, adb_unconfirmed=True),
+                uh.row("192.0.2.53", "Wrongly ready TV", "ready", stale=True)]
+        pg = self.open(uh.Harness(rows=rows))
+        pg.click("#setup-start")
+        pg.wait_for_selector("#found .tvc")
+        self.assertEqual(pg.get_by_role("button", name="Set up this TV").count(), 0)
+        self.assertEqual(pg.locator("#found .pill", has_text="Looking for it again").count(), 2)
+        stale = pg.locator("#found .tvc").nth(0)
+        self.assertTrue(stale.locator("button.btn").is_disabled())
+        pg.locator("#found .tvc").nth(1).get_by_role("button", name="Show me how").click()
+        pg.wait_for_selector("#guide:not([hidden])")
+        self.assertEqual(self.h.log.count("/api/connect"), 0)
+
+    def test_a_tv_that_needs_the_helper_keeps_its_action(self):
+        rows = [uh.row("192.0.2.61", "Den TV", "other", other="Tizen", android=False),
+                uh.row("192.0.2.62", "Other TV", "other", other="VIDAA", android=False)]
+        pg = self.open(uh.Harness(rows=rows))
+        pg.click("#setup-start")
+        pg.wait_for_selector("#found .tvc")
+        self.assertIn("Needs the Helper", pg.locator("#found .tvc").nth(0).inner_text())
+        pg.get_by_role("button", name="Set up the helper").click()
+        self.assertEqual(step(pg), "helper-tv")
+        self.assertIn("Your Samsung TV needs the helper.", pg.inner_text("#helper-tv-title"))
+        pg.click("#back")
+        self.assertEqual(step(pg), "find")
+        self.assertIn("Found. Can't install from here yet", pg.locator("#found .tvc").nth(1).inner_text())
+        self.assertEqual(pg.locator("#found .tvc").nth(1).get_by_role("link", name="Open the guide").count(), 1)
+
+    def test_the_address_box_is_on_the_help_page(self):
+        pg = self.open(uh.Harness(rows=[]))
+        pg.click("#setup-start")
+        pg.wait_for_selector("#find-help:not([hidden])")
+        self.assertTrue(pg.is_hidden("#ip"))
+        pg.click("#nohere-go")
+        pg.wait_for_selector('section[data-step="nohere"]:not([hidden])')
+        pg.fill("#ip", "192.0.2.77")
+        pg.press("#ip", "Enter")                    # Enter does what Use this does
+        pg.wait_for_selector('section[data-step="kind"]:not([hidden])')
+
+    # ---- the rest of the flows still work ----
+
+    def test_phone_remote_health_report_and_debugging_off(self):
+        pg = self.open(uh.Harness(stub=uh.stub_account()))
+        self.sign_in(pg)
+        self.to_plan(pg)
+        self.install(pg)
+        pg.click("#health-look")
+        pg.wait_for_selector("#health-show:not([hidden])")
+        self.assertTrue(pg.inner_text("#health-text").strip().startswith("{"))
+        self.assertTrue(pg.is_visible("#health-send"))
+        pg.click("#remote-go")
+        pg.wait_for_selector('section[data-step="work"]:not([hidden])')
+        self.assertTrue(pg.is_disabled("#back"))
+        pg.wait_for_selector('section[data-step="done"]:not([hidden])', timeout=30000)
+        self.assertTrue(pg.is_visible("#remote-addr") or pg.is_visible("#error"))
+        pg.click("#debug-off")
+        pg.wait_for_selector("#debug-line:has-text('Debugging is off')")
+        self.assertTrue(pg.is_hidden("#debug-off"))
+
+    def test_take_couch_tv_off_a_tv(self):
+        pg = self.open(uh.Harness())
+        pg.click("#undo-start")
+        pg.wait_for_selector("#found .tvc")
+        self.assertIn("Choose this TV", pg.inner_text("#found"))
+        pg.locator("#found .tvc").nth(0).get_by_role("button", name="Choose this TV").click()
+        pg.wait_for_selector('section[data-step="undo"]:not([hidden])', timeout=20000)
+        self.assertTrue(pg.is_hidden("#steps"))
+        pg.click("#back")
+        self.assertEqual(step(pg), "find")
+        pg.locator("#found .tvc").nth(0).get_by_role("button", name="Choose this TV").click()
+        pg.wait_for_selector('section[data-step="undo"]:not([hidden])', timeout=20000)
+        pg.click("#undo-go")
+        pg.wait_for_selector('section[data-step="undone"]:not([hidden])', timeout=30000)
+
+    def test_helper_is_still_reachable(self):
+        pg = self.open(uh.Harness())
+        pg.wait_for_selector("#helper-later:not([hidden])")
+        pg.click("#helper-later-go")
+        self.assertEqual(step(pg), "extras")
+        self.assertTrue(pg.is_visible("#extras-on"))
+
+    # ---- keyboard ----
+
+    def test_keyboard_alone_gets_through(self):
+        pg = self.open(uh.Harness())
+        pg.keyboard.press("Tab")
+        for _ in range(8):
+            if pg.evaluate("document.activeElement.id") == "setup-start":
+                break
+            pg.keyboard.press("Tab")
+        self.assertEqual(pg.evaluate("document.activeElement.id"), "setup-start")
+        pg.keyboard.press("Enter")
+        pg.wait_for_selector("#found .tvc")
+        self.assertEqual(pg.evaluate("document.activeElement.tagName"), "H1", "focus moves to the new screen's heading")
+        for _ in range(12):
+            pg.keyboard.press("Tab")
+            if pg.evaluate("document.activeElement.textContent.trim()") == "Set up this TV":
+                break
+        self.assertEqual(pg.evaluate("document.activeElement.textContent.trim()"), "Set up this TV")
+        outline = pg.evaluate("getComputedStyle(document.activeElement).outlineStyle")
+        self.assertNotEqual(outline, "none", "the focused button shows a ring")
+        pg.keyboard.press("Enter")
+        pg.wait_for_selector('section[data-step="plan"]:not([hidden])', timeout=20000)
+        pg.fill("#tv-room", "Keyboard TV")
+        pg.keyboard.press("Enter")                   # Enter in the name box starts the setup
+        pg.wait_for_selector('section[data-step="done"]:not([hidden])', timeout=30000)
+
+    # ---- layout ----
+
+    def test_no_sideways_scroll_390(self):
+        self.scroll_check(390)
+
+    def test_no_sideways_scroll_768(self):
+        self.scroll_check(768)
+
+    def test_no_sideways_scroll_1440(self):
+        self.scroll_check(1440)
+
+    def scroll_check(self, w):
+        if True:
+            pg = self.open(uh.Harness(stub=uh.stub_account()), width=w)
+            self.sign_in(pg)
+            self.no_sideways_scroll(pg, f"welcome at {w}")
+            self.to_plan(pg)
+            self.no_sideways_scroll(pg, f"plan at {w}")
+            pg.click("#plan-details > summary")
+            pg.wait_for_selector("#plan-list li", state="attached")
+            pg.click("#plan-details .sub > summary")
+            self.no_sideways_scroll(pg, f"plan open at {w}")
+            self.install(pg, "A very long name for a TV in a big house")
+            self.no_sideways_scroll(pg, f"finish at {w}")
+            pg.click("#health-look")
+            pg.wait_for_selector("#health-show:not([hidden])")
+            self.no_sideways_scroll(pg, f"finish with the report at {w}")
+            pg.click("#another-go")
+            pg.wait_for_selector("#found .tvc")
+            self.no_sideways_scroll(pg, f"find at {w}")
+            pg.click("#nohere-go")
+            self.no_sideways_scroll(pg, f"help at {w}")
+            for name in ("kind", "dev-google", "dev-google-pair", "dev-classic", "allow", "fix-home", "phone-route",
+                         "stop", "blocked", "undo", "extras", "helper-tv", "work"):
+                pg.evaluate("(n) => document.querySelectorAll('section').forEach(s => s.hidden = s.dataset.step !== n)", name)
+                self.no_sideways_scroll(pg, f"{name} at {w}")
+
+    # ---- nothing leaves this computer ----
+
+    def test_nothing_is_fetched_from_outside(self):
+        pg = self.open(uh.Harness(stub=uh.stub_account()))
+        self.sign_in(pg)
+        self.to_plan(pg)
+        self.install(pg)
+        pg.wait_for_timeout(300)
+        outside = [u for u in self.requests if not u.startswith(self.h.url[:-1]) and not u.startswith("data:")]
+        self.assertEqual(outside, [])
+        fonts = [u for u in self.requests if u.endswith(".woff2")]
+        self.assertTrue(any("nunito" in u for u in fonts) and any("inter" in u for u in fonts), fonts)
+        got = pg.evaluate("[document.fonts.check('900 20px Nunito'), document.fonts.check('500 16px Inter')]")
+        self.assertEqual(got, [True, True])
+
+    # ---- words ----
+
+    def test_words_follow_the_text_rules(self):
+        banned = re.compile(r"couch-tv|\bbeta\b|experimental|coming soon|[–—]", re.I)
+        pg = self.open(uh.Harness(stub=uh.stub_account()))
+        self.sign_in(pg)
+        seen = []
+        for name in pg.evaluate("[...document.querySelectorAll('section')].map(s => s.dataset.step)"):
+            pg.evaluate("(n) => document.querySelectorAll('section').forEach(s => s.hidden = s.dataset.step !== n)", name)
+            seen.append((name, pg.evaluate("document.querySelector('section:not([hidden])').innerText")))
+        seen.append(("header", pg.inner_text("header")))
+        for name, text in seen:
+            m = banned.search(text)
+            self.assertIsNone(m, f"{name}: {m and m.group(0)}")
+        # the help lines (the help page and the empty list) are 14 words or fewer
+        for name, sel in (("nohere", 'section[data-step="nohere"]'), ("find-help", "#find-help")):
+            pg.evaluate("(n) => document.querySelectorAll('section').forEach(s => s.hidden = s.dataset.step !== n)", "find" if name == "find-help" else name)
+            pg.evaluate("document.getElementById('find-help').hidden = false")
+            lines = pg.evaluate("(sel) => [...document.querySelectorAll(sel + ' li, ' + sel + ' .hint, ' + sel + ' .lede')].filter(e => e.offsetParent).map(e => e.innerText)", sel)
+            self.assertTrue(lines, name)
+            for line in lines:
+                for sentence in re.split(r"(?<=[.?!])\s+", line.strip()):
+                    self.assertLessEqual(len(sentence.split()), 14, f"{name}: {sentence}")
+
+
+if __name__ == "__main__":
+    unittest.main()
