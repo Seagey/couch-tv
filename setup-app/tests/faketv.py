@@ -41,6 +41,10 @@ class FakeTv:
         self.other_bound = []        # labels of other bound accessibility services
         self.fail_on = None
         self.keys = []
+        self.settings = {}           # Settings.Global values; a missing name is "null" (unset)
+        self.refuse_settings = set() # names the TV ignores writes to (and deletes of)
+        self.refuse_disable = set()  # packages the TV will not switch off (Fire OS protects some)
+        self.gfxinfo = ""
 
     # what the steps call
     def prop(self, name):
@@ -121,6 +125,8 @@ class FakeTv:
             return ""
         if c.startswith("pm disable-user"):
             p = c.split()[-1]
+            if p in self.refuse_disable:
+                return f"Exception occurred while executing 'disable-user':\njava.lang.SecurityException: Shell cannot change state of {p}"
             self.disabled.add(p)
             return f"Package {p} new state: disabled-user"
         if c.startswith("pm enable"):
@@ -149,6 +155,21 @@ class FakeTv:
         if c.startswith("settings delete secure enabled_accessibility_services"):
             self.a11y = "null"
             return ""
+        m = re.match(r"settings get global (\S+)$", c)
+        if m:
+            return self.settings.get(m.group(1), "null")
+        m = re.match(r"settings put global (\S+) (\S+)$", c)
+        if m:
+            if m.group(1) not in self.refuse_settings:
+                self.settings[m.group(1)] = m.group(2)
+            return ""
+        m = re.match(r"settings delete global (\S+)$", c)
+        if m:
+            if m.group(1) not in self.refuse_settings:
+                self.settings.pop(m.group(1), None)
+            return ""
+        if c.startswith("dumpsys gfxinfo") and not c.endswith("reset"):
+            return self.gfxinfo
         if c.startswith("appops get"):
             return "SYSTEM_ALERT_WINDOW: default"
         if c == "dumpsys accessibility":

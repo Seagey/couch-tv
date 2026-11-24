@@ -26,7 +26,7 @@ import webbrowser
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
-from . import errors, finder, guide, health, linkin, pairing, paths, release, scanlog, steps, studio, tvprofile
+from . import errors, finder, guide, health, linkin, pairing, paths, release, scanlog, steps, studio, tidy, tvprofile
 from .helper import autostart as hautostart, config as hconfig, deeplink
 from .identity import Identity
 from .tv import Tv, TvError
@@ -426,15 +426,17 @@ def api(method, path, body):
         return run_job("connect", connect)
     if path == "/api/plan":
         tv = need_tv()
-        return {"items": steps.plan(tv, S.facts, ambient_off=bool(body.get("ambient_off", True)),
+        return {"items": steps.plan(tv, S.facts, ambient_off=bool(body.get("ambient_off", False)),
                                     ontv_home_off=bool(body.get("ontv_home_off", True))), "facts": S.facts}
+    if path.startswith("/api/tidy/"):
+        return tidy.route(path[len("/api/tidy/"):], body, need_tv(), run_job)
     if path == "/api/place":
         return place_search(body.get("q"))
     if path == "/api/setup":
         tv = need_tv()
         people = [str(x) for x in (body.get("people") or []) if isinstance(x, str)]
         weather = body.get("weather") if isinstance(body.get("weather"), dict) else None
-        ambient_off = bool(body.get("ambient_off", True))
+        ambient_off = bool(body.get("ambient_off", False))   # off unless asked (the Tidy up step owns this switch)
         ontv_off = bool(body.get("ontv_home_off", True))
 
         def setup(progress):
