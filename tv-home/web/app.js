@@ -6345,7 +6345,7 @@
     none: "No new designs from your account.",
     item: "A new design came from your account. The home starts again with it.",
     wait: "Couch TV Studio asked this TV to wait. Try again in a few minutes.",
-    error: "Could not reach your Couch TV account. Check the TV is online, then try again.",
+    fail: "Could not reach your Couch TV account. Check the TV is online, then try again.",   // "fail", not "error": a TV word, not an error sent to the phone
     unlinked: "This TV is no longer linked to your account. A typed code still works."
   };
   function accountInbox(raw) {
@@ -6355,7 +6355,7 @@
     if (a.state !== "unlinked") inboxTime("next", now + CouchDesignCode.inboxDelay(a) * 1000);
     if (ACCT_INBOX.manual) {
       ACCT_INBOX.manual = false;
-      SET.msg = INBOX_SAID[a.state] || INBOX_SAID.error;
+      SET.msg = INBOX_SAID[a.state === "error" ? "fail" : a.state] || INBOX_SAID.fail;
       if (zone === "settings") renderSettings();
     }
     if (a.state === "unlinked") { inboxStop(); return; }   // the app forgot the link; a typed code still works
