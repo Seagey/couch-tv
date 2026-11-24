@@ -27,6 +27,17 @@ html.lighter .cw-ink-glass, html.glass-lite .cw-ink-glass { --ink: #fff !importa
 html.lighter .cw-ink-glass, html.lighter .cw-ink-glass *, html.glass-lite .cw-ink-glass, html.glass-lite .cw-ink-glass * { text-shadow: 0 2px 6px rgba(0, 0, 0, 0.35) !important; }
 html.lighter .cw-ink-smoke, html.glass-lite .cw-ink-smoke { --ink: #1d1b18 !important; --sub: rgba(29, 27, 24, 0.74) !important; }
 html.lighter .cw-ink-smoke, html.lighter .cw-ink-smoke *, html.glass-lite .cw-ink-smoke, html.glass-lite .cw-ink-smoke * { text-shadow: none !important; }
+/* Liquid glass words (style.ink "liquid", widgets.js shell and liquidBack): the home's photo, or its frosted copy,
+   fills every letter, lined up with the photo on screen, lightened at the top like glass, with a bright rim and a
+   shadow under. Only with .cw-lq-on and never on a slower TV; otherwise .cw-ink-glass above draws frosted words. */
+html:not(.lighter):not(.glass-lite) .cw-ink-liquid.cw-lq-on > :not(.cw-bg) {
+  background-image: linear-gradient(180deg, rgba(255, 255, 255, 0.34), rgba(255, 255, 255, 0.08) 48%, rgba(255, 255, 255, 0.16)), var(--lq-img);
+  background-size: 100% 100%, var(--lq-size); background-position: 0 0, var(--lq-pos); background-repeat: no-repeat; background-attachment: scroll, fixed;
+  -webkit-background-clip: text; background-clip: text;
+  filter: drop-shadow(0 -1px 0 rgba(255, 255, 255, 0.4)) drop-shadow(0 4px 10px rgba(0, 0, 0, 0.38)); }
+html:not(.lighter):not(.glass-lite) .cw-ink-liquid.cw-lq-on > :not(.cw-bg),
+html:not(.lighter):not(.glass-lite) .cw-ink-liquid.cw-lq-on > :not(.cw-bg) * {
+  -webkit-text-fill-color: transparent; -webkit-text-stroke: 1px rgba(255, 255, 255, 0.62); text-shadow: none !important; }
 .cw-bare { padding: 0; border-radius: 0; overflow: visible; }
 .cw-photo { padding: 0; }
 .cw-sh-soft { box-shadow: 0 18px 44px rgba(0, 0, 0, 0.22); }

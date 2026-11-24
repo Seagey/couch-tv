@@ -96,6 +96,68 @@ try {
   s = await read();
   ok(alpha(s.g.color) < 1 && /0px -1px 0px/.test(s.g.shadow), "off the slower TV classes, the glass is back");
   ok(errors.length === 0, "no page errors (" + errors.join(" | ") + ")");
+
+  // 5. Liquid glass words (style.ink "liquid"): over a photo the letters are clear and show the scene's frosted
+  // copy, lined up with the screen; on paper smoked glass; over a plain colour, frosted Glass words; a slower TV
+  // or a 1 GB TV draws frosted (then solid) words instead.
+  const night = { v: 1, background: { image: "backgrounds/scene-night.jpg", darken: 0.28 }, objects: [
+    w("l", "tallclock", 80, 60, { panel: "none", ink: "liquid" }),
+    w("lg", "clock", 480, 60, { panel: "glass", ink: "liquid" }),
+    w("lp", "clock", 880, 60, { panel: "paper", ink: "liquid" }),
+    w("ls", "clock", 1280, 60, { panel: "solid", ink: "liquid" })
+  ] };
+  async function liquidPage(d, mem) {
+    const p = await browser.newPage({ viewport: { width: 1920, height: 1080 } });
+    p.errs = [];
+    p.on("pageerror", (e) => p.errs.push(String(e)));
+    if (mem) await p.addInitScript((m) => Object.defineProperty(Navigator.prototype, "deviceMemory", { get: () => m, configurable: true }), mem);
+    await p.goto(BASE + "?mock=1&reset=1");
+    await p.evaluate((x) => { localStorage.clear(); localStorage.setItem("tvdesigner.design", JSON.stringify(x)); }, d);
+    await p.goto(BASE + "?mock=1&design=local");
+    await p.waitForFunction(() => document.querySelectorAll(".cw-o .cw").length >= 4);
+    await p.evaluate(() => { document.documentElement.classList.remove("lighter", "glass-lite"); });
+    await p.waitForTimeout(2000);   // the 1.5 s second look for the photo
+    return p;
+  }
+  const lread = (p) => p.evaluate(() => {
+    const out = {};
+    document.querySelectorAll(".cw-o[data-obj]").forEach((o) => {
+      const cw = o.querySelector(".cw"); if (!cw) return;
+      const kid = [].find.call(cw.children, (k) => !k.classList.contains("cw-bg")) || cw, ks = getComputedStyle(kid);
+      out[o.getAttribute("data-obj")] = { cls: cw.className, img: cw.style.getPropertyValue("--lq-img"), bg: ks.backgroundImage, clip: ks.webkitBackgroundClip || ks.backgroundClip,
+        fill: ks.webkitTextFillColor, stroke: ks.webkitTextStrokeWidth, attach: ks.backgroundAttachment, filter: ks.filter, color: getComputedStyle(cw).color };
+    });
+    return out;
+  });
+  let lp = await liquidPage(night);
+  let L = await lread(lp);
+  ok(/\bcw-ink-liquid\b/.test(L.l.cls) && /\bcw-lq-on\b/.test(L.l.cls) && /\bcw-lq-on\b/.test(L.lg.cls), "liquid glass on a bare and a glass box over a photo");
+  ok(/scene-night-glass\.jpg/.test(L.l.img) && /scene-night-glass\.jpg/.test(L.l.bg), "through the letters: the night scene's frosted copy (" + L.l.img + ")");
+  ok(/^text(, text)*$/.test(L.l.clip) && L.l.fill === "rgba(0, 0, 0, 0)" && L.l.stroke === "1px", "letters are clear, clipped to the photo, with a 1 px rim " + JSON.stringify(L.l));
+  ok(/fixed/.test(L.l.attach), "the photo is lined up with the screen, not the widget");
+  ok(/drop-shadow/.test(L.l.filter), "a shadow under the glass letters");
+  ok(/\bcw-ink-smoke\b/.test(L.lp.cls) && !/cw-lq-on/.test(L.lp.cls), "on paper: smoked glass words, no photo through them");
+  ok(/\bcw-ink-glass\b/.test(L.ls.cls) && !/cw-lq-on/.test(L.ls.cls) && L.ls.fill !== "rgba(0, 0, 0, 0)", "on a solid box: frosted Glass words");
+  for (const cls of ["lighter", "glass-lite"]) {
+    await lp.evaluate((c) => document.documentElement.classList.add(c), cls);
+    L = await lread(lp);
+    ok(L.l.fill !== "rgba(0, 0, 0, 0)" && !/text/.test(L.l.clip) && L.l.color === "rgb(255, 255, 255)", "html." + cls + ": liquid glass words drawn solid white, no photo clip (" + L.l.fill + ", " + L.l.color + ")");
+    await lp.evaluate((c) => document.documentElement.classList.remove(c), cls);
+  }
+  L = await lread(lp);
+  ok(L.l.fill === "rgba(0, 0, 0, 0)" && /^text/.test(L.l.clip), "off the slower TV classes, liquid glass is back");
+  ok(lp.errs.length === 0, "liquid: no page errors (" + lp.errs.join(" | ") + ")");
+  await lp.close();
+
+  lp = await liquidPage(night, 1);
+  L = await lread(lp);
+  ok(/\bcw-ink-liquid\b/.test(L.l.cls) && !/cw-lq-on/.test(L.l.cls) && /\bcw-ink-glass\b/.test(L.l.cls), "a 1 GB TV: frosted Glass words instead");
+  await lp.close();
+
+  lp = await liquidPage(Object.assign({}, night, { background: { colour: "#26303f" } }));
+  L = await lread(lp);
+  ok(!/cw-lq-on/.test(L.l.cls) && /\bcw-ink-glass\b/.test(L.l.cls), "over a plain colour: frosted Glass words (no photo to see)");
+  await lp.close();
 } finally {
   await browser.close();
   server.close();
