@@ -32,6 +32,10 @@
 #          silicon Mac job never got a runner, so the upload job was skipped), and exits 7 if the four files are
 #          still not on the release. SETUP_WAIT (seconds between looks, default 30), SETUP_TIMEOUT (default 3600)
 #          and SETUP_RERUNS (default 2) change how long it tries.
+#          Then it signs SHA256SUMS-setup.txt with scripts/sign-setup-sums.py (the key stays at
+#          ~/.couch-tv-signing/update-ed25519.pem; COUCHTV_SIGNING_KEY names another), checks the signature as an
+#          installed helper does, uploads SHA256SUMS-setup.txt.sig and checks the release copy again; exit 8 if any
+#          of that fails (installed helpers could then not check for updates).
 #
 # Always checked against the key TVs already have (4e): --signer defaults to the couch-tv release
 # certificate below and is always passed; for Seagey/couch-tv no other is accepted. --previous (last
@@ -238,13 +242,35 @@ setup_missing() {  # <tag>: the Setup files the release does not have, one a lin
   have=$(gh release view "$1" --repo "$REPO" --json assets --jq '.assets[].name' 2>/dev/null) || have=""
   for f in $SETUP_FILES; do printf '%s\n' "$have" | grep -qxF "$f" || echo "$f"; done
 }
+# The helper only trusts an update when SHA256SUMS-setup.txt carries a signature made with a key that is not on GitHub
+# (setup-app/couchtv_setup/helper/update.py). The key stays on this computer; this never prints it. It signs the very
+# file that is on the release, checks the signature the way an installed helper does, uploads the .sig, then downloads
+# both again and checks once more. Without the .sig on the release, installed helpers say "Could not check for updates".
+SETUP_SUMS=SHA256SUMS-setup.txt
+sign_setup_sums() {  # <tag>
+  local tag=$1 key=${COUCHTV_SIGNING_KEY:-$HOME/.couch-tv-signing/update-ed25519.pem} dir="$DIST/setup-sign" f
+  [ -f "$key" ] || { echo "The Setup signing key is not on this computer (COUCHTV_SIGNING_KEY or ~/.couch-tv-signing/update-ed25519.pem): not signing"; exit 8; }
+  mkdir -p "$dir"
+  for f in $SETUP_SUMS $SETUP_SUMS.sig; do [ -f "$dir/$f" ] && rm "$dir/$f"; done
+  gh release download "$tag" --repo "$REPO" --pattern "$SETUP_SUMS" --dir "$dir" || { echo "Could not download $SETUP_SUMS from $tag"; exit 8; }
+  python3 "$ROOT/scripts/sign-setup-sums.py" "$dir/$SETUP_SUMS" > /dev/null || { echo "SIGNING $SETUP_SUMS FAILED"; exit 8; }
+  python3 "$ROOT/scripts/verify-setup-sig.py" "$dir/$SETUP_SUMS" "$dir/$SETUP_SUMS.sig" || { echo "The new signature does not check against the public key in the app"; exit 8; }
+  gh release upload "$tag" "$dir/$SETUP_SUMS.sig" --repo "$REPO" --clobber || { echo "Could not upload $SETUP_SUMS.sig to $tag"; exit 8; }
+  # what is on the release now, not what is on this disk
+  for f in $SETUP_SUMS $SETUP_SUMS.sig; do rm "$dir/$f"; done
+  gh release download "$tag" --repo "$REPO" --pattern "$SETUP_SUMS" --pattern "$SETUP_SUMS.sig" --dir "$dir" || { echo "Could not download the signed files again"; exit 8; }
+  python3 "$ROOT/scripts/verify-setup-sig.py" "$dir/$SETUP_SUMS" "$dir/$SETUP_SUMS.sig" || { echo "The signature on $tag does not check"; exit 8; }
+  for f in $SETUP_SUMS $SETUP_SUMS.sig; do rm "$dir/$f"; done
+  rmdir "$dir"
+  echo "SETUP SUMS SIGNED on $tag: $SETUP_SUMS.sig checked against the key in the app"
+}
 do_setup() {
   [ -n "$VERSION" ] || { echo "setup needs --version, for example --version 0.13.9"; exit 2; }
   local tag="v$VERSION" wait=${SETUP_WAIT:-30} limit=${SETUP_TIMEOUT:-3600} reruns=${SETUP_RERUNS:-2}
   local waited=0 done_reruns=0 missing run id status conclusion
   while :; do
     missing=$(setup_missing "$tag")
-    [ -z "$missing" ] && { echo "SETUP FILES OK on $tag: $SETUP_FILES"; return 0; }
+    [ -z "$missing" ] && { echo "SETUP FILES OK on $tag: $SETUP_FILES"; sign_setup_sums "$tag"; return 0; }
     # the Setup app workflow's run for this release (a release event runs on the tag)
     run=$(gh run list --repo "$REPO" --workflow setup-app.yml --event release --branch "$tag" --limit 1 \
       --json databaseId,status,conclusion --jq '.[0] | "\(.databaseId) \(.status) \(.conclusion)"' 2>/dev/null) || run=""
@@ -260,7 +286,7 @@ do_setup() {
       elif [ "${conclusion:-}" = success ] || [ "$done_reruns" -ge "$reruns" ]; then
         # one more look: the upload may have landed between the two calls
         missing=$(setup_missing "$tag")
-        [ -z "$missing" ] && { echo "SETUP FILES OK on $tag: $SETUP_FILES"; return 0; }
+        [ -z "$missing" ] && { echo "SETUP FILES OK on $tag: $SETUP_FILES"; sign_setup_sums "$tag"; return 0; }
         echo "SETUP FILES MISSING on $tag after the Setup app run $id ($conclusion):" $missing
         echo "Run its failed jobs again (gh run rerun $id --failed), then: bash scripts/release.sh setup --version $VERSION"
         exit 7

@@ -56,10 +56,10 @@ jobs:
           python -m pip install --disable-pip-version-check --require-hashes -r requirements.txt
           python -m pip install --disable-pip-version-check pyinstaller==6.16.0
 
-      - name: Install the helper's packages (the bridge and the tray)
+      - name: Install the helper's packages (the bridge and the tray, hash checked)
         id: helper
         run: |
-          if python -m pip install --disable-pip-version-check -r requirements-helper.txt; then
+          if python -m pip install --disable-pip-version-check --require-hashes -r requirements-helper.txt; then
             echo "bundled=yes" >> "$GITHUB_OUTPUT"
           else
             echo "The helper's packages did not install: building Setup without the bridge."
@@ -132,6 +132,16 @@ jobs:
 
       - name: Smoke test the built app
         run: python tests/smoke.py "$PROGRAM"
+
+      # Couch TV Helper: the built app started with --helper. The bundled bridge runs as its child process and
+      # answers, the menu page loads and says Running, and Quit stops both. A release must carry the helper.
+      - name: Smoke test the helper in the built app
+        run: |
+          if [ "${{ steps.helper.outputs.bundled }}" != "yes" ]; then
+            if [ "${{ github.event_name }}" = "release" ]; then echo "::error::the helper's packages did not install, so this release would have no helper"; exit 1; fi
+            echo "Built without the helper: nothing to test."; exit 0
+          fi
+          python tests/smoke_helper.py "$PROGRAM"
 
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02   # v4.6.2
         with:

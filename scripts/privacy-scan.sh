@@ -77,8 +77,9 @@ ALLOW='users\.noreply\.github\.com|@example\.(com|org)|your-computer\.local|home
 echo "== 2. generic checks (private addresses, emails, phones, paths)"
 for rule in "${RULES[@]}"; do
   name="${rule%%|*}"; re="${rule#*|}"
-  # package-lock.json is machine written: only check it for the rules that cannot match a hash.
-  hits=$(grep -rInE "${EXCL[@]}" --exclude=privacy-scan.sh "$re" . 2> /dev/null | grep -vE "$ALLOW" | grep -vE '^\./remote/package-lock\.json:[0-9]+:.*(integrity|resolved)' | cut -d: -f1,2)
+  # package-lock.json is machine written: only check it for the rules that cannot match a hash. The same for the
+  # pip hash lines in setup-app/requirements*.txt (a line that is only "--hash=sha256:" and 64 hex digits).
+  hits=$(grep -rInE "${EXCL[@]}" --exclude=privacy-scan.sh "$re" . 2> /dev/null | grep -vE "$ALLOW" | grep -vE '^\./remote/package-lock\.json:[0-9]+:.*(integrity|resolved)' | grep -vE '^\./setup-app/requirements[a-z-]*\.txt:[0-9]+:[[:space:]]+--hash=sha256:[0-9a-f]{64}( \\)?$' | cut -d: -f1,2)
   if [ -n "$hits" ]; then
     while IFS= read -r h; do note "$name  $h"; done <<< "$hits"
   fi

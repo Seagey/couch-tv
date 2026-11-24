@@ -1,0 +1,12 @@
+# Couch TV Helper (setup-app/couchtv_setup/helper): the bridge's packages and the tray libraries.
+# This is the list to edit. requirements-helper.txt is made from it, with a hash for every file, for every
+# computer type at once (Mac, Windows and Linux, Python 3.12):
+#   uv pip compile requirements-helper.in --universal --python-version 3.12 --generate-hashes -o requirements-helper.txt
+# Install: pip install --require-hashes -r requirements-helper.txt
+# Optional: without them Setup still builds and runs, and the helper shows its menu as a browser page. The build
+# installs them in a separate step and only bundles the bridge when that step worked.
+-r ../bridge/requirements.txt
+# the same versions as requirements.txt: 49 and newer have no Intel Mac build
+cryptography==48.0.1
+rumps==0.4.0; sys_platform == "darwin"
+pystray==0.19.5; sys_platform != "darwin"
