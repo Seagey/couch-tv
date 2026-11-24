@@ -25,6 +25,29 @@ object SetupSteps {
     fun firstScreen(done: Boolean, phones: Int, homeOn: Boolean): Screen =
         if (done || phones > 0 || homeOn) Screen.READY else Screen.HOME_STEP
 
+    /** What Back does on Settings. */
+    enum class SettingsBack {
+        /** the setup screen it came from (READY or step 1) */
+        BACK_TO,
+        /** close the setup screen: the home is still under it */
+        FINISH,
+        /** show where it came from and open the home again above it */
+        REOPEN_HOME
+    }
+
+    /**
+     * Back on Settings. Opened from the home's gear, Phone remote (fromHome): when the home was opened from the
+     * setup screen (Couch TV in the apps row, Open the home), the setup screen is the task's root, and opening it
+     * again (singleTask) cleared the home above it, so a bare finish() left an empty task and Google's home showed
+     * (0.13.12 RC emulator pass, 24 Nov 2026). Then the home opens again above the setup screen, as it was before
+     * the gear. When the home is under the setup screen (Couch TV is the Home app), finish() goes back to it.
+     */
+    fun settingsBack(fromHome: Boolean, taskRoot: Boolean): SettingsBack = when {
+        !fromHome -> SettingsBack.BACK_TO
+        taskRoot -> SettingsBack.REOPEN_HOME
+        else -> SettingsBack.FINISH
+    }
+
     /** What step 1 offers. */
     enum class HomeStep {
         /** one press asks Android's own "default home app" question (HomeAsk.Plan.ASK) */

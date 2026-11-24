@@ -97,7 +97,24 @@ forget everything. The TV lists the key as **couch-tv-setup** under Wireless deb
 devices, where you can Forget it.
 
 **Nothing is sent anywhere** except the download from GitHub and, only if you type one, a place
-name to Open-Meteo for the weather. No accounts, no tracking, no AI.
+name to Open-Meteo for the weather. No tracking, no AI.
+
+**If you link your Couch TV account** (the website's **Set up my TV** button, or its code typed on the
+first page): Setup tells your account what kind of TV it set up (its system, Android version, memory,
+screen size and how smoothly it drew Couch TV, so Couch TV Studio shows designs that work on it),
+gets your design and Your home details for that TV, and writes the TV's own account link into Couch TV
+on the TV. A health report (Couch TV's versions, free space, memory, its last crash and its own log
+lines, addresses and e-mails blanked out) is only sent if you press **Send a health report** after
+seeing all of it. The account link is kept in memory only, never on this computer's disk.
+
+## Finding the TV
+
+Setup looks on the Wi-Fi by itself and keeps looking while the list is open: the TVs' own
+announcements (Android TV Remote, Cast, Wireless debugging and its pairing screen, plain ADB), a knock on
+ports 5555 and 6466 across this computer's network, confirmed by the first ADB message (CONNECT, which
+holds no key, so the TV shows nothing), and DIAL names. Each TV shows **Ready**, **Type the code** or
+**1 step on the TV** with the steps for its Android version. TVs Setup cannot put Couch TV on (Tizen,
+webOS) are listed as found, with no button.
 
 ## For developers
 
@@ -105,7 +122,8 @@ name to Open-Meteo for the weather. No accounts, no tracking, no AI.
 cd setup-app
 python3 -m venv .venv && .venv/bin/pip install --require-hashes -r requirements.txt
 .venv/bin/python -m couchtv_setup                    # opens the page
-.venv/bin/python -m unittest discover -s tests       # 95 tests, no TV needed
+.venv/bin/python -m unittest discover -s tests       # 157 tests, no TV needed
+COUCHTV_SETUP_ADBKEY=~/.android/adbkey .venv/bin/python tests/emulator_check.py --port 5591 --install   # Android TV emulator only
 .venv/bin/python couch-tv-setup.py --self-test       # pairs with itself, as the built app does in CI
 ```
 
@@ -116,6 +134,10 @@ python3 -m venv .venv && .venv/bin/pip install --require-hashes -r requirements.
 | `COUCHTV_SETUP_NO_BROWSER=1` | Do not open the browser |
 | `COUCHTV_SETUP_HOME` | Keep the setup's own files somewhere else |
 | `COUCHTV_SETUP_ADBKEY` | Use another ADB key file |
+| `COUCHTV_SETUP_STUDIO=live` | Talk to the Couch TV Studio account API (off until that API exists) |
+| `COUCHTV_SETUP_STUDIO_URL` | Another Studio address (https, or http on 127.0.0.1 for development) |
+| `COUCHTV_SETUP_STUDIO_STUB=<file.json>` | Answer the account calls from a file instead (development) |
+| `COUCHTV_SETUP_FAKE_SCAN=<file.json>` | Use recorded discovery answers instead of the network (screenshots) |
 
 How it fits together, and why there is no Google `adb` inside: [BUILD.md](BUILD.md). The pairing
 protocol is in `couchtv_setup/pairing.py` and `spake2.py`, each with a description at the top.

@@ -332,7 +332,19 @@ class SetupActivity : Activity() {
     @Deprecated("Back on a TV remote")
     override fun onBackPressed() {
         when (screen) {
-            SetupSteps.Screen.SETTINGS -> if (fromHome) { fromHome = false; finish() } else show(backTo)
+            SetupSteps.Screen.SETTINGS -> {
+                val back = SetupSteps.settingsBack(fromHome, isTaskRoot)
+                fromHome = false
+                when (back) {
+                    SetupSteps.SettingsBack.BACK_TO -> show(backTo)
+                    SetupSteps.SettingsBack.FINISH -> finish()
+                    // the home was cleared from above this screen: open it again, and keep this screen under it
+                    SetupSteps.SettingsBack.REOPEN_HOME -> {
+                        show(backTo)
+                        if (runCatching { startActivity(Intent(this, HomeActivity::class.java)) }.isFailure) finish()
+                    }
+                }
+            }
             SetupSteps.Screen.HOME_HELP -> show(SetupSteps.Screen.HOME_STEP)
             SetupSteps.Screen.KEYS -> if (AllowWait.backStepsAside(hiddenShown, waitingForAllow())) stepAside() else keyAction(SetupSettings.Action.BACK)
             SetupSteps.Screen.KEYS_DONE -> show(SetupSteps.Screen.SETTINGS, SetupSettings.Item.PHONE)

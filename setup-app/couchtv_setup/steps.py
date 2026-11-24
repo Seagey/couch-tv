@@ -342,9 +342,17 @@ def home_config(people=None, weather=None):
     """The home's settings for its built-in copy, the shape tv-home/tools/home-config.py makes. Only
     what the person gave: names and a weather place. Settings changed later on the TV itself
     (Home settings) are kept by the TV and win over these."""
-    names = [n.strip()[:30] for n in (people or []) if n and n.strip()][:8]
+    # a name typed on the page, or a person from the Couch TV account ({"id": "p_...", "name"}), whose id
+    # is kept so the app's own home pack later updates the same person instead of adding a second one
+    plist = []
+    for n in people or []:
+        pid = n.get("id") if isinstance(n, dict) and re.match(r"^p_[a-z0-9]{6,12}$", str(n.get("id") or "")) else None
+        name = (n.get("name") if isinstance(n, dict) else n) or ""
+        if isinstance(name, str) and name.strip():
+            plist.append((pid, name.strip()[:30]))
+    plist = plist[:8]
     cfg = {
-        "people": [{"id": f"person{i + 1}", "name": n} for i, n in enumerate(names)] or [{"id": "person1", "name": "Me"}],
+        "people": [{"id": pid or f"person{i + 1}", "name": n} for i, (pid, n) in enumerate(plist)] or [{"id": "person1", "name": "Me"}],
         "home": {"hide_packages": [], "look": "night", "scenes": ["night", "golden", "water", "fog", "dawn"],
                  "scene_seconds": 20, "dock_size": 10, "my_scenes": [], "sun_sync": False, "skip_watch_next": [],
                  "bedtime_dim": False, "watch_next_per_app": 5},
@@ -359,8 +367,29 @@ def home_config(people=None, weather=None):
     return base64.b64encode(json.dumps(cfg, separators=(",", ":")).encode()).decode()
 
 
+LINK_RE = re.compile(r"^[A-Za-z0-9_-]{32,128}$")
+CODE_RE = re.compile(r"^CTV1-[A-Za-z0-9_-]{43}$")
+
+
+def account_extras(account):
+    """The Couch TV account link, written straight into the app over ADB with the settings, so nobody
+    types a code at the TV (FIND-TV-ON-WIFI.md, step 4):
+    - account_link: this TV's own link token from Couch TV Studio (studio.register_tv);
+    - design_code: the account's send code for this TV; the app fetches it like a typed code and gets
+      the design and the Your home pack (HOME-DETAILS-PAYLOAD.md).
+    Only values of the exact shapes go into the shell line; anything else is left out. A Couch TV app
+    that does not know these extras ignores them (DREAM-SETUP-BUILD.md, TV side)."""
+    account = account or {}
+    out = ""
+    if isinstance(account.get("link"), str) and LINK_RE.match(account["link"]):
+        out += f" --es account_link {account['link']}"
+    if isinstance(account.get("code"), str) and CODE_RE.match(account["code"]):
+        out += f" --es design_code {account['code']}"
+    return out
+
+
 def make_home(tv, apk_path, ambient_off=True, people=None, weather=None, progress=lambda f, msg=None: None,
-              ontv_home_switch_off=True):
+              ontv_home_switch_off=True, account=None):
     done = []
     ontv = ontv_home(tv)
     alias_left = False
@@ -425,7 +454,7 @@ def make_home(tv, apk_path, ambient_off=True, people=None, weather=None, progres
     if tv.shell(f"appops get {HOME_PKG} SYSTEM_ALERT_WINDOW").find("allow") >= 0:
         tv.shell(f"appops set {HOME_PKG} SYSTEM_ALERT_WINDOW default")   # no doorbell card in this setup
     cfg = home_config(people, weather)
-    tv.shell(f'am force-stop {HOME_PKG}; am start -n {HOME_ACT} --es bridge none --es config_b64 {cfg} --es ha_b64 none --es key ""')
+    tv.shell(f'am force-stop {HOME_PKG}; am start -n {HOME_ACT} --es bridge none --es config_b64 {cfg} --es ha_b64 none --es key ""' + account_extras(account))
     if facts_tcl(tv):
         tv.shell(f"appops set {HOME_PKG} AUTO_START allow")
         done.append("TCL: AUTO_START allowed")

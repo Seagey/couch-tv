@@ -26,7 +26,7 @@ import webbrowser
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
-from . import errors, finder, pairing, paths, release, steps
+from . import errors, finder, guide, health, linkin, pairing, paths, release, steps, studio, tvprofile
 from .identity import Identity
 from .tv import Tv, TvError
 
@@ -55,6 +55,9 @@ class State:
         self.port = None
         self.seen = None
         self.started = time.time()
+        self.link = studio.Link()      # the Couch TV account, in memory only
+        self.handoff = None            # a code from couchtv://setup?handoff=..., not used yet
+        self.profile = None            # tvprofile of the connected TV
 
 
 S = State()
@@ -127,8 +130,9 @@ def _attach(tv, ip, route):
         S.tv.close()
     S.tv, S.ip, S.route = tv, ip, route
     S.facts = steps.facts(tv)
-    _remember(ip, S.facts)
-    return {"facts": S.facts, "route": route}
+    S.profile = tvprofile.read(tv, S.facts)
+    _remember(ip, S.facts, route=route)
+    return {"facts": S.facts, "route": route, "profile": S.profile}
 
 
 def _known():
@@ -138,14 +142,47 @@ def _known():
         return {}
 
 
-def _remember(ip, f):
-    """What this TV turned out to be, so the list and the kind question know it next time."""
+def _remember(ip, f=None, route=None, room=None):
+    """What this TV turned out to be, so the list and the kind question know it next time: its model,
+    kind, the way in that worked ("tls" means Wireless debugging is paired with this computer) and the
+    room name the person gave it ("Living room TV")."""
     k = _known()
-    k[ip] = {"name": f.get("name"), "kind": f.get("kind")}
+    old = k.get(ip) or {}
+    k[ip] = {"name": (f or {}).get("name") or old.get("name"), "kind": (f or {}).get("kind") or old.get("kind"),
+             "route": route or old.get("route"), "room": room if room is not None else old.get("room")}
     try:
         (paths.data() / "known-tvs.json").write_text(json.dumps(k), encoding="utf-8")
     except OSError:
         pass
+
+
+def _town_weather(town):
+    """The account's town ({name, lat, lon}) as the home's weather setting, which also needs the time
+    zone: the nearest Open-Meteo match for the town's name. None when it cannot be looked up."""
+    if not town:
+        return None
+    try:
+        places = place_search(town["name"])["places"]
+    except TvError:
+        return None
+    near = sorted(places, key=lambda p: (p["lat"] - town["lat"]) ** 2 + (p["lon"] - town["lon"]) ** 2)
+    if not near or abs(near[0]["lat"] - town["lat"]) > 0.5 or abs(near[0]["lon"] - town["lon"]) > 0.5:
+        return None
+    return {"lat": town["lat"], "lon": town["lon"], "place": town["name"], "timezone": near[0]["timezone"]}
+
+
+def _from_account(progress):
+    """Registers the connected TV with the signed in account and gets what goes onto it. A failure
+    here never stops the setup: Couch TV still goes on, without the account parts."""
+    progress(0.26, "Linking the TV to your Couch TV account")
+    name = (_known().get(S.ip) or {}).get("room") or (S.facts or {}).get("name") or "TV"
+    try:
+        reg = studio.register_tv(S.link, tvprofile.clean(S.profile), name)
+    except TvError:
+        return None
+    people, town = studio.setup_inputs(reg["home"])
+    return {"people": people, "weather": _town_weather(town), "design": reg["design"],
+            "extras": {"link": reg["link"], "code": reg["code"]}}
 
 
 def place_search(q):
@@ -176,7 +213,7 @@ def api(method, path, body):
     if path == "/api/ping":
         return {"ok": True}
     if path == "/api/info":
-        return {"os": OS, "connected": bool(S.tv), "facts": S.facts, "route": S.route, "ip": S.ip}
+        return {"os": OS, "connected": bool(S.tv), "facts": S.facts, "route": S.route, "ip": S.ip, "profile": S.profile}
     if path == "/api/quit":
         if S.job.get("running"):
             raise TvError("Still busy with the last step. Wait for it to finish, then close.", "busy")
@@ -186,12 +223,68 @@ def api(method, path, body):
         return S.job
     if path == "/api/scan":
         def scan(p):
-            known = _known()
-            tvs = finder.scan()
+            fake = os.environ.get("COUCHTV_SETUP_FAKE_SCAN")
+            if fake:
+                # development and screenshots: recorded answers ({"heard", "knocks", "dial", "confirmed"}),
+                # merged exactly as a real scan would be, and nothing is sent on the network
+                with open(fake, encoding="utf-8") as f:
+                    rec = json.load(f)
+                time.sleep(float(rec.get("delay", 0.5)))
+                tvs = finder.merge(rec.get("heard", []), [tuple(k) for k in rec.get("knocks", [])], rec.get("dial", {}),
+                                   _known(), rec.get("confirmed", {}))
+            else:
+                tvs = finder.scan(known=_known())
             for t in tvs:
-                t["known"] = known.get(t["ip"])
+                t["profile"] = tvprofile.guess(t)
+                t["route"] = guide.route_for(t)
             return {"tvs": tvs, "networks": [str(n) for n in finder.home_networks()]}
         return run_job("scan", scan)
+    if path == "/api/guide":
+        row = body.get("row") if isinstance(body.get("row"), dict) else {}
+        wireless = body.get("wireless") if isinstance(body.get("wireless"), bool) else None
+        kind = "fire" if body.get("kind") == "fire" else None
+        android = row.get("android_version") or body.get("android")
+        route = str(body.get("route") or "") or guide.route_for(row, android, kind, wireless)
+        if route not in ("ready", "pair", "allow", "fire", "choose"):
+            route = "choose"
+        return {"route": route, "steps": guide.steps(route, android, bool(body.get("google_tv")))}
+    if path == "/api/name-tv":
+        ip = home_ip(body)
+        room = str(body.get("room") or "").strip()[:30]
+        _remember(ip, room=room or None)
+        return {"ok": True}
+    if path == "/api/account":
+        return {"mode": studio.mode(), "account": S.link.account if S.link.token else None,
+                "handoff": bool(S.handoff), "tv": S.link.tv and {k: S.link.tv.get(k) for k in ("tv_id", "design")}}
+    if path in ("/api/handoff", "/api/handoff-in"):
+        code = studio.read_code(body.get("code"))
+        if path == "/api/handoff-in":
+            S.handoff = code or S.handoff   # from a second copy opened by a link: the page picks it up
+            return {"ok": bool(code)}
+        code = code or S.handoff
+        S.handoff = None
+        return {"account": studio.handoff(S.link, code)}
+    if path == "/api/device/start":
+        return studio.device_start(S.link)
+    if path == "/api/device/poll":
+        return studio.device_poll(S.link)
+    if path == "/api/sign-out":
+        S.link = studio.Link()
+        return {"ok": True}
+    if path == "/api/profile":
+        need_tv()
+        return {"profile": S.profile}
+    if path == "/api/health/preview":
+        # what a health report would hold, shown in full before the person says yes
+        tv = need_tv()
+        S.health = health.health_report(tv, (S.facts or {}).get("installed") or {})
+        return {"report": S.health, "can_send": bool(S.link.token and S.link.tv)}
+    if path == "/api/health/send":
+        if body.get("yes") is not True or not getattr(S, "health", None):
+            raise TvError("Look at the report first, then press Send.", "no_ok")
+        out = studio.send_health(S.link, S.health)
+        S.health = None
+        return out
     if path == "/api/look":
         ip = home_ip(body)
         r = finder.look(ip)
@@ -273,9 +366,27 @@ def api(method, path, body):
                 r["apk"] = {"version": "none", "sha256": "", "checked": "nothing installed"}
                 return r
             apk = release.get(release.HOME_APK, lambda f, m=None: progress(0.25 * f, m))
-            r = steps.make_home(tv, apk["path"], ambient_off=ambient_off, people=people, weather=weather,
-                                ontv_home_switch_off=ontv_off, progress=lambda f, m=None: progress(0.25 + 0.75 * f, m))
+            acct = _from_account(progress) if S.link.token else None
+            ppl, wx = people, weather
+            if acct:
+                a_people, a_weather = acct["people"], acct["weather"]
+                ppl = a_people or people          # the account's people win over names typed here
+                wx = a_weather or weather
+            r = steps.make_home(tv, apk["path"], ambient_off=ambient_off, people=ppl, weather=wx,
+                                ontv_home_switch_off=ontv_off, progress=lambda f, m=None: progress(0.27 + 0.73 * f, m),
+                                account=acct and acct["extras"])
             r["apk"] = {k: apk[k] for k in ("version", "sha256", "checked")}
+            if r.get("front"):
+                progress(0.99, "Measuring how smoothly this TV draws Couch TV")
+                try:
+                    S.profile = dict(S.profile or {}, speed=health.speed_test(tv), couchtv=apk.get("version"))
+                    r["speed"] = S.profile["speed"]
+                except Exception:
+                    r["speed"] = None
+            if acct:
+                r["account"] = {"linked": bool(acct["extras"].get("link")), "design": acct["design"],
+                                "people": len(ppl or []), "town": (acct["weather"] or {}).get("place"),
+                                "reported": studio.report_done(S.link, r.get("front"), apk.get("version"), tvprofile.clean(S.profile))}
             return r
         return run_job("setup", setup)
     if path == "/api/check":
@@ -390,10 +501,27 @@ class Handler(BaseHTTPRequestHandler):
         self._send(200, raw, TYPES.get(f.suffix, "application/octet-stream"))
 
 
-def main():
+def main(argv=None):
+    # Opened by the website's "Set up my TV" link: hand the code to a Setup that is already running
+    # (then just show its page), or keep it for this run's page.
+    link = studio.url_in(argv if argv is not None else sys.argv)
+    code = studio.parse_url(link) if link else ""
+    if code:
+        running = linkin.hand_to_running(code)
+        if running:
+            if not os.environ.get("COUCHTV_SETUP_NO_BROWSER"):
+                webbrowser.open(running)
+            print("Couch TV Setup was already open, so the code went to it.")
+            return
+        S.handoff = code
+    try:
+        linkin.register_windows()
+    except OSError:
+        pass   # the link button then falls back to the typed code
     port = int(os.environ.get("COUCHTV_SETUP_PORT") or 0)
     httpd = ThreadingHTTPServer(("127.0.0.1", port), Handler)
     S.httpd, S.port = httpd, httpd.server_address[1]
+    linkin.write_running(S.port, SECRET)
     url = f"http://127.0.0.1:{S.port}/"
     print(f"couch-tv Setup is open in your browser: {url}")
     print("Keep this running until you are done. Press Close setup on the page, or Ctrl+C here, to stop.")
@@ -415,5 +543,6 @@ def main():
     except KeyboardInterrupt:
         pass
     finally:
+        linkin.clear_running()
         if S.tv:
             S.tv.close()
