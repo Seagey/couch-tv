@@ -583,6 +583,26 @@
   var CORNER = { square: 12, soft: 28, round: 36, pill: 999 };
   function nightNow() { var h = now().getHours(); return h >= 18 || h < 6; }
 
+  // What Liquid glass words show through them: the design's photo (#cd-bg i, placed as design.js placed it) or
+  // the scene on screen, as the frosted copy for the five scenes that ship one. null (so frosted words) for a
+  // colour background, no photo yet, a slower TV (lighter, glass lite) or a TV with 1 GB of memory.
+  var LQ_FROST = /(backgrounds\/scene-(dawn|fog|golden|night|water))(@2x)?\.jpg/;
+  function liquidBack() {
+    try {
+      var de = document.documentElement, mem = Number((window.navigator || {}).deviceMemory) || 0;
+      if (de.classList.contains("lighter") || de.classList.contains("glass-lite") || (mem > 0 && mem < 2)) return null;
+      var frost = function (u) { return String(u).replace(LQ_FROST, "$1-glass.jpg"); };
+      var box = document.getElementById("cd-bg");
+      if (box && getComputedStyle(box).display !== "none") {
+        var i = box.querySelector("i"), cs = i && getComputedStyle(i);
+        if (!cs || cs.display === "none" || !cs.backgroundImage || cs.backgroundImage === "none") return null;
+        return { image: frost(cs.backgroundImage), size: cs.backgroundSize || "100vw 100vh", pos: cs.backgroundPosition || "50% 50%" };
+      }
+      var s = document.querySelector("#scenes .scene.on .sbg"), src = s && (s.currentSrc || s.src);
+      return src ? { image: 'url("' + frost(src).replace(/["\\\n]/g, "") + '")', size: "100vw 100vh", pos: "50% 50%" } : null;
+    } catch (e) { return null; }
+  }
+
   function shell(o, b, env, kindOverride) {
     var kind = kindOverride || o.kind, st = o.style || {};
     var panel = st.panel || (window.CouchDesign && window.CouchDesign.wpanel ? window.CouchDesign.wpanel({ kind: kind, style: st }) : "glass");
@@ -601,7 +621,34 @@
     } else if (panel === "paper") { tile = rgbOf(look.paper) || [246, 242, 234]; ink = INK_DARK; }
     else if (panel === "solid") { tile = rgbOf(look.solid) || [22, 22, 27]; }
     if (st.ink === "white") ink = WHITE; else if (st.ink === "ink") ink = INK_DARK; else if (st.ink === "accent") ink = rgbOf(st.accent || look.accent) || [255, 214, 10];
-    if (ink) {
+    else if (st.ink === "glass" || st.ink === "liquid") {
+      // Glass words (owner approved 24 Nov 2026): frosted white with a light top edge and a soft shadow, or
+      // smoked dark glass where Auto would pick dark words (paper, a pale colour, a light page). The colour
+      // is see through (widgets.css .cw-ink-glass); a slower TV (lighter, glass lite) draws it solid.
+      var base = ink || rgbOf(look.ink) || WHITE, dark = contrast(base, INK_DARK) < contrast(base, WHITE);
+      root.classList.add(dark ? "cw-ink-smoke" : "cw-ink-glass");
+      root.style.setProperty("--ink", dark ? "rgba(18, 18, 24, 0.84)" : "rgba(255, 255, 255, 0.9)");
+      root.style.setProperty("--sub", dark ? "rgba(18, 18, 24, 0.7)" : "rgba(255, 255, 255, 0.74)");
+      root.style.setProperty("--faint", dark ? "rgba(18, 18, 24, 0.5)" : "rgba(255, 255, 255, 0.52)");
+      root.style.color = "var(--ink)";
+      ink = dark ? INK_DARK : WHITE;
+      // Liquid glass words (24 Nov 2026): the photo behind the home seen through every letter, its frosted copy
+      // where the home has one, with a bright rim. Only on a see through box (glass or none) over a photo, on a
+      // TV that is not lighter, glass lite or 1 GB; otherwise it stays the frosted Glass words above.
+      if (st.ink === "liquid") {
+        root.classList.add("cw-ink-liquid");
+        var lqOn = function () {
+          var lq = liquidBack();
+          if (!lq) return false;
+          root.classList.add("cw-lq-on");
+          root.style.setProperty("--lq-img", lq.image); root.style.setProperty("--lq-size", lq.size); root.style.setProperty("--lq-pos", lq.pos);
+          return true;
+        };
+        // the photo can arrive after the first draw (a scene still loading): look once more
+        if (!dark && (panel === "glass" || panel === "none") && !lqOn()) setTimeout(lqOn, 1500);
+      }
+    }
+    if (ink && st.ink !== "glass" && st.ink !== "liquid") {
       root.style.setProperty("--ink", rgba(ink, 1)); root.style.setProperty("--sub", rgba(ink, 0.76)); root.style.setProperty("--faint", rgba(ink, 0.5));
       root.style.color = rgba(ink, 1);
     }

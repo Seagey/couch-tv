@@ -375,7 +375,7 @@
     "weather", "bigtemp", "hourly", "week", "rain", "uv", "sun", "moon", "air", "surf", "photo", "slideshow", "mosaic", "artframe",
     "camera", "doorbell", "card", "news", "sports", "memory", "queue", "speakers", "energy", "sensor", "battery", "note", "list", "stocks", "commute", "wifi", "guide", "screentime", "ask", "agent"];
   var WSIZES = ["line", "wline", "tile", "wtile", "small", "tall", "medium", "wide", "large", "xl", "hero", "full", "row8", "row12", "row18"];
-  var WSTYLE = { panel: ["glass", "solid", "colour", "paper", "none"], gradient: ["off", "soft"], ink: ["auto", "white", "ink", "accent"],
+  var WSTYLE = { panel: ["glass", "solid", "colour", "paper", "none"], gradient: ["off", "soft"], ink: ["auto", "white", "ink", "accent", "glass", "liquid"],
     font: ["inter", "antonio", "rounded", "cormorant", "jost"], icons: ["line", "solid", "duotone", "tile", "glass", "playful", "classic"],
     corners: ["square", "soft", "round", "pill"], shadow: ["none", "soft", "lifted"], show: ["always", "live", "night", "day"] };
   var QUICK_IDS = ["sleep", "picture", "look", "soundscape", "screen_off", "headphones", "input", "bluetooth", "network", "tvsettings", "screensaver"];
@@ -854,6 +854,14 @@
     if (ctls) out.push(["Controls in sections (" + ctls + ")", Math.ceil(ctls / 4), "controls"]);
     var glows = Object.keys(E).filter(function (k) { return obj(E[k]).shade && !obj(E[k]).hidden; }).length + shown.filter(function (o) { return o.shade; }).length;
     if (glows) out.push(["Glow behind words (" + glows + ")", glows * 2, "glow"]);
+    // glass words: a soft shadow under every letter, redrawn when the words change (no blur behind them)
+    var inked = function (v) { return shown.filter(function (o) { return o.type === "widget" && [o].concat(list(o.items)).some(function (it) { return obj(obj(it).style).ink === v; }); }).length; };
+    var gtext = inked("glass");
+    if (gtext) out.push(["Glass words (" + gtext + ")", gtext, "glasstext"]);
+    // liquid glass words: the photo behind seen through every letter, drawn again with a shadow filter each
+    // time the words change; weighed like a frosted card (3 each)
+    var ltext = inked("liquid");
+    if (ltext) out.push(["Liquid glass words (" + ltext + ")", ltext * 3, "liquidtext"]);
     var strong = Object.keys(E).filter(function (k) { return obj(E[k]).shadow === "strong"; }).length + shown.filter(function (o) { return o.shadow === "strong"; }).length;
     if (strong) out.push(["Strong shadows (" + strong + ")", strong, "strong"]);
     var turned = shown.filter(function (o) { return o.rotate; }).length;
