@@ -3829,6 +3829,7 @@
   function toggleScreenOff(on) {
     var overlay = $("screen-off-overlay");
     screenOffActive = !!on;
+    if (screenOffActive && zone === "makeit") makeitClose();
     if (screenOffActive) {
       if (overlay) {
         var hint = $("screen-off-hint");
@@ -3883,6 +3884,7 @@
   function setIdleAmbient(on) {
     var ov = $("idle-ambient-overlay");
     idleAmbientActive = !!on;
+    if (idleAmbientActive && zone === "makeit") makeitClose();
     if (idleAmbientActive) {
       clock();
       updateOledShift();
@@ -4227,6 +4229,8 @@
   // A kids profile's home is kids.js's shelf, drawn over everything here. app.js keeps who is
   // watching; kids.js shows or hides itself from that, and hands back here once the parent PIN is right.
   function kidsOn() { return !!(window.KidsMode && window.KidsMode.active()); }
+  // the person watching is marked a guest (docs/CONFIG.md, "guest": true)
+  function guestOn() { return !NOBODY && PEOPLE.some(function (p) { return p && p.id === who && p.guest === true; }); }
   function kidSync() {
     if (!window.KidsMode) return;
     var p = NOBODY ? null : PEOPLE.filter(function (x) { return x.id === who; })[0] || null;
@@ -5314,6 +5318,7 @@
     saveFocusSoon();
     followSync();   // the row follows the app tile the remote is on (home.shelf_follows_app)
     if (zone === "welcome") { renderWelcome(); return; }
+    if (zone === "makeit") return;
     if (zone === "settings") { renderSettings(); return; }
     if (zone === "smart") { window.smartHome.paint(); return; }
     if (zone === "remind") { window.Reminders.paint(); return; }
@@ -5799,6 +5804,7 @@
 
   function goHome() {
     if (zone === "welcome") { welcomeChoose(1); return; }   // Back on the first-run welcome: Couch Original
+    if (zone === "makeit") { makeitClose(); return; }       // Back on Make it yours: closed for good
     if (screenOffActive) {
       toggleScreenOff(false);
       return;
@@ -6370,6 +6376,7 @@
         if (CLOCK24 !== clock24()) { CLOCK24 = !CLOCK24; glassShown = ""; clock(); }
       } };
     }) : [];
+    if (inboxCan()) rows.unshift(inboxRow("top-inbox-now"));   // a linked TV: Get my new design, at the top
     rows.push(info("lang-note", t("lang_note")));
     return rows;
   }
@@ -6521,6 +6528,9 @@
     // Right under Get a design, so the rows above stay where Couch TV Studio's pictured steps show them.
     if (CouchDesignCode.openInbox && window.TVQR) rows.push({ kind: "nav", key: "design-phone", label: "Get a design from your phone",
       sub: "Scan a code with your phone and choose a design there. No typing on the TV", act: openPhoneInbox });
+    // the first-run Make it yours card, again
+    if (window.TVQR) rows.push({ kind: "action", key: "design-makeit", label: "Make it yours", sub: "Show the address and code to design your own screen on your phone",
+      act: function () { closeSettings(); setTimeout(function () { makeitOpen(true); }, 0); } });
   }
   // A design got by code is kept on this TV until it is deleted here, whether designs are on or off
   // (it used to be hidden while they were off, so deleting it meant turning it back on first).
@@ -6710,7 +6720,8 @@
     if (!next) { next = now + CouchDesignCode.INBOX_WEEK * 1000; inboxTime("next", next); }
     inboxLater(Math.max(1, (next - now) / 1000));
   }
-  // why: "open" (the page started), "front" (tv.resume), "now" (the person pressed Check), "week" (the timer).
+  // why: "open" (the page started), "front" (tv.resume), "now" (the person pressed Get my new design), "week" (the timer),
+  // "card" (the Make it yours card is open on a linked TV: makeitCheck).
   // Answers whether the app was asked (or a kept send is being fetched).
   function inboxAsk(why) {
     var now = Date.now();
@@ -6720,7 +6731,7 @@
     var away = !seen || seen > now || now - seen >= CouchDesignCode.INBOX_AWAY * 1000;
     var due = !!inboxTime("next") && now >= inboxTime("next");
     inboxTime("seen", now);
-    var go = why === "now" || why === "week" || due || ((why === "open" || why === "front") && away);
+    var go = why === "now" || why === "card" || why === "week" || due || ((why === "open" || why === "front") && away);
     if (!go || now < inboxTime("wait")) { inboxArm(); return false; }
     inboxTime("last", now);
     inboxTime("next", now + CouchDesignCode.INBOX_WEEK * 1000);   // until the answer says otherwise
@@ -6739,18 +6750,20 @@
   // Home settings, Designs, Check for new designs now
   function inboxCheckNow() {
     var now = Date.now();
+    if (!inboxCan()) { SET.msg = INBOX_SAID.unlinked; return; }
     if (now < inboxTime("wait")) { SET.msg = "Couch TV Studio asked this TV to wait. Try again in a few minutes."; return; }
-    if (now - inboxTime("last") < INBOX_PRESS_MS) { SET.msg = "Looked a moment ago. Try again in a minute."; return; }
+    // one press is one look, and the next one waits 30 s (INBOX_PRESS_MS) from the last look of any kind
+    if (now - inboxTime("last") < INBOX_PRESS_MS) { SET.msg = "Looked a moment ago. Try again in 30 seconds."; return; }
     ACCT_INBOX.manual = true;
-    if (inboxAsk("now")) SET.msg = "Looking for new designs from your account.";
-    else { ACCT_INBOX.manual = false; SET.msg = "Could not look just now. Try again in a minute."; }
+    if (inboxAsk("now")) SET.msg = "Looking for your new design.";
+    else { ACCT_INBOX.manual = false; SET.msg = INBOX_SAID.fail; }
   }
   var INBOX_SAID = {
-    none: "No new designs from your account.",
-    item: "Getting the design...",
+    none: "Nothing new yet.",
+    item: "A new design arrived. Getting it...",
     wait: "Couch TV Studio asked this TV to wait. Try again in a few minutes.",
-    fail: "Could not reach your Couch TV account. Check the TV is online, then try again.",   // "fail", not "error": a TV word, not an error sent to the phone
-    unlinked: "This TV is no longer linked to your account. A typed code still works."
+    fail: "No internet. Check the TV is online, then try again.",   // "fail", not "error": a TV word, not an error sent to the phone
+    unlinked: "This TV is not linked to your account."
   };
   function accountInbox(raw) {
     if (typeof CouchDesignCode === "undefined" || !CouchDesignCode.readInboxAnswer) return;
@@ -6763,6 +6776,7 @@
       ACCT_INBOX.shown = a.state === "item";   // the fetch that follows says how it went
       if (zone === "settings") renderSettings();
     }
+    makeitAnswered(a);
     if (a.state === "unlinked") { inboxStop(); return; }   // the app forgot the link; a typed code still works
     if (a.state === "item") takeAccountDesign(a);
     if (!PAGE_PAUSED && !ACCT_INBOX.stopped) inboxArm();
@@ -6819,14 +6833,19 @@
   // press asks, a second press unlinks: the TV stops getting what the account sends; the design and the
   // names already here stay (Home settings, People takes the account's names off).
   var UNLINK_ASK = 0;
+  // Get my new design: one press is one look at the account's inbox (30 s between looks), with a plain answer.
+  // Also the first row of Home settings (languageRows) on a linked TV, so it is Settings, Right, OK.
+  function inboxRow(key) {
+    return { kind: "action", key: key, label: "Get my new design",
+      sub: "Sent a design from your account? This looks for it now. It also comes by itself when the TV wakes, or once a week", act: inboxCheckNow };
+  }
   function accountRows(rows) {
     if (typeof CouchDesignCode === "undefined" || !CouchDesignCode.linked) return;
     var u = CouchDesignCode.undoHeld && CouchDesignCode.undoHeld();
     if (u) rows.push({ kind: "action", key: "dz-undo", label: "Undo the new design", sub: "Puts back what this TV had before " +
       (u.title ? "“" + u.title + "”" : "the design") + " came from your account", act: undoAccountDesign });
     if (!CouchDesignCode.linked()) return;
-    if (inboxCan()) rows.push({ kind: "action", key: "dz-inbox-now", label: "Check for new designs now",
-      sub: "Designs you send from your account come by themselves when the TV wakes, or once a week. This looks now", act: inboxCheckNow });
+    if (inboxCan()) rows.push(inboxRow("dz-inbox-now"));
     var asking = UNLINK_ASK && Date.now() - UNLINK_ASK < 15000;
     rows.push({ kind: "action", key: "dz-unlink", label: asking ? "Press OK again to unlink" : "Unlink this TV from your account",
       sub: asking ? "This TV stops getting designs your Couch TV Studio account sends. What is on it now stays." :
@@ -7888,6 +7907,7 @@
       if (typeof CouchShare !== "undefined" && CouchShare.isOpen && CouchShare.isOpen()) return true;
       if (window.CouchAsk && window.CouchAsk.isOpen && window.CouchAsk.isOpen()) return true;
     } catch (e) { return true; }
+    if (zone === "makeit") return true;
     var s = $("settings"), w = $("welcome"), g = $("gear-pop");
     return !!((s && s.classList.contains("on")) || (w && w.classList.contains("on")) || (g && g.classList.contains("on")));
   }
@@ -8113,8 +8133,140 @@
     welcomeClose("original");
     startFocus();
     paintFocus();
+    makeitDue();   // a new TV that stays on Couch Original gets the Make it yours card, once, on a calm moment
     // the one other first-run question (make Couch TV the home), now the welcome is answered
     setTimeout(homeAsk, 800);
+  }
+  // ---- the first-run "Make it yours" card (owner approved, 25 Nov 2026) ----
+  // A new TV that stayed on Couch Original (answered the welcome with Use Couch Original or Back) is shown one
+  // card, once, on a calm moment: a QR code and an address to design its own screen on a phone. Never on an
+  // update (only the welcome's answer in this version makes it due), never once a design or home pack is here,
+  // in a guest's or kids profile, in setup or while a question or sheet is up, over an app or the screensaver.
+  // Back (or OK) closes it for good; Home settings, Designs, Make it yours shows the same card again.
+  // The card is built only when it is shown and taken out of the page when it closes, so a TV that never
+  // shows it pays for none of it. No blur, no animation. The QR is drawn here (qr.js): it carries the address
+  // below and nothing else, no code, token, device id or any personal data.
+  // The address is this one constant. Its /go page must send someone signed in with a linked TV to
+  // the editor (/design/) and everyone else to /get/ before a release that shows this card (coord notes).
+  var MAKEIT_URL = "https://couchtv.joshuaseage.com/go";
+  var MAKEIT_KEY = "tvhome.makeit";   // "due" until it is shown, then "done"
+  var MAKEIT_CALM = (MOCK || PREVIEW) && /[?&]makeitcalm=(\d+)/.test(Q) ? +RegExp.$1 : 25000;   // the wait for a calm home
+  var MAKEIT_AWAY = 180000;   // nobody pressed anything: it goes by itself, so the remote is never held
+  var makeitWait = 0, makeitAway = 0, makeitPrev = null;
+  function makeitDue() {
+    keep(MAKEIT_KEY, "due");
+    makeitSchedule(MAKEIT_CALM);
+  }
+  function makeitSchedule(ms) {
+    if (makeitWait) clearTimeout(makeitWait);
+    makeitWait = kept(MAKEIT_KEY) === "due" ? setTimeout(makeitTry, ms) : 0;
+  }
+  // a design or home pack arrived: the TV is no longer on Couch Original
+  function makeitDesigned() {
+    var cfg = window.COUCH_CONFIG || {};
+    if (cfg.design && typeof cfg.design === "object") return true;
+    try { if (localStorage.getItem("couchtv.design.ok") || localStorage.getItem("couchtv.design.no")) return true; } catch (e) {}
+    if (typeof CouchDesigner !== "undefined" && kept(CouchDesigner.KEY)) return true;
+    if (typeof CouchDesignCode !== "undefined") {
+      try { if (CouchDesignCode.kept() || (CouchDesignCode.takeHome && CouchDesignCode.takeHome(true))) return true; } catch (e) {}
+    }
+    return !!(ACCOUNT || keptAccount());
+  }
+  function makeitTry() {
+    makeitWait = 0;
+    if (kept(MAKEIT_KEY) !== "due") return;
+    if (makeitDesigned()) { keep(MAKEIT_KEY, "done"); return; }
+    if (kidsOn() || guestOn()) return;   // asked again if the profile changes and the home comes to the front
+    if (document.hidden || PAGE_PAUSED || screenOffActive || idleAmbientActive) return;   // the front again: makeitSchedule
+    // not on the home yet (a question, a sheet, Home settings, setup): look again soon
+    if ((zone !== "grid" && zone !== "shelf" && zone !== "people" && zone !== "quick") || updSheetUp() ||
+      (homeState() === "ask" && !kept("tvhome.home.asked"))) { makeitSchedule(10000); return; }
+    makeitOpen(false);
+  }
+  function makeitUp() { return zone === "makeit"; }
+  function makeitOpen(manual) {
+    if (zone === "makeit" || !window.TVQR) return;
+    makeitPrev = { zone: zone, s: s, g: g };
+    if (!manual) keep(MAKEIT_KEY, "done");   // shown once
+    zone = "makeit";
+    clearFocus();
+    var el = document.createElement("div");
+    el.id = "makeit"; el.className = "makeit";
+    el.setAttribute("role", "dialog"); el.setAttribute("aria-modal", "true"); el.setAttribute("aria-labelledby", "makeit-title");
+    var shown = MAKEIT_URL.replace(/^https:\/\//, "");
+    el.innerHTML = '<div class="mk-card"><div class="mk-text"><div class="mk-brand" aria-hidden="true"><img src="couchtv-logo.svg" alt="" width="66" height="66"><span>Couch TV</span></div>' +
+      '<h1 class="mk-title" id="makeit-title">' + esc(t("makeit_title")) + '</h1><p class="mk-sub">' + esc(t("makeit_sub")) + '</p>' +
+      '<p class="mk-url" id="makeit-url">' + esc(shown) + '</p><p class="mk-hint">' + esc(t("makeit_back")) + '</p></div>' +
+      '<div class="mk-scan"><span class="mk-qr" id="makeit-qr"></span><p>' + esc(t("makeit_scan")) + '</p></div></div>';
+    try { el.querySelector("#makeit-qr").appendChild(window.TVQR.svg(MAKEIT_URL, 440)); } catch (e) { el.querySelector(".mk-scan").style.display = "none"; }
+    el.addEventListener("click", function (e) { e.preventDefault(); e.stopPropagation(); makeitClose(); });
+    document.body.appendChild(el);
+    if (makeitAway) clearTimeout(makeitAway);
+    makeitAway = setTimeout(makeitClose, MAKEIT_AWAY);
+    makeitWindowStart();
+  }
+  function makeitClose() {
+    if (zone !== "makeit") return;
+    if (makeitAway) { clearTimeout(makeitAway); makeitAway = 0; }
+    makeitWindowStop();
+    var el = $("makeit");
+    if (el && el.parentNode) el.parentNode.removeChild(el);   // out of the page, nothing left behind
+    var p = makeitPrev; makeitPrev = null;
+    if (p && (p.zone === "grid" || p.zone === "shelf" || p.zone === "people" || p.zone === "quick")) { zone = p.zone; s = p.s; g = p.g; paintFocus(); }
+    else { zone = "grid"; startFocus(); paintFocus(); }
+  }
+  // ---- the look for a design while the Make it yours card is open (owner, 25 Nov 2026) ----
+  // The TV asks the account's inbox only when someone expects a design. While the card is open and in front, on a
+  // linked TV, it looks every 20 s, at most 45 looks (15 minutes) in the whole life of the TV: the count is kept, so a
+  // restart, or the card shown again from Home settings, goes on from what is left and never starts over. It stops the
+  // moment a design arrives, the card closes (Back, OK, Home, Settings, a pointer click, an app, the screensaver, screen
+  // off, sleep), the page is hidden, or the TV goes offline; it comes on again only while the card is still open and
+  // in front. A TV that is not linked asks nothing. If Setup links the TV while the card is open (the app's start
+  // from Setup with the link calls tv.setupDesign), it starts then. A look that fails (no internet, a busy server) waits twice as long
+  // each time, up to 160 s, and still counts. A 429 (the app answers "wait") ends the window for good.
+  // Nothing else in the home starts a look: the Home key, opening the home and the weekly look are as they were.
+  var MAKEIT_CHK = "tvhome.makeit.looks", MAKEIT_MAX = 45;
+  var MAKEIT_EVERY = (MOCK || PREVIEW) && /[?&]makeitevery=(\d+)/.test(Q) ? +RegExp.$1 : 20000;
+  var makeitTick = 0, makeitBack = 0;
+  function makeitLooks() { var n = +kept(MAKEIT_CHK); return n > 0 ? Math.min(n, MAKEIT_MAX) : 0; }
+  function makeitWindowOk() {
+    return zone === "makeit" && !document.hidden && !PAGE_PAUSED && !screenOffActive && !idleAmbientActive &&
+      navigator.onLine !== false && makeitLooks() < MAKEIT_MAX && inboxCan() && Date.now() >= inboxTime("wait");
+  }
+  function makeitWindowStop() { if (makeitTick) clearTimeout(makeitTick); makeitTick = 0; makeitBack = 0; }
+  function makeitWindowStart() {
+    if (makeitTick || !makeitWindowOk()) return;
+    makeitBack = 0;
+    makeitTick = setTimeout(makeitCheck, MAKEIT_EVERY);
+    // a linked TV keeps the card up for the whole window (the same 3 minutes as before when it is not linked)
+    if (makeitAway) { clearTimeout(makeitAway); makeitAway = setTimeout(makeitClose, (MAKEIT_MAX - makeitLooks()) * MAKEIT_EVERY + 60000); }
+  }
+  function makeitCheck() {
+    makeitTick = 0;
+    if (!makeitWindowOk()) return;
+    keep(MAKEIT_CHK, makeitLooks() + 1);   // counted before the look, so a crash cannot give extra looks
+    var asked = inboxAsk("card");
+    if (!asked) makeitBack = Math.min(makeitBack + 1, 3);
+    if (makeitLooks() < MAKEIT_MAX) makeitTick = setTimeout(makeitCheck, MAKEIT_EVERY * Math.pow(2, makeitBack));
+  }
+  // the app's answer to a look: a design closes the card; a failure backs off; a wait or an unlinked TV ends it
+  function makeitAnswered(a) {
+    if (zone !== "makeit" || !a) return;
+    if (a.state === "item") { makeitWindowStop(); makeitClose(); return; }
+    if (a.state === "wait") { keep(MAKEIT_CHK, MAKEIT_MAX); makeitWindowStop(); return; }
+    if (a.state === "unlinked") { makeitWindowStop(); return; }
+    if (a.state === "error") { makeitBack = Math.min(makeitBack + 1, 3); if (makeitTick) { clearTimeout(makeitTick); makeitTick = makeitLooks() < MAKEIT_MAX ? setTimeout(makeitCheck, MAKEIT_EVERY * Math.pow(2, makeitBack)) : 0; } }
+    else makeitBack = 0;
+  }
+  document.addEventListener("visibilitychange", function () { if (document.hidden) makeitWindowStop(); else makeitWindowStart(); });
+  window.addEventListener("offline", makeitWindowStop);
+  window.addEventListener("online", makeitWindowStart);
+  function makeitKey(e) {
+    if (isSettings(e)) { e.preventDefault(); if (!e.repeat) settingsKey(); return; }
+    if (isBack(e) || isOk(e) || arrowOf(e)) {
+      e.preventDefault();
+      if (!e.repeat && !arrowOf(e)) makeitClose();   // Back and OK close it; the arrows do nothing and never hold anything
+    }
   }
   function updWhen(u) {
     if (!u.checked) return t("upd_never");
@@ -8619,6 +8771,7 @@
   function settingsKey() {
     // the first-run welcome: Home settings stays one press away (the welcome counts as answered)
     if (zone === "welcome") { welcomeClose("settings"); startFocus(); paintFocus(); }
+    if (zone === "makeit") makeitClose();
     if (kidsOn()) { window.KidsMode.askPin(); return; }
     if (idlePhotoInput(null)) return;
     if (zone === "gear" || zone === "settings" || zone === "smart" || zone === "remind" || zone === "appmenu" || zone === "shelfmenu" || zone === "updask" || zone === "inputs") { goHome(); return; }
@@ -8803,6 +8956,7 @@
       return;
     }
     if (zone === "welcome") { welcomeKey(e); return; }   // the first-run welcome has the remote
+    if (zone === "makeit") { makeitKey(e); return; }     // the first-run Make it yours card
     if (kidsOn()) { okReset(); if (window.KidsMode.key(e)) e.preventDefault(); return; }
     if (idlePhotoInput(e)) return;
     if (typingKey(e)) return;   // typing a place or a name: the keys belong to the text box
@@ -9834,6 +9988,7 @@
   // Home on the remote also re-reads the lists, so an order arranged on the phone shows straight away
   window.tv = { back: function () { if (window.CouchAsk && window.CouchAsk.back && window.CouchAsk.back()) return; if (typeof CouchShare !== "undefined" && CouchShare.close()) return; if (typeof CouchDesign !== "undefined" && CouchDesign.back && CouchDesign.back()) return; if (idleAmbientActive) { setIdleAmbient(false); resetSmartIdle(); return; } if (idlePhotoInput(null)) return; goHome(); resetIdlePhoto(); resetSmartIdle(); },
     home: function () { forgetFocus(); updFront(); if (zone === "welcome") return;   // the first-run welcome stays until it is answered
+      if (zone === "makeit") { makeitClose(); return; }
       clipWake(); if (idleAmbientActive) { setIdleAmbient(false); resetSmartIdle(); return; } if (idlePhotoInput(null)) return; if (zone === "settings") closeSettings(); else goHome(); refresh(); resetIdlePhoto(); resetSmartIdle(); },
     screenOff: function () { toggleScreenOff(true); },
     // the TV home app's Spotify listener says the moment the song, play or pause changes (MainActivity), so
@@ -9848,10 +10003,10 @@
     phoneLink: function () { PHONE_QR.url = ""; phoneQr(); if (typeof CouchDesign !== "undefined" && CouchDesign.nav && CouchDesign.nav.phoneAgain) CouchDesign.nav.phoneAgain(); },
     // also the on-TV app's HomeActivity.refresh() after a phone or setup save, with the home already in front
     // and never paused: that redraws, but only a resume after tv.pause() is the home coming to the front
-    resume: function () { var front = PAGE_PAUSED; PAGE_PAUSED = false; clock(); designVideo("away", false); toggleScreenOff(false); setIdleAmbient(false); resetSmartIdle(); okReset(); refresh(); if (!OFFLINE) refreshQuick(); refreshWeather(); startVideo(); clipWake(); sceneVideos(true); refreshMusic(); refreshCards(true); if (window.AmbientWeather) window.AmbientWeather.resume(); resetIdlePhoto(); kwArtAgain(); if (front) updFront(); setupDesign(); if (front) inboxAsk("front"); },
+    resume: function () { var front = PAGE_PAUSED; PAGE_PAUSED = false; clock(); designVideo("away", false); toggleScreenOff(false); setIdleAmbient(false); resetSmartIdle(); okReset(); refresh(); if (!OFFLINE) refreshQuick(); refreshWeather(); startVideo(); clipWake(); sceneVideos(true); refreshMusic(); refreshCards(true); if (window.AmbientWeather) window.AmbientWeather.resume(); resetIdlePhoto(); kwArtAgain(); if (front) { updFront(); makeitSchedule(MAKEIT_CALM); } setupDesign(); if (front) inboxAsk("front"); },
     // an app is in front: the video background stops until the home is back
     // (and a design's video background lets go of the TV's decoder, which the app may need)
-    pause: function () { saveFocusNow(); PAGE_PAUSED = true; pauseVideo(); designVideo("away", true); inboxAway(); },
+    pause: function () { if (zone === "makeit") makeitClose(); saveFocusNow(); PAGE_PAUSED = true; pauseVideo(); designVideo("away", true); inboxAway(); },
     scene: function (pick) { return phoneScene(pick); },
     // the launcher's file picker has copied the chosen photos into its own storage (Home settings)
     photosAdded: function (names) { photosAdded(names); },
@@ -9865,7 +10020,7 @@
     homeAnswered: function (held) { homeAnswered(held); },
     // a calendar the launcher read for the Agenda widget (MainActivity.calendar)
     calendarText: function (id, ok, text) { calendarText(id, ok, text); },
-    setupDesign: function () { setupDesign(); ACCT_INBOX.stopped = false; inboxArm(); },   // Setup brings its own design; the inbox keeps its times
+    setupDesign: function () { setupDesign(); ACCT_INBOX.stopped = false; inboxArm(); makeitWindowStart(); },   // Setup brings its own design; the inbox keeps its times
     accountInbox: function (raw) { accountInbox(raw); },
     // words typed on the phone remote (Type on the TV) when the TV app cannot press keys (the on-TV app
     // with no ADB): they go into the typing box Home settings has open, at the cursor. False: no box open.
@@ -10757,6 +10912,7 @@
     initSettings();
     remindersInit();
     welcomeStart(freshTv);   // a TV never set up: the first-run welcome, over everything else
+    makeitSchedule(MAKEIT_CALM + 5000);   // the Make it yours card, if the welcome was answered with Couch Original and it never showed
     setupDesign();           // Couch TV Setup's design code, if it brought one: no typing
     accountNewNotice();      // a design the account just sent: say so once, with where Undo is
     inboxAsk("open");        // the account's TV inbox, when this TV is linked (after 30 minutes away, or due)

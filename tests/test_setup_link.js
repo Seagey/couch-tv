@@ -173,7 +173,7 @@ function app(code, linked) {
   // ---- 5. app.js wiring and privacy ----
   const appJs = fs.readFileSync(path.join(web, "app.js"), "utf8");
   const dc = fs.readFileSync(path.join(web, "design-code.js"), "utf8");
-  for (const s of ["setupDesign();", "inboxAsk(\"open\");", "inboxAsk(\"front\");", "inboxAway(); },", "accountNewNotice();", "accountInbox: function (raw)", "key: \"dz-unlink\"", "key: \"dz-undo\"", "key: \"dz-inbox-now\"", "Check for new designs now"])
+  for (const s of ["setupDesign();", "inboxAsk(\"open\");", "inboxAsk(\"front\");", "inboxAway(); },", "accountNewNotice();", "accountInbox: function (raw)", "key: \"dz-unlink\"", "key: \"dz-undo\"", "inboxRow(\"dz-inbox-now\")", "Get my new design"])
     assert.ok(appJs.includes(s), "app.js has " + s);
   // the link never reaches the page: nothing here asks for it, names the extra, or the Studio inbox address
   // (app.js has its own "Bearer" for the home computer's key, so only the Studio words are looked for there)

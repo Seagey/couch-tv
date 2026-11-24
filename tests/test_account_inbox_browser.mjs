@@ -177,12 +177,12 @@ try {
   ok(!back.fetched && !back.ok && !back.undo, "Undo put back the TV as it was: no design kept, no yes, no Undo left");
   ok(!back.asked, "and no question after Undo");
 
-  // 4a2. Check for new designs now (the TV looks by itself only after 30 minutes away, or once a week)
+  // 4a2. Get my new design (the TV looks by itself only after 30 minutes away, or once a week)
   await toDesigns();
   rows = await rowsText();
-  ok(/Check for new designs now/.test(rows) && /when the TV wakes, or once a week/.test(rows), "Designs has Check for new designs now");
+  ok(/Get my new design/.test(rows) && /when the TV wakes, or once a week/.test(rows), "Designs has Get my new design");
   const msgText = () => page.evaluate(() => (document.getElementById("set-msg") || {}).textContent || "");
-  ok(await toRow(/Check for new designs now/), "Check can be reached with the remote");
+  ok(await toRow(/Get my new design/), "Check can be reached with the remote");
   // the last look (the first open) was a moment ago: the press would say so; move it back a minute
   await press("Enter", 600);
   ok(/Looked a moment ago/.test(await msgText()), "a press within 30 s of the last look asks nothing");
@@ -190,7 +190,7 @@ try {
   const asks0 = app.inboxAsks;
   await press("Enter", 900);
   ok(app.inboxAsks === asks0 + 1, "the press asks the inbox once (" + (app.inboxAsks - asks0) + ")");
-  ok(/No new designs from your account/.test(await msgText()), "and says there is nothing new (" + (await msgText()) + ")");
+  ok(/Nothing new yet/.test(await msgText()), "and says there is nothing new (" + (await msgText()) + ")");
   await press("Enter", 600);
   ok(app.inboxAsks === asks0 + 1 && /Looked a moment ago/.test(await msgText()), "a second press within 30 s asks nothing (" + (await msgText()) + ")");
   // the home coming back after a moment away asks nothing
@@ -204,12 +204,12 @@ try {
   app.answer = { state: "item", code: CODE2, title: "Sunday morning", poll: 60 };
   storeFail = 1;
   await toDesigns();
-  ok(await toRow(/Check for new designs now/), "Check again");
+  ok(await toRow(/Get my new design/), "Check again");
   await page.evaluate(() => localStorage.setItem("couchtv.inbox.last", String(Date.now() - 60000)));
   let a1 = app.inboxAsks, f1 = fetched.length;
   await press("Enter", 1500);
   ok(app.inboxAsks === a1 + 1 && fetched.length === f1 + 1, "the press got the send and tried its design once");
-  ok(/Could not reach your Couch TV account/.test(await msgText()), "the failed fetch says so (" + (await msgText()) + ")");
+  ok(/No internet/.test(await msgText()), "the failed fetch says so (" + (await msgText()) + ")");
   const held = await page.evaluate(() => JSON.parse(localStorage.getItem("couchtv.inbox.pending") || "null"));
   ok(held && held.code === CODE2 && held.title === "Sunday morning", "and the send is kept, not lost");
   await page.evaluate(() => localStorage.setItem("couchtv.inbox.last", String(Date.now() - 60000)));

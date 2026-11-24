@@ -2896,3 +2896,34 @@ html.glass.theme-night:not(.theme-loop) .people:not(.focus), html.glass.theme-ni
 [dir="rtl"] .wel-studio p { margin: 0 1.75rem 0 0; text-align: right; }
 html.lighter .wpick { box-shadow: none; }
 html.lighter .wpick.focus { box-shadow: 0 0 0 0.5rem #FFFFFF, 0 0 0 1rem var(--wel-sun); }
+
+/* ---------- the first-run "Make it yours" card (app.js makeitOpen): built when shown, out of the page when closed ----------
+   The approved picture (setup-mockups 08, 25 Nov 2026) at 1920x1080: a white card on a dimmed home. No blur, no
+   animation and flexbox with margins only, so it costs nothing on a Lighter home or an old WebView. rem follows the
+   screen's width (16px at 1920), so 720p and 4K look the same. Words are 2.25rem (36px at 1080p) or bigger: readable from 3 m. */
+.makeit {
+  position: fixed; top: 0; right: 0; bottom: 0; left: 0; z-index: 36; display: -webkit-box; display: flex;
+  -webkit-box-align: center; align-items: center; -webkit-box-pack: center; justify-content: center;
+  background: rgba(8, 8, 14, 0.62); text-shadow: none; font-family: "Inter", system-ui, sans-serif; font-weight: 450;
+}
+.mk-card {
+  display: -webkit-box; display: flex; -webkit-box-align: center; align-items: center; -webkit-box-pack: justify; justify-content: space-between;
+  box-sizing: border-box; width: 101.25rem; height: 48.75rem; padding: 0 5.5rem 0 6.25rem; border-radius: 6.25rem;
+  background: #FFFFFF; color: #14131A;
+}
+.mk-text { -webkit-box-flex: 1; flex: 1; min-width: 0; margin-right: 4rem; }
+.mk-brand { display: -webkit-box; display: flex; -webkit-box-align: center; align-items: center; }
+.mk-brand img { display: block; width: 4.125rem; height: 4.125rem; }
+.mk-brand span { margin-left: 1.25rem; font-family: "Nunito", "Inter", sans-serif; font-size: 2.625rem; line-height: 3.25rem; font-weight: 900; }
+.mk-title { margin: 1.5rem 0 0; font-family: "Nunito", "Inter", sans-serif; font-size: 8rem; line-height: 8.75rem; font-weight: 900; letter-spacing: -0.02em; }
+.mk-sub { margin: 1.25rem 0 0; font-size: 2.75rem; line-height: 3.5rem; color: #3E3C4A; }
+.mk-url { display: inline-block; margin: 2.75rem 0 0; padding: 0.875rem 2.5rem; border: 0.125rem solid #E7E3DA; border-radius: 4rem; background: #FAF8F3;
+  font-size: 2.875rem; line-height: 3.75rem; font-weight: 800; }
+.mk-hint { margin: 2.25rem 0 0; font-size: 2.25rem; line-height: 3rem; color: #5A5866; }
+.mk-scan { -webkit-box-flex: 0; flex: none; text-align: center; }
+.mk-qr { display: block; box-sizing: border-box; width: 29.375rem; height: 29.375rem; padding: 0.875rem; border: 0.125rem solid #E7E3DA; border-radius: 2.75rem; background: #FFFFFF; }
+.mk-qr svg { display: block; width: 100%; height: 100%; }
+.mk-scan p { margin: 1.5rem 0 0; font-size: 2.5rem; line-height: 3.25rem; font-weight: 800; }
+[dir="rtl"] .mk-card { padding: 0 6.25rem 0 5.5rem; }
+[dir="rtl"] .mk-text { margin: 0 0 0 4rem; }
+[dir="rtl"] .mk-brand span { margin: 0 1.25rem 0 0; }
