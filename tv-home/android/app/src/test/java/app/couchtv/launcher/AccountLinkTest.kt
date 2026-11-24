@@ -176,6 +176,15 @@ class AccountLinkTest {
         assertEquals(ask, StartRules.decide(u, false, true, true))
     }
 
+    @Test fun aTvInUseAsksEvenWhenNoComputerSetItUp() {
+        val hour = 3_600_000L
+        assertFalse("just installed, nothing on it", StartRules.setUp(settings = false, linked = false, installedFor = 5 * 60_000L))
+        assertTrue(StartRules.setUp(settings = true, linked = false, installedFor = 0))
+        assertTrue("linked to an account", StartRules.setUp(settings = false, linked = true, installedFor = 0))
+        assertTrue("put on by hand and used for days", StartRules.setUp(settings = false, linked = false, installedFor = 48 * hour))
+        assertTrue("a clock that moved back says nothing", StartRules.setUp(settings = false, linked = false, installedFor = -hour))
+    }
+
     @Test fun theSameStartIsDealtWithOnce() {
         val kv = Mem()
         val x = mapOf("bridge" to "none", "config_b64" to "e30=", "account_link" to null)

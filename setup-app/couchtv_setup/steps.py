@@ -406,25 +406,35 @@ def link_account(tv, account):
     """Writes the account link (and the design code) into Couch TV that is already on the TV, with no
     reinstall and no change to its settings: the app keeps them and fetches the design at once.
     True: the TV answered that it holds this link (Couch TV 0.13.15 and newer, SetupLink.kt). "sent": an older Couch
-    TV took the start, which says nothing about the link. Anything else is raised."""
+    TV took the start, which says nothing about the link. Anything else is raised.
+    account["said"] is what the account is to be told, raised or not: "sent" as soon as the TV may have it (an answer
+    that got lost is not a No: the TV let go of its old link when it took this one), False once the TV said no."""
     extras = account_extras(account)
     if "account_link" not in extras:
         raise TvError("Your Couch TV account did not give this TV a link. Try again.", "studio_bad")
     need_link_version(tv)
     want = hashlib.sha256(account["link"].encode()).hexdigest()[:16]
+    account["said"] = "sent"
     for attempt in range(2):
         out = tv.shell(f"am broadcast --include-stopped-packages -n {SETUP_LINK}{extras}")
         said = re.search(r'data="(couchtv-link [^"]*)"', out)
         if said and said.group(1) == "couchtv-link ok " + want:
+            account["said"] = True
             return True
         if said:
+            account["said"] = False
             raise TvError("The TV did not keep the link. Try again.", "link_failed", said.group(1))
         if attempt == 0:
             if not version_at_least(app_version(tv, HOME_PKG), (0, 13, 15)):
                 break                        # 0.13.13 and 0.13.14 have nothing to answer with
             start_activity(tv, HOME_ACT)     # some TVs hold a message for an app that is not running: open it, ask again
             time.sleep(3)
-    start_activity(tv, HOME_ACT, extras)
+    try:
+        start_activity(tv, HOME_ACT, extras)
+    except TvError as e:
+        if e.code == "not_started" and not version_at_least(app_version(tv, HOME_PKG), (0, 13, 15)):
+            account["said"] = False              # the only way in, and Android said it did not happen
+        raise
     return "sent"
 
 

@@ -651,10 +651,10 @@
   function ask(q, then) {
     if (!q || q.id === askId) return;
     askId = q.id; askThen = then || null;
-    var x = q.account.name ? q.account.name + " (" + q.account.email + ")" : q.account.email;
+    var x = q.account.email + (q.account.name ? ", " + q.account.name : "");   // the name is only what its account says
     text("link-ask-who", "Link as " + x + "?");
     var was = q.instead_of && (q.instead_of.name || q.instead_of.email);
-    text("link-ask-mail", was ? "Setup is signed in as " + was + " now. Yes switches accounts." : "Only press Yes if this is your account.");
+    text("link-ask-mail", was ? "Setup is signed in as " + was + " now. Yes switches accounts." : "Only press Yes if you just asked for this. Check the email is yours.");
     $("link-ask").hidden = false;
     $("link-ask-who").focus();
   }

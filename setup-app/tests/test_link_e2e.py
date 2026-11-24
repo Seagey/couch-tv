@@ -301,6 +301,47 @@ class LinkEndToEnd:
         self.http("POST", "/test/clock", {"ms": 9 * DAY})
         self.assertEqual(self.inbox(old)[0], 200)
 
+    # ---- second gate: Setup not hearing back is not the TV saying no ----
+    def lost_after_the_tv_took_it(self, tv, old):
+        """The TV let go of its old link when it took the new one (AccountLink.letGo): the new one is all it has."""
+        self.assertNotEqual(tv.held, old)
+        self.http("POST", "/v1/setup/leave", {}, {"Authorization": "Bearer " + old})
+        self.assertEqual(self.inbox(tv.held)[0], 200)
+        self.assertEqual([t["link"] for t in self.mine()["tvs"]], ["linked"])
+
+    def test_an_answer_lost_on_the_way_keeps_the_link_the_tv_took(self):
+        tv, old = self.linked_tv()
+        real = tv.shell
+
+        def shell(cmd, *a, **k):
+            out = real(cmd, *a, **k)
+            if "SetupLink" in cmd:
+                raise TvError("The TV stopped answering.", "lost")
+            return out
+        with mock.patch.object(tv, "shell", shell):
+            self.assertEqual(self.job("/api/link-tv")["code"], "lost")
+        self.lost_after_the_tv_took_it(tv, old)
+
+    def test_an_install_that_breaks_after_the_link_keeps_the_link(self):
+        tv, old = self.linked_tv()
+        with mock.patch.object(steps, "facts_tcl", side_effect=TvError("The TV stopped answering.", "lost")), \
+                mock.patch.object(release, "get", lambda name, p=None: {"path": "/x/a.apk", "version": "v0.13.15", "sha256": "", "checked": ""}):
+            self.assertEqual(self.job("/api/setup", {})["code"], "lost")
+        self.lost_after_the_tv_took_it(tv, old)
+
+    def test_another_tv_answering_at_the_address_is_not_linked(self):
+        """The connection comes back by itself (tv.py): when another TV answers now, nothing goes to it or about it."""
+        self.sign_in()
+        tv = self.connected_tv()
+        tv.serial = "ANOTHERTV"
+        self.assertEqual(self.job("/api/link-tv")["code"], "no_tv")
+        self.assertIsNone(tv.held)
+        self.assertEqual(self.mine()["tvs"], [])
+
+    def test_a_name_cannot_pretend_to_be_an_email(self):
+        acct = studio.clean_account({"name": "Sam (s***@example.test)\u202e?", "email": "x***@evil.test"})
+        self.assertEqual(acct, {"name": "Sam s example.test", "email": "x***@evil.test", "design": None})
+
     # ---- 5 and 10: ways on, and signing out ----
     def test_a_sign_in_that_ran_out_signs_setup_out_and_a_new_code_works(self):
         self.sign_in()
@@ -467,6 +508,9 @@ class PageAsks(unittest.TestCase):
             js = f.read()
         self.assertNotIn("signedIn(r.account); linkCard(false); linkRun()", js)
         self.assertEqual(js.count("/api/link-yes"), 1)
+        # the email is what cannot be made up, so it comes first; and when to press Yes is said
+        self.assertIn('q.account.email + (q.account.name ? ", " + q.account.name : "")', js)
+        self.assertIn("Only press Yes if you just asked for this.", js)
         # a button the page does not have stops the rest of the page's script (Close setup did nothing, 0.13.14)
         for el in set(re.findall(r'\$\("([a-z0-9-]+)"\)\.addEventListener', js)):
             self.assertIn(f'id="{el}"', html)

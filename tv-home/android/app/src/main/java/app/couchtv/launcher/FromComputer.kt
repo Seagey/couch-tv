@@ -72,6 +72,12 @@ object StartRules {
     }
 
     /**
+     * Is this TV in use? Settings from a computer, an account link, or Couch TV put on by hand more than an hour ago
+     * (then there are no settings to see, but there is a home somebody uses).
+     */
+    fun setUp(settings: Boolean, linked: Boolean, installedFor: Long): Boolean = settings || linked || installedFor !in 0..3_600_000L
+
+    /**
      * replay: Android started this again by itself with an intent already dealt with. setUp: this TV has settings.
      * The first set up of a new TV asks nothing, whoever sends it; an account link is never taken from an unknown caller
      * without the person at the TV (new Setup sends it through [SetupLink]).

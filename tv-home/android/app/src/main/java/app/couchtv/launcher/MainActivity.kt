@@ -340,7 +340,9 @@ class MainActivity : Activity() {
         val replay = again != null && (again || i.flags and Intent.FLAG_ACTIVITY_LAUNCHED_FROM_HISTORY != 0 ||
             StartRules.seen(AccountLink.kv(this), StartRules.startId((StartRules.SETTINGS + StartRules.LINK).associateWith { i.getStringExtra(it) }, taskId,
                 if (Build.VERSION.SDK_INT >= 24) Settings.Global.getInt(contentResolver, Settings.Global.BOOT_COUNT, 0) else 0)))
-        val setUp = prefs.contains("config") || prefs.contains("bridge") || prefs.contains("pairing_key")
+        val installed = runCatching { packageManager.getPackageInfo(packageName, 0).firstInstallTime }.getOrDefault(0L)
+        val setUp = StartRules.setUp(prefs.contains("config") || prefs.contains("bridge") || prefs.contains("pairing_key"),
+            AccountLink.linked(AccountLink.kv(this)), System.currentTimeMillis() - installed)
         return i to StartRules.decide(StartRules.who(Build.VERSION.SDK_INT, startedBy()), replay, StartRules.hasLink(i), setUp)
     }
 

@@ -218,6 +218,9 @@ def _register(strict=False):
     known = _known().get(S.ip) or {}
     name = known.get("room") or (S.facts or {}).get("name") or "TV"
     try:
+        if S.tv_key and steps.tv_key(need_tv()) != S.tv_key:
+            # the connection came back by itself and another TV has the address now
+            raise TvError("This computer is not connected to the TV. Find the TV again.", "no_tv")
         reg = _account(lambda: studio.register_tv(S.link, tvprofile.clean(S.profile), name, _rows().get(_row_name() or "")))
     except TvError as e:
         if strict:
@@ -273,6 +276,9 @@ def _say_yes(offer_id):
         new = studio.Link()
         S.offer = None            # used once, whatever comes back
         acct = studio.handoff(new, o["code"])
+        if S.job.get("running"):       # a step that began meanwhile keeps the account it began with
+            studio.end(new)
+            raise TvError("Still busy with the last step.", "busy")
         if acct.get("email") != o["account"]["email"]:
             studio.end(new)
             raise TvError("That code is for another account now. Use a new code.", "other_account")
@@ -294,10 +300,11 @@ def _link_now(progress):
     progress(0.2, "Linking the TV to your Couch TV account")
     reg = _register(strict=True)
     progress(0.6, "Sending the link to the TV")
+    new = {"link": reg["link"], "code": reg["code"]}
     try:
-        took = steps.link_account(tv, {"link": reg["link"], "code": reg["code"]})
+        took = steps.link_account(tv, new)
     except TvError:
-        studio.report_done(S.link, False, ver, tvprofile.clean(S.profile), linked=False)
+        studio.report_done(S.link, False, ver, tvprofile.clean(S.profile), linked=new.get("said", False))
         raise
     progress(0.9, "Telling your account the TV is ready")
     reported = studio.report_done(S.link, True, ver, tvprofile.clean(S.profile), linked=took)
@@ -596,7 +603,7 @@ def api(method, path, body):
                                     account=acct and acct["extras"])
             except Exception:
                 if acct:
-                    studio.report_done(S.link, False, None, tvprofile.clean(S.profile), linked=False)
+                    studio.report_done(S.link, False, None, tvprofile.clean(S.profile), linked=acct["extras"].get("said", False))
                 raise
             r["apk"] = {k: apk[k] for k in ("version", "sha256", "checked")}
             if r.get("front"):
@@ -608,7 +615,8 @@ def api(method, path, body):
                     r["speed"] = None
             if acct:
                 took = r.get("link") or False
-                reported = studio.report_done(S.link, r.get("front"), apk.get("version"), tvprofile.clean(S.profile), linked=took)
+                reported = studio.report_done(S.link, r.get("front"), apk.get("version"), tvprofile.clean(S.profile),
+                                              linked=took or acct["extras"].get("said", False))
                 r["account"] = dict(_link_words(took, reported), design=acct["design"] if took else None,
                                     people=len(ppl or []), town=(acct["weather"] or {}).get("place"), reported=reported,
                                     error=(r.get("link_error") or {}).get("error"))

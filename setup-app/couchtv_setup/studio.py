@@ -229,7 +229,9 @@ def clean_account(acct):
     acct = acct if isinstance(acct, dict) else {}
     mail = acct.get("email")
     ok = isinstance(mail, str) and re.fullmatch(r"[^\s@<>\x00-\x1f]{1,4}\*\*\*@[A-Za-z0-9.-]{1,80}", mail)
-    return {"name": re.sub(r"[\x00-\x1f\x7f<>]", "", str(acct.get("name") or ""))[:40] or None,
+    # the name is whatever its account says: letters that turn text round, and what makes it look like an email, go
+    name = re.sub(r"[^\w .,'\u2019-]+", " ", str(acct.get("name") or ""))
+    return {"name": re.sub(r"\s+", " ", name).strip()[:40] or None,
             "email": mail if ok else None,
             "design": re.sub(r"[\x00-\x1f\x7f<>]", "", str(acct.get("design") or ""))[:60] or None}
 
