@@ -51,6 +51,12 @@ if [ "$1 $2" = "release view" ] && [ "$7" = assets ]; then
   if [ -n "${FAKE_ASSETS_AFTER+x}" ] && grep -q "^gh run rerun" "$CALLS"; then printf "%b" "$FAKE_ASSETS_AFTER"; else printf "%b" "${FAKE_ASSETS-SETUP_DEFAULT}"; fi
 fi
 [ "$1 $2" = "run list" ] && printf "%s" "${FAKE_RUN:-}"
+if [ "$1 $2" = "release download" ]; then
+  [ -n "${FAKE_DOWNLOAD_RC:-}" ] && exit "$FAKE_DOWNLOAD_RC"
+  dir=""; pats=""; prev=""
+  for a in "$@"; do [ "$prev" = --dir ] && dir=$a; [ "$prev" = --pattern ] && pats="$pats $a"; prev=$a; done
+  for f in $pats; do echo "content of $f" > "$dir/$f"; done
+fi
 exit 0
 """.replace("SETUP_DEFAULT", "\\\\n".join(SETUP) + "\\\\n")
 # called as: gradlew -p <dir> --no-daemon -q <tasks...>  or  gradlew -p <dir> --stop
@@ -74,6 +80,15 @@ FAKE_SIGN = """#!/bin/bash
 echo "sign $1 $(basename "$3")" >> "$CALLS"
 [ -n "${FAKE_SIGN_RC:-}" ] && exit "$FAKE_SIGN_RC"
 cp "$2" "$3"
+"""
+# the Setup sums signer and checker: the real ones need the release key and the app's public key
+FAKE_SIGN_SUMS = """import os, sys
+open(os.environ["CALLS"], "a").write("sign-setup-sums " + os.path.basename(sys.argv[1]) + "\\n")
+open(sys.argv[1] + ".sig", "w").write("c2ln\\n")
+"""
+FAKE_VERIFY_SUMS = """import os, sys
+open(os.environ["CALLS"], "a").write("verify-setup-sig " + " ".join(os.path.basename(a) for a in sys.argv[1:]) + "\\n")
+sys.exit(int(os.environ.get("FAKE_VERIFY_RC", "0")))
 """
 FAKE_SAMSUNG = """#!/bin/bash
 echo "samsung $*" >> "$CALLS"
@@ -111,12 +126,16 @@ class ReleaseScript(unittest.TestCase):
         exe(self.r / "tv-home/android/gradlew", FAKE_GRADLEW)
         exe(self.r / "fake-samsung", FAKE_SAMSUNG)
         exe(self.r / "scripts/sign-ontv.sh", FAKE_SIGN)
+        (self.r / "scripts/sign-setup-sums.py").write_text(FAKE_SIGN_SUMS)
+        (self.r / "scripts/verify-setup-sig.py").write_text(FAKE_VERIFY_SUMS)
+        (self.r / "fake-signing-key.pem").write_text("not a key\n")
         (self.r / "remote/dist").mkdir(parents=True)
         (self.r / "remote/dist/index.html").write_text("x")
         self.calls = self.r / "calls.log"
         self.lock = self.r / "gradle.lock"
         self.env = dict(os.environ, PATH=f"{b}:{os.environ['PATH']}", CALLS=str(self.calls), ANDROID_HOME="/nonexistent",
-                        FAKE_HEAD=HEAD, JAVA_HOME=str(self.r), SAMSUNG_PYTHON=str(self.r / "fake-samsung"))
+                        FAKE_HEAD=HEAD, JAVA_HOME=str(self.r), SAMSUNG_PYTHON=str(self.r / "fake-samsung"),
+                        COUCHTV_SIGNING_KEY=str(self.r / "fake-signing-key.pem"))
         for k in ("REPO", "REMOTE", "GRADLE_LOCK", "CONFIG", "STUB_RC"):
             self.env.pop(k, None)
 
@@ -407,6 +426,34 @@ class ReleaseScript(unittest.TestCase):
         rc, out = self.setup_step()
         self.assertEqual(rc, 0, out)
         self.assertEqual([l for l in self.log() if " run " in l], [])
+
+    def test_setup_signs_the_sums_on_the_release_and_uploads_the_sig(self):
+        rc, out = self.setup_step()
+        self.assertEqual(rc, 0, out)
+        self.assertIn("SETUP SUMS SIGNED on v9.9.9", out)
+        log = self.log()
+        up = [l for l in log if l.startswith("gh release upload v9.9.9")]
+        self.assertEqual(len(up), 1, up)
+        self.assertIn("SHA256SUMS-setup.txt.sig", up[0])
+        self.assertIn("--clobber", up[0])
+        # checked before the upload and again from the release's own copy after it
+        verifies = [i for i, l in enumerate(log) if l.startswith("verify-setup-sig")]
+        upload = next(i for i, l in enumerate(log) if l.startswith("gh release upload"))
+        self.assertEqual(len(verifies), 2, log)
+        self.assertLess(verifies[0], upload)
+        self.assertGreater(verifies[1], upload)
+        self.assertFalse((self.dist / "setup-sign").exists(), "the working folder is cleaned up")
+        self.assertNotIn("not a key", out, "the key is never printed")
+
+    def test_setup_without_the_signing_key_exits_8_and_uploads_nothing(self):
+        rc, out = self.setup_step(COUCHTV_SIGNING_KEY=str(self.r / "no-such-key.pem"))
+        self.assertEqual(rc, 8, out)
+        self.assertEqual([l for l in self.log() if l.startswith("gh release upload")], [])
+
+    def test_setup_does_not_upload_a_signature_that_does_not_check(self):
+        rc, out = self.setup_step(FAKE_VERIFY_RC="1")
+        self.assertEqual(rc, 8, out)
+        self.assertEqual([l for l in self.log() if l.startswith("gh release upload")], [])
 
     def test_setup_names_the_one_missing_file(self):
         have = "\n".join(f for f in SETUP if "apple-silicon" not in f) + "\n"
