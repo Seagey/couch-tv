@@ -104,6 +104,25 @@ TV on the computer:
   Mute from the phone works (over UPnP: this Frame ignores the remote's mute key). The TV home
   needed one fix for the Frame's older browser (no `inset` in CSS), which showed no photos and two
   clocks before it.
+- **On a real 2016 TV, 22 November 2026 (UN40KU6290, Tizen 2.4, US, app only, Classic look):** its
+  browser (WebKit 538) has no `Promise`, `fetch` or `Object.assign`, no CSS custom properties and
+  only `-webkit-` flexbox and transforms, so the home was a black screen with "Keep watching" in a
+  corner, then (with the first two fixed) every app piled down the left edge. Four things made it
+  work, none of which change anything on a TV that already understood the page:
+  - `samsung/app/tizen.js` fills in the missing library calls (`Object.assign`, `Array.from`,
+    `Promise`, `fetch` over XMLHttpRequest and the like) only where the TV lacks them.
+  - `samsung/build.py` (`legacy_css`) puts a copy the old engine understands in front of each CSS
+    declaration that needs it: custom properties written out from their first definition,
+    `-webkit-` prefixes, `display: -webkit-flex`. A newer engine takes the original, which comes
+    last.
+  - This TV will not hand another app's icon file (`file:///opt/usr/apps/...`) to couch-tv, so a
+    tile whose picture fails shows the app's name instead, and on `html.old-engine` the Settings and
+    More apps line icons (inline SVG, which it did not draw) become pictures of the same drawing.
+  - It lists Netflix as `RN1MCdNq8t.Netflix` and Prime Video as `evKhCgZelL.AmazonIgnitionLauncher2`
+    (`bridge/apps.py`), so both get their logos and Netflix shows once.
+
+  Then the home, the apps and Netflix opened quickly. Not tried on it: the bridge, the Night scenes
+  and the phone remote. Netflix ignores Back on its profile page, so Home, Couch TV is the way back.
 
 ## What works and what does not
 

@@ -97,9 +97,11 @@ APPS = [
 # app lists, not installed on the test TV). Ids can change between TV years: the bridge asks the
 # TV which ones it has and only uses those.
 TIZEN = {
-    "netflix": {"ids": ["3201907018807", "11101200001"], "app": "org.tizen.netflix-app"},
+    # RN1MCdNq8t.Netflix and evKhCgZelL.AmazonIgnitionLauncher2: as a 2016 Samsung (UN40KU6290,
+    # Tizen 2.4, US) lists Netflix and Amazon Video, November 2026.
+    "netflix": {"ids": ["3201907018807", "11101200001", "RN1MCdNq8t.Netflix"], "app": "org.tizen.netflix-app"},
     "youtube": {"ids": ["111299001912"], "app": "9Ur5IzDKqV.TizenYouTube"},
-    "prime-video": {"ids": ["3201910019365", "3201512006785"], "app": "org.tizen.primevideo"},
+    "prime-video": {"ids": ["3201910019365", "3201512006785", "evKhCgZelL.AmazonIgnitionLauncher2"], "app": "org.tizen.primevideo"},
     "disney-plus": {"ids": ["3201901017640", "3202009021709", "3202204027038"], "app": "MCmYXNxgcu.DisneyPlus"},
     "apple-tv": {"ids": ["3201807016597"], "app": "com.samsung.tv.aria-video"},
     "stan": {"ids": ["3201606009798"], "app": "73iTZRTc34.Stan"},

@@ -5,6 +5,183 @@
 // Apps keep their Android names inside the page (Netflix is "com.netflix.ninja"), so the order
 // arranged on the phone works on every TV. COUCH_TIZEN_APPS (tizen-apps.js, made by build.py from
 // bridge/apps.py) says which Samsung app each one is.
+// Old Tizen (2.4, 2016 TVs) has an older WebKit without some ES2015+ library calls the home uses.
+// Fill in only what is missing; newer TVs are untouched.
+(function () {
+  function def(o, k, v) { if (o && !o[k]) try { Object.defineProperty(o, k, { value: v, configurable: true, writable: true }); } catch (e) { o[k] = v; } }
+  def(Object, "assign", function (t) {
+    if (t == null) throw new TypeError("Cannot convert undefined or null to object");
+    var to = Object(t);
+    for (var i = 1; i < arguments.length; i++) {
+      var s = arguments[i];
+      if (s != null) for (var k in s) if (Object.prototype.hasOwnProperty.call(s, k)) to[k] = s[k];
+    }
+    return to;
+  });
+  def(Object, "values", function (o) { return Object.keys(o).map(function (k) { return o[k]; }); });
+  def(Object, "entries", function (o) { return Object.keys(o).map(function (k) { return [k, o[k]]; }); });
+  def(Object, "fromEntries", function (it) { var o = {}; Array.prototype.forEach.call(Array.from(it), function (p) { o[p[0]] = p[1]; }); return o; });
+  def(Number, "isFinite", function (v) { return typeof v === "number" && isFinite(v); });
+  def(Number, "isNaN", function (v) { return typeof v === "number" && v !== v; });
+  def(Number, "isInteger", function (v) { return typeof v === "number" && isFinite(v) && Math.floor(v) === v; });
+  def(Number, "parseFloat", parseFloat);
+  def(Number, "parseInt", parseInt);
+  def(Math, "trunc", function (v) { return v < 0 ? Math.ceil(v) : Math.floor(v); });
+  def(Math, "sign", function (v) { v = +v; return v > 0 ? 1 : v < 0 ? -1 : v; });
+  def(Math, "hypot", function () { var s = 0; for (var i = 0; i < arguments.length; i++) s += arguments[i] * arguments[i]; return Math.sqrt(s); });
+  def(Math, "log10", function (v) { return Math.log(v) / Math.LN10; });
+  def(Array, "from", function (a, fn, self) {
+    var out = [];
+    if (a == null) return out;
+    if (typeof Symbol !== "undefined" && Symbol.iterator && typeof a[Symbol.iterator] === "function" && typeof a.length !== "number") {
+      var it = a[Symbol.iterator](), r;
+      while (!(r = it.next()).done) out.push(r.value);
+    } else if (typeof a.forEach === "function" && typeof a.length !== "number") {
+      a.forEach(function (v) { out.push(v); });
+    } else {
+      for (var i = 0; i < (a.length >>> 0); i++) out.push(a[i]);
+    }
+    return fn ? out.map(fn, self) : out;
+  });
+  def(Array, "of", function () { return Array.prototype.slice.call(arguments); });
+  var AP = Array.prototype;
+  def(AP, "find", function (f, t) { for (var i = 0; i < this.length; i++) if (f.call(t, this[i], i, this)) return this[i]; });
+  def(AP, "findIndex", function (f, t) { for (var i = 0; i < this.length; i++) if (f.call(t, this[i], i, this)) return i; return -1; });
+  def(AP, "findLast", function (f, t) { for (var i = this.length - 1; i >= 0; i--) if (f.call(t, this[i], i, this)) return this[i]; });
+  def(AP, "findLastIndex", function (f, t) { for (var i = this.length - 1; i >= 0; i--) if (f.call(t, this[i], i, this)) return i; return -1; });
+  def(AP, "includes", function (v, from) { for (var i = from || 0; i < this.length; i++) if (this[i] === v || (v !== v && this[i] !== this[i])) return true; return false; });
+  def(AP, "fill", function (v, s, e) { var n = this.length; s = s || 0; e = e === undefined ? n : e; if (s < 0) s += n; if (e < 0) e += n; for (var i = s; i < e; i++) this[i] = v; return this; });
+  def(AP, "flat", function (d) { d = d === undefined ? 1 : d; var out = []; (function f(a, k) { for (var i = 0; i < a.length; i++) if (Array.isArray(a[i]) && k > 0) f(a[i], k - 1); else out.push(a[i]); })(this, d); return out; });
+  def(AP, "flatMap", function (fn, t) { return AP.map.call(this, fn, t).flat(); });
+  def(AP, "at", function (i) { i = Math.trunc(i) || 0; if (i < 0) i += this.length; return this[i]; });
+  var SP = String.prototype;
+  def(SP, "includes", function (s, p) { return this.indexOf(s, p || 0) !== -1; });
+  def(SP, "startsWith", function (s, p) { p = p || 0; return this.substr(p, s.length) === s; });
+  def(SP, "endsWith", function (s, n) { var t = String(this); n = n === undefined ? t.length : n; return t.slice(n - s.length, n) === s; });
+  def(SP, "repeat", function (n) { var s = "", t = String(this); for (var i = 0; i < n; i++) s += t; return s; });
+  def(SP, "padStart", function (n, f) { var t = String(this); f = f === undefined ? " " : String(f); while (t.length < n) t = f + t; return t.slice(t.length - Math.max(n, String(this).length)); });
+  def(SP, "padEnd", function (n, f) { var t = String(this); f = f === undefined ? " " : String(f); while (t.length < n) t += f; return t.slice(0, Math.max(n, String(this).length)); });
+  def(SP, "trimStart", function () { return String(this).replace(/^\s+/, ""); });
+  def(SP, "trimEnd", function () { return String(this).replace(/\s+$/, ""); });
+  def(SP, "replaceAll", function (a, b) { if (a instanceof RegExp) return this.replace(a, b); return String(this).split(a).join(b); });
+  def(SP, "at", function (i) { i = Math.trunc(i) || 0; if (i < 0) i += this.length; return this.charAt(i) || undefined; });
+  // Promise (Promises/A+ core, plus all/race/allSettled/resolve/reject/finally)
+  if (typeof window.Promise !== "function") {
+    var asap = function (fn) { setTimeout(fn, 0); };
+    var P = function (exec) {
+      var self = this; self._s = 0; self._v = undefined; self._q = [];
+      function settle(s, v) {
+        if (self._s) return;
+        self._s = s; self._v = v;
+        var q = self._q; self._q = [];
+        for (var i = 0; i < q.length; i++) run(q[i]);
+      }
+      function resolve(v) {
+        if (v === self) return settle(2, new TypeError("cycle"));
+        if (v && (typeof v === "object" || typeof v === "function")) {
+          var then, called = false;
+          try { then = v.then; } catch (e) { return settle(2, e); }
+          if (typeof then === "function") {
+            try {
+              then.call(v, function (x) { if (!called) { called = true; resolve(x); } },
+                           function (r) { if (!called) { called = true; settle(2, r); } });
+            } catch (e) { if (!called) { called = true; settle(2, e); } }
+            return;
+          }
+        }
+        settle(1, v);
+      }
+      function run(h) {
+        asap(function () {
+          var cb = self._s === 1 ? h.ok : h.no;
+          if (typeof cb !== "function") { (self._s === 1 ? h.res : h.rej)(self._v); return; }
+          var out;
+          try { out = cb(self._v); } catch (e) { h.rej(e); return; }
+          h.res(out);
+        });
+      }
+      self._add = function (h) { if (self._s) run(h); else self._q.push(h); };
+      try { exec(resolve, function (r) { settle(2, r); }); } catch (e) { settle(2, e); }
+    };
+    P.prototype.then = function (ok, no) {
+      var me = this;
+      return new P(function (res, rej) { me._add({ ok: ok, no: no, res: res, rej: rej }); });
+    };
+    P.prototype["catch"] = function (no) { return this.then(null, no); };
+    P.prototype["finally"] = function (f) {
+      return this.then(function (v) { return P.resolve(f()).then(function () { return v; }); },
+                       function (r) { return P.resolve(f()).then(function () { throw r; }); });
+    };
+    P.resolve = function (v) { return v instanceof P ? v : new P(function (res) { res(v); }); };
+    P.reject = function (r) { return new P(function (res, rej) { rej(r); }); };
+    P.all = function (list) {
+      list = Array.from(list);
+      return new P(function (res, rej) {
+        var out = new Array(list.length), left = list.length;
+        if (!left) return res(out);
+        list.forEach(function (x, i) { P.resolve(x).then(function (v) { out[i] = v; if (--left === 0) res(out); }, rej); });
+      });
+    };
+    P.race = function (list) {
+      return new P(function (res, rej) { Array.from(list).forEach(function (x) { P.resolve(x).then(res, rej); }); });
+    };
+    P.allSettled = function (list) {
+      return P.all(Array.from(list).map(function (x) {
+        return P.resolve(x).then(function (v) { return { status: "fulfilled", value: v }; },
+                                 function (r) { return { status: "rejected", reason: r }; });
+      }));
+    };
+    window.Promise = P;
+  }
+  // fetch, on top of XMLHttpRequest (enough for GET/POST of JSON and text)
+  if (typeof window.fetch !== "function") {
+    window.fetch = function (input, init) {
+      init = init || {};
+      return new Promise(function (resolve, reject) {
+        var x = new XMLHttpRequest();
+        var url = typeof input === "string" ? input : (input && input.url) || String(input);
+        x.open(init.method || "GET", url, true);
+        if (init.credentials === "include") x.withCredentials = true;
+        var h = init.headers || {};
+        if (typeof h.forEach === "function" && !(h instanceof Array)) h.forEach(function (v, k) { x.setRequestHeader(k, v); });
+        else for (var k in h) if (Object.prototype.hasOwnProperty.call(h, k)) x.setRequestHeader(k, h[k]);
+        if (init.signal) {
+          if (init.signal.aborted) { reject(new Error("AbortError")); return; }
+          if (init.signal.addEventListener) init.signal.addEventListener("abort", function () { x.abort(); reject(new Error("AbortError")); });
+        }
+        x.onload = function () {
+          var status = x.status === 0 ? 200 : x.status;   // file:// answers 0 when it worked
+          var text = x.responseText;
+          resolve({
+            ok: status >= 200 && status < 300, status: status, statusText: x.statusText, url: url,
+            headers: { get: function (n) { return x.getResponseHeader(n); } },
+            text: function () { return Promise.resolve(text); },
+            json: function () { return new Promise(function (ok, no) { try { ok(JSON.parse(text)); } catch (e) { no(e); } }); },
+            clone: function () { return this; }
+          });
+        };
+        x.onerror = function () {
+          try { console.warn("fetch failed: " + url.split("?")[0]); } catch (e) {}
+          reject(new TypeError("Network request failed"));
+        };
+        x.ontimeout = x.onerror;
+        x.send(init.body === undefined ? null : init.body);
+      });
+    };
+  }
+  if (window.NodeList) def(NodeList.prototype, "forEach", AP.forEach);
+  if (window.Element) {
+    var EP = Element.prototype;
+    def(EP, "matches", EP.webkitMatchesSelector || EP.msMatchesSelector);
+    def(EP, "closest", function (sel) { var el = this; while (el && el.nodeType === 1) { if (el.matches(sel)) return el; el = el.parentElement; } return null; });
+    def(EP, "remove", function () { if (this.parentNode) this.parentNode.removeChild(this); });
+    def(EP, "append", function () { for (var i = 0; i < arguments.length; i++) { var a = arguments[i]; this.appendChild(typeof a === "string" ? document.createTextNode(a) : a); } });
+    def(EP, "prepend", function () { for (var i = arguments.length - 1; i >= 0; i--) { var a = arguments[i]; this.insertBefore(typeof a === "string" ? document.createTextNode(a) : a, this.firstChild); } });
+    def(EP, "replaceChildren", function () { while (this.firstChild) this.removeChild(this.firstChild); EP.append.apply(this, arguments); });
+    def(EP, "toggleAttribute", function (n, f) { var on = f === undefined ? !this.hasAttribute(n) : !!f; if (on) this.setAttribute(n, ""); else this.removeAttribute(n); return on; });
+  }
+})();
+
 (function () {
   "use strict";
   var S = window.COUCH_TIZEN || {};
@@ -89,6 +266,59 @@
   var SKY = "local.sky", SKY_PORT = parseInt(S.sky_hdmi, 10) || 0, skyOn = false;
   sortOut();
   send("log", "apps on this TV: " + tizenApps.length + ", shown: " + shown.map(function (a) { return a.label; }).join(", "));
+  if (LOG) send("log", "not shown: " + tizenApps.filter(function (a) {
+    return !/^(org\.tizen|com\.samsung)/.test(a.id || "") && !shown.some(function (s) { return byPkg[s.package] === a; });
+  }).map(function (a) { return a.name + " [" + a.id + " show=" + a.show + "]"; }).join(", "));
+
+  // Older TVs (a 2016 one on Tizen 2.4) will not hand another app's icon file to this one, so the
+  // picture fails. Show the app's name on the tile instead of a broken picture.
+  document.addEventListener("error", function (e) {
+    var img = e.target;
+    if (!img || img.tagName !== "IMG") return;
+    var face = img.parentNode;
+    if (!face || !/(^|\s)face(\s|$)/.test(face.className || "")) return;
+    var tile = face.parentNode, lab = tile && tile.querySelector && tile.querySelector(".label");
+    face.removeChild(img);
+    face.className = (face.className || "").replace(/(^|\s)icon(\s|$)/, " ") + " word";
+    face.textContent = lab ? lab.textContent : "";
+  }, true);
+
+  // A 2016 TV (Tizen 2.4, html.old-engine) drew nothing for the line icons app.js puts in with
+  // innerHTML (Settings, More apps). Only there, each one becomes a picture of the same drawing, with
+  // the size and stroke the CSS would have given it written in (a picture gets none of the page's CSS).
+  // Newer TVs never get here.
+  function oldEngine() { return /(^|\s)old-engine(\s|$)/.test(document.documentElement.className || ""); }
+  function paintIcons() {
+    if (!oldEngine()) return;
+    var list = document.querySelectorAll(".face.tool svg");
+    for (var i = 0; i < list.length; i++) {
+      var s = list[i];
+      if (!s.getAttribute("width")) s.setAttribute("width", "44");
+      if (!s.getAttribute("height")) s.setAttribute("height", "44");
+      if (/(^|\s)iset(\s|$)/.test(s.parentNode.className || "")) {
+        s.setAttribute("color", "#f5f5f7");   // icon packs fill with currentColor
+      } else {
+        s.setAttribute("stroke", "#f5f5f7");
+        s.setAttribute("fill", "none");
+        s.setAttribute("stroke-width", "1.6");
+        s.setAttribute("stroke-linecap", "round");
+        s.setAttribute("stroke-linejoin", "round");
+      }
+      var src = s.outerHTML || new XMLSerializer().serializeToString(s);
+      if (!/xmlns=/.test(src)) src = src.replace(/^<svg/, '<svg xmlns="http://www.w3.org/2000/svg"');
+      var img = document.createElement("img");
+      img.setAttribute("alt", "");
+      img.setAttribute("width", s.getAttribute("width"));
+      img.setAttribute("height", s.getAttribute("height"));
+      img.style.cssText = "display:block;width:2.75rem;height:2.75rem;object-fit:contain";
+      img.src = "data:image/svg+xml;charset=utf-8," + encodeURIComponent(src);
+      s.parentNode.replaceChild(img, s);
+    }
+  }
+  if (window.MutationObserver) {
+    new MutationObserver(paintIcons).observe(document.documentElement, { childList: true, subtree: true });
+  }
+  document.addEventListener("DOMContentLoaded", paintIcons);
 
   // The list in localStorage is last time's. Read it again a few seconds after the home is up (a TV
   // with hundreds of apps takes several seconds to answer), save it, and reload the home only if the

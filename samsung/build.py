@@ -65,6 +65,73 @@ def web_ignore(release=False):
     return ignore
 
 
+_DECL = re.compile(r"([{;])(\s*)(-?[a-z][a-z-]*)\s*:\s*([^;{}]+?)\s*(?=[;}])")
+_VAR = re.compile(r"var\(\s*(--[\w-]+)\s*(?:,\s*([^()]*(?:\([^()]*\)[^()]*)*))?\)")
+_PREFIX = {"flex", "flex-wrap", "flex-direction", "flex-flow", "flex-grow", "flex-shrink", "flex-basis",
+           "justify-content", "align-items", "align-content", "align-self", "order",
+           "transform", "transform-origin", "transition", "animation", "animation-name",
+           "animation-duration", "animation-delay", "animation-timing-function", "filter"}
+
+
+def legacy_css(folder):
+    """Old Samsung TVs (Tizen 2.4, 2016, WebKit 538) know neither CSS custom properties nor unprefixed
+    flexbox and transforms. For each declaration that needs one of those, put a copy the old engine
+    understands just before it (custom properties written out from their first definition, -webkit-
+    prefixes, display: -webkit-flex). Newer engines take the original, which comes last; older ones
+    drop it as invalid and keep the copy. Nothing changes for a TV that already understood the CSS."""
+    for dirpath, _, names in os.walk(folder):
+        for name in names:
+            if not name.endswith(".css"):
+                continue
+            path = os.path.join(dirpath, name)
+            with open(path, encoding="utf-8") as f:
+                css = re.sub(r"/\*.*?\*/", "", f.read(), flags=re.S)
+            defs = {}
+            for m in re.finditer(r"(?<![\w-])(--[\w-]+)\s*:\s*([^;{}]+?)\s*(?=[;}])", css):
+                defs.setdefault(m.group(1), m.group(2))
+
+            def resolve(value, depth=0):
+                if depth > 8 or "var(" not in value:
+                    return value
+                def one(m):
+                    v = defs.get(m.group(1))
+                    if v is None:
+                        v = m.group(2)
+                    return resolve(v, depth + 1) if v is not None else "\0"
+                return resolve(_VAR.sub(one, value), depth + 1)
+
+            def fix(m):
+                lead, ws, prop, value = m.group(1), m.group(2), m.group(3), m.group(4)
+                if prop.startswith("--"):
+                    return m.group(0)
+                imp = ""
+                if value.endswith("!important"):
+                    value, imp = value[:-10].rstrip(), " !important"
+                extra = []
+                flat = value
+                if "var(" in value:
+                    flat = resolve(value)
+                    if "\0" in flat or "var(" in flat:
+                        flat = None
+                    elif flat != value:
+                        extra.append(f"{prop}: {flat}{imp}")
+                if flat is not None:
+                    if prop == "display" and flat in ("flex", "inline-flex"):
+                        extra.append(f"display: -webkit-{flat}{imp}")
+                    elif prop in _PREFIX:
+                        extra.append(f"-webkit-{prop}: {flat}{imp}")
+                    elif prop in ("width", "height", "left", "right", "top", "bottom", "margin", "padding",
+                                  "font-size", "line-height", "min-height", "max-width", "max-height", "min-width") and "calc(" in flat:
+                        extra.append(f"{prop}: {flat.replace('calc(', '-webkit-calc(')}{imp}")
+                if not extra:
+                    return m.group(0)
+                return lead + ws + "; ".join(extra) + "; " + prop + ": " + m.group(4)
+
+            out = _DECL.sub(fix, css)
+            with open(path, "w", encoding="utf-8") as f:
+                f.write(out)
+
+
 def couch_version():
     """couch-tv's version (the TV home's versionName), also the Samsung app's version."""
     with open(GRADLE) as f:
@@ -92,6 +159,7 @@ def main():
     shutil.copytree(WEB, stage, ignore=web_ignore(a.release))
     for name in os.listdir(os.path.join(HERE, "app")):
         shutil.copy(os.path.join(HERE, "app", name), stage)
+    legacy_css(stage)
     shutil.copy(ICON, os.path.join(stage, "icon.png"))
     os.makedirs(os.path.join(stage, "logos"))
     logos = set()
