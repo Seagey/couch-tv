@@ -18,10 +18,10 @@ import urllib.error
 LOCAL_NETWORK_CODE = "local_network_blocked"
 
 MAC_BLOCKED = ("Your Mac blocked this app from finding the TV. Open System Settings, Privacy and Security, "
-               "Local Network, switch on couch-tv Setup, then press Look again.")
+               "Local Network, switch on Couch TV Setup, then press Look again.")
 WINDOWS_BLOCKED = ("Windows blocked this app from finding the TV. Open Windows Security, Firewall and network "
-                   "protection, Allow an app through firewall, tick Private for couch-tv Setup, then press Look again.")
-OTHER_BLOCKED = ("This computer blocked this app from finding the TV. Allow couch-tv Setup on your home network "
+                   "protection, Allow an app through firewall, tick Private for Couch TV Setup, then press Look again.")
+OTHER_BLOCKED = ("This computer blocked this app from finding the TV. Allow Couch TV Setup on your home network "
                  "in this computer's firewall settings, then press Look again.")
 
 # "No route to host" and "Operation not permitted": what a blocked send to the home network gives.
@@ -132,7 +132,7 @@ def explain(exc, dest=None, platform=None, default_route=None):
     elif isinstance(e, ssl.SSLError):
         msg, code = "The TV would not open a private connection with this computer. Try again.", "secure"
     elif isinstance(e, PermissionError) or no in (errno.EACCES, errno.EROFS):
-        msg, code = ("couch-tv Setup could not save its own files on this computer. Check there is free space, "
+        msg, code = ("Couch TV Setup could not save its own files on this computer. Check there is free space, "
                      "then try again."), "files"
     elif no == errno.ENOSPC or isinstance(e, MemoryError):
         msg, code = "This computer is out of space. Free some up, then try again.", "no_space_here"

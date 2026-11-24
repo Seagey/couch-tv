@@ -48,8 +48,8 @@ FRIENDLY_HOMES = {
     "com.amazon.firehomestarter": "Amazon's home",
     "com.google.android.apps.tv.launcherx": "Google TV's home",
     "com.google.android.tvlauncher": "Android TV's home",
-    ONTV_PKG: "couch-tv's other app (the on-TV app)",
-    HOME_PKG: "couch-tv's home app",
+    ONTV_PKG: "Couch TV's other app (the on-TV app)",
+    HOME_PKG: "Couch TV's home app",
 }
 
 
@@ -213,35 +213,35 @@ def plan(tv, f, ambient_off=True, ontv_home_off=True):
     ontv = f.get("ontv_home") or {}
     if ontv.get("takes_home"):
         if ontv_home_off and f.get("fire"):
-            items.append("couch-tv's other app (the on-TV app) is already this TV's home screen, with its own Home button "
+            items.append("Couch TV's other app (the on-TV app) is already this TV's home screen, with its own Home button "
                          "watch. This switches the on-TV app's Home button watch off and takes back its permission, then makes "
-                         "couch-tv's home app the home. Fire OS won't let a computer switch its home entry off, which is fine "
+                         "Couch TV's home app the home. Fire OS won't let a computer switch its home entry off, which is fine "
                          "because without its watch it stays in the background. The on-TV app stays installed.")
         elif ontv_home_off:
-            items.append("couch-tv's other app (the on-TV app) is already this TV's home screen, with its own Home button "
-                         "watch. Two couch-tv homes would fight and the on-TV app would keep winning. This switches its "
-                         "home and watch off first (the on-TV app stays installed), then makes couch-tv's home app the home.")
+            items.append("Couch TV's other app (the on-TV app) is already this TV's home screen, with its own Home button "
+                         "watch. Two Couch TV homes would fight and the on-TV app would keep winning. This switches its "
+                         "home and watch off first (the on-TV app stays installed), then makes Couch TV's home app the home.")
         else:
-            items.append("couch-tv's other app (the on-TV app) is already this TV's home screen, and you are keeping it "
+            items.append("Couch TV's other app (the on-TV app) is already this TV's home screen, and you are keeping it "
                          "that way. Nothing will be installed, because a second home would fight it.")
     if f["installed"]["home"]:
-        items.append(f"couch-tv {f['installed']['home']} is already on this TV. If a computer at home runs it for you (the "
-                     "bridge, option B), stop here: this app sets couch-tv up to run on the TV by itself, and the computer's "
+        items.append(f"Couch TV {f['installed']['home']} is already on this TV. If a computer at home runs it for you (the "
+                     "bridge, option B), stop here: this app sets Couch TV up to run on the TV by itself, and the computer's "
                      "phone remote and settings would no longer reach it. Otherwise this updates it.")
-    items.append(f"Put the couch-tv home on the TV ({'update it' if f['installed']['home'] else 'install it'}) and make it the home screen.")
+    items.append(f"Put the Couch TV home on the TV ({'update it' if f['installed']['home'] else 'install it'}) and make it the home screen.")
     back_on = [p for p in NEVER_OFF if p in disabled]
     if back_on:
-        items.append("Switch the TV's own home and setup app back on (an older couch-tv switched them off; that is the fix "
+        items.append("Switch the TV's own home and setup app back on (an older Couch TV switched them off; that is the fix "
                      "for TVs that loop after a restart).")
     if ambient_off and AMBIENT in present and AMBIENT not in disabled:
         items.append("Switch off ambient mode (the adverts and photos the TV shows when idle). It is switched off, not deleted.")
     if any(p in present for p in STOCK_HOMES):
-        items.append("Switch on couch-tv's Home button watch. It only notices when the TV's own home comes forward and puts "
-                     "couch-tv back on top, so the TV's own home may flash up for a moment. It never reads the screen.")
+        items.append("Switch on Couch TV's Home button watch. It only notices when the TV's own home comes forward and puts "
+                     "Couch TV back on top, so the TV's own home may flash up for a moment. It never reads the screen.")
     items.append("Leave the TV's own home screen and setup app switched on, so the TV always has them when it starts. "
                  "Nothing is deleted.")
     if f.get("tcl"):
-        items.append("TCL only: let couch-tv start by itself after a restart (a TCL setting).")
+        items.append("TCL only: let Couch TV start by itself after a restart (a TCL setting).")
     warn = watch_warning(other_watches(tv))
     if warn:
         items.append(warn)
@@ -396,7 +396,7 @@ def make_home(tv, apk_path, ambient_off=True, people=None, weather=None, progres
     if ontv["takes_home"]:
         if not ontv_home_switch_off:
             # The person keeps the on-TV app as the home: a second home would only fight it.
-            return {"changed": [], "front": False, "kept_ontv": True, "home_key_opens": "couch-tv's other app (the on-TV app)",
+            return {"changed": [], "front": False, "kept_ontv": True, "home_key_opens": "Couch TV's other app (the on-TV app)",
                     "watch": False, "watch_bound": None, "fire": is_fire(tv), "disabled": record(tv)["disabled"],
                     "warning": watch_warning(other_watches(tv))}
         progress(0.01, "Switching off the on-TV app's home and Home button watch")
@@ -411,8 +411,8 @@ def make_home(tv, apk_path, ambient_off=True, people=None, weather=None, progres
             rec["home"] = prev
     _write_record(tv, rec)
 
-    progress(0.05, "Copying couch-tv to the TV")
-    tv.install(apk_path, lambda f: progress(0.05 + 0.6 * f, "Copying couch-tv to the TV" if f < 1 else "Installing it"))
+    progress(0.05, "Copying Couch TV to the TV")
+    tv.install(apk_path, lambda f: progress(0.05 + 0.6 * f, "Copying Couch TV to the TV" if f < 1 else "Installing it"))
     done.append("installed")
     tv.shell(f"cmd package set-home-activity {HOME_ACT}")
     now = tv.shell("cmd shortcut get-default-launcher")
@@ -420,7 +420,7 @@ def make_home(tv, apk_path, ambient_off=True, people=None, weather=None, progres
     # Fire OS keeps Amazon's home as the chosen one whatever is set (priority 950, seen by killy10o10 on a
     # Fire TV Stick 4K 2nd gen): there the Home button watch is what brings couch-tv back, so carry on.
     if f"{HOME_PKG}/" not in now and not fire:
-        raise TvError("The TV did not take couch-tv as its home screen, so nothing was switched off. "
+        raise TvError("The TV did not take Couch TV as its home screen, so nothing was switched off. "
                       "Undo takes the app off again.", "home_refused")
     tv.shell(f"pm grant {HOME_PKG} android.permission.READ_TV_LISTINGS")
     tv.shell(f"appops set {HOME_PKG} WRITE_SETTINGS allow")
@@ -448,7 +448,7 @@ def make_home(tv, apk_path, ambient_off=True, people=None, weather=None, progres
             rec["disabled"].append(p)
     _write_record(tv, rec)
 
-    progress(0.8, "Making couch-tv the home and sending your settings")
+    progress(0.8, "Making Couch TV the home and sending your settings")
     tv.shell(f"cmd package set-home-activity {HOME_ACT}")
     resolved = (_lines(tv.shell(RESOLVE)) or [""])[-1]
     if tv.shell(f"appops get {HOME_PKG} SYSTEM_ALERT_WINDOW").find("allow") >= 0:
@@ -486,7 +486,7 @@ def make_home(tv, apk_path, ambient_off=True, people=None, weather=None, progres
     progress(0.95, "Pressing Home")
     result = check_home(tv)
     progress(1.0, "Done")
-    return {"changed": done, "front": result["ok"], "home_key_opens": "couch-tv" if resolved.startswith(HOME_PKG + "/") else resolved,
+    return {"changed": done, "front": result["ok"], "home_key_opens": "Couch TV" if resolved.startswith(HOME_PKG + "/") else resolved,
             "watch": watch, "watch_bound": bound, "fire": fire, "disabled": rec["disabled"],
             "warning": watch_warning(other_watches(tv)), "other_front": result.get("other_front"),
             "ontv_alias_left": alias_left}
@@ -604,7 +604,7 @@ def undo(tv, progress=lambda f, msg=None: None):
     rec = record(tv)
     present = _packages(tv)
     pkgs = list(NEVER_OFF) + (rec["disabled"] or [AMBIENT])
-    progress(0.1, "Switching back on what couch-tv switched off")
+    progress(0.1, "Switching back on what Couch TV switched off")
     for p in dict.fromkeys(pkgs):
         if p in present:
             tv.shell(f"pm enable {p}")
@@ -632,12 +632,12 @@ def undo(tv, progress=lambda f, msg=None: None):
     if home and ACT_RE.match(home):
         tv.shell(f"cmd package set-home-activity {home}")
         done.append("home back to " + home)
-    progress(0.5, "Removing the couch-tv apps")
+    progress(0.5, "Removing the Couch TV apps")
     for p in (HOME_PKG, ONTV_PKG):
         if p in present:
             out = tv.shell(f"pm uninstall {p}", 120)
             if "Success" not in out:
-                raise TvError("The TV would not remove a couch-tv app. Restart the TV, then try again.", "uninstall_failed", f"{p}: " + out.strip()[-160:])
+                raise TvError("The TV would not remove a Couch TV app. Restart the TV, then try again.", "uninstall_failed", f"{p}: " + out.strip()[-160:])
             done.append("removed " + p)
     tv.shell(f"rm -rf {RECORD_DIR} {RECORD_DIR}.apk {RECORD_DIR}.parts {RECORD_DIR}.b64")
     _save_local(serial(tv), None)

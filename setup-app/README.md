@@ -1,4 +1,4 @@
-# couch-tv Setup
+# Couch TV Setup
 
 The free, official way to put couch-tv on your TV **without a command line and without an AI
 agent**. You open one app on your computer, it opens a page in your browser, and it walks you
@@ -48,6 +48,8 @@ for your computer and unzip it:
 | Mac with an Intel chip | `couch-tv-Setup-mac-intel.zip` | **couch-tv Setup** |
 | Windows 10 or 11 | `couch-tv-Setup-windows.zip` | **couch-tv Setup.exe**, inside the unzipped folder |
 | Linux, 64 bit Intel or AMD (Ubuntu 22.04 or newer, Debian 12, Fedora, Arch and Omarchy) | `couch-tv-Setup-linux.tar.gz` (from 0.13.13) | **couch-tv Setup**, inside the unpacked folder |
+
+The app is called **Couch TV Setup** everywhere you read it (the page, the Mac's Info.plist, the Windows file details, the Linux desktop file). The program's file name stays **couch-tv Setup** on purpose: renaming it would break the helper's self update (it starts the new copy by the old program name), the helper's start with the computer entry and the Windows link registration, which all hold that path.
 
 Not sure which Mac? Apple menu, **About This Mac**: "Chip: Apple M..." is Apple silicon,
 "Processor: ... Intel" is Intel. `SHA256SUMS-setup.txt` in the same release lists each file's

@@ -33,11 +33,14 @@ from .tv import Tv, TvError
 
 WEB = (Path(sys._MEIPASS) / "couchtv_setup" if getattr(sys, "frozen", False) else Path(__file__).parent) / "web"
 TYPES = {".html": "text/html; charset=utf-8", ".js": "text/javascript; charset=utf-8", ".css": "text/css; charset=utf-8",
-         ".svg": "image/svg+xml", ".png": "image/png"}
+         ".svg": "image/svg+xml", ".png": "image/png", ".webp": "image/webp", ".woff2": "font/woff2"}
 CSP = ("default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; "
        "frame-ancestors 'none'; base-uri 'none'; form-action 'none'")
 SECRET = secrets.token_urlsafe(24)
 OS = "mac" if sys.platform == "darwin" else "windows" if sys.platform == "win32" else "linux"
+# What this Setup can do beyond the basics. The page shows a feature's button only when it is listed, so a
+# build without it hides it. "link-tv" (link a TV that is already set up) is added by the account linking change.
+FEATURES = ["reset-tv"]
 ALLOW_WAIT_S = 45     # how long one try waits for Allow on the TV; the page counts it down
 IDLE_S = 180         # the page asks every 20 s; this long without it means the tab is closed
 FIRST_S = 600
@@ -217,6 +220,14 @@ def place_search(q):
     return {"places": [p for p in out if p["timezone"]]}
 
 
+def _studio_url():
+    """Where Open Couch TV Studio goes (only a link the person opens; nothing is sent there)."""
+    try:
+        return studio.base()
+    except TvError:
+        return studio.DEFAULT_STUDIO
+
+
 def helper_state():
     cfg = hconfig.load()
     return {"mode": cfg["mode"], "autostart": hautostart.is_enabled(), "intent": S.intent,
@@ -269,7 +280,22 @@ def api(method, path, body):
         return helper_api(path[len("/api/helper/"):], body)
     if path == "/api/info":
         return {"os": OS, "connected": bool(S.tv), "facts": S.facts, "route": S.route, "ip": S.ip, "profile": S.profile,
-                "helper": helper_state()}
+                "helper": helper_state(), "features": FEATURES, "studio": _studio_url()}
+    if path == "/api/reset-tv":
+        # "Set up another TV": forget everything that belongs to the TV just done (the connection, its facts,
+        # its health report, its row in the account). The sign in and the helper stay as they are.
+        if S.job.get("running"):
+            raise TvError("Still busy with the last step. Wait for it to finish, then set up another TV.", "busy")
+        if S.tv:
+            try:
+                S.tv.close()
+            except Exception:
+                pass
+        S.tv = S.ip = S.route = S.facts = S.profile = None
+        S.health = None
+        S.link.tv = None
+        S.job = {"running": False}
+        return {"ok": True}
     if path == "/api/quit":
         if S.job.get("running"):
             raise TvError("Still busy with the last step. Wait for it to finish, then close.", "busy")
@@ -598,7 +624,7 @@ def main(argv=None):
     S.httpd, S.port = httpd, httpd.server_address[1]
     linkin.write_running(S.port, SECRET)
     url = f"http://127.0.0.1:{S.port}/"
-    print(f"couch-tv Setup is open in your browser: {url}")
+    print(f"Couch TV Setup is open in your browser: {url}")
     print("Keep this running until you are done. Press Close setup on the page, or Ctrl+C here, to stop.")
     if not os.environ.get("COUCHTV_SETUP_NO_BROWSER"):
         webbrowser.open(url)
@@ -609,7 +635,7 @@ def main(argv=None):
             now = time.time()
             if (S.seen is None and now - S.started > FIRST_S) or \
                     (S.seen is not None and now - S.seen > IDLE_S and not S.job.get("running")):
-                print("The setup page was closed, so couch-tv Setup has stopped.")
+                print("The setup page was closed, so Couch TV Setup has stopped.")
                 httpd.shutdown()
                 return
     threading.Thread(target=stop_when_closed, daemon=True).start()
