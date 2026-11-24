@@ -2,7 +2,9 @@
 show the same thing, and a test can check it without any tray library.
 
 State (from helper.status.snapshot):
-    {"running": bool, "paused": bool, "port": 5400, "tvs": [{"name", "kind", "ready": bool}], "autostart": bool}
+    {"running": bool, "paused": bool, "port": 5400, "tvs": [{"name", "kind", "ready": bool}], "autostart": bool,
+     "update": {"state": "up_to_date" | "downloading" | "ready" | "error", "version": "0.13.14"} or None,
+     "awake": {"needed": bool, "allow_sleep": bool} or None}
 Items: {"id", "label", "enabled", "checked"} or {"id": "-"} for a separator. Lines are 14 words or fewer.
 """
 
@@ -36,6 +38,18 @@ def tv_line(tv):
     return "%s: %s, %s" % (tv.get("name") or "TV", kind, "ready" if tv.get("ready") else "not reachable")
 
 
+def update_line(state):
+    u = state.get("update") or {}
+    s = u.get("state")
+    if s == "ready":
+        return "Update ready, restart"
+    if s == "downloading":
+        return "Downloading %s" % (u.get("version") or "the update")
+    if s == "error":
+        return "Could not check for updates"
+    return "Up to date, %s" % (u.get("version") or "")
+
+
 def build(state):
     items = [{"id": "status", "label": "Couch TV Helper", "enabled": False},
              {"id": "headline", "label": headline(state), "enabled": False}]
@@ -44,10 +58,15 @@ def build(state):
     items += [{"id": "-"},
               {"id": "studio", "label": "Open Couch TV Studio", "enabled": True},
               {"id": "setup", "label": "Add or change a TV...", "enabled": True},
-              {"id": "autostart", "label": "Start with this computer", "enabled": True, "checked": bool(state.get("autostart"))},
-              {"id": "-"},
+              {"id": "autostart", "label": "Start with this computer", "enabled": True, "checked": bool(state.get("autostart"))}]
+    if (state.get("awake") or {}).get("needed"):
+        items.append({"id": "sleep", "label": "Let this computer sleep", "enabled": True, "checked": bool(state["awake"].get("allow_sleep"))})
+    if state.get("update"):
+        items.append({"id": "update", "label": update_line(state), "enabled": state["update"].get("state") == "ready"})
+    items += [{"id": "-"},
               {"id": "pause", "label": "Resume the helper" if state.get("paused") else "Pause the helper", "enabled": True},
               {"id": "off", "label": "Turn off extra features...", "enabled": True},
+              {"id": "remove", "label": "Remove everything from this computer...", "enabled": True},
               {"id": "quit", "label": "Quit", "enabled": True}]
     return items
 

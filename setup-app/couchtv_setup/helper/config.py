@@ -2,6 +2,7 @@
 
 helper.json, in Setup's own folder:
     {"v": 1, "mode": "once" | "helper", "autostart": bool, "port": 5400, "pairing_key": "...",
+     "allow_sleep": false (keep the computer awake on power for Samsung, LG, Roku), "updates": true,
      "tvs": [{"ip": "192.0.2.20", "kind": "samsung" | "lg" | "roku", "name": "Living room TV"}]}
 
 "tvs" holds only the TVs that need the helper (Samsung, LG, Roku). Android TVs come from known-tvs.json,
@@ -29,7 +30,8 @@ def _dir(data=None):
 
 
 def default():
-    return {"v": 1, "mode": "once", "autostart": False, "port": DEFAULT_PORT, "pairing_key": "", "tvs": []}
+    return {"v": 1, "mode": "once", "autostart": False, "port": DEFAULT_PORT, "pairing_key": "", "tvs": [],
+            "allow_sleep": False, "updates": True}
 
 
 def load(data=None):
@@ -43,6 +45,8 @@ def load(data=None):
     if raw.get("mode") in MODES:
         cfg["mode"] = raw["mode"]
     cfg["autostart"] = raw.get("autostart") is True
+    cfg["allow_sleep"] = raw.get("allow_sleep") is True
+    cfg["updates"] = raw.get("updates") is not False
     port = raw.get("port")
     if isinstance(port, int) and not isinstance(port, bool) and 1024 <= port <= 65535:
         cfg["port"] = port

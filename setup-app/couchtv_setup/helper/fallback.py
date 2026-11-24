@@ -22,7 +22,7 @@ function post(p,b){return fetch(p,{method:'POST',headers:{'Content-Type':'applic
 function draw(s){var d=document.createElement('span');d.className='dot '+s.dot;var h=document.getElementById('head');h.textContent='';h.appendChild(d);h.appendChild(document.createTextNode(s.headline));
 var tv=document.getElementById('tvs');tv.textContent='';s.items.forEach(function(i){if(i.id.indexOf('tv')===0){var li=document.createElement('li');li.textContent=i.label;tv.appendChild(li);}});
 var a=document.getElementById('acts');a.textContent='';s.items.forEach(function(i){if(i.id==='-'||!i.enabled)return;var b=document.createElement('button');b.textContent=(i.checked?'\\u2713 ':'')+i.label;
-b.onclick=function(){if(i.id==='off'&&!confirm('Couch TV stays on your TV. The helper stops and will not start with this computer.'))return;post('/api/act',{id:i.id}).then(refresh,function(){});};a.appendChild(b);});}
+b.onclick=function(){var ask={off:'Couch TV stays on your TV. The helper stops and will not start with this computer.',remove:'This deletes the TV key, settings and downloads kept here. Couch TV stays on your TV.'};if(ask[i.id]&&!confirm(ask[i.id]))return;post('/api/act',{id:i.id}).then(refresh,function(){});};a.appendChild(b);});}
 function refresh(){post('/api/state').then(draw,function(){document.getElementById('head').textContent='The helper has stopped.';});}
 refresh();setInterval(refresh,5000);})();"""
 

@@ -22,6 +22,7 @@ def run(data=None, no_tray=False):
     (paths.data() / "helper-data").mkdir(parents=True, exist_ok=True)
     sup.start()
     ctl = control.Controller(data, sup, known)
+    ctl.start_background()
     url = fallback.serve(ctl)
     print("Couch TV Helper is running. Menu page: " + url)
     if not no_tray and tray.run(ctl, url):

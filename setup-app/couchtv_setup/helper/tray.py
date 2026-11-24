@@ -8,7 +8,8 @@ import webbrowser
 from . import menu
 
 COLOURS = {"green": (46, 160, 67), "amber": (230, 160, 20), "grey": (140, 140, 140)}
-CONFIRM_OFF = ("Turn off extra features?", "Couch TV stays on your TV. The helper stops and will not start with this computer.")
+CONFIRM = {"off": ("Turn off extra features?", "Couch TV stays on your TV. The helper stops and will not start with this computer."),
+           "remove": ("Remove everything from this computer?", "This deletes the TV key, settings and downloads kept here. Couch TV stays on your TV.")}
 
 
 def icon_image(colour):
@@ -37,8 +38,8 @@ def _run_rumps(ctl):
     app = rumps.App("Couch TV Helper", title="Couch TV", quit_button=None)
 
     def pick(item):
-        if item.id == "off":
-            if not rumps.alert(CONFIRM_OFF[0], CONFIRM_OFF[1], ok="Turn off", cancel="Cancel"):
+        if item.id in CONFIRM:
+            if not rumps.alert(CONFIRM[item.id][0], CONFIRM[item.id][1], ok="Continue", cancel="Cancel"):
                 return
         ctl.act(item.id)
         if ctl.quit_event.is_set():
@@ -65,13 +66,13 @@ def _run_rumps(ctl):
 def _run_pystray(ctl, fallback_url):
     import pystray   # noqa: Windows and Linux
 
-    def confirm_off():
+    def confirm(item_id):
         try:
             import tkinter
             from tkinter import messagebox
             root = tkinter.Tk()
             root.withdraw()
-            ok = messagebox.askokcancel(CONFIRM_OFF[0], CONFIRM_OFF[1])
+            ok = messagebox.askokcancel(*CONFIRM[item_id])
             root.destroy()
             return ok
         except Exception:
@@ -81,7 +82,7 @@ def _run_pystray(ctl, fallback_url):
 
     def make_callback(item_id):
         def cb(icon, _item):
-            if item_id == "off" and not confirm_off():
+            if item_id in CONFIRM and not confirm(item_id):
                 return
             ctl.act(item_id)
             if ctl.quit_event.is_set():
