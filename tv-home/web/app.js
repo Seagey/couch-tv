@@ -3318,7 +3318,7 @@
       repeat: s.repeat || null,
       can_shuffle: !!s.can_shuffle,
       can_repeat: !!s.can_repeat,
-      app: { name: "Spotify", package: s.package || "com.spotify.tv.android" }
+      app: { name: s.app_name || (s.package && s.package.indexOf("spotify") >= 0 ? "Spotify" : t("np_head")), package: s.package || "com.spotify.tv.android" }
     };
     refreshAudioOutput(false);
     renderNp();
@@ -3458,7 +3458,8 @@
           TV.spotifyControl("fast_forward", SPOTIFY.seek_seconds * 1000);
         } else if (act === "shuffle") {
           var curS = music.shuffle;
-          var nextS = !curS ? null : (curS === "off" ? "normal" : (curS === "normal" ? "smart" : "off"));
+          var isSpApp = !!(music.app && music.app.package && music.app.package.indexOf("com.spotify") === 0);
+          var nextS = !curS ? null : (curS === "off" ? "normal" : (curS === "normal" && isSpApp ? "smart" : "off"));
           TV.spotifyControl("shuffle", nextS === "off" ? 0 : (nextS === "smart" ? 2 : 1));
           toast(nextS ? t("np_shuffle_" + nextS) : t("np_shuffle_toggled"));
           setTimeout(refreshSpotify, 350);

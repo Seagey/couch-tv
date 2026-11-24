@@ -4,6 +4,7 @@ import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.graphics.Bitmap
+import android.media.AudioAttributes
 import android.media.MediaMetadata
 import android.media.session.MediaController
 import android.media.session.MediaSession
@@ -98,16 +99,43 @@ class SpotifyMediaListener : NotificationListenerService() {
         Log.i(TAG, "SpotifyMediaListener disconnected")
     }
 
+    private fun isMusicSession(c: MediaController): Boolean {
+        val pb = c.playbackState
+        if (pb != null && pb.state == PlaybackState.STATE_ERROR) return false
+        val title = c.metadata?.getString(MediaMetadata.METADATA_KEY_TITLE)
+        if (title.isNullOrBlank()) return false
+        if (c.packageName in MUSIC_ONLY_PACKAGES) return true
+        val contentType = try { c.playbackInfo?.audioAttributes?.contentType } catch (_: Exception) { null }
+        return contentType == AudioAttributes.CONTENT_TYPE_MUSIC
+    }
+
+    private fun pickMusicController(controllers: List<MediaController>?): MediaController? {
+        val candidates = controllers?.filter { isMusicSession(it) }.orEmpty()
+        if (candidates.isEmpty()) return null
+        return candidates.firstOrNull { it.playbackState?.state == PlaybackState.STATE_PLAYING }
+            ?: candidates.firstOrNull { it.packageName in SPOTIFY_PACKAGES }
+            ?: candidates.firstOrNull()
+    }
+
+    private fun resolveAppName(pkg: String): String {
+        return try {
+            val info = packageManager.getApplicationInfo(pkg, 0)
+            packageManager.getApplicationLabel(info)?.toString()?.takeIf { it.isNotBlank() } ?: pkg
+        } catch (_: Exception) {
+            if (pkg in SPOTIFY_PACKAGES) "Spotify" else pkg
+        }
+    }
+
     private fun updateController(controllers: List<MediaController>?) {
-        val spotify = controllers?.firstOrNull { it.packageName in SPOTIFY_PACKAGES }
-        if (spotify?.sessionToken != activeController?.sessionToken) {
+        val chosen = pickMusicController(controllers)
+        if (chosen?.sessionToken != activeController?.sessionToken) {
             activeController?.unregisterCallback(sessionCallback)
-            activeController = spotify
+            activeController = chosen
             cachedArtUrl = null
             lastTrackKey = null
-            if (spotify != null) {
-                spotify.registerCallback(sessionCallback, main)
-                updateCoverArt(spotify.metadata)
+            if (chosen != null) {
+                chosen.registerCallback(sessionCallback, main)
+                updateCoverArt(chosen.metadata)
             }
             postStateUpdate()
         }
@@ -213,6 +241,7 @@ class SpotifyMediaListener : NotificationListenerService() {
             out.put("speed", 0.0)
             out.put("actions", 0L)
         }
+        out.put("app_name", resolveAppName(controller.packageName))
 
         // Up Next queue peek (when the app populates MediaController.queue)
         var upNextTitle: String? = null
@@ -437,6 +466,17 @@ class SpotifyMediaListener : NotificationListenerService() {
     companion object {
         const val TAG = "couchtv.spotify"
         val SPOTIFY_PACKAGES = setOf("com.spotify.tv.android", "com.spotify.music")
+        val MUSIC_ONLY_PACKAGES = SPOTIFY_PACKAGES + setOf(
+            "tv.plex.labs.plexamp",
+            "com.google.android.apps.youtube.music",
+            "com.apple.android.music",
+            "com.amazon.mp3",
+            "com.aspiro.tidal",
+            "deezer.android.app",
+            "com.soundcloud.android",
+            "com.pandora.android",
+            "tunein.player"
+        )
         const val DEFAULT_SEEK_MS = 10_000L
 
         var instance: SpotifyMediaListener? = null
