@@ -26,7 +26,7 @@ import webbrowser
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
-from . import errors, finder, guide, health, linkin, pairing, paths, release, steps, studio, tvprofile
+from . import errors, finder, guide, health, linkin, pairing, paths, release, scanlog, steps, studio, tvprofile
 from .helper import autostart as hautostart, config as hconfig, deeplink
 from .identity import Identity
 from .tv import Tv, TvError
@@ -55,6 +55,7 @@ class State:
         self.httpd = None
         self.port = None
         self.seen = None
+        self.tv_seen = finder.Seen()    # TVs the last scans found (kept ~30 s, never shown Ready once missed)
         self.started = time.time()
         self.link = studio.Link()      # the Couch TV account, in memory only
         self.handoff = None            # a code from couchtv://setup?handoff=..., not used yet
@@ -93,6 +94,8 @@ def error_payload(e):
 def run_job(name, fn):
     with S.lock:
         if S.job.get("running"):
+            if name == "scan" and S.job.get("name") == "scan":
+                return {"started": name}   # the page asked again while a scan is running: it joins that one
             raise TvError("Still busy with the last step.", "busy")
         S.job = {"name": name, "running": True, "progress": 0, "message": ""}
 
@@ -280,6 +283,17 @@ def api(method, path, body):
     if path == "/api/scan":
         def scan(p):
             fake = os.environ.get("COUCHTV_SETUP_FAKE_SCAN")
+
+            def enrich(tvs):
+                for t in tvs:
+                    t["profile"] = tvprofile.guess(t)
+                    t["route"] = guide.route_for(t)
+                return tvs
+
+            def early(rows):
+                # the TVs' own announcements are in: show them while the knocking goes on
+                S.job["partial"] = {"tvs": S.tv_seen.apply(enrich(rows))}
+            diag = {}
             if fake:
                 # development and screenshots: recorded answers ({"heard", "knocks", "dial", "confirmed"}),
                 # merged exactly as a real scan would be, and nothing is sent on the network
@@ -288,12 +302,19 @@ def api(method, path, body):
                 time.sleep(float(rec.get("delay", 0.5)))
                 tvs = finder.merge(rec.get("heard", []), [tuple(k) for k in rec.get("knocks", [])], rec.get("dial", {}),
                                    _known(), rec.get("confirmed", {}))
+                diag["networks"] = []
             else:
-                tvs = finder.scan(known=_known())
-            for t in tvs:
-                t["profile"] = tvprofile.guess(t)
-                t["route"] = guide.route_for(t)
-            return {"tvs": tvs, "networks": [str(n) for n in finder.home_networks()]}
+                try:
+                    tvs = finder.scan(known=_known(), on_partial=early, diag=diag, hints=S.tv_seen.ips())
+                except Exception as e:
+                    diag.setdefault("error", str(getattr(e, "code", "") or "scan_failed"))
+                    scanlog.write(diag)
+                    raise
+            tvs = S.tv_seen.apply(enrich(tvs))
+            if not fake:
+                diag["shown"] = [{"ip": t["ip"], "status": t["status"], "stale": bool(t.get("stale"))} for t in tvs]
+                scanlog.write(diag)
+            return {"tvs": tvs, "networks": diag.get("networks", [])}
         return run_job("scan", scan)
     if path == "/api/guide":
         row = body.get("row") if isinstance(body.get("row"), dict) else {}

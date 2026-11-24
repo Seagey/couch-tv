@@ -10,6 +10,7 @@ LGPL library (python-zeroconf) inside it. One question goes out as multicast wit
 directly" bit set, from a random port, and a second socket listens on 5353 for the answers that are
 multicast anyway.
 """
+import select
 import socket
 import struct
 import time
@@ -84,23 +85,59 @@ def parse(buf):
     return out
 
 
-def _sockets():
-    socks = []
+def _open_sender(iface_ip=None):
+    """A socket the question goes out from. With an address it is tied to that network card
+    (IP_MULTICAST_IF), so a computer on Wi-Fi and Ethernet asks on both."""
     s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP)
-    s.setsockopt(socket.IPPROTO_IP, socket.IP_MULTICAST_TTL, 255)
-    s.bind(("", 0))
-    socks.append(s)
     try:
-        m = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP)
+        s.setsockopt(socket.IPPROTO_IP, socket.IP_MULTICAST_TTL, 255)
+        if iface_ip:
+            s.setsockopt(socket.IPPROTO_IP, socket.IP_MULTICAST_IF, socket.inet_aton(iface_ip))
+            s.bind((iface_ip, 0))
+        else:
+            s.bind(("", 0))
+    except OSError:
+        s.close()
+        raise
+    return s
+
+
+def _open_listener(ifaces):
+    """The socket on 5353 that hears multicast answers, joined to the group on every network card."""
+    m = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP)
+    try:
         m.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         if hasattr(socket, "SO_REUSEPORT"):
             m.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEPORT, 1)
         m.bind(("", PORT))
-        m.setsockopt(socket.IPPROTO_IP, socket.IP_ADD_MEMBERSHIP, socket.inet_aton(GROUP) + socket.inet_aton("0.0.0.0"))
-        socks.append(m)
+        joined = 0
+        for ip in list(ifaces) or ["0.0.0.0"]:
+            try:
+                m.setsockopt(socket.IPPROTO_IP, socket.IP_ADD_MEMBERSHIP, socket.inet_aton(GROUP) + socket.inet_aton(ip))
+                joined += 1
+            except OSError:
+                pass
+        if not joined:
+            m.setsockopt(socket.IPPROTO_IP, socket.IP_ADD_MEMBERSHIP, socket.inet_aton(GROUP) + socket.inet_aton("0.0.0.0"))
+        return m
     except OSError:
-        pass   # someone holds 5353 alone (some Windows set ups): the direct answers still come
-    return socks
+        m.close()
+        return None   # someone holds 5353 alone (some Windows set ups): the direct answers still come
+
+
+def _sockets(ifaces):
+    """(senders, listeners): one sender per network card (or one on the default route when no card
+    could be listed or opened), and the 5353 listener when it can be had."""
+    senders = []
+    for ip in ifaces:
+        try:
+            senders.append(_open_sender(ip))
+        except OSError:
+            pass
+    if not senders:
+        senders.append(_open_sender(None))
+    listener = _open_listener(ifaces)
+    return senders, ([listener] if listener else [])
 
 
 def send(sock, q):
@@ -113,23 +150,86 @@ def send(sock, q):
         raise
 
 
-def browse(services, wait=3.0):
+def questions(pairs):
+    """One packet asking for each (name, type): PTR, SRV, TXT or A, class IN with the unicast bit."""
+    msg = struct.pack(">6H", 0, 0, len(pairs), 0, 0, 0)
+    for name, rtype in pairs:
+        msg += _name_bytes(name) + struct.pack(">HH", rtype, 0x8001)
+    return msg
+
+
+def unresolved(records, wanted):
+    """What a TV announced but did not finish saying: ([instance names with no SRV or TXT yet],
+    [host names with no address yet]). Those are asked for directly."""
+    ptrs, srv, txts, addr = set(), {}, set(), set()
+    for name, rtype, value, _ in records:
+        if rtype == PTR and name in wanted:
+            ptrs.add(value.lower())
+        elif rtype == SRV:
+            srv[name] = value
+        elif rtype == TXT:
+            txts.add(name)
+        elif rtype == A:
+            addr.add(name)
+    need_inst = sorted(i for i in ptrs if i not in srv or i not in txts)
+    need_host = sorted({srv[i][1].lower() for i in ptrs if i in srv and srv[i][1].lower() not in addr})
+    return need_inst, need_host
+
+
+def follow_up(records, wanted, per_packet=12):
+    """The direct questions for what is still missing, as packets (none when nothing is)."""
+    need_inst, need_host = unresolved(records, wanted)
+    pairs = [(i, t) for i in need_inst for t in (SRV, TXT)] + [(h, A) for h in need_host]
+    return [questions(pairs[i:i + per_packet]) for i in range(0, len(pairs), per_packet)]
+
+
+last_info = {}   # what the latest browse did (for the scan log): cards used, rounds, direct questions
+
+
+def browse(services, wait=3.0, ifaces=None):
     """Asks for each service and returns what answered: a list of
-    {"service", "instance", "ip", "port", "name"} (name is the instance's own label)."""
+    {"service", "instance", "ip", "port", "name"} (name is the instance's own label).
+    The question goes out three times across `wait`, from every network card of this computer. From the
+    second time on, a TV heard saying only "I am here" is asked directly for its port, name and
+    address, so one lost reply does not hide it. What happened is left in `last_info`."""
     services = [s.rstrip(".") + "." if not s.endswith(".") else s for s in services]
     wanted = [s.rstrip(".").lower() for s in services]
+    if ifaces is None:
+        try:
+            from . import netinfo
+            ifaces = netinfo.own_ipv4s()
+        except Exception:
+            ifaces = []
     records = []
-    socks = _sockets()
+    senders, listeners = _sockets(ifaces)
+    stats = {}
+    stats.update({"interfaces": len(senders), "rounds": 0, "followups": 0, "send_errors": 0})
     try:
         q = query([s.rstrip(".") for s in services])
-        send(socks[0], q)
-        end, resent = time.time() + wait, False
-        import select
-        while time.time() < end:
-            if not resent and time.time() > end - wait / 2:
-                send(socks[0], q)
-                resent = True
-            ready, _, _ = select.select(socks, [], [], 0.2)
+        start = time.monotonic()
+        schedule, nxt, ever_sent = [0.0, wait / 3, 2 * wait / 3], 0, False
+        while True:
+            now = time.monotonic() - start
+            if nxt < len(schedule) and now >= schedule[nxt]:
+                packets = [q] + (follow_up(records, wanted) if nxt else [])
+                stats["followups"] += len(packets) - 1
+                last_err = None
+                for sock in senders:
+                    for pkt in packets:
+                        try:
+                            send(sock, pkt)
+                            ever_sent = True
+                        except OSError as e:
+                            last_err = e
+                            stats["send_errors"] += 1
+                if last_err is not None and not ever_sent:
+                    raise last_err   # every card failed: the caller can tell a Local Network block
+                nxt += 1
+                stats["rounds"] = nxt
+                continue
+            if now >= wait:
+                break
+            ready, _, _ = select.select(senders + listeners, [], [], 0.2)
             for s in ready:
                 try:
                     buf, src = s.recvfrom(9000)
@@ -137,9 +237,14 @@ def browse(services, wait=3.0):
                     continue
                 records += [r + (src[0],) for r in parse(buf)]
     finally:
-        for s in socks:
+        for s in senders + listeners:
             s.close()
-    return resolve(records, wanted)
+    found = resolve(records, wanted)
+    stats["heard"] = len(found)
+    stats["unresolved"] = len(unresolved(records, wanted)[0])
+    last_info.clear()
+    last_info.update(stats)
+    return found
 
 
 def txt(rdata):
