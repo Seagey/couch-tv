@@ -76,12 +76,14 @@ jobs:
           python stamp_version.py windows-file version.txt
           # Mac: the website's "Set up my TV" link (couchtv://) reaches the app as an argument at start
           ARGV=""; [ "$RUNNER_OS" = "macOS" ] && ARGV="--argv-emulation"
-          # Couch TV Helper: the bridge's code and the packages it imports, run in-process by --bridge
+          # Couch TV Helper: the bridge's code and the packages it imports, run in-process by --bridge. Not mcp:
+          # the bridge never imports it (bridge/mcp_server.py is a separate program the AI agent starts), and
+          # collecting its submodules needs typer, which the bridge does not install.
           HELPER=""
           if [ "${{ steps.helper.outputs.bundled }}" = "yes" ]; then
             HELPER="--add-data ../bridge${SEP}bridge"
-            for m in aiohttp androidtvremote2 zeroconf mcp adb_shell airtouch5py PIL; do HELPER="$HELPER --collect-submodules $m"; done
-            for m in aiohttp androidtvremote2 zeroconf mcp airtouch5py; do HELPER="$HELPER --copy-metadata $m"; done
+            for m in aiohttp androidtvremote2 zeroconf adb_shell airtouch5py PIL; do HELPER="$HELPER --collect-submodules $m"; done
+            for m in aiohttp androidtvremote2 zeroconf airtouch5py; do HELPER="$HELPER --copy-metadata $m"; done
             if [ "$RUNNER_OS" = "macOS" ]; then HELPER="$HELPER --hidden-import rumps"; else HELPER="$HELPER --hidden-import pystray"; fi
           fi
           pyinstaller --noconfirm --windowed --name "couch-tv Setup" $ARGV \

@@ -65,7 +65,8 @@ class Config(unittest.TestCase):
         self.assertEqual(hconfig.turn_on(False, d)["pairing_key"], key)
         off = hconfig.turn_off(d)
         self.assertEqual((off["mode"], off["autostart"], off["pairing_key"]), ("once", False, key))
-        self.assertEqual(oct(os.stat(Path(d, "helper.json")).st_mode & 0o777), "0o600")
+        if os.name != "nt":   # Windows has no owner only file mode
+            self.assertEqual(oct(os.stat(Path(d, "helper.json")).st_mode & 0o777), "0o600")
 
     def test_tvs_are_checked(self):
         d = tempfile.mkdtemp()
@@ -106,7 +107,7 @@ class Autostart(unittest.TestCase):
     def test_linux_xdg_autostart(self):
         home = tempfile.mkdtemp()
         where = autostart.enable(["/opt/couch tv/app", "--helper"], "linux", home)
-        self.assertTrue(where.endswith(".config/autostart/couch-tv-helper.desktop"))
+        self.assertTrue(Path(where).as_posix().endswith(".config/autostart/couch-tv-helper.desktop"))
         text = Path(where).read_text()
         self.assertIn('Exec="/opt/couch tv/app" "--helper"', text)
         self.assertIn("Type=Application", text)
