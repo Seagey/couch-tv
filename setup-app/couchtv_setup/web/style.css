@@ -87,7 +87,36 @@ input:not([type=checkbox]) {
 footer { margin-top: 40px; color: var(--soft); font-size: 14px; }
 footer a, a { color: var(--accent); }
 section[hidden] { display: none; }
+[hidden] { display: none !important; }
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 14px 18px; margin: 18px 0; }
+.acct { color: var(--good); font-size: 15px; }
+/* the list of TVs found on the Wi-Fi */
+.tvrow { display: flex; align-items: center; gap: 14px; padding: 14px 16px; background: var(--panel);
+  border: 1px solid var(--line); border-radius: 12px; }
+.tvrow .who { flex: 1; min-width: 0; }
+.tvrow .who b { display: block; font-size: 18px; }
+.tvrow.open { border-color: var(--accent); }
+.pill { font-size: 13px; font-weight: 700; padding: 4px 10px; border-radius: 999px; white-space: nowrap; }
+.pill.ready { background: #183324; color: var(--good); }
+.pill.step { background: #33280f; color: var(--accent); }
+.pill.other { background: #262b31; color: var(--soft); }
+/* the steps on the TV, drawn as small TV screens */
+.guide { margin-top: 8px; }
+.shot { display: grid; grid-template-columns: 220px 1fr; gap: 18px; align-items: start; margin: 16px 0; }
+.screen { background: #000; border: 6px solid #22262c; border-radius: 8px; padding: 10px; aspect-ratio: 16 / 9;
+  display: flex; flex-direction: column; gap: 6px; font-size: 12px; }
+.screen .path { color: var(--soft); }
+.screen .item { background: #1c2026; border-radius: 4px; padding: 5px 8px; color: var(--soft); }
+.screen .item.lit { background: var(--text); color: #111; font-weight: 700; }
+.shot h3 { margin: 0 0 6px; font-size: 17px; }
+.shot ol { margin: 0; }
+.report { max-height: 260px; overflow: auto; background: #0b0d10; border: 1px solid var(--line); border-radius: 8px;
+  padding: 10px; font-size: 12px; white-space: pre-wrap; word-break: break-word; }
+.ticks { list-style: none; padding: 0; }
+.ticks li::before { content: "✓ "; color: var(--good); font-weight: 700; }
 @media (max-width: 560px) {
   h1 { font-size: 26px; }
   .code-box { grid-template-columns: 1fr; }
+  .shot { grid-template-columns: 1fr; }
+  .tvrow { flex-wrap: wrap; }
 }

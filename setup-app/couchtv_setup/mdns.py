@@ -2,6 +2,8 @@
 - `_adb-tls-pairing._tcp`: the port of "Pair device with pairing code" (only while that screen is open)
 - `_adb-tls-connect._tcp`: the Wireless debugging port (changes after every restart)
 - `_androidtvremote2._tcp`: any Google TV or Android TV, with the name the TV gives itself
+- `_googlecast._tcp`: the same TVs again, with the name (TXT `fn`) and model (TXT `md`) in its TXT record
+- `_adb._tcp`: older Android TVs that announce plain ADB (port 5555)
 
 It only asks and listens: nothing on the TV changes. Written for couch-tv so the app needs no
 LGPL library (python-zeroconf) inside it. One question goes out as multicast with the "answer me
@@ -140,9 +142,28 @@ def browse(services, wait=3.0):
     return resolve(records, wanted)
 
 
+def txt(rdata):
+    """A TXT record's key=value strings as a dict ({"fn": "Living room TV", "md": "..."}). Keys are
+    lower case; a key with no "=" gets "". Anything that does not decode is skipped."""
+    out = {}
+    off = 0
+    while off < len(rdata):
+        n = rdata[off]
+        part = rdata[off + 1:off + 1 + n]
+        off += 1 + n
+        if not part:
+            continue
+        s = part.decode("utf-8", "replace")
+        k, _, v = s.partition("=")
+        k = k.strip().lower()
+        if k and k not in out:
+            out[k] = v[:100]
+    return out
+
+
 def resolve(records, wanted):
     ptrs = {}
-    srv, addr = {}, {}
+    srv, addr, texts = {}, {}, {}
     sender = {}
     for name, rtype, value, src in records:
         if rtype == PTR and name in wanted:
@@ -152,6 +173,8 @@ def resolve(records, wanted):
             sender.setdefault(name, src)
         elif rtype == A:
             addr.setdefault(name, value)
+        elif rtype == TXT and isinstance(value, (bytes, bytearray)):
+            texts.setdefault(name, txt(bytes(value)))
     found = []
     for inst, (service, original) in ptrs.items():
         if inst not in srv:
@@ -159,5 +182,6 @@ def resolve(records, wanted):
         port, target = srv[inst]
         ip = addr.get(target.lower()) or sender.get(inst)
         label = original[:-len(service) - 1] if inst.endswith("." + service) else original
-        found.append({"service": service, "instance": inst, "ip": ip, "port": port, "name": label})
+        found.append({"service": service, "instance": inst, "ip": ip, "port": port, "name": label,
+                      "txt": texts.get(inst, {})})
     return found

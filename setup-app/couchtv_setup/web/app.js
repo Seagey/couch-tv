@@ -77,28 +77,164 @@
 
   // ---- find ----
 
+  // The list finds TVs by itself and keeps looking while it is on screen, so a TV turns Ready on its own
+  // once its switch is on (the person never comes back to press Next).
+  var poll = null, openRow = null, rows = {};
+  var PILL = { ready: ["Ready", "ready"], code: ["Type the code", "step"], pair: ["1 step on the TV", "step"],
+               "switch": ["1 step on the TV", "step"], other: ["Found. Can't install from here yet", "other"] };
+
+  function onFind() { return !document.querySelector('[data-step="find"]').hidden; }
+
   function scan() {
     show("find");
     text("find-status", "Looking on your Wi-Fi…");
     $("found").textContent = "";
     $("find-help").hidden = true;
-    job("/api/scan").then(function (r) {
-      var tvs = r.tvs.filter(function (t) { return t.android; });
-      text("find-status", tvs.length ? "Which one is it?" : "No TV found yet.");
-      $("find-help").hidden = tvs.length > 0;
-      tvs.forEach(function (t) {
-        var b = document.createElement("button");
-        var name = document.createElement("span");
-        var model = t.known && t.known.name;
-        name.textContent = t.name || t.announced || model || (t.adb_5555 ? "A TV with debugging on" : "Android TV");
-        var small = document.createElement("small");
-        small.textContent = ((t.name || t.announced) && model ? model + " · " : "") + t.ip;
-        b.appendChild(name); b.appendChild(small);
-        b.addEventListener("click", function () { pick(t.ip, t); });
-        $("found").appendChild(b);
-      });
-    }, function (e) { fail(e); $("find-help").hidden = false; });
+    $("find-watch").hidden = true;
+    $("guide").hidden = true;
+    openRow = null; rows = {};
+    lookAgain();
   }
+
+  function lookAgain() {
+    clearTimeout(poll);
+    job("/api/scan").then(function (r) {
+      if (!onFind() || state.mode !== "setup" && state.mode !== "undo") return;
+      drawRows(r.tvs || []);
+      poll = setTimeout(function () { if (onFind()) lookAgain(); }, 6000);
+    }, function (e) { if (onFind()) { fail(e); $("find-help").hidden = false; } });
+  }
+
+  function stopLooking(then) {
+    clearTimeout(poll); poll = null;
+    // a scan may still be running: wait for it, so the next step is not told "still busy"
+    (function wait() {
+      api("/api/job").then(function (j) { if (j.running) return setTimeout(wait, 400); then(); }, then);
+    })();
+  }
+
+  function drawRows(tvs) {
+    var box = $("found");
+    var before = rows; rows = {};
+    box.textContent = "";
+    var usable = tvs.filter(function (t) { return t.android || t.status === "other"; });
+    text("find-status", usable.length ? (usable.length === 1 ? "Found your TV." : "Found " + usable.length + " TVs. Which one?") : "No TV found yet.");
+    $("find-help").hidden = usable.length > 0;
+    $("find-watch").hidden = !usable.length;
+    usable.forEach(function (t) {
+      rows[t.ip] = t;
+      var row = document.createElement("div");
+      row.className = "tvrow" + (openRow === t.ip ? " open" : "");
+      var who = document.createElement("div"); who.className = "who";
+      var b = document.createElement("b"); b.textContent = t.label;
+      var small = document.createElement("small");
+      small.textContent = [t.model && t.model !== t.label ? t.model : "", t.ip].filter(Boolean).join(", ");
+      who.appendChild(b); who.appendChild(small);
+      var pill = document.createElement("span");
+      var p = PILL[t.status] || PILL["switch"];
+      pill.className = "pill " + p[1]; pill.textContent = p[0];
+      row.appendChild(who); row.appendChild(pill);
+      if (t.status === "other") {
+        var note = document.createElement("small");
+        note.textContent = "Couch TV goes on this TV another way. See the guide on GitHub.";
+        who.appendChild(document.createElement("br")); who.appendChild(note);
+      } else {
+        var go = document.createElement("button");
+        go.className = t.status === "ready" ? "primary" : "";
+        go.textContent = t.status === "ready" ? "Set up" : t.status === "code" ? "Type the code" : "Show me how";
+        go.addEventListener("click", function () { rowAction(t.ip); });
+        row.appendChild(go);
+      }
+      box.appendChild(row);
+    });
+    // the TV whose steps are open just became ready, or its pairing screen just opened
+    if (openRow && rows[openRow] && before[openRow] && rows[openRow].status !== before[openRow].status) openGuide(rows[openRow]);
+  }
+
+  function rowAction(ip) {
+    var t = rows[ip];
+    if (!t) return;
+    if (t.status === "ready" || t.status === "code") return setUpRow(t);
+    openGuide(t);
+  }
+
+  function setUpRow(t) {
+    state.ip = t.ip; state.look = t; state.tried = 0;
+    state.kind = (t.known && t.known.kind) || state.kind || "google";
+    state.devStep = "find";
+    if (state.mode === "undo" && !t.adb_5555 && !t.wireless_debugging) return pick(t.ip, t);
+    stopLooking(function () {
+      if (t.adb_5555) return allow();
+      if (t.status === "code") {
+        startPair();
+        if (t.pairing_port) { $("pair-port").value = t.pairing_port; text("pair-status", "Found the pairing screen. Type the 6 numbers and press Pair."); }
+        return;
+      }
+      // Wireless debugging, paired with this computer before: straight in, no code
+      text("find-status", "Connecting to " + t.label + "…");
+      job("/api/connect-tls", { ip: t.ip, port: t.wireless_debugging }).then(connected, function (e) {
+        fail(e); show("find"); lookAgain();
+      });
+    });
+  }
+
+  // The few steps on the TV for this TV's Android version, as little TV screens.
+  function openGuide(t, extra) {
+    openRow = t.ip;
+    document.querySelectorAll(".tvrow").forEach(function (r) { r.classList.remove("open"); });
+    var body = { row: t };
+    if (extra) Object.keys(extra).forEach(function (k) { body[k] = extra[k]; });
+    api("/api/guide", body).then(function (g) {
+      state.guide = { ip: t.ip, route: g.route, extra: extra || {} };
+      text("guide-title", t.label + ": " + (g.route === "ready" ? "ready to set up" : "the steps on the TV"));
+      var box = $("guide-steps"); box.textContent = "";
+      g.steps.forEach(function (s, i) {
+        var shot = document.createElement("div"); shot.className = "shot";
+        var scr = document.createElement("div"); scr.className = "screen";
+        var path = document.createElement("div"); path.className = "path"; path.textContent = s.path.join("  ›  ");
+        scr.appendChild(path);
+        var lit = document.createElement("div"); lit.className = "item lit"; lit.textContent = s.pick;
+        var other = document.createElement("div"); other.className = "item"; other.textContent = "…";
+        scr.appendChild(other); scr.appendChild(lit);
+        var words = document.createElement("div");
+        var h = document.createElement("h3"); h.textContent = (i + 1) + ". " + s.title;
+        var ol = document.createElement("ul");
+        s.lines.forEach(function (l) { var li = document.createElement("li"); li.textContent = l; ol.appendChild(li); });
+        words.appendChild(h); words.appendChild(ol);
+        shot.appendChild(scr); shot.appendChild(words);
+        box.appendChild(shot);
+      });
+      $("guide-which").hidden = g.route !== "choose";
+      $("guide-fire").hidden = g.route === "fire" || g.route === "ready";
+      var next = $("guide-next");
+      next.hidden = g.route === "choose";
+      next.textContent = g.route === "pair" ? "I see the code" : g.route === "ready" ? "Set up" : "Done, connect";
+      $("guide").hidden = false;
+    }, fail);
+  }
+
+  document.querySelectorAll("[data-which]").forEach(function (b) {
+    b.addEventListener("click", function () {
+      var t = rows[openRow] || state.look; if (t) openGuide(t, { wireless: b.dataset.which === "wireless" });
+    });
+  });
+  $("guide-fire").addEventListener("click", function () {
+    var t = rows[openRow]; if (t) { state.kind = "fire"; openGuide(t, { kind: "fire" }); }
+  });
+  $("guide-next").addEventListener("click", function () {
+    var t = rows[openRow]; if (!t) return;
+    var g = state.guide || {};
+    state.ip = t.ip; state.look = t; state.tried = 0; state.devStep = "find";
+    if (g.route === "ready") return setUpRow(t);
+    if (g.route === "pair") {
+      return stopLooking(function () {
+        startPair();
+        if (t.pairing_port) $("pair-port").value = t.pairing_port;
+      });
+    }
+    state.kind = g.route === "fire" ? "fire" : (t.known && t.known.kind) || "google";
+    stopLooking(allow);
+  });
 
   // What kind of TV it most likely is, from what we already know: a TV this app connected to before, then
   // what it announces. Google TV and Android TV announce themselves; a Fire TV only has ADB on 5555.
@@ -149,7 +285,7 @@
     }
   }
 
-  $("ip-go").addEventListener("click", function () { pick($("ip").value.trim(), null); });
+  $("ip-go").addEventListener("click", function () { stopLooking(function () { pick($("ip").value.trim(), null); }); });
   $("rescan").addEventListener("click", scan);
 
   document.querySelectorAll("[data-kind]").forEach(function (b) {
@@ -246,7 +382,7 @@
     show("kind");
   });
   $("allow-retry").addEventListener("click", allow);
-  $("allow-back").addEventListener("click", function () { clearInterval(countdown); show(state.devStep); });
+  $("allow-back").addEventListener("click", function () { clearInterval(countdown); show(state.devStep); if (state.devStep === "find") lookAgain(); });
   document.querySelectorAll(".fix-try").forEach(function (b) { b.addEventListener("click", allow); });
   document.querySelectorAll(".fix-back").forEach(function (b) {
     b.addEventListener("click", function () { show(state.devStep); });
@@ -307,6 +443,13 @@
     $("ontv-row").hidden = !state.ontvTakes;
     text("device-line", "Connected to your " + f.name + " (" + (f.fire ? "Fire OS " + (f.fire_os || "") : "Android " + f.android) + ").");
     $("tcl-note").hidden = !f.tcl;
+    var t = rows[state.ip];
+    if (t && !$("tv-room").value && t.known && t.known.room) $("tv-room").value = t.known.room;
+    if (state.account) {
+      $("plan-account").textContent = "Signed in as " + (state.account.name || "you") + ". Couch TV gets your home details" +
+        (state.account.design ? " and \"" + state.account.design + "\"" : "") + " as it goes on.";
+    }
+    $("plan-account").hidden = !state.account;
     refreshPlan();
     show("plan");
   }
@@ -370,13 +513,33 @@
 
   $("setup-go").addEventListener("click", function () {
     var people = $("people").value.split(",").map(function (s) { return s.trim(); }).filter(Boolean);
-    job("/api/setup", { ambient_off: $("ambient").checked, ontv_home_off: $("ontv-off").checked, people: people, weather: state.weather }, working("Setting it up"))
+    var room = $("tv-room").value.trim();
+    var named = room ? api("/api/name-tv", { ip: state.ip, room: room }).catch(function () {}) : Promise.resolve();
+    named.then(function () {
+      return job("/api/setup", { ambient_off: $("ambient").checked, ontv_home_off: $("ontv-off").checked, people: people, weather: state.weather }, working("Setting it up"));
+    })
       .then(function (r) {
+        var ul = $("done-account"); ul.textContent = "";
+        if (r.account) {
+          var lines = ["Couch TV installed and checked"];
+          if (r.account.linked) lines.push("Linked to your Couch TV account");
+          if (r.account.people) lines.push("Added " + r.account.people + (r.account.people === 1 ? " person" : " people") + " from your home details");
+          if (r.account.town) lines.push("Weather for " + r.account.town);
+          if (r.account.design) lines.push("Sent \"" + r.account.design + "\" to the TV");
+          lines.forEach(function (l) { var li = document.createElement("li"); li.textContent = l; ul.appendChild(li); });
+        }
+        ul.hidden = !r.account;
+        $("health-box").hidden = false;
+        if (r.speed && r.speed.cls) {
+          var sp = document.createElement("li");
+          sp.textContent = "Measured how smoothly it draws: " + ({ a: "Slow", b: "Everyday", c: "Quick", d: "Fast" })[r.speed.cls] + " (Couch TV Studio uses this)";
+          ul.appendChild(sp); ul.hidden = false;
+        }
         if (r.kept_ontv) {
           text("done-title", "Left as it was");
           text("done-line", "couch-tv's other app (the on-TV app) is still your home screen, and nothing was installed.");
         } else {
-          text("done-title", r.front ? "couch-tv is your home screen" : "couch-tv is on the TV");
+          text("done-title", r.front ? "Couch TV is your home screen" : "Couch TV is on the TV");
           text("done-line", (r.front ? "It is on the screen now. " : "It is installed. ") +
             "Version " + r.apk.version + ", checked against " + r.apk.checked + ". " +
             homeWords({ ok: r.front, watch_bound: r.watch_bound, warning: r.warning, other_front: r.other_front }));
@@ -416,6 +579,80 @@
     api("/api/debug-off").then(function () {
       text("debug-line", "Debugging is off. couch-tv keeps working.");
       $("debug-off").hidden = true;
+    }, fail);
+  });
+
+  // ---- health report: shown in full, sent only after Send ----
+
+  $("health-look").addEventListener("click", function () {
+    api("/api/health/preview").then(function (r) {
+      text("health-text", JSON.stringify(r.report, null, 2));
+      $("health-send").hidden = !r.can_send;
+      text("health-status", r.can_send ? "" : "Link your Couch TV account to send it.");
+      $("health-show").hidden = false;
+    }, fail);
+  });
+  $("health-send").addEventListener("click", function () {
+    api("/api/health/send", { yes: true }).then(function (r) {
+      text("health-status", "Sent. Thank you." + (r.ref ? " Reference " + r.ref + "." : ""));
+      $("health-send").hidden = true;
+    }, fail);
+  });
+
+  // ---- the Couch TV account (only when this Setup links accounts) ----
+
+  function signedIn(acct) {
+    state.account = acct;
+    text("acct-top", "Signed in as " + (acct.name || "you"));
+    $("acct-top").hidden = false;
+    text("acct-line", "Signed in as " + (acct.name || "you") + ". Your design and home details go on the TV too.");
+    $("acct-ask").hidden = true;
+  }
+
+  api("/api/account").then(function (a) {
+    if (a.mode === "off") return;
+    $("acct-box").hidden = false;
+    if (a.account) return signedIn(a.account);
+    if (a.handoff) {
+      // opened from the website's Set up my TV button: sign in with its code straight away
+      text("acct-line", "Signing in to your Couch TV account…");
+      api("/api/handoff", {}).then(function (r) { signedIn(r.account); }, function (e) {
+        text("acct-line", "Have a Couch TV account? Link it, and your design and home details go on the TV too.");
+        fail(e);
+      });
+    }
+  }, function () {});
+
+  // a link opened while this page was already up arrives here
+  setInterval(function () {
+    if (state.account || $("acct-box").hidden) return;
+    api("/api/account").then(function (a) {
+      if (a.account) signedIn(a.account);
+      else if (a.handoff) api("/api/handoff", {}).then(function (r) { signedIn(r.account); }, fail);
+    }, function () {});
+  }, 5000);
+
+  $("acct-go").addEventListener("click", function () {
+    api("/api/handoff", { code: $("acct-code").value }).then(function (r) { signedIn(r.account); }, fail);
+  });
+
+  var devicePoll = null;
+  $("acct-device").addEventListener("click", function () {
+    api("/api/device/start").then(function (d) {
+      var p = $("acct-device-code"); p.textContent = "";
+      p.appendChild(document.createTextNode("On the Couch TV website, press Allow for the code "));
+      var b = document.createElement("b"); b.textContent = d.user_code; p.appendChild(b);
+      p.appendChild(document.createTextNode(". "));
+      var a = document.createElement("a"); a.href = d.verify; a.target = "_blank"; a.rel = "noopener";
+      a.textContent = "Open the website"; p.appendChild(a);
+      p.hidden = false;
+      window.open(d.verify, "_blank", "noopener");
+      clearInterval(devicePoll);
+      devicePoll = setInterval(function () {
+        api("/api/device/poll").then(function (r) {
+          if (r.account) { clearInterval(devicePoll); $("acct-device-code").hidden = true; signedIn(r.account); }
+        }, function (e) { clearInterval(devicePoll); fail(e); });
+      }, d.interval * 1000);
     }, fail);
   });
 
