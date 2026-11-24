@@ -28,6 +28,7 @@ Your names, photos, town and guest Wi-Fi can now come to the TV from your Couch 
 - Setup installs the newest Couch TV, checked against the release's sums, makes it the home, links the TV to your account, brings your home details and your design, and checks how smoothly it runs.
 - **Or sign in with a code:** Setup shows a code like ABCD-EFGH to type on the Couch TV website.
 - **Setting the same TV up again** keeps it as the same TV in your account, instead of adding a second one.
+- **Couch TV Setup for Linux:** `couch-tv-Setup-linux.tar.gz`, for 64 bit Intel or AMD computers on Ubuntu, Debian, Fedora, Arch or Omarchy. Unpack it and open **couch-tv Setup** in the folder. It needs no adb, no USB cable and no udev rule.
 - **Something not right?** The last page can show a health report. You see all of it first, and it goes to your account only if you press Send.
 
 ### Your account's inbox: one click Send

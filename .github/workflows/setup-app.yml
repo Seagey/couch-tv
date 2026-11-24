@@ -1,6 +1,6 @@
-# Builds couch-tv Setup (setup-app/) for Apple silicon Macs, Intel Macs and Windows, and tests each
+# Builds couch-tv Setup (setup-app/) for Apple silicon Macs, Intel Macs, Windows and Linux (x86_64), and tests each
 # build: the unit tests, then the built app's own pairing self test and a start and stop.
-# When a couch-tv release is published, the three zips and their SHA256SUMS-setup.txt are added to
+# When a couch-tv release is published, the three zips, the Linux tar.gz and their SHA256SUMS-setup.txt are added to
 # that same release, so the APKs and the setup app always come from one release (a separate setup
 # release would become "latest" and hide the APKs from the TV home's update check).
 #
@@ -32,6 +32,11 @@ jobs:
             os: macos-15-intel
           - name: windows
             os: windows-2022
+          # Linux x86_64 (0.13.13): built on Ubuntu 22.04, so its glibc (2.35) is old enough for current Debian,
+          # Ubuntu, Fedora and Arch (Omarchy). No adb program and no udev rule: Setup talks to the TV over the
+          # network with its own Python ADB (adb-shell), never over USB.
+          - name: linux
+            os: ubuntu-22.04
     runs-on: ${{ matrix.os }}
     defaults:
       run:
@@ -99,13 +104,20 @@ jobs:
           echo "PROGRAM=dist/couch-tv Setup/couch-tv Setup.exe" >> "$GITHUB_ENV"
           python -c "import shutil; shutil.make_archive('dist/couch-tv-Setup-${{ matrix.name }}', 'zip', 'dist', 'couch-tv Setup')"
 
+      - name: Package (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          # A folder with the "couch-tv Setup" program in it, as on Windows; tar keeps its run permission.
+          echo "PROGRAM=dist/couch-tv Setup/couch-tv Setup" >> "$GITHUB_ENV"
+          tar -czf "dist/couch-tv-Setup-${{ matrix.name }}.tar.gz" -C dist "couch-tv Setup"
+
       - name: Smoke test the built app
         run: python tests/smoke.py "$PROGRAM"
 
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02   # v4.6.2
         with:
           name: couch-tv-Setup-${{ matrix.name }}
-          path: setup-app/dist/couch-tv-Setup-${{ matrix.name }}.zip
+          path: setup-app/dist/couch-tv-Setup-${{ matrix.name }}.${{ runner.os == 'Linux' && 'tar.gz' || 'zip' }}
           if-no-files-found: error
 
   publish:
@@ -125,20 +137,20 @@ jobs:
           TAG: ${{ github.event.release.tag_name }}
         run: |
           cd out
-          sha256sum couch-tv-Setup-*.zip > SHA256SUMS-setup.txt
+          sha256sum couch-tv-Setup-*.zip couch-tv-Setup-*.tar.gz > SHA256SUMS-setup.txt
           cat SHA256SUMS-setup.txt
-          gh release upload "$TAG" couch-tv-Setup-*.zip SHA256SUMS-setup.txt --repo "$GITHUB_REPOSITORY" --clobber
-      # The website links releases/latest/download/couch-tv-Setup-*.zip, so a release without all four is broken.
+          gh release upload "$TAG" couch-tv-Setup-*.zip couch-tv-Setup-*.tar.gz SHA256SUMS-setup.txt --repo "$GITHUB_REPOSITORY" --clobber
+      # The website links releases/latest/download/couch-tv-Setup-*, so a release without all five is broken.
       # If a build job fails (0.13.11: the Apple silicon Mac job never got a runner), this job is skipped and the
       # run fails; scripts/release.sh setup (which publish ends with) runs the failed jobs again and checks.
-      - name: Check the release has all four
+      - name: Check the release has all five
         env:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ github.event.release.tag_name }}
         run: |
           have=$(gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json assets --jq '.assets[].name')
           missing=0
-          for f in couch-tv-Setup-mac-apple-silicon.zip couch-tv-Setup-mac-intel.zip couch-tv-Setup-windows.zip SHA256SUMS-setup.txt; do
+          for f in couch-tv-Setup-mac-apple-silicon.zip couch-tv-Setup-mac-intel.zip couch-tv-Setup-windows.zip couch-tv-Setup-linux.tar.gz SHA256SUMS-setup.txt; do
             printf '%s\n' "$have" | grep -qxF "$f" || { echo "::error::$f is not on $TAG"; missing=1; }
           done
           exit $missing

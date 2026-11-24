@@ -231,8 +231,8 @@ do_publish() {
   do_setup
 }
 
-# couch-tv Setup's files on every release (the website links releases/latest/download/couch-tv-Setup-*.zip)
-SETUP_FILES="couch-tv-Setup-mac-apple-silicon.zip couch-tv-Setup-mac-intel.zip couch-tv-Setup-windows.zip SHA256SUMS-setup.txt"
+# couch-tv Setup's files on every release (the website links releases/latest/download/couch-tv-Setup-*); Linux from 0.13.13
+SETUP_FILES="couch-tv-Setup-mac-apple-silicon.zip couch-tv-Setup-mac-intel.zip couch-tv-Setup-windows.zip couch-tv-Setup-linux.tar.gz SHA256SUMS-setup.txt"
 setup_missing() {  # <tag>: the Setup files the release does not have, one a line (all of them when it cannot be read)
   local have
   have=$(gh release view "$1" --repo "$REPO" --json assets --jq '.assets[].name' 2>/dev/null) || have=""

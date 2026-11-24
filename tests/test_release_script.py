@@ -40,7 +40,8 @@ case "$3" in
 esac
 exit 0
 """
-SETUP = ["couch-tv-Setup-mac-apple-silicon.zip", "couch-tv-Setup-mac-intel.zip", "couch-tv-Setup-windows.zip", "SHA256SUMS-setup.txt"]
+SETUP = ["couch-tv-Setup-mac-apple-silicon.zip", "couch-tv-Setup-mac-intel.zip", "couch-tv-Setup-windows.zip",
+         "couch-tv-Setup-linux.tar.gz", "SHA256SUMS-setup.txt"]
 # release view --json assets: the asset names (FAKE_ASSETS, default every Setup file; after a rerun FAKE_ASSETS_AFTER);
 # run list: "id status conclusion" (FAKE_RUN)
 FAKE_GH = """#!/bin/bash
@@ -438,12 +439,15 @@ class ReleaseScript(unittest.TestCase):
         rc, out = self.run_step("setup")
         self.assertEqual(rc, 2, out)
 
-    def test_the_workflow_uploads_and_checks_all_four(self):
+    def test_the_workflow_uploads_and_checks_all_five(self):
         wf = (ROOT / ".github/workflows/setup-app.yml").read_text()
-        for name in ("mac-apple-silicon", "mac-intel", "windows"):
+        for name in ("mac-apple-silicon", "mac-intel", "windows", "linux"):
             self.assertIn("- name: " + name, wf)
-        self.assertIn("gh release upload \"$TAG\" couch-tv-Setup-*.zip SHA256SUMS-setup.txt", wf)
-        check = wf.split("- name: Check the release has all four", 1)[1]
+        self.assertIn("gh release upload \"$TAG\" couch-tv-Setup-*.zip couch-tv-Setup-*.tar.gz SHA256SUMS-setup.txt", wf)
+        self.assertIn("sha256sum couch-tv-Setup-*.zip couch-tv-Setup-*.tar.gz > SHA256SUMS-setup.txt", wf)
+        self.assertIn("os: ubuntu-22.04", wf)
+        self.assertIn('tar -czf "dist/couch-tv-Setup-${{ matrix.name }}.tar.gz"', wf)
+        check = wf.split("- name: Check the release has all five", 1)[1]
         for f in SETUP:
             self.assertIn(f, check)
 
