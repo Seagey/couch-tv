@@ -56,8 +56,25 @@ jobs:
       - name: Build the TV apps
         run: sh scripts/build-apk.sh
 
+      - name: Gradle cache
+        # Maven Central answers 429 (too many requests) to GitHub's runners now and then, and the
+        # Robolectric native runtime jar is large; keep what was downloaded for the next run
+        uses: actions/cache@v4
+        with:
+          path: ~/.gradle/caches
+          key: gradle-${{ runner.os }}-${{ hashFiles('on-tv/android/**/*.kts', 'on-tv/android/gradle/**', 'tv-home/android/**/*.kts') }}
+          restore-keys: gradle-${{ runner.os }}-
+
       - name: On-TV app unit tests
-        run: tv-home/android/gradlew -p on-tv/android --no-daemon testDebugUnitTest
+        # a download refused with 429 is tried again after a pause; a test that fails is not retried
+        run: |
+          for try in 1 2 3 4; do
+            tv-home/android/gradlew -p on-tv/android --no-daemon testDebugUnitTest 2>&1 | tee "$RUNNER_TEMP/unit.log"
+            [ "${PIPESTATUS[0]}" = 0 ] && exit 0
+            grep -q "status code 429" "$RUNNER_TEMP/unit.log" || exit 1
+            echo "Maven Central said 429; waiting before try $((try + 1))"; sleep $((try * 45))
+          done
+          exit 1
 
       - name: Signing fingerprints
         run: for f in dist/*.apk; do echo "$f"; "$ANDROID_HOME/build-tools/34.0.0/apksigner" verify --print-certs "$f" | grep -i "SHA-256"; done
