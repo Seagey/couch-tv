@@ -173,7 +173,7 @@ class Unpack(unittest.TestCase):
         return z
 
     def test_zip_symlinks_that_point_outside_are_refused_before_unpacking(self):
-        for target in ("/etc", "../../x", "a/../../b", "C:\\Windows"):
+        for target in ("/etc", "../../x", "a/../../../b", "C:\\Windows", "..", ""):
             d = tempfile.mkdtemp()
             z = self._zip_with_link(d, target)
             with mock.patch.object(update.subprocess, "run") as run:
@@ -181,6 +181,20 @@ class Unpack(unittest.TestCase):
                     update.unpack(z, os.path.join(d, "out"), "darwin")
                 run.assert_not_called()
             self.assertEqual(list(Path(d, "out").iterdir()), [])
+
+    def test_a_zip_symlink_that_climbs_but_stays_inside_is_allowed(self):
+        # a Mac .app links Frameworks and Versions/Current with "..": the CI archive has them
+        d = tempfile.mkdtemp()
+        z = os.path.join(d, "l.zip")
+        with zipfile.ZipFile(z, "w") as f:
+            info = zipfile.ZipInfo("app/Contents/Frameworks/link")
+            info.create_system = 3
+            info.external_attr = (stat.S_IFLNK | 0o755) << 16
+            f.writestr(info, "../Resources/lib")
+            f.writestr("app/Contents/Resources/lib", "x")
+        with mock.patch.object(update.subprocess, "run") as run:
+            update.unpack(z, os.path.join(d, "out"), "darwin")
+            self.assertEqual(run.call_args[0][0][:3], ["/usr/bin/ditto", "-x", "-k"])
 
     def test_a_zip_symlink_inside_the_app_is_allowed(self):
         d = tempfile.mkdtemp()

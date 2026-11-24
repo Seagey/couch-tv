@@ -13,6 +13,7 @@ import http.client
 import json
 import os
 import platform
+import posixpath
 import re
 import shutil
 import stat
@@ -143,7 +144,10 @@ def unpack(archive, into, system=None):
                     raise bad
                 if stat.S_ISLNK(info.external_attr >> 16):   # a link pointing outside is a write-through for the next entry
                     target = z.read(info).decode("utf-8", "replace").replace("\\", "/")
-                    if target.startswith("/") or re.match(r"^[A-Za-z]:", target) or ".." in target.split("/"):
+                    # a .app's own links climb with ".." (Frameworks, Versions/Current): fine while they stay inside it
+                    inside = posixpath.normpath(posixpath.join(posixpath.dirname(info.filename.rstrip("/")), target))
+                    if not target or target.startswith("/") or re.match(r"^[A-Za-z]:", target) \
+                            or inside == ".." or inside.startswith("../") or inside == ".":
                         raise bad
             if (system or sys.platform) == "darwin":
                 # a .app holds symlinks and run permissions, which zipfile drops: ditto made the zip, ditto opens it
