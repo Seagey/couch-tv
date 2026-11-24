@@ -320,7 +320,7 @@ class Account(unittest.TestCase):
         return mock.patch.dict(os.environ, {"COUCHTV_SETUP_STUDIO_STUB": f.name, "COUCHTV_SETUP_STUDIO": ""})
 
     def test_off_sends_nothing(self):
-        with mock.patch.dict(os.environ, {"COUCHTV_SETUP_STUDIO": "", "COUCHTV_SETUP_STUDIO_STUB": ""}), \
+        with mock.patch.dict(os.environ, {"COUCHTV_SETUP_STUDIO": "off", "COUCHTV_SETUP_STUDIO_STUB": ""}), \
                 mock.patch.object(studio.urllib.request, "build_opener", side_effect=AssertionError("network")):
             self.assertEqual(studio.mode(), "off")
             with self.assertRaises(TvError) as e:
@@ -455,11 +455,40 @@ class LinkOnTheTv(unittest.TestCase):
         steps.make_home(tv, "/x/couch-tv-home.apk", people=[{"id": "p_3k9x2m", "name": "Ruby"}, "Alex"],
                         account={"link": LINK, "code": CODE})
         start = next(c for c in tv.log if c.startswith("am force-stop app.couchtv.launcher"))
-        self.assertIn("--es account_link " + LINK, start)
-        self.assertIn("--es design_code " + CODE, start)
+        self.assertIn("am start -n app.couchtv.launcher/.FromComputer ", start)      # only a computer can send settings
+        self.assertNotIn("account_link", start)
+        told = next(c for c in tv.log if c.startswith("am broadcast"))
+        self.assertEqual(told, f"am broadcast --include-stopped-packages -n app.couchtv.launcher/.SetupLink --es account_link {LINK} --es design_code {CODE}")
+        self.assertEqual(tv.held, LINK)
         import base64
         cfg = json.loads(base64.b64decode(re.search(r"--es config_b64 (\S+)", start).group(1)))
         self.assertEqual(cfg["people"], [{"id": "p_3k9x2m", "name": "Ruby"}, {"id": "person2", "name": "Alex"}])
+
+
+    def test_an_older_couch_tv_gets_its_settings_the_old_way(self):
+        tv = FakeTv("google")
+        tv.app = "0.13.14"
+        r = steps.make_home(tv, "/x/couch-tv-home.apk", account={"link": LINK, "code": CODE})
+        starts = [c for c in tv.log if "config_b64" in c]
+        self.assertEqual([c.split("-n ")[1].split()[0] for c in starts],
+                         ["app.couchtv.launcher/.FromComputer", "app.couchtv.launcher/.MainActivity"])
+        self.assertEqual((r["link"], tv.held), ("sent", LINK))
+
+    def test_versions(self):
+        for v, ok in (("0.13.13", True), ("0.13.12", False), ("v0.14", True), ("1.0.0-beta.1", True), ("0.9", False), (None, False), ("x", False)):
+            self.assertEqual(steps.version_at_least(v, steps.LINK_SINCE), ok, v)
+
+    def test_what_am_start_says_is_read(self):
+        for out in ("", "Starting: Intent { }\nError type 3\nError: Activity class {x} does not exist.",
+                    "Starting: Intent { }\njava.lang.SecurityException: Permission Denial: starting Intent",
+                    "Security exception: Permission Denial", "Error: unknown command"):
+            tv = FakeTv("google")
+            tv.shell = lambda c, o=out: o
+            with self.assertRaises(TvError, msg=out) as e:
+                steps.start_activity(tv, steps.HOME_ACT)
+            self.assertEqual(e.exception.code, "not_started")
+        tv.shell = lambda c: "Starting: Intent { }\nWarning: Activity not started, intent has been delivered to currently running top-most instance."
+        steps.start_activity(tv, steps.HOME_ACT)
 
 
 class Profile(unittest.TestCase):

@@ -263,7 +263,12 @@ if echo "$SMART" | grep -qx doorbell; then
 elif "$PY" "$T" shell "appops get app.couchtv.launcher SYSTEM_ALERT_WINDOW" 2> /dev/null | grep -q allow; then
   "$PY" "$T" shell "appops set app.couchtv.launcher SYSTEM_ALERT_WINDOW default"
 fi
-"$PY" "$T" shell "am force-stop app.couchtv.launcher; am start -n $HOME_ACT --es bridge ${BRIDGE_URL:-none} --es config_b64 $CFG64 --es ha_b64 $HA64 ${TV_ID:+--es tv $TV_ID} --es key \"${PAIRING_KEY:-}\""
+SETS="--es bridge ${BRIDGE_URL:-none} --es config_b64 $CFG64 --es ha_b64 $HA64 ${TV_ID:+--es tv $TV_ID} --es key \"${PAIRING_KEY:-}\""
+# FromComputer only answers a computer over ADB (0.13.15). An older app has no such screen: then the old way.
+STARTED=$("$PY" "$T" shell "am force-stop app.couchtv.launcher; am start -n app.couchtv.launcher/.FromComputer $SETS" 2>&1) || true
+case "$STARTED" in
+  *Error*|*Exception*|*"does not exist"*|"") "$PY" "$T" shell "am force-stop app.couchtv.launcher; am start -n $HOME_ACT $SETS" ;;
+esac
 
 # The Home button watch (FireWatch.kt: it only sees which window came forward). The TV's own home
 # stays on, so at power on, and from the Home key on Google TV and Fire TV, the TV opens its own

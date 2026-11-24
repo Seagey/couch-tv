@@ -32,12 +32,21 @@
   </nav>
   <div class="who">
     <span class="chip" id="acct-top" hidden><span class="av" id="acct-av"></span><span id="acct-name"></span></span>
+    <button class="q" id="acct-out" type="button" hidden>Sign out</button>
     <a class="q" id="studio-top" target="_blank" rel="noopener" hidden>Open Couch TV Studio</a>
   </div>
 </header>
 <p class="backnote" id="back-note" hidden></p>
 
 <main>
+  <!-- whose account: asked before the code is used, on any screen -->
+  <div class="card flat askcard" id="link-ask" role="alertdialog" aria-labelledby="link-ask-who" hidden>
+    <h2 id="link-ask-who" tabindex="-1">Link to this account?</h2>
+    <p id="link-ask-mail"></p>
+    <p>Linking sends this TV's model, speed and installed app names to your account.</p>
+    <div class="actions"><button type="button" id="link-ask-no">Not me</button><button type="button" class="primary" id="link-ask-yes">Yes, link it</button></div>
+  </div>
+
   <!-- welcome -->
   <section data-step="welcome" class="hero">
     <div>
@@ -399,6 +408,7 @@
           <p class="hint" id="fl-status" aria-live="polite"></p>
         </div>
         <p class="hint" id="link-status" aria-live="polite" hidden></p>
+        <div class="actions" id="link-fix" hidden><button class="btn ghost" id="link-fix-go" type="button">Find the TV</button></div>
         <div class="row2">
           <button class="btn ghost" id="another-go" type="button">Set up another TV</button>
           <button class="q" id="finish-go" type="button"><span id="finish-text">Keep this one</span></button>

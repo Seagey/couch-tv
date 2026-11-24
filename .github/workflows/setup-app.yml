@@ -168,6 +168,10 @@ jobs:
         if: runner.os != 'macOS'
         run: python tests/smoke.py "$PROGRAM_OLD"
 
+      # 0.13.14 shipped with account linking switched off. The built program as a person gets it: linking must be on.
+      - name: The built app ships with account linking on
+        run: python tests/smoke_link.py "$PROGRAM"
+
       # Couch TV Helper: the built app started with --helper. The bundled bridge runs as its child process and
       # answers, the menu page loads and says Running, and Quit stops both. A release must carry the helper.
       - name: Smoke test the helper in the built app

@@ -615,7 +615,7 @@
     $("tv-room").value = state.tvName;
     syncName();
     if (state.account) {
-      $("plan-account").textContent = signedInWords(state.account.name) + ". Couch TV gets your home details" +
+      $("plan-account").textContent = signedInWords(state.account.name || state.account.email) + ". Couch TV gets your home details" +
         (state.account.design ? " and \"" + state.account.design + "\"" : "") + " as it goes on.";
     }
     $("plan-account").hidden = !state.account;
@@ -742,10 +742,13 @@
     if (r.account) {
       lines.push("Couch TV installed and checked");
       if (linked) lines.push("Linked to your Couch TV account");
+      else if (r.account.sent) lines.push(SENT);
+      else if (r.account.error) lines.push("Not linked yet. " + r.account.error);
       if (r.account.people) lines.push("Added " + r.account.people + (r.account.people === 1 ? " person" : " people") + " from your home details");
       if (r.account.town) lines.push("Weather for " + r.account.town);
       if (r.account.design) lines.push("Sent \"" + r.account.design + "\" to the TV");
     }
+    if (r.account_error) { lines.push("Not linked yet. " + r.account_error); checkAccount(); }
     if (r.speed && r.speed.cls) {
       lines.push("Measured how smoothly it draws: " + ({ a: "Slow", b: "Everyday", c: "Quick", d: "Fast" })[r.speed.cls] + (linked ? " (Couch TV Studio uses this)" : ""));
     }
@@ -755,6 +758,7 @@
     state.kept = !!r.kept_ontv;
     state.linked = accountOn && !state.kept ? linked : null;
     state.design = (r.account && r.account.design) || null;
+    state.sent = !linked && !!(r.account && r.account.sent);   // the TV was told; it says "linked" when it checks in
     state.finishName = name;
     var notice = r.kept_ontv ? "Couch TV's other app (the on-TV app) is still your home screen, and nothing was installed." :
       homeWords({ ok: r.front, watch_bound: r.watch_bound, warning: r.warning, other_front: r.other_front });
@@ -818,7 +822,7 @@
       text("fin-badge-text", "Installed. Not linked to your account");
       text("done-title", "Couch TV is on your TV");
       var can = hasFeature("link-tv");
-      text("fin-lede", can ? "Link it to your account so Send and designs work." : "Couch TV is installed. It was not linked to your account.");
+      text("fin-lede", state.sent ? SENT : can ? "Link it to your account so Send and designs work." : "Couch TV is installed. It was not linked to your account.");
       if (can) { lk.hidden = false; text("fin-cap", "Nothing on the TV is installed again."); $("fin-cap").hidden = false; }
       finish.className = "q"; text("finish-text", "Not now");
     }
@@ -855,19 +859,38 @@
     $("fl-code").focus();
   });
 
+  // Every way linking can fail has a way on: sign in again, find the TV again, update Couch TV, or the same button.
+  function linkFailed(e) {
+    $("link-cta").disabled = false;
+    var m = (e && e.message) || "That did not work. Try again.";
+    var code = e && e.code;
+    text("link-status", m); $("link-status").hidden = false;
+    if (code === "signed_out" || code === "no_account") { signedOut(); $("link-status").hidden = false; text("link-status", m); }
+    var lost = { no_tv: 1, lost: 1, not_allowed: 1, not_paired: 1, closed: 1 }[code], old = code === "old_app" || code === "not_installed";
+    $("link-fix").hidden = !(lost || old);
+    text("link-fix-go", old ? "Update Couch TV" : "Find the TV");
+    state.linkFix = old ? "plan" : "scan";
+    if (lost) text("link-status", "This computer lost the TV. Switch debugging on there, then find it.");
+  }
+  $("link-fix-go").addEventListener("click", function () {
+    if (state.linkFix === "plan") { refreshPlan(); show("plan"); return; }
+    state.mode = "setup"; $("debug-off").hidden = false; text("debug-line", "Switching debugging off again is safest."); scan();
+  });
+
   function linkRun() {
     var st = $("link-status");
     text("link-status", "Linking…"); st.hidden = false;
+    $("link-fix").hidden = true;
     $("link-cta").disabled = true;
     HOOKS.linkNow(function (f, m) { if (m) text("link-status", m + "…"); }).then(function (a) {
       $("link-cta").disabled = false;
-      if (a.linked) {
-        state.linked = true;
+      if (a.linked || a.sent) {
+        state.linked = !!a.linked; state.sent = !a.linked;
         if (a.design) state.design = a.design;
         var hit = state.session.filter(function (s) { return s.ip === state.ip; })[0];
-        if (hit) hit.linked = true;
+        if (hit) hit.linked = !!a.linked;
         var ul = $("done-account");
-        ["Linked to your Couch TV account"].concat(a.design ? ["Sent \"" + a.design + "\" to the TV"] : []).forEach(function (l) {
+        [a.linked ? "Linked to your Couch TV account" : SENT].concat(a.design ? ["Sent \"" + a.design + "\" to the TV"] : []).forEach(function (l) {
           var li = document.createElement("li"); li.textContent = l; ul.appendChild(li);
         });
         ul.hidden = false;
@@ -876,17 +899,14 @@
       } else {
         text("link-status", "It is still not linked. Try again.");
       }
-    }, function (e) {
-      $("link-cta").disabled = false;
-      text("link-status", (e && e.message) || "That did not work. Try again.");
-    });
+    }, linkFailed);
   }
 
+  // A typed code or the website's Allow only asks "Link as X?". Setup is signed in, and the TV is linked, after Yes.
   $("fl-go").addEventListener("click", function () {
     text("fl-status", "Signing in…");
-    api("/api/handoff", { code: $("fl-code").value }).then(function (r) {
-      signedIn(r.account); text("fl-status", ""); $("fl-panel").hidden = true; linkRun();
-    }, function (e) { text("fl-status", (e && e.message) || "That code did not work."); });
+    api("/api/handoff", { code: $("fl-code").value }).then(function (r) { text("fl-status", ""); ask(r.ask, linkRun); },
+      function (e) { text("fl-status", (e && e.message) || "That code did not work."); });
   });
   enter("fl-code", "fl-go");
 
@@ -904,7 +924,7 @@
       clearInterval(linkTimer);
       linkTimer = setInterval(function () {
         api("/api/device/poll").then(function (r) {
-          if (r.account) { clearInterval(linkTimer); $("fl-device-code").hidden = true; signedIn(r.account); $("fl-panel").hidden = true; linkRun(); }
+          if (r.ask) { clearInterval(linkTimer); $("fl-device-code").hidden = true; ask(r.ask, linkRun); }
         }, function (e) { clearInterval(linkTimer); text("fl-status", (e && e.message) || "That did not work. Try again."); });
       }, d.interval * 1000);
     }, function (e) { text("fl-status", (e && e.message) || "That did not work. Try again."); });
@@ -936,7 +956,7 @@
     clearTimeout(poll); poll = null;
     state.ip = null; state.kind = null; state.facts = null; state.route = null; state.weather = null; state.remote = false;
     state.look = null; state.tried = 0; state.guide = null; state.helperTv = null; state.ontvTakes = false;
-    state.linked = null; state.design = null; state.tvName = ""; state.finishName = ""; state.kept = false;
+    state.linked = null; state.sent = false; state.design = null; state.tvName = ""; state.finishName = ""; state.kept = false;
     state.mode = "setup";
     openRow = null; rows = {}; detailsOpen = {};
     ["tv-room", "ip", "code", "pair-port", "tls-port", "fl-code", "undo-details-x"].forEach(function (id) { if ($(id)) $(id).value = ""; });
@@ -945,7 +965,7 @@
     ["plan-list", "done-account", "undo-list", "guide-steps", "found", "fl-device-code", "session-list-x"].forEach(function (id) { if ($(id)) $(id).textContent = ""; });
     text("plan-name", "this TV"); text("done-line", ""); text("link-status", ""); text("fl-status", ""); text("pair-status", ""); text("tls-status", "");
     text("health-text", ""); text("health-status", ""); text("undo-details", "");
-    ["done-line", "done-account", "link-status", "fl-panel", "guide", "ontv-row", "tcl-note", "plan-account", "fl-device-code"].forEach(function (id) { $(id).hidden = true; });
+    ["done-line", "done-account", "link-status", "link-fix", "fl-panel", "guide", "ontv-row", "tcl-note", "plan-account", "fl-device-code"].forEach(function (id) { $(id).hidden = true; });
     $("health-send").hidden = false;
     ["remote-go", "health-look", "debug-off"].forEach(function (id) { $(id).hidden = false; });
     $("link-cta").disabled = false;
@@ -1015,44 +1035,89 @@
     return name ? "Signed in as " + name : "Signed in to your Couch TV account";
   }
 
+  var SENT = "Sent to the TV. It shows as linked once the TV checks in.";
+  var ASK_LINE = "Have a Couch TV account? Link it, and your design and home details go on the TV too.";
   function signedIn(acct) {
     state.account = acct;
-    text("acct-name", acct.name || "Signed in");
+    text("acct-name", acct.name || acct.email || "Signed in");
     text("acct-av", acct.name ? acct.name.charAt(0).toUpperCase() : "✓");
     $("acct-top").hidden = false;
-    text("acct-line", signedInWords(acct.name) + ". Your design and home details go on the TV too.");
+    $("acct-out").hidden = false;
+    text("acct-line", signedInWords(acct.name || acct.email) + ". Your design and home details go on the TV too.");
     $("acct-ask").hidden = true;
     $("acct-box").hidden = true;   // the chip at the top says it now
     chrome(current || "welcome");
   }
+  function signedOut() {
+    state.account = null;
+    $("acct-top").hidden = true; $("acct-out").hidden = true;
+    text("acct-line", ASK_LINE);
+    $("acct-ask").hidden = false;
+    $("acct-box").hidden = state.accountMode === "off";
+    $("plan-account").hidden = true;
+    chrome(current || "welcome");
+    if (current === "done") renderFinish();
+  }
+  $("acct-out").addEventListener("click", function () { api("/api/sign-out").then(signedOut, fail); });
+  // the server knows: signed out when the sign in ran out
+  function checkAccount() {
+    return api("/api/account").then(function (a) { if (a.account) signedIn(a.account); else if (state.account) signedOut(); }, function () {});
+  }
+
+  // "Link as X?": the code is not used, and nothing about the TV is sent, until Yes. The server keeps to that too.
+  var askId = null, askThen = null;
+  function ask(q, then) {
+    if (!q || q.id === askId) return;
+    askId = q.id; askThen = then || null;
+    var x = q.account.email + (q.account.name ? ", " + q.account.name : "");   // the name is only what its account says
+    text("link-ask-who", "Link as " + x + "?");
+    var was = q.instead_of && (q.instead_of.name || q.instead_of.email);
+    text("link-ask-mail", was ? "Setup is signed in as " + was + " now. Yes switches accounts." : "Only press Yes if you just asked for this. Check the email is yours.");
+    $("link-ask").hidden = false;
+    $("link-ask-who").focus();
+  }
+  function askDone() { $("link-ask").hidden = true; askId = null; }
+  $("link-ask-yes").addEventListener("click", function () {
+    var id = askId, then = askThen;
+    if (!id) return;
+    $("link-ask-yes").disabled = true;
+    api("/api/link-yes", { id: id }).then(function (r) {
+      askDone(); signedIn(r.account);
+      $("fl-panel").hidden = true;
+      if (then) then();
+    }, function (e) { askDone(); fail(e); }).then(function () { $("link-ask-yes").disabled = false; });
+  });
+  $("link-ask-no").addEventListener("click", function () {
+    askDone();
+    text("fl-status", "Not linked. Sign in on the website as you, then use a new code.");
+    if (!state.account) text("acct-line", "Not linked. Sign in on the website as you, then use a new code.");
+    api("/api/link-no").catch(function () {});
+  });
 
   api("/api/account").then(function (a) {
     state.accountMode = a.mode || "off";
     chrome(current || "welcome");
     if (a.mode === "off") return;
     $("acct-box").hidden = false;
-    if (a.account) return signedIn(a.account);
-    if (a.handoff) {
-      // opened from the website's Set up my TV button: sign in with its code straight away
-      text("acct-line", "Signing in to your Couch TV account…");
-      api("/api/handoff", {}).then(function (r) { signedIn(r.account); }, function (e) {
-        text("acct-line", "Have a Couch TV account? Link it, and your design and home details go on the TV too.");
-        fail(e);
-      });
-    }
+    if (a.account) signedIn(a.account);
+    // opened from the website's Set up my TV button: whose account it is, and Yes or Not me
+    if (a.ask) ask(a.ask);
+    else if (a.handoff) api("/api/handoff", {}).then(function (r) { ask(r.ask); }, fail);
   }, function () {});
 
   // a link opened while this page was already up arrives here
   setInterval(function () {
-    if (state.account || $("acct-box").hidden) return;
+    if (state.accountMode === "off") return;
     api("/api/account").then(function (a) {
-      if (a.account) signedIn(a.account);
-      else if (a.handoff) api("/api/handoff", {}).then(function (r) { signedIn(r.account); }, fail);
+      if (a.account) { if (!state.account) signedIn(a.account); } else if (state.account) signedOut();
+      if (a.ask) ask(a.ask);
+      else if (a.handoff) api("/api/handoff", {}).then(function (r) { ask(r.ask); }, fail);
+      else if (askId) askDone();
     }, function () {});
   }, 5000);
 
   $("acct-go").addEventListener("click", function () {
-    api("/api/handoff", { code: $("acct-code").value }).then(function (r) { signedIn(r.account); }, fail);
+    api("/api/handoff", { code: $("acct-code").value }).then(function (r) { ask(r.ask); }, fail);
   });
   enter("acct-code", "acct-go");
 
@@ -1070,7 +1135,7 @@
       clearInterval(devicePoll);
       devicePoll = setInterval(function () {
         api("/api/device/poll").then(function (r) {
-          if (r.account) { clearInterval(devicePoll); $("acct-device-code").hidden = true; signedIn(r.account); }
+          if (r.ask) { clearInterval(devicePoll); $("acct-device-code").hidden = true; ask(r.ask); }
         }, function (e) { clearInterval(devicePoll); fail(e); });
       }, d.interval * 1000);
     }, fail);

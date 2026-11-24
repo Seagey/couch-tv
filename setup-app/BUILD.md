@@ -203,6 +203,20 @@ screen at once, since 5555 is open, then the fix screens); the Local Network mes
 really refused the permission (simulated by errno only); the Intel Mac and Windows builds of this
 commit (CI builds them after a push).
 
+## Linking a TV to the account (security gate, 25 Nov 2026)
+
+What Setup and the website agree on. `tests/fakestudio.py` answers it, `tests/test_link_e2e.py` runs it.
+
+- A code from the website is looked at first (`POST /v1/setup/who {handoff}` gives `{account: {name, email, design}}`, the email covered) and used only
+  after **Yes, link it** (`/api/link-yes`, enforced by `server.py`). The website's Allow asks the same way. A signed in Setup never changes accounts without that Yes.
+- `POST /v1/setup/tv` makes a waiting link. The TV's old link works until the new one is confirmed: the TV asks its inbox with it, or Setup's
+  `done` says `linked: true` with that `link`. `"sent"`: an older Couch TV that cannot answer. `false`: dropped.
+- The TV: `am broadcast -n app.couchtv.launcher/.SetupLink` answers `couchtv-link ok <first 16 of sha256 of the link>`. Settings go to
+  `.FromComputer`. Both need `android.permission.DUMP`, which ADB's shell holds and TV apps do not. Couch TV 0.13.13 and 0.13.14 have neither: `am start` on MainActivity, and "sent".
+- `POST /v1/setup/seen {tv_id}`, `/end` (Setup's Sign out), `/leave` (the TV let go of a link), `/signout` (the account page).
+- A TV's My TVs row is remembered by the TV and the account (`linked-tvs.json`, hashes), never by its address.
+- Order: the migration, then the website, then Couch TV on the TV, then Setup. Setup against an older website says so and uses nothing.
+
 ## Couch TV Helper (extra features from this computer)
 
 Same app, same download. The last screen offers **Done** or **Add extra features**; the second sets

@@ -111,7 +111,8 @@ It checks for a newer version of itself (the new version must carry Couch TV's s
 
 Its own folder: `~/Library/Application Support/couch-tv Setup/` on a Mac, `%APPDATA%\couch-tv Setup\`
 on Windows, `~/.local/share/couch-tv-setup/` on Linux: the key the TV allowed (`adbkey`, `adbkey.pub` and a certificate made from it), and
-`changed.json` (what it changed on which TV). The downloaded apps are cached in
+`changed.json` (what it changed on which TV), and, once a TV was linked to an account, `linked-tvs.json` (which row of My
+TVs it is, under a hash of the TV and the account). The downloaded apps are cached in
 `~/Library/Caches/couch-tv Setup/`, `%LOCALAPPDATA%\couch-tv Setup\Cache\` or `~/.cache/couch-tv-setup/`. Delete the folders to
 forget everything. The TV lists the key as **couch-tv-setup** under Wireless debugging, Paired
 devices, where you can Forget it.
@@ -120,12 +121,22 @@ devices, where you can Forget it.
 name to Open-Meteo for the weather. No tracking, no AI.
 
 **If you link your Couch TV account** (the website's **Set up my TV** button, or its code typed on the
-first page): Setup tells your account what kind of TV it set up (its system, Android version, memory,
-screen size and how smoothly it drew Couch TV, so Couch TV Studio shows designs that work on it),
-gets your design and Your home details for that TV, and writes the TV's own account link into Couch TV
-on the TV. A health report (Couch TV's versions, free space, memory, its last crash and its own log
+first page): Setup first shows whose account it is (the name, and the email with most of it covered) and waits for
+your **Yes, link it**. Before that Yes it sends only the code, and nothing about any TV. After it, Setup sends your account:
+
+- the room name you typed, and the TV's make, model, system, Android version, memory, screen size, whether it lets
+  Couch TV be its home, and its Couch TV version;
+- the package names of the apps with an icon on that TV (such as `com.netflix.ninja`, at most 300). Never what is
+  in them, who is signed in, or what is watched. Couch TV Studio uses them to put the apps you have first;
+- after an install, how smoothly the TV drew Couch TV for 8 seconds, with its chip and graphics names.
+
+Setup gets your design and Your home details for that TV (people, their colours, which are kids, and the town, which
+Setup looks up with Open-Meteo to set the weather; photos and guest Wi-Fi only when the website's button opened
+Setup), and writes the TV's own account link into Couch TV on the TV. Studio keeps the TV's details, its app names and when it last
+checked in until you remove the TV in My TVs (last checked in: until you unlink it). Setup's sign in ends after 2 hours, with **Sign out** in Setup, or with
+**Sign out Couch TV Setup** on the website's account page. A health report (Couch TV's versions, free space, memory, its last crash and its own log
 lines, addresses and e-mails blanked out) is only sent if you press **Send a health report** after
-seeing all of it. The account link is kept in memory only, never on this computer's disk.
+seeing all of it, and is kept 30 days. The account link is kept in memory only, never on this computer's disk.
 
 ## Finding the TV
 
@@ -154,7 +165,7 @@ COUCHTV_SETUP_ADBKEY=~/.android/adbkey .venv/bin/python tests/emulator_check.py 
 | `COUCHTV_SETUP_NO_BROWSER=1` | Do not open the browser |
 | `COUCHTV_SETUP_HOME` | Keep the setup's own files somewhere else |
 | `COUCHTV_SETUP_ADBKEY` | Use another ADB key file |
-| `COUCHTV_SETUP_STUDIO=live` | Talk to the Couch TV Studio account API (off until that API exists) |
+| `COUCHTV_SETUP_STUDIO=off` | Do not talk to the Couch TV Studio account API (linking is on by default) |
 | `COUCHTV_SETUP_STUDIO_URL` | Another Studio address (https, or http on 127.0.0.1 for development) |
 | `COUCHTV_SETUP_STUDIO_STUB=<file.json>` | Answer the account calls from a file instead (development) |
 | `COUCHTV_SETUP_FAKE_SCAN=<file.json>` | Use recorded discovery answers instead of the network (screenshots) |
