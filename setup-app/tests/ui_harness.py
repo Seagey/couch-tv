@@ -81,7 +81,21 @@ class Harness:
                 real_sleep(h.slow / n)
             return {"path": "/tmp/couch-tv-home.apk", "version": "0.13.14", "sha256": "a" * 64, "checked": "the release's checksum list"}
 
+        class Said:
+            def __init__(self, data): self.data = data
+            def __enter__(self): return self
+            def __exit__(self, *a): return False
+            def read(self, n=-1): return self.data
+
+        def urlopen(req, timeout=None, **kw):
+            # the TV's phone remote app (port 5400) answers; nothing else may be asked
+            url = getattr(req, "full_url", str(req))
+            if ":5400/api/pair/start" in url:
+                return Said(b'{"ok": true}')
+            raise AssertionError("the page server asked the network for " + url)
+
         self.patches += [
+            mock.patch.object(server.urllib.request, "urlopen", urlopen),
             mock.patch.object(server.finder, "scan", scan),
             mock.patch.object(server.finder, "knock", lambda ip, port, t=0.5: 0),   # 0 = the port answered
             mock.patch.object(server.finder, "pairing_port", lambda ip, t=2.0: None),

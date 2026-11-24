@@ -2,6 +2,7 @@
 import base64
 import hashlib
 import io
+import shutil
 import json
 import os
 import stat
@@ -22,6 +23,7 @@ from cryptography.hazmat.primitives import serialization  # noqa: E402
 from cryptography.hazmat.primitives.asymmetric import ed25519  # noqa: E402
 
 from couchtv_setup import release  # noqa: E402
+from test_helper import FakeReg  # noqa: E402
 from couchtv_setup.helper import keepawake, remove, update  # noqa: E402
 from couchtv_setup.tv import TvError  # noqa: E402
 
@@ -283,6 +285,135 @@ class Swap(unittest.TestCase):
         d = tempfile.mkdtemp()
         Path(d, "pending.json").write_text(json.dumps({"archive": "a.zip"}))
         self.assertFalse(update.apply(staging=d))   # from source: nothing to replace
+
+
+def shutil_copy(src, out):
+    shutil.copytree(src, out)
+    return list(Path(out).iterdir())
+
+
+class RenameMigration(unittest.TestCase):
+    """0.13.15 renamed the program from "couch-tv Setup" to "Couch TV Setup". An installed Helper that updates itself
+    must end up running the new program, with its start with the computer entry and (Windows) link following."""
+
+    @unittest.skipIf(sys.platform == "win32", "sh script")
+    def test_swap_puts_the_new_copy_under_its_own_name_and_keeps_the_old(self):
+        d = Path(tempfile.mkdtemp())
+        old, new, keep, dest = d / "couch-tv Setup", d / "stage" / "Couch TV Setup", d / "prev" / "couch-tv Setup", d / "Couch TV Setup"
+        old.mkdir(); new.mkdir(parents=True); keep.parent.mkdir()
+        (old / "v").write_text("1"); (new / "v").write_text("2")
+        marker = d / "started-new"
+        script = d / "s.sh"
+        script.write_text(update.swap_script(old, new, keep, 99999999, "touch '%s'" % marker, "linux", dest, "touch '%s'" % (d / "started-old")))
+        subprocess.run(["/bin/sh", str(script)], check=True, timeout=20)
+        deadline = time.monotonic() + 10
+        while not marker.exists() and time.monotonic() < deadline:
+            time.sleep(0.05)
+        self.assertEqual((dest / "v").read_text(), "2")
+        self.assertEqual((keep / "v").read_text(), "1")
+        self.assertFalse(old.exists(), "the old name is gone")
+        self.assertTrue(marker.exists())
+        self.assertFalse((d / "started-old").exists())
+
+    @unittest.skipIf(sys.platform == "win32", "sh script")
+    def test_a_failed_second_move_puts_the_old_one_back_and_starts_it(self):
+        d = Path(tempfile.mkdtemp())
+        old, new, keep, dest = d / "couch-tv Setup", d / "stage" / "Couch TV Setup", d / "prev" / "couch-tv Setup", d / "nowhere" / "Couch TV Setup"
+        old.mkdir(); new.mkdir(parents=True); keep.parent.mkdir()
+        (old / "v").write_text("1")
+        script = d / "s.sh"
+        script.write_text(update.swap_script(old, new, keep, 99999999, "touch '%s'" % (d / "started-new"), "linux", dest, "touch '%s'" % (d / "started-old")))
+        p = subprocess.run(["/bin/sh", str(script)], timeout=20, stderr=subprocess.DEVNULL)
+        deadline = time.monotonic() + 10
+        while not (d / "started-old").exists() and time.monotonic() < deadline:
+            time.sleep(0.05)
+        self.assertEqual(p.returncode, 1)
+        self.assertEqual((old / "v").read_text(), "1", "the old app is back where it was")
+        self.assertTrue((d / "started-old").exists())
+        self.assertFalse((d / "started-new").exists())
+
+    def stage(self, system, old_name, new_name, exists=False):
+        d = Path(tempfile.mkdtemp())
+        folder = d / "cache"
+        (folder / "new-src" / new_name).mkdir(parents=True)
+        (folder / "a.zip").write_bytes(b"x")
+        (folder / "pending.json").write_text(json.dumps({"archive": "couch-tv-Setup-linux.tar.gz", "sha256": "0" * 64}))
+        apps = d / "apps"
+        (apps / old_name).mkdir(parents=True)
+        if exists:
+            (apps / new_name).mkdir()
+        spawned = []
+        from unittest import mock
+        exe = apps / old_name / ("couch-tv Setup" + (".exe" if system == "win32" else ""))
+        patches = [mock.patch.object(update, "app_location", lambda exe=None, system=None: apps / old_name),
+                   mock.patch.object(update.release, "verify", lambda *a, **k: True),
+                   mock.patch.object(update, "unpack", lambda archive, out, system=None: shutil_copy(folder / "new-src", out)),
+                   mock.patch.object(update.sys, "executable", str(exe))]
+        for m in patches:
+            m.start()
+            self.addCleanup(m.stop)
+        ok = update.apply(staging=str(folder), spawn=lambda *a, **k: spawned.append(a), system=system)
+        return ok, folder, apps, spawned
+
+    def test_apply_starts_the_new_program_by_its_new_name(self):
+        for system in ("linux", "win32"):
+            ok, folder, apps, spawned = self.stage(system, "couch-tv Setup", "Couch TV Setup")
+            self.assertTrue(ok, system)
+            script = (folder / ("swap.cmd" if system == "win32" else "swap.sh")).read_text(encoding="utf-8")
+            sep = "/"   # the staged paths are made on this computer
+            self.assertIn("Couch TV Setup" + sep + "Couch TV Setup" + (".exe" if system == "win32" else ""), script, system)
+            self.assertIn("couch-tv Setup" + sep + "couch-tv Setup" + (".exe" if system == "win32" else ""), script, "the old one is what a failed swap starts")
+
+    def test_apply_never_goes_over_something_already_called_the_new_name(self):
+        ok, folder, apps, spawned = self.stage("linux", "couch-tv Setup", "Couch TV Setup", exists=True)
+        self.assertFalse(ok)
+        self.assertEqual(spawned, [])
+
+    def test_same_name_still_updates_in_place(self):
+        ok, folder, apps, spawned = self.stage("linux", "Couch TV Setup", "Couch TV Setup")
+        self.assertTrue(ok)
+
+    def test_login_item_follows_the_new_program(self):
+        old = ["/Apps/couch-tv Setup.app/Contents/MacOS/couch-tv Setup", "--helper"]
+        new = ["/Apps/Couch TV Setup.app/Contents/MacOS/Couch TV Setup", "--helper"]
+        from couchtv_setup.helper import autostart
+        for plat in ("darwin", "linux"):
+            home = tempfile.mkdtemp()
+            self.assertFalse(autostart.refresh(new, plat, home, frozen=True), "nothing switched on: nothing written")
+            autostart.enable(old, plat, home)
+            self.assertFalse(autostart.refresh(old, plat, home, frozen=True), "already right")
+            self.assertTrue(autostart.refresh(new, plat, home, frozen=True))
+            self.assertIn("Couch TV Setup", Path(autostart.file_path(plat, home)).read_text(errors="replace") if plat == "linux" else Path(autostart.file_path(plat, home)).read_bytes().decode("latin-1"))
+            self.assertFalse(autostart.refresh(new, plat, home, frozen=True), "second time changes nothing")
+        reg = FakeReg()
+        autostart.enable(old, "win32", registry=reg)
+        self.assertTrue(autostart.refresh(new, "win32", registry=reg, frozen=True))
+        self.assertEqual(reg.values[autostart.RUN_VALUE], '"%s" "--helper"' % new[0])
+        self.assertFalse(autostart.refresh(new, "win32", registry=reg, frozen=False), "a source run never rewrites it")
+
+    def test_windows_link_is_registered_again_by_the_running_program(self):
+        from couchtv_setup import linkin
+        reg = FakeReg()
+        keys = {}
+
+        class W:
+            HKEY_CURRENT_USER = 1
+            REG_SZ = 1
+            def CreateKey(self, root, path):
+                keys.setdefault(path, {})
+                outer = self
+                class K:
+                    def __enter__(s): return path
+                    def __exit__(s, *a): return False
+                return K()
+            def SetValueEx(self, k, name, _r, _t, value): keys[k][name] = value
+        from unittest import mock
+        with mock.patch.object(linkin.sys, "platform", "win32"), mock.patch.object(linkin.sys, "frozen", True, create=True), \
+                mock.patch.dict(sys.modules, {"winreg": W()}):
+            self.assertTrue(linkin.register_windows("C:\\Apps\\Couch TV Setup\\Couch TV Setup.exe"))
+        cmd = keys[r"Software\Classes\couchtv\shell\open\command"][""]
+        self.assertIn("Couch TV Setup.exe", cmd)
+        self.assertNotIn("couch-tv Setup", cmd)
 
 
 class Awake(unittest.TestCase):

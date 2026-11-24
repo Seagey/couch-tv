@@ -40,7 +40,7 @@
   <!-- welcome -->
   <section data-step="welcome" class="hero">
     <div>
-      <h1>Put Couch TV on your TV</h1>
+      <h1>Put Couch TV<br>on your TV</h1>
       <button class="btn go huge" id="setup-start" type="button">Start <svg class="arr" viewBox="0 0 24 24" aria-hidden="true"><use href="#arrow"/></svg></button>
       <div class="pills">
         <span class="pill dim"><span class="tick-icon sm"><svg aria-hidden="true"><use href="#check"/></svg></span>TV switched on</span>
@@ -54,19 +54,24 @@
           <p class="lead" id="acct-device-code" hidden></p>
         </div>
       </div>
-      <p class="small later" id="helper-later" hidden>Extra features from this computer are off. <button class="link" id="helper-later-go" type="button">Turn on extra features</button></p>
-      <details class="which">
-        <summary>Which TVs work with this app</summary>
-        <ul class="tvs">
-          <li class="yes"><b>Google TV</b>. Android 12 or newer uses Wireless debugging and a code. Android 11 uses USB debugging over Wi-Fi, no cable.</li>
-          <li class="yes"><b>Android TV</b> 7.1 or newer, with Wireless debugging, or a TV that asks "Allow USB debugging?" over Wi-Fi.</li>
-          <li class="partly"><b>Fire TV</b> on Fire OS. Amazon's home flashes up for a moment before Couch TV comes back.</li>
-          <li class="no">TVs that need the Couch TV Helper, a small app on this computer. Setup finds them and offers it.</li>
-          <li class="no">Some TVs cannot install apps this way. Setup tells you, and nothing on the TV is changed.</li>
-        </ul>
-        <p class="small">Plug a Google TV box into any TV to get everything. This computer is only needed today. Nothing is deleted from the TV. Nothing about you is sent anywhere, unless you link your Couch TV account.</p>
+      <details class="more" id="more">
+        <summary>More</summary>
+        <div class="morelist">
+          <button class="q soft" id="undo-start" type="button">Take Couch TV off a TV</button>
+          <p class="small later" id="helper-later" hidden><button class="q soft" id="helper-later-go" type="button">Turn on extra features</button></p>
+          <details class="which">
+            <summary>Which TVs work with this app</summary>
+            <ul class="tvs">
+              <li class="yes"><b>Google TV</b>. Android 12 or newer uses Wireless debugging and a code. Android 11 uses USB debugging over Wi-Fi, no cable.</li>
+              <li class="yes"><b>Android TV</b> 7.1 or newer, with Wireless debugging, or a TV that asks "Allow USB debugging?" over Wi-Fi.</li>
+              <li class="partly"><b>Fire TV</b> on Fire OS. Amazon's home flashes up for a moment before Couch TV comes back.</li>
+              <li class="no">TVs that need the Couch TV Helper, a small app on this computer. Setup finds them and offers it.</li>
+              <li class="no">Some TVs cannot install apps this way. Setup tells you, and nothing on the TV is changed.</li>
+            </ul>
+            <p class="small">Plug a Google TV box into any TV to get everything. This computer is only needed today. Nothing is deleted from the TV. Nothing about you is sent anywhere, unless you link your Couch TV account.</p>
+          </details>
+        </div>
       </details>
-      <div class="below"><button class="q soft" id="undo-start" type="button">Take Couch TV off a TV</button></div>
     </div>
     <div class="hero-art">
       <div class="tv stand"><img src="img/tv-home.webp" width="1200" height="675" alt="A Couch TV home screen: the time, the weather, shows to keep watching and a row of apps over a changing scene."></div>
@@ -414,28 +419,37 @@
       <button class="tool" id="debug-off" type="button"><span><small>Done with the computer?</small><b>Switch debugging off</b></span><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#arrow"/></svg></button>
       <button class="tool" id="tidy-go" type="button" hidden><span><small>Clear out what you do not use</small><b>Tidy up your TV</b></span><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#arrow"/></svg></button>
     </div>
+  </section>
 
-    <div class="card panel" id="remote-done" hidden>
-      <h2>Phone remote</h2>
-      <p>On your phone (on the same Wi-Fi), open <b id="remote-addr"></b> and type the 6 numbers the TV shows.
-        Then add the page to the phone's home screen.</p>
-      <div class="actions"><button id="remote-code" type="button">Show a code on the TV</button></div>
+  <!-- what each card on the finish screen opens -->
+  <section data-step="remote" class="sheet">
+    <h1>Phone remote</h1>
+    <div id="remote-done">
+      <p class="lead">On your phone, on the same Wi-Fi, open <b id="remote-addr"></b> and type the 6 numbers the TV shows.</p>
+      <p>Then add the page to the phone's home screen.</p>
+      <div class="actions"><button class="primary" id="remote-code" type="button">Show a code on the TV</button></div>
+      <p class="hint" id="remote-status" aria-live="polite"></p>
       <p class="small" id="remote-adb-google">To let the phone press keys and type, open <b id="remote-setup"></b> on the phone and follow the steps there.</p>
       <p class="small" id="remote-adb-fire">On an up to date Fire TV, Amazon blocks the phone remote from pressing keys and typing. Opening apps and finding shows still work.</p>
     </div>
-    <div class="card panel" id="health-box" hidden>
-      <h2>Health report</h2>
-      <div id="health-show" hidden>
-        <p class="small">Couch TV's own details only: versions, free space, memory, its last crash and its own log lines. Addresses and e-mails are blanked out. You see all of it before anything is sent.</p>
-        <pre class="report" id="health-text"></pre>
-        <div class="actions"><button class="primary" id="health-send" type="button">Send it to my Couch TV account</button></div>
-        <p class="hint" id="health-status"></p>
-      </div>
+  </section>
+
+  <section data-step="health" class="sheet">
+    <h1>Health report</h1>
+    <div id="health-show">
+      <p class="lead">You see all of it before anything is sent.</p>
+      <p class="small">Couch TV's own details only: versions, free space, memory, its last crash and its own log lines. Addresses and e-mails are blanked out.</p>
+      <pre class="report" id="health-text"></pre>
+      <div class="actions"><button class="primary" id="health-send" type="button">Send it to my Couch TV account</button></div>
+      <p class="hint" id="health-status" aria-live="polite"></p>
     </div>
-    <div class="panel" id="debug-box">
-      <p class="small" id="debug-line">Couch TV does not need debugging any more. Switching it off is safest: <span id="debug-why"></span></p>
-      <p class="small">To take Couch TV off again, open this app and choose <b>Take Couch TV off a TV</b>. Or by hand, with the remote: Settings, Apps, the Couch TV <b>Home</b> app, Uninstall.</p>
-    </div>
+  </section>
+
+  <section data-step="debug" class="sheet">
+    <h1>Switch debugging off</h1>
+    <p class="lead" id="debug-line">Couch TV does not need debugging any more. Switching it off is safest: <span id="debug-why"></span></p>
+    <div class="actions"><button class="primary" id="debug-go" type="button">Switch it off</button></div>
+    <p class="hint" id="debug-status" aria-live="polite"></p>
   </section>
 
   <!-- the last screen: Done, or add the helper -->
@@ -461,6 +475,7 @@
       <div class="actions"><button id="extras-on" type="button">Add extra features</button></div>
     </div>
     <p class="small">You can add them any time, from Couch TV Setup or your account.</p>
+    <p class="small">To take Couch TV off again, open this app and choose <b>Take Couch TV off a TV</b>.</p>
   </section>
 
   <!-- the helper is on -->
