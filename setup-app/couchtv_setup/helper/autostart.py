@@ -110,3 +110,29 @@ def is_enabled(platform=None, home=None, registry=None):
         except OSError:
             return False
     return file_path(platform, home).is_file()
+
+
+def refresh(cmd=None, platform=None, home=None, registry=None, frozen=None):
+    """After an update that renamed the program (couch-tv Setup became Couch TV Setup in 0.13.15) the login item
+    still points at the old path. If one is switched on and does not say what the running program says, write it
+    again. Only from the built app (a source run has no program of its own). True when it was rewritten."""
+    frozen = getattr(sys, "frozen", False) if frozen is None else frozen
+    if not frozen or not is_enabled(platform, home, registry):
+        return False
+    cmd = cmd or command(frozen=True)
+    plat = _plat(platform)
+    if plat == "windows":
+        w = _winreg(registry)
+        with w.OpenKey(w.HKEY_CURRENT_USER, RUN_KEY, 0, w.KEY_READ) as k:
+            same = w.QueryValueEx(k, RUN_VALUE)[0] == windows_command(cmd)
+    else:
+        p = file_path(platform, home)
+        want = mac_plist(cmd) if plat == "mac" else linux_desktop(cmd).encode("utf-8")
+        try:
+            same = p.read_bytes() == want
+        except OSError:
+            same = False
+    if same:
+        return False
+    enable(cmd, platform, home, registry)
+    return True

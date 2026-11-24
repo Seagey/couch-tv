@@ -144,6 +144,8 @@ class Page(unittest.TestCase):
         self.to_plan(pg, 0)
         self.install(pg, "Lounge")
         pg.click("#remote-go")
+        pg.wait_for_selector('section[data-step="remote"]:not([hidden])', timeout=30000)
+        pg.click("#back")
         pg.wait_for_selector('section[data-step="done"]:not([hidden])')
         pg.click("#another-go")
         pg.wait_for_selector("#found .tvc")
@@ -340,20 +342,69 @@ class Page(unittest.TestCase):
         self.to_plan(pg)
         self.install(pg)
         pg.click("#health-look")
-        pg.wait_for_selector("#health-show:not([hidden])")
+        pg.wait_for_selector('section[data-step="health"]:not([hidden])')
         self.assertTrue(pg.inner_text("#health-text").strip().startswith("{"))
         self.assertTrue(pg.is_visible("#health-send"))
+        pg.click("#back")
+        self.assertEqual(step(pg), "done")
         pg.click("#remote-go")
-        pg.wait_for_selector('section[data-step="work"]:not([hidden])')
-        self.assertTrue(pg.is_disabled("#back"))
-        pg.wait_for_selector('section[data-step="done"]:not([hidden])', timeout=30000)
-        self.assertTrue(pg.is_visible("#remote-addr") or pg.is_visible("#error"))
+        pg.wait_for_selector('section[data-step="remote"]:not([hidden])', timeout=30000)
+        self.assertTrue(pg.is_visible("#remote-addr"))
+        pg.click("#remote-code")
+        pg.wait_for_selector("#remote-status:not(:empty)")
+        pg.click("#back")
         pg.click("#debug-off")
-        pg.wait_for_selector("#debug-line:has-text('Debugging is off')")
+        pg.wait_for_selector('section[data-step="debug"]:not([hidden])')
+        self.assertIn("safest", pg.inner_text("#debug-line"))
+        pg.click("#debug-go")
+        pg.wait_for_selector('section[data-step="done"]:not([hidden])')
+        self.assertIn("Debugging is off", pg.inner_text("#done-line"))
         self.assertTrue(pg.is_hidden("#debug-off"))
+        self.assertTrue(pg.is_hidden("#remote-go"))
+
+    def test_nothing_is_written_below_the_three_cards(self):
+        pg = self.open(uh.Harness())
+        self.to_plan(pg)
+        self.install(pg)
+        below = pg.evaluate("""() => {
+          const tools = document.querySelector('section[data-step="done"] .tools');
+          const bottom = tools.getBoundingClientRect().bottom + window.scrollY;
+          const out = [];
+          document.querySelectorAll('section[data-step="done"] *').forEach(e => {
+            if (e.children.length || !e.textContent.trim() || e.offsetParent === null) return;
+            if (e.getBoundingClientRect().top + window.scrollY > bottom - 1) out.push(e.textContent.trim());
+          });
+          return out;
+        }""")
+        self.assertEqual(below, [])
+
+    def test_welcome_keeps_the_extras_behind_more(self):
+        pg = self.open(uh.Harness())
+        body = visible_text(pg)
+        self.assertNotIn("Extra features", body)
+        self.assertNotIn("Which TVs work", body)
+        self.assertNotIn("Take Couch TV off a TV", body)
+        self.assertIn("More", body)
+        self.assertEqual(pg.inner_text("h1").replace("\n", "|"), "Put Couch TV|on your TV")
+        pg.click("#more > summary")
+        pg.wait_for_selector("#undo-start", state="visible")
+        self.assertTrue(pg.is_visible("#helper-later-go"))
+        self.assertIn("Which TVs work", visible_text(pg))
+
+    def test_cards_in_a_row_line_up(self):
+        rows = [uh.row("192.0.2.71", "A", "ready"), uh.row("192.0.2.72", "A much longer name for a TV in the big house", "switch", adb_5555=False),
+                uh.row("192.0.2.73", "Den TV", "other", other="Tizen", android=False)]
+        pg = self.open(uh.Harness(rows=rows))
+        pg.click("#setup-start")
+        pg.wait_for_selector("#found .tvc")
+        tops = pg.evaluate("[...document.querySelectorAll('#found .tvc')].map(c => [...c.querySelectorAll(':scope > button.btn, :scope > a.btn')].map(b => Math.round(b.getBoundingClientRect().top)))")
+        self.assertEqual(len({t[0] for t in tops}), 1, tops)
+        pills = pg.evaluate("[...document.querySelectorAll('#found .pill')].map(p => Math.round(p.getBoundingClientRect().height))")
+        self.assertEqual(len(set(pills)), 1, pills)
 
     def test_take_couch_tv_off_a_tv(self):
         pg = self.open(uh.Harness())
+        pg.click("#more > summary")
         pg.click("#undo-start")
         pg.wait_for_selector("#found .tvc")
         self.assertIn("Choose this TV", pg.inner_text("#found"))
@@ -369,6 +420,7 @@ class Page(unittest.TestCase):
 
     def test_helper_is_still_reachable(self):
         pg = self.open(uh.Harness())
+        pg.click("#more > summary")
         pg.wait_for_selector("#helper-later:not([hidden])")
         pg.click("#helper-later-go")
         self.assertEqual(step(pg), "extras")
@@ -425,15 +477,16 @@ class Page(unittest.TestCase):
             self.install(pg, "A very long name for a TV in a big house")
             self.no_sideways_scroll(pg, f"finish at {w}")
             pg.click("#health-look")
-            pg.wait_for_selector("#health-show:not([hidden])")
-            self.no_sideways_scroll(pg, f"finish with the report at {w}")
+            pg.wait_for_selector('section[data-step="health"]:not([hidden])')
+            self.no_sideways_scroll(pg, f"the report at {w}")
+            pg.click("#back")
             pg.click("#another-go")
             pg.wait_for_selector("#found .tvc")
             self.no_sideways_scroll(pg, f"find at {w}")
             pg.click("#nohere-go")
             self.no_sideways_scroll(pg, f"help at {w}")
             for name in ("kind", "dev-google", "dev-google-pair", "dev-classic", "allow", "fix-home", "phone-route",
-                         "stop", "blocked", "undo", "extras", "helper-tv", "work"):
+                         "stop", "blocked", "undo", "extras", "helper-tv", "work", "remote", "health", "debug"):
                 pg.evaluate("(n) => document.querySelectorAll('section').forEach(s => s.hidden = s.dataset.step !== n)", name)
                 self.no_sideways_scroll(pg, f"{name} at {w}")
 

@@ -193,22 +193,25 @@ def _w(s):
     return str(s).replace("%", "%%")
 
 
-def swap_script(old, new, keep, pid, relaunch, system=None):
-    """The script that waits for this program to exit, keeps the old version as `keep`, puts the new one in
-    its place and starts it. On a failed move the old one is put back and started again."""
+def swap_script(old, new, keep, pid, relaunch, system=None, dest=None, relaunch_old=None):
+    """The script that waits for this program to exit, keeps the old version as `keep`, puts the new one at
+    `dest` (the old place unless the new copy has another name: 0.13.15 renamed the program to Couch TV Setup)
+    and starts it. On a failed move the old one is put back and started again with relaunch_old."""
+    dest = dest or old
+    relaunch_old = relaunch_old or relaunch
     if (system or sys.platform) == "win32":
         # the UTF-8 code page first, so a user name like José reads in the file as it does in the path
         return ('@echo off\r\nchcp 65001 >NUL\r\n:wait\r\ntasklist /FI "PID eq %d" 2>NUL | find "%d" >NUL\r\n'
                 'if not errorlevel 1 (timeout /t 1 >NUL & goto wait)\r\n'
                 'if exist "%s" rmdir /S /Q "%s"\r\nmove "%s" "%s" || goto restore\r\n'
-                'move "%s" "%s" || goto restore\r\ngoto done\r\n'
-                ':restore\r\nif not exist "%s" move "%s" "%s"\r\n:done\r\nstart "" %s\r\n'
-                % (pid, pid, _w(keep), _w(keep), _w(old), _w(keep), _w(new), _w(old),
-                   _w(old), _w(keep), _w(old), _w(relaunch)))
+                'move "%s" "%s" || goto restore\r\nstart "" %s\r\nexit /b\r\n'
+                ':restore\r\nif not exist "%s" move "%s" "%s"\r\nstart "" %s\r\n'
+                % (pid, pid, _w(keep), _w(keep), _w(old), _w(keep), _w(new), _w(dest), _w(relaunch),
+                   _w(old), _w(keep), _w(old), _w(relaunch_old)))
     q = _q
     return ("#!/bin/sh\nwhile kill -0 %d 2>/dev/null; do sleep 1; done\nrm -rf %s\n"
-            "mv %s %s || { %s & exit 1; }\nmv %s %s || mv %s %s\n%s &\n"
-            % (pid, q(keep), q(old), q(keep), relaunch, q(new), q(old), q(keep), q(old), relaunch))
+            "mv %s %s || { %s & exit 1; }\nmv %s %s || { mv %s %s; %s & exit 1; }\n%s &\n"
+            % (pid, q(keep), q(old), q(keep), relaunch_old, q(new), q(dest), q(keep), q(old), relaunch_old, relaunch))
 
 
 def write_script(path, text):
@@ -244,16 +247,25 @@ def apply(staging=None, spawn=subprocess.Popen, system=None):
     keep = folder / "previous" / old.name
     keep.parent.mkdir(parents=True, exist_ok=True)
     plat = system or sys.platform
+    # The new copy goes where the old one was, under its own name (the program was called "couch-tv Setup" until
+    # 0.13.15 and is "Couch TV Setup" now). Never over something else that is already there.
+    dest = old.parent / items[0].name
+    if dest != old and dest.exists():
+        return False
+    exe_new = items[0].name + (".exe" if plat == "win32" else "")
     if plat == "win32":
         script = folder / "swap.cmd"
-        relaunch = '"%s" --helper' % (old / Path(sys.executable).name)   # swap_script doubles any % for the .cmd
+        relaunch_old = '"%s" --helper' % (old / Path(sys.executable).name)   # swap_script doubles any % for the .cmd
+        relaunch = '"%s" --helper' % (dest / exe_new)
     else:
         script = folder / "swap.sh"
         if plat == "darwin":
-            relaunch = "open -a %s --args --helper" % _q(old)
+            relaunch_old = "open -a %s --args --helper" % _q(old)
+            relaunch = "open -a %s --args --helper" % _q(dest)
         else:
-            relaunch = "%s --helper" % _q(old / Path(sys.executable).name)
-    write_script(script, swap_script(old, items[0], keep, os.getpid(), relaunch, system))
+            relaunch_old = "%s --helper" % _q(old / Path(sys.executable).name)
+            relaunch = "%s --helper" % _q(dest / exe_new)
+    write_script(script, swap_script(old, items[0], keep, os.getpid(), relaunch, system, dest, relaunch_old))
     os.chmod(script, 0o700)
     spawn(["cmd", "/c", str(script)] if (system or sys.platform) == "win32" else ["/bin/sh", str(script)],
           stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)

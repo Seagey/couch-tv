@@ -95,11 +95,12 @@ jobs:
           ICON=""
           [ "$RUNNER_OS" = "macOS" ] && ICON="--icon assets/icon/couch-tv-setup.icns"
           [ "$RUNNER_OS" = "Windows" ] && ICON="--icon assets/icon/couch-tv-setup.ico"
-          # The program and its folder keep the file name "couch-tv Setup" on purpose: the helper's updater puts the
-          # new copy where the old one was and starts it by the old program name, the helper's start with the computer
-          # entry holds that path, and the Windows link registration points at it. The name people read is
-          # "Couch TV Setup" (set below on a Mac, in the file details on Windows, in the desktop file on Linux).
-          pyinstaller --noconfirm --windowed --name "couch-tv Setup" $ARGV $ICON \
+          # The program, its folder and the Mac app are all called "Couch TV Setup" (0.13.15; they were "couch-tv Setup").
+          # Only the name inside the release files changed: the zip and tar.gz names stay couch-tv-Setup-*, because the
+          # website, SHA256SUMS-setup.txt and the helper's updater look for those. The helper's updater puts the new
+          # copy under its own name and moves the start with the computer entry and the Windows link (helper/update.py,
+          # helper/autostart.py refresh).
+          pyinstaller --noconfirm --windowed --name "Couch TV Setup" $ARGV $ICON \
             --version-file version.txt \
             --osx-bundle-identifier app.couchtv.setup \
             --add-data "couchtv_setup/web${SEP}couchtv_setup/web" \
@@ -115,14 +116,7 @@ jobs:
       - name: Package (Mac)
         if: runner.os == 'macOS'
         run: |
-          APP="dist/couch-tv Setup.app"
-          # The name people see is Couch TV Setup (Finder, Dock if shown, System Settings): the file name stays
-          # "couch-tv Setup.app" so the helper's updater and start with the computer entry keep finding it.
-          plutil -replace CFBundleName -string "Couch TV Setup" "$APP/Contents/Info.plist"
-          plutil -replace CFBundleDisplayName -string "Couch TV Setup" "$APP/Contents/Info.plist"
-          plutil -replace CFBundleLocalizations -json '["en"]' "$APP/Contents/Info.plist"
-          mkdir -p "$APP/Contents/Resources/en.lproj"
-          printf '"CFBundleName" = "Couch TV Setup";\n"CFBundleDisplayName" = "Couch TV Setup";\n' > "$APP/Contents/Resources/en.lproj/InfoPlist.strings"
+          APP="dist/Couch TV Setup.app"
           # No Dock icon or window of its own: the setup is the browser page, and the app stops by
           # itself on Close setup or a few minutes after the page is closed.
           plutil -insert LSUIElement -bool true "$APP/Contents/Info.plist"
@@ -135,27 +129,26 @@ jobs:
           python stamp_version.py mac-plist "$APP/Contents/Info.plist"
           # Ad hoc signature only (no paid Apple account): macOS asks once, see setup-app/README.md.
           codesign --force --deep --sign - "$APP"
-          echo "PROGRAM=$APP/Contents/MacOS/couch-tv Setup" >> "$GITHUB_ENV"
+          echo "PROGRAM=$APP/Contents/MacOS/Couch TV Setup" >> "$GITHUB_ENV"
           ditto -c -k --keepParent "$APP" "dist/couch-tv-Setup-${{ matrix.name }}.zip"
 
       - name: Package (Windows)
         if: runner.os == 'Windows'
         run: |
-          # A folder with "couch-tv Setup.exe" in it, not one big .exe: antivirus programs flag those far more.
-          echo "PROGRAM=dist/couch-tv Setup/couch-tv Setup.exe" >> "$GITHUB_ENV"
-          python -c "import shutil; shutil.make_archive('dist/couch-tv-Setup-${{ matrix.name }}', 'zip', 'dist', 'couch-tv Setup')"
+          # A folder with "Couch TV Setup.exe" in it, not one big .exe: antivirus programs flag those far more.
+          echo "PROGRAM=dist/Couch TV Setup/Couch TV Setup.exe" >> "$GITHUB_ENV"
+          python -c "import shutil; shutil.make_archive('dist/couch-tv-Setup-${{ matrix.name }}', 'zip', 'dist', 'Couch TV Setup')"
 
       - name: Package (Linux)
         if: runner.os == 'Linux'
         run: |
-          # A folder with the "couch-tv Setup" program in it, as on Windows; tar keeps its run permission.
-          echo "PROGRAM=dist/couch-tv Setup/couch-tv Setup" >> "$GITHUB_ENV"
-          # Called Couch TV Setup in a file manager: a desktop file beside the program (it opens the program in
-          # its own folder) and the icon. The program keeps its file name: see the note at the Build step.
-          cp "assets/linux/Couch TV Setup.desktop" "dist/couch-tv Setup/"
-          chmod +x "dist/couch-tv Setup/Couch TV Setup.desktop"
-          cp assets/icon/couch-tv-setup-linux.png "dist/couch-tv Setup/couch-tv-setup.png"
-          tar -czf "dist/couch-tv-Setup-${{ matrix.name }}.tar.gz" -C dist "couch-tv Setup"
+          # A folder with the "Couch TV Setup" program in it, as on Windows; tar keeps its run permission.
+          echo "PROGRAM=dist/Couch TV Setup/Couch TV Setup" >> "$GITHUB_ENV"
+          # A desktop file beside the program (it opens the program in its own folder) and the icon.
+          cp "assets/linux/Couch TV Setup.desktop" "dist/Couch TV Setup/"
+          chmod +x "dist/Couch TV Setup/Couch TV Setup.desktop"
+          cp assets/icon/couch-tv-setup-linux.png "dist/Couch TV Setup/couch-tv-setup.png"
+          tar -czf "dist/couch-tv-Setup-${{ matrix.name }}.tar.gz" -C dist "Couch TV Setup"
 
       - name: Smoke test the built app
         run: python tests/smoke.py "$PROGRAM"

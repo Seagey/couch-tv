@@ -75,7 +75,9 @@
     $("error").hidden = true;
     current = step;
     if (!(opts && opts.back)) {
-      var at = nav.lastIndexOf(step);
+      // coming back to a screen already walked cuts the way back to it (a screen that is only shown while something
+      // runs is never cut to: it is skipped by Back anyway)
+      var at = TRANSIENT[step] ? -1 : nav.lastIndexOf(step);
       if (at >= 0) nav.length = at + 1; else nav.push(step);
     }
     chrome(step);
@@ -250,11 +252,12 @@
       var h = document.createElement("h3"); h.textContent = t.label; card.appendChild(h);
       var kind = helperKind(t);
       var p = t.stale ? ["Looking for it again", "warn"] : t.status === "other" && kind ? ["Needs the Helper", "dim"] : (PILL[t.status] || PILL["switch"]);
-      var state_ = document.createElement("div"); state_.appendChild(pillEl(p[0], p[1])); card.appendChild(state_);
+      var state_ = document.createElement("div"); state_.className = "state"; state_.appendChild(pillEl(p[0], p[1])); card.appendChild(state_);
+      // every card has the same rows (picture, name, state, note, button, details) so buttons line up across a row
+      var note = document.createElement("p"); note.className = "small note";
+      card.appendChild(note);
       if (t.status === "other") {
-        var note = document.createElement("p"); note.className = "small";
         note.textContent = kind ? "Needs the helper." : "Couch TV goes on this TV another way. See the guide on GitHub.";
-        card.appendChild(note);
         if (kind) {
           var hb = document.createElement("button"); hb.type = "button"; hb.className = "btn ghost";
           hb.textContent = "Set up the helper";
@@ -291,7 +294,9 @@
         det.setAttribute("aria-expanded", detailsOpen[t.ip] ? "true" : "false");
         more.hidden = !detailsOpen[t.ip];
       });
-      card.appendChild(det); card.appendChild(more);
+      var wrap = document.createElement("div"); wrap.className = "detwrap";
+      wrap.appendChild(det); wrap.appendChild(more);
+      card.appendChild(wrap);
       box.appendChild(card);
     });
     // the TV whose steps are open just became ready, or its pairing screen just opened
@@ -742,13 +747,11 @@
       if (r.account.design) lines.push("Sent \"" + r.account.design + "\" to the TV");
     }
     if (r.speed && r.speed.cls) {
-      lines.push("Measured how smoothly it draws: " + ({ a: "Slow", b: "Everyday", c: "Quick", d: "Fast" })[r.speed.cls] + " (Couch TV Studio uses this)");
+      lines.push("Measured how smoothly it draws: " + ({ a: "Slow", b: "Everyday", c: "Quick", d: "Fast" })[r.speed.cls] + (linked ? " (Couch TV Studio uses this)" : ""));
     }
     if (r.apk && !r.kept_ontv) lines.push("Version " + r.apk.version + ", checked against " + r.apk.checked);
     lines.forEach(function (l) { var li = document.createElement("li"); li.textContent = l; ul.appendChild(li); });
     ul.hidden = !lines.length;
-    $("health-box").hidden = true;
-    $("health-show").hidden = true;
     state.kept = !!r.kept_ontv;
     state.linked = accountOn && !state.kept ? linked : null;
     state.design = (r.account && r.account.design) || null;
@@ -758,7 +761,6 @@
     text("done-line", notice);
     $("done-line").hidden = !notice;
     if (!state.kept) addSession(name, state.linked);
-    $("remote-done").hidden = true;
     $("remote-adb-google").hidden = state.facts.fire;
     $("remote-adb-fire").hidden = !state.facts.fire;
     text("debug-why", state.route === "tls" ?
@@ -793,6 +795,11 @@
       text("fin-badge-text", name + " is ready");
       text("done-title", "Couch TV is on your TV");
       text("fin-lede", "Couch TV is your home screen. Press Home on your TV remote to see it.");
+      // No account link in this Setup: the design reaches the TV by a code made on the website
+      if (state.studio) {
+        cta.href = state.studio + "/design/"; cta.hidden = false;
+        text("fin-cap", "Make a code there, then enter it in the TV's Home settings."); $("fin-cap").hidden = false;
+      }
       finish.className = "btn go big"; text("finish-text", "Finish");
     } else if (linked) {
       badge.className = "pill ok";
@@ -938,12 +945,11 @@
     ["plan-list", "done-account", "undo-list", "guide-steps", "found", "fl-device-code", "session-list-x"].forEach(function (id) { if ($(id)) $(id).textContent = ""; });
     text("plan-name", "this TV"); text("done-line", ""); text("link-status", ""); text("fl-status", ""); text("pair-status", ""); text("tls-status", "");
     text("health-text", ""); text("health-status", ""); text("undo-details", "");
-    ["done-line", "done-account", "remote-done", "health-box", "health-show", "link-status", "fl-panel", "guide", "ontv-row", "tcl-note", "plan-account", "fl-device-code"].forEach(function (id) { $(id).hidden = true; });
+    ["done-line", "done-account", "link-status", "fl-panel", "guide", "ontv-row", "tcl-note", "plan-account", "fl-device-code"].forEach(function (id) { $(id).hidden = true; });
     $("health-send").hidden = false;
     ["remote-go", "health-look", "debug-off"].forEach(function (id) { $(id).hidden = false; });
     $("link-cta").disabled = false;
-    text("debug-line", "Couch TV does not need debugging any more. Switching it off is safest: ");
-    var why = document.createElement("span"); why.id = "debug-why"; $("debug-line").appendChild(why);
+    text("debug-status", ""); text("remote-status", "");
   }
 
   $("another-go").addEventListener("click", function () {
@@ -967,20 +973,21 @@
       state.remote = true;
       text("remote-addr", r.address);
       text("remote-setup", r.setup);
-      $("remote-done").hidden = false;
-      back();
+      text("remote-status", "");
+      show("remote");
     }, function (e) { back(); fail(e); });
   });
 
   $("remote-code").addEventListener("click", function () {
-    api("/api/remote/code").then(function () { text("done-line", "The code is on the TV now. It lasts 3 minutes."); $("done-line").hidden = false; }, fail);
+    api("/api/remote/code").then(function () { text("remote-status", "The code is on the TV now. It lasts 3 minutes."); }, fail);
   });
 
-  $("debug-off").addEventListener("click", function () {
+  $("debug-off").addEventListener("click", function () { text("debug-status", ""); show("debug"); });
+  $("debug-go").addEventListener("click", function () {
     api("/api/debug-off").then(function () {
-      text("debug-line", "Debugging is off. Couch TV keeps working.");
       ["debug-off", "remote-go", "health-look"].forEach(function (id) { $(id).hidden = true; });
-      $("remote-done").hidden = true; $("health-box").hidden = true;
+      show("done");
+      text("done-line", "Debugging is off. Couch TV keeps working."); $("done-line").hidden = false;
     }, fail);
   });
 
@@ -990,10 +997,8 @@
     api("/api/health/preview").then(function (r) {
       text("health-text", JSON.stringify(r.report, null, 2));
       $("health-send").hidden = !r.can_send;
-      text("health-status", r.can_send ? "" : "Link your Couch TV account to send it.");
-      $("health-box").hidden = false;
-      $("health-show").hidden = false;
-      $("health-box").scrollIntoView({ block: "nearest" });
+      text("health-status", r.can_send || state.accountMode === "off" ? "" : "Link your Couch TV account to send it.");
+      show("health");
     }, fail);
   });
   $("health-send").addEventListener("click", function () {

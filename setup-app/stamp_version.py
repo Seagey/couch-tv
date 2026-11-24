@@ -26,9 +26,9 @@ VSVersionInfo(
       StringStruct('CompanyName', 'couch-tv'),
       StringStruct('FileDescription', 'Couch TV Setup'),
       StringStruct('FileVersion', '{v}'),
-      StringStruct('InternalName', 'couch-tv Setup'),
+      StringStruct('InternalName', 'Couch TV Setup'),
       StringStruct('LegalCopyright', 'MIT licence, github.com/Seagey/couch-tv'),
-      StringStruct('OriginalFilename', 'couch-tv Setup.exe'),
+      StringStruct('OriginalFilename', 'Couch TV Setup.exe'),
       StringStruct('ProductName', 'Couch TV Setup'),
       StringStruct('ProductVersion', '{v}')])]),
     VarFileInfo([VarStruct('Translation', [1033, 1200])])
