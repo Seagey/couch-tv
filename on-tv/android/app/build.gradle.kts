@@ -115,7 +115,10 @@ android.sourceSets.getByName("main").java.srcDir(File(repoRoot, "tv-home/android
 android.sourceSets.getByName("test").java.srcDir(File(repoRoot, "tv-home/android/shared/test"))
 
 // -PsetupShots=<folder>: SetupShotsTest saves PNGs of the setup screens there (skipped without it).
-tasks.withType<Test>().configureEach { systemProperty("setupShots", (project.findProperty("setupShots") as String?) ?: "") }
+tasks.withType<Test>().configureEach {
+    systemProperty("setupShots", (project.findProperty("setupShots") as String?) ?: "")
+    testLogging { exceptionFormat = org.gradle.api.tasks.testing.logging.TestExceptionFormat.FULL }
+}
 
 // ------------------------------------------------------------------------------------------- Google Play
 // Product flavours, dimension "store" (coord/GOOGLE-PLAY-PLAN.md section 4, coord/GOOGLE-PLAY-BUILD.md):
