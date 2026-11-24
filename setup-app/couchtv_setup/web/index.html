@@ -35,6 +35,11 @@
         <p class="lead" id="acct-device-code" hidden></p>
       </div>
     </div>
+    <div class="card" id="helper-later" hidden>
+      <p><b>Extra features from this computer</b> are off.</p>
+      <p class="small">Turn the TV on from your phone, Ask AI at home, picks. The TV works without them.</p>
+      <div class="actions"><button id="helper-later-go">Turn on extra features</button></div>
+    </div>
     <p>Works with Google TV and Android TV 7.1 or newer. Setup finds the TV on your Wi-Fi by itself.</p>
     <details class="small"><summary>Which TVs work with this app</summary>
     <h2>Works with</h2>
@@ -45,7 +50,7 @@
     </ul>
     <h2>Does not work with this app</h2>
     <ul class="tvs">
-      <li class="no"><b>Samsung (Tizen)</b>, <b>LG (webOS)</b> and <b>Roku OS</b>. couch-tv still works on them through a computer at home that stays on (the bridge), just not through this app. The guides are on GitHub: docs/SAMSUNG.md, docs/LG.md and docs/ROKU.md.</li>
+      <li class="no"><b>Samsung (Tizen)</b>, <b>LG (webOS)</b> and <b>Roku OS</b>. they need the Couch TV Helper, a small app on this computer. Setup finds them and offers it. The guides are on GitHub: docs/SAMSUNG.md, docs/LG.md and docs/ROKU.md.</li>
       <li class="no"><b>VIDAA</b> (Hisense's own system).</li>
       <li class="no"><b>Apple TV (tvOS)</b>.</li>
       <li class="no"><b>Fire TV sticks on Vega OS</b> (Fire TV Stick 4K Select, Fire TV Stick HD 2026, Fire TV Stick 4K 3rd gen). They cannot install apps.</li>
@@ -356,9 +361,62 @@
     <p id="debug-line">couch-tv does not need debugging any more. Switching it off is safest: <span id="debug-why"></span></p>
     <div class="actions">
       <button id="debug-off">Switch debugging off</button>
-      <button class="primary" id="close-go">Close setup</button>
+      <button class="primary" id="finish-go">Finish</button>
     </div>
     <p class="small">To take couch-tv off again, open this app and choose <b>Take couch-tv off a TV</b>. Or by hand, with the remote: Settings, Apps, the couch-tv <b>Home</b> app, Uninstall.</p>
+  </section>
+
+  <!-- the last screen: Done, or add the helper -->
+  <section data-step="extras">
+    <h1>Couch TV is on your TV.</h1>
+    <p class="lead">It works on its own. You can stop here.</p>
+    <div class="card">
+      <h2>Done</h2>
+      <p>Close this app. Delete it if you like.</p>
+      <p class="small">The TV needs no computer.</p>
+      <div class="actions"><button class="primary" id="extras-done">Done</button></div>
+    </div>
+    <div class="card" id="extras-add">
+      <h2>Add extra features</h2>
+      <p>Keep the Couch TV Helper in your <span data-os="mac">menu bar</span><span data-os="windows">tray</span><span data-os="linux">tray</span>.</p>
+      <ul class="ticks">
+        <li>Turn the TV on from your phone</li>
+        <li>Ask AI on your home computer</li>
+        <li>Picks made for you</li>
+      </ul>
+      <label class="small"><input type="checkbox" id="extras-autostart"> Start with this computer</label>
+      <p class="small"><b>Computer off?</b> Your home keeps working. Only these extras pause.</p>
+      <div class="actions"><button id="extras-on">Add extra features</button></div>
+    </div>
+    <p class="small">You can add them any time, from Couch TV Setup or your account.</p>
+  </section>
+
+  <!-- the helper is on -->
+  <section data-step="helper-on">
+    <h1>Couch TV Helper is on.</h1>
+    <p class="lead" id="helper-on-line">Look for it in your menu bar.</p>
+    <p class="small">Open Couch TV Studio, pause it or turn it off from there. The TV stays as it is.</p>
+    <div class="actions"><button class="primary" id="helper-on-done">Close setup</button></div>
+  </section>
+
+  <!-- Samsung, LG or Roku found -->
+  <section data-step="helper-tv">
+    <h1 id="helper-tv-title">Your TV needs the helper.</h1>
+    <p class="lead">It opens Couch TV and runs your phone remote.</p>
+    <h2>What the helper does</h2>
+    <ul class="ticks">
+      <li>Opens Couch TV when the TV comes on</li>
+      <li>Runs the phone remote and "put on Bluey"</li>
+      <li>Brings weather, people and Keep watching</li>
+    </ul>
+    <h2>Computer off?</h2>
+    <p>Couch TV stays on the TV. Open it from the app row.</p>
+    <p>It will not open itself, and the phone remote stops.</p>
+    <label class="small"><input type="checkbox" id="helper-tv-autostart" checked> Start with this computer</label>
+    <div class="actions">
+      <button data-go="find">Not now</button>
+      <button class="primary" id="helper-tv-go">Set up the helper</button>
+    </div>
   </section>
 
   <!-- undo -->

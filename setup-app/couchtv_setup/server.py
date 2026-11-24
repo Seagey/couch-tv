@@ -27,6 +27,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 from . import errors, finder, guide, health, linkin, pairing, paths, release, steps, studio, tvprofile
+from .helper import autostart as hautostart, config as hconfig, deeplink
 from .identity import Identity
 from .tv import Tv, TvError
 
@@ -58,6 +59,7 @@ class State:
         self.link = studio.Link()      # the Couch TV account, in memory only
         self.handoff = None            # a code from couchtv://setup?handoff=..., not used yet
         self.profile = None            # tvprofile of the connected TV
+        self.intent = None             # "helper" when opened by couchtv://helper/on
 
 
 S = State()
@@ -215,12 +217,59 @@ def place_search(q):
     return {"places": [p for p in out if p["timezone"]]}
 
 
+def helper_state():
+    cfg = hconfig.load()
+    return {"mode": cfg["mode"], "autostart": hautostart.is_enabled(), "intent": S.intent,
+            "can_autostart": True, "tvs": cfg["tvs"]}
+
+
+def helper_api(name, body):
+    """Extra features (Couch TV Helper): turn on, turn off, add a TV that needs it, start it now."""
+    if name == "state":
+        return helper_state()
+    if name == "intent":
+        S.intent = "helper" if body.get("intent") == "helper" else S.intent
+        return {"ok": True}
+    if name == "add-tv":
+        ip, kind = home_ip(body), str(body.get("kind") or "")
+        if not hconfig.needs_helper(kind):
+            raise TvError("That TV does not need the helper.", "bad_kind")
+        hconfig.add_tv(ip, kind, str(body.get("name") or ""))
+        return {"ok": True}
+    if name == "on":
+        want = body.get("autostart") is True
+        hconfig.turn_on(want)
+        if want:
+            hautostart.enable()
+        else:
+            hautostart.disable()
+        S.intent = None
+        if body.get("start") is not False and not os.environ.get("COUCHTV_SETUP_NO_HELPER_START"):
+            _start_helper()
+        return helper_state()
+    if name == "off":
+        hautostart.disable()
+        hconfig.turn_off()
+        return helper_state()
+    raise TvError("No such step.", "404")
+
+
+def _start_helper():
+    """The helper is the same program started with --helper, apart from this page."""
+    import subprocess
+    exe = [sys.executable, "--helper"] if getattr(sys, "frozen", False) else [sys.executable, "-m", "couchtv_setup", "--helper"]
+    subprocess.Popen(exe, stdin=subprocess.DEVNULL)
+
+
 def api(method, path, body):
     S.seen = time.time()
     if path == "/api/ping":
         return {"ok": True}
+    if path.startswith("/api/helper/"):
+        return helper_api(path[len("/api/helper/"):], body)
     if path == "/api/info":
-        return {"os": OS, "connected": bool(S.tv), "facts": S.facts, "route": S.route, "ip": S.ip, "profile": S.profile}
+        return {"os": OS, "connected": bool(S.tv), "facts": S.facts, "route": S.route, "ip": S.ip, "profile": S.profile,
+                "helper": helper_state()}
     if path == "/api/quit":
         if S.job.get("running"):
             raise TvError("Still busy with the last step. Wait for it to finish, then close.", "busy")
@@ -511,7 +560,26 @@ class Handler(BaseHTTPRequestHandler):
 def main(argv=None):
     # Opened by the website's "Set up my TV" link: hand the code to a Setup that is already running
     # (then just show its page), or keep it for this run's page.
-    link = studio.url_in(argv if argv is not None else sys.argv)
+    argv = argv if argv is not None else sys.argv
+    if "--bridge" in argv:      # the helper's child process: the bridge, inside this program
+        from .helper import bridge_proc
+        return bridge_proc.run_bridge()
+    if "--helper" in argv:      # Couch TV Helper: the bridge and the menu bar item, no setup page
+        from .helper import app as helper_app
+        return sys.exit(helper_app.run())
+    if deeplink.find(argv):     # couchtv://helper/on from the account page
+        S.intent = "helper"
+        try:
+            info = json.loads((paths.data() / linkin.RUNNING).read_text(encoding="utf-8"))
+            req = urllib.request.Request(f"http://127.0.0.1:{int(info['port'])}/api/helper/intent", data=b'{"intent":"helper"}',
+                                         method="POST", headers={"Content-Type": "application/json", "X-Setup-Key": str(info["key"])})
+            with urllib.request.urlopen(req, timeout=3):
+                if not os.environ.get("COUCHTV_SETUP_NO_BROWSER"):
+                    webbrowser.open(f"http://127.0.0.1:{int(info['port'])}/")
+                return
+        except Exception:
+            pass
+    link = studio.url_in(argv)
     code = studio.parse_url(link) if link else ""
     if code:
         running = linkin.hand_to_running(code)

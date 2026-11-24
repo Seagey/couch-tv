@@ -5654,6 +5654,7 @@
   // taking this TV's older copy whole; the copy it keeps comes back here.
   var SEEN = null;
   function pushSettings(rec) {
+    if (!rec) rec = keepSettings(true);   // a fresh frame has nothing kept yet
     var body = { settings: rec.s };
     if (SEEN !== null) body.seen = SEEN || "none";   // "none": it had no copy when this TV last looked
     return api("POST", "/api/settings", body)
@@ -9670,7 +9671,7 @@
     ST.widgets_design = mark;
     ST.widgets_base = base;
     keepSettings(true);
-    if (!OFFLINE && data.bridge !== false) { clearTimeout(pushTimer); pushTimer = setTimeout(function () { pushSettings(kept(ST_KEY)); }, 400); }
+    if (!OFFLINE && data.bridge !== false) { clearTimeout(pushTimer); pushTimer = setTimeout(function () { pushSettings(kept(ST_KEY) || keepSettings(true)); }, 400); }
     if (changed && CouchDesign.dataChanged) CouchDesign.dataChanged("wset", JSON.stringify(all));
   }
   // one setting saved, and what follows from it: a "sets" setting writes its own count; a new bin night

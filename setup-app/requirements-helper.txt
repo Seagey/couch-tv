@@ -1,0 +1,7 @@
+# Couch TV Helper (setup-app/couchtv_setup/helper): the bridge's packages and the tray libraries.
+# Not hash pinned yet (phase 2 in coord/HELPER-MODE-PLAN.md). Optional: without them Setup still builds and runs,
+# and the helper shows its menu as a browser page. The build installs them in a separate step and only
+# bundles the bridge when that step worked.
+-r ../bridge/requirements.txt
+rumps==0.4.0; sys_platform == "darwin"
+pystray==0.19.5; sys_platform != "darwin"

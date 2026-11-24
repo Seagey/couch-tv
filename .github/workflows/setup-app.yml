@@ -56,6 +56,16 @@ jobs:
           python -m pip install --disable-pip-version-check --require-hashes -r requirements.txt
           python -m pip install --disable-pip-version-check pyinstaller==6.16.0
 
+      - name: Install the helper's packages (the bridge and the tray)
+        id: helper
+        run: |
+          if python -m pip install --disable-pip-version-check -r requirements-helper.txt; then
+            echo "bundled=yes" >> "$GITHUB_OUTPUT"
+          else
+            echo "The helper's packages did not install: building Setup without the bridge."
+            echo "bundled=no" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Unit tests
         run: python -m unittest discover -s tests -v
 
@@ -66,6 +76,14 @@ jobs:
           python stamp_version.py windows-file version.txt
           # Mac: the website's "Set up my TV" link (couchtv://) reaches the app as an argument at start
           ARGV=""; [ "$RUNNER_OS" = "macOS" ] && ARGV="--argv-emulation"
+          # Couch TV Helper: the bridge's code and the packages it imports, run in-process by --bridge
+          HELPER=""
+          if [ "${{ steps.helper.outputs.bundled }}" = "yes" ]; then
+            HELPER="--add-data ../bridge${SEP}bridge"
+            for m in aiohttp androidtvremote2 zeroconf mcp adb_shell airtouch5py PIL; do HELPER="$HELPER --collect-submodules $m"; done
+            for m in aiohttp androidtvremote2 zeroconf mcp airtouch5py; do HELPER="$HELPER --copy-metadata $m"; done
+            if [ "$RUNNER_OS" = "macOS" ]; then HELPER="$HELPER --hidden-import rumps"; else HELPER="$HELPER --hidden-import pystray"; fi
+          fi
           pyinstaller --noconfirm --windowed --name "couch-tv Setup" $ARGV \
             --version-file version.txt \
             --osx-bundle-identifier app.couchtv.setup \
@@ -76,6 +94,7 @@ jobs:
             --copy-metadata adb-shell --copy-metadata cryptography --copy-metadata pyOpenSSL \
             --copy-metadata rsa --copy-metadata pyasn1 --copy-metadata cffi --copy-metadata pycparser \
             --copy-metadata typing_extensions --copy-metadata certifi \
+            $HELPER \
             couch-tv-setup.py
 
       - name: Package (Mac)

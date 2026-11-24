@@ -202,3 +202,27 @@ NOT verified: the new screens on a real TV (a Toshiba Google TV on Android 11 wo
 screen at once, since 5555 is open, then the fix screens); the Local Network message on a Mac that
 really refused the permission (simulated by errno only); the Intel Mac and Windows builds of this
 commit (CI builds them after a push).
+
+## Couch TV Helper (extra features from this computer)
+
+Same app, same download. The last screen offers **Done** or **Add extra features**; the second sets
+`helper.json` to mode `helper` in Setup's own folder and starts `couch-tv Setup --helper`.
+
+- `couchtv_setup/helper/config.py`: `helper.json` and the bridge's config (written from `known-tvs.json` and the TVs that need the helper: Samsung, LG, Roku). The pairing key is made once and kept.
+- `bridge_proc.py`: runs `bridge/server.py` as a child process (`--bridge`, in the app's own Python) and restarts it with a growing wait.
+- `tray.py`: rumps on a Mac, pystray on Windows and Linux. No tray or no library: `fallback.py` shows the same menu (`menu.py`) as a page on 127.0.0.1.
+- `autostart.py`: LaunchAgent (Mac), `HKCU\...\Run` (Windows), `~/.config/autostart/couch-tv-helper.desktop` (Linux). Removed on turn off.
+- `couchtv://helper/on`: the Couch TV account page's **Turn on extra features** link (Studio side, not changed here). Setup opens on the Add extra features screen. `deeplink.py` documents it.
+- Packages: `requirements-helper.txt` (the bridge's and the tray's). The build installs them in a separate step and bundles the bridge only when that worked, so Setup alone always builds. Not hash pinned yet.
+- Tests: `tests/test_helper.py` (config, login item in a temp folder and a fake registry, menu state, supervisor, page API).
+
+### Helper phase 2: updates, keep awake, remove everything
+
+- `helper/update.py`: asks GitHub for the newest release at start and every 24 hours, downloads the archive for this computer into the cache, and only keeps it when `SHA256SUMS-setup.txt` has a valid Ed25519 signature (`SHA256SUMS-setup.txt.sig`, public key inside the app) and the archive matches its line in that file (and GitHub's own digest). The menu then says **Update ready, restart**. Pressing it unpacks the update (no links, nothing outside its folder) and runs a small script that waits for the helper to exit, keeps the old version in the cache folder (`helper-update/previous`) and starts the new one.
+- **Signing a release** (the private key is not in this repo): after the Setup workflow adds `SHA256SUMS-setup.txt` to the release, on the release computer run `python3 scripts/sign-setup-sums.py SHA256SUMS-setup.txt` and upload the `.sig` to the same release. The key is `~/.couch-tv-signing/update-ed25519.pem` (mode 600; `COUCHTV_SIGNING_KEY` names another). Until a release carries the `.sig`, installed helpers say "Could not check for updates" and change nothing. To rotate the key, make a new pair and change `PUBLIC_KEY_B64`; helpers built before that need a manual download.
+- `helper/keepawake.py`: only while a Samsung, LG or Roku TV is set up, the helper is on, and the computer is on mains power (Mac `caffeinate -i -s`, Windows `SetThreadExecutionState`, Linux `systemd-inhibit`). Menu: **Let this computer sleep** switches it off. Google TV only homes never hold it.
+- `helper/remove.py`: menu **Remove everything from this computer...** stops the helper, removes the start-up item, and deletes the files in Setup's own folders (TV key, helper settings, bridge data, downloads). It tells the person to Forget the key on each TV.
+
+### Home Assistant without the helper (checked in the code, 24 Nov 2026)
+
+Works without the helper on Google TV, Android TV and Fire TV. The Couch TV home talks to Home Assistant through the launcher itself (`tv-home/web/smarthome.js`, `window.TVHA`, app.couchtv.ha), and the on-TV app answers `/api/ha/*` (`on-tv/.../Server.kt`, `HaPhone.kt`) so a phone can sign the TV in. The bridge's `/api/ha` (`bridge/smarthome.py`) is used only where there is no launcher (Samsung, LG, Roku, which need the helper anyway) and for Philips Hue and AirTouch 5, which are set up from the computer. Not run against a real Home Assistant here.

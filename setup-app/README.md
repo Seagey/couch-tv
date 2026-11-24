@@ -94,6 +94,17 @@ same as the repo's `tv-home/tools/apply.sh`:
 off, puts the TV's own home back, then removes the couch-tv apps. Or by hand, with the remote:
 [docs/UNINSTALL.md](../docs/UNINSTALL.md).
 
+## Extra features (Couch TV Helper)
+
+The last screen asks: **Done**, or **Add extra features**. The TV works on its own either way. The helper
+is a small part of this same app that stays in your menu bar (Mac) or tray (Windows, Linux) and adds:
+turn the TV on from your phone, Ask AI on your home computer, picks. A Samsung, LG or Roku TV needs it to
+open Couch TV and run the phone remote. It has no AI of its own and needs no coding. **Start with this
+computer** is a tick box, off until you pick it. **Turn off extra features** in its menu stops it and
+removes the start-up item. Reopen Setup any time to turn it on again.
+
+It checks for a newer version of itself (the new version must carry Couch TV's signature, and is only used when you press **Update ready, restart**), keeps the computer awake on power only when a Samsung, LG or Roku TV needs it (**Let this computer sleep** overrides that), and **Remove everything from this computer** deletes what Setup keeps here.
+
 ## What stays on your computer
 
 Its own folder: `~/Library/Application Support/couch-tv Setup/` on a Mac, `%APPDATA%\couch-tv Setup\`
