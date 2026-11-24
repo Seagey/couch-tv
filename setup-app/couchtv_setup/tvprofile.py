@@ -12,12 +12,21 @@ The object ("tv profile", documented in coord/HOME-DETAILS-PAYLOAD.md):
      "res": "1920x1080",        the screen size Android draws at (wm size, the override if there is one)
      "cls": "b",                Studio's speed class guess from the memory (a to d), only a guess
      "homeRole": true,          Android lets this app hold the Home role (Android 10 or newer, not Fire OS)
-     "couchtv": "0.13.12"}      Couch TV's version on the TV once installed, else null
+     "couchtv": "0.13.12",      Couch TV's version on the TV once installed, else null
+     "apps": ["com.netflix.ninja", ...]}   package names of the apps that have a launcher icon (max 300)
 
 Reading it from a connected TV only runs getprop, cat /proc/meminfo, wm size, pm list features and
-cmd role: nothing on the TV changes. A TV found only by its name on the Wi-Fi gets a best guess.
+cmd role and two query-activities lists of launcher apps: nothing on the TV changes. Apps are package
+names only, never data or accounts (Android keeps what you are signed into inside each app). A TV found only by its name on the Wi-Fi gets a best guess.
 """
 import re
+
+MAX_APPS = 300
+PKG_RE = re.compile(r"[A-Za-z][A-Za-z0-9_]*(?:\.[A-Za-z0-9_]+)+")
+APP_QUERIES = tuple(
+    f"pm query-activities --brief -a android.intent.action.MAIN -c android.intent.category.{c}"
+    for c in ("LEANBACK_LAUNCHER", "LAUNCHER"))
+OWN_PACKAGES = ("dev.couchtv.ontv", "app.couchtv.launcher")
 
 PLATFORM_KEYS = ("Google TV", "Android TV", "Fire OS", "Tizen", "webOS", "Roku OS", "VIDAA", "Titan OS")
 
@@ -71,7 +80,26 @@ def platform_of(facts):
     return "Android TV"
 
 
-def from_facts(facts, meminfo="", wm_size="", role_out=""):
+def parse_apps(*outputs):
+    """Package names from `pm query-activities --brief` answers ("com.netflix.ninja/.MainActivity" lines,
+    with "priority=0 ..." lines between). Leanback apps first, no repeats, Couch TV itself left out,
+    at most MAX_APPS, and only names that look like Android package names."""
+    seen = {}
+    for out in outputs:
+        for line in (out or "").splitlines():
+            pkg = line.strip().split("/", 1)[0] if "/" in line else ""
+            if len(pkg) <= 200 and PKG_RE.fullmatch(pkg) and pkg not in OWN_PACKAGES:
+                seen.setdefault(pkg, None)
+    return list(seen)[:MAX_APPS]
+
+
+def clean_apps(apps):
+    if not isinstance(apps, list):
+        return []
+    return parse_apps("\n".join(a + "/x" for a in apps if isinstance(a, str)))
+
+
+def from_facts(facts, meminfo="", wm_size="", role_out="", apps=None):
     """The profile from steps.facts() and three read only answers from the TV."""
     sdk = int(facts.get("sdk") or 0)
     mem = mem_mb(meminfo)
@@ -84,6 +112,7 @@ def from_facts(facts, meminfo="", wm_size="", role_out=""):
         "android": str(facts.get("android") or ""), "sdk": sdk or None,
         "memMb": mem, "res": screen(wm_size), "cls": speed_class(mem),
         "homeRole": bool(role_ok), "couchtv": installed or None,
+        "apps": clean_apps(apps),
     }
 
 
@@ -95,7 +124,7 @@ def read(tv, facts):
         except Exception:
             return ""
     return from_facts(facts, ask("cat /proc/meminfo"), ask("wm size"),
-                      ask("cmd role help"))
+                      ask("cmd role help"), parse_apps(*[ask(q) for q in APP_QUERIES]))
 
 
 def guess(row):
@@ -115,7 +144,7 @@ def guess(row):
     return {"v": 1, "source": "guess", "platform": platform,
             "brand": studio_brand(maker, model, row.get("name"), row.get("announced")),
             "maker": maker, "model": model, "android": "", "sdk": None, "memMb": None, "res": None,
-            "cls": "b", "homeRole": None, "couchtv": None}
+            "cls": "b", "homeRole": None, "couchtv": None, "apps": []}
 
 
 def clean(p):
@@ -132,7 +161,8 @@ def clean(p):
            "res": p.get("res") if isinstance(p.get("res"), str) and re.fullmatch(r"\d{3,5}x\d{3,5}", p["res"]) else None,
            "cls": p.get("cls") if p.get("cls") in ("a", "b", "c", "d") else "b",
            "homeRole": p.get("homeRole") if isinstance(p.get("homeRole"), bool) else None,
-           "couchtv": s(p.get("couchtv"), 20) or None}
+           "couchtv": s(p.get("couchtv"), 20) or None,
+           "apps": clean_apps(p.get("apps"))}
     sp = p.get("speed")
     if isinstance(sp, dict):
         n = lambda v, hi: v if isinstance(v, int) and not isinstance(v, bool) and 0 <= v <= hi else None

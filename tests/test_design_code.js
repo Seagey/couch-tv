@@ -171,6 +171,12 @@ sb.C.get("abcde-fghjk").then((got) => {
     assert.strictEqual(prof({ model: "<img src=x>QA55" }).model, "img src=xQA55");
     assert.strictEqual(prof({ model: "M".repeat(40) }).model, "M".repeat(40));
     for (const bad of ["", "   ", "M".repeat(41), "\u0000", 5]) assert.strictEqual(prof({ model: bad }), null, "model " + JSON.stringify(bad));
+    // apps: package names only, no repeats, at most 300; nothing valid means no apps key
+    assert.deepStrictEqual(prof({ sdk: 34, apps: ["com.netflix.ninja", "com.netflix.ninja", "bad name", "<x>.y", 5, "org.a.b"] }).apps, ["com.netflix.ninja", "org.a.b"]);
+    assert.strictEqual(prof({ sdk: 34, apps: ["nope", 1] }).apps, undefined);
+    assert.strictEqual(prof({ apps: ["com.a.b"] }).apps.length, 1);
+    assert.strictEqual(prof({ sdk: 34, apps: Array.from({ length: 400 }, (_, i) => "com.x.p" + i) }).apps.length, 300);
+    assert.strictEqual(prof({ sdk: 34, apps: "com.a.b" }).apps, undefined);
     // not JSON, a list, a number, empty, or a bridge that throws: no profile, and the rest still goes
     for (const bad of ["nope", "[1,2]", "42", "", "null", "{}"]) assert.strictEqual(prof(bad), null, "answer " + bad);
     T.TVOS = { version: () => "0.13.13", tvProfile: () => { throw new Error("z"); } };

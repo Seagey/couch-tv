@@ -290,7 +290,7 @@
 
   // The kind of TV (from 0.13.13): TVOS.tvProfile() gives a JSON string with platform ("Google TV",
   // "Android TV", "Fire OS"), sdk (Android's API level), memMb, res ("1920x1080", the size Android draws
-  // the home at) and model (Android's model name, such as "Smart TV Pro"). Only those five keys, each checked
+  // the home at) and model (Android's model name, such as "Smart TV Pro"). Those keys (the five, then apps: package names), each checked
   // the way Couch TV Studio checks them (HOME-DETAILS-PAYLOAD.md, "What the TV says about itself"); a key that
   // fails is left out, and no profile at all when none passes. Never a serial, an address or an id.
   function whole(n, lo, hi) { return typeof n === "number" && n % 1 === 0 && n >= lo && n <= hi; }
@@ -309,6 +309,15 @@
       // eslint-disable-next-line no-control-regex
       var m = raw.model.replace(/[\u0000-\u001f\u007f-\u009f]/g, " ").replace(/[<>]/g, "").replace(/\s+/g, " ").trim();
       if (m && m.length <= 40) { p.model = m; any = true; }
+    }
+    if (Array.isArray(raw.apps)) {
+      // Installed apps (TV-APPS.md): package names only, same pattern as Studio, at most 300.
+      var apps = [];
+      for (var i = 0; i < raw.apps.length && apps.length < 300; i++) {
+        var a = raw.apps[i];
+        if (typeof a === "string" && a.length <= 200 && /^[A-Za-z][A-Za-z0-9_]*(\.[A-Za-z0-9_]+)+$/.test(a) && apps.indexOf(a) < 0) apps.push(a);
+      }
+      if (apps.length) { p.apps = apps; any = true; }
     }
     return any ? p : null;
   }

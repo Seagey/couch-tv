@@ -66,4 +66,13 @@ class TvReportTest {
         assertTrue(empty.isEmpty())
         assertEquals(listOf("sdk"), TvReport.profile(null, 31, 63, null, null).keys.toList())
     }
+
+    @Test
+    fun appsAreCleanPackageNamesOnly() {
+        val raw = listOf("com.netflix.ninja", "app.couchtv.launcher", "bad name", "com.netflix.ninja", "<x>.y", "org.a.b")
+        assertEquals(listOf("com.netflix.ninja", "org.a.b"), TvReport.cleanApps(raw))
+        assertEquals(300, TvReport.cleanApps((0 until 400).map { "com.x.p$it" }).size)
+        assertTrue(TvReport.profile(null, null, 0, null, null, listOf("no")).isEmpty())
+        assertTrue(TvReport.profile(null, 31, 0, null, null, listOf("com.a.b")).containsKey("apps"))
+    }
 }

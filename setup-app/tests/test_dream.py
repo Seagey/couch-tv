@@ -482,8 +482,23 @@ class Profile(unittest.TestCase):
         self.assertEqual(p["platform"], "Android TV")
         self.assertFalse(p["homeRole"])                 # Android 9 has no Home role
         for c in tv.log:
-            self.assertRegex(c, r"^(cat /proc/meminfo|wm size|cmd role help|pm list|cmd package resolve|"
+            self.assertRegex(c, r"^(cat /proc/meminfo|wm size|cmd role help|pm list|pm query-activities --brief|cmd package resolve|"
                                 r"dumpsys package|getprop|cat /data/local/tmp)", c)
+
+    def test_apps_are_package_names_only(self):
+        tv = FakeTv("android", sdk=34)
+        p = tvprofile.read(tv, steps.facts(tv))
+        self.assertEqual(p["apps"], ["com.netflix.ninja", "com.google.android.youtube.tv", "com.spotify.tv.android"])
+        self.assertEqual(tvprofile.clean(p)["apps"], p["apps"])
+
+    def test_parse_apps(self):
+        out = "priority=0 x\ncom.a.b/.Main\n  com.a.b/.Other\nDROP TABLE/x\nbad name/.M\ndev.couchtv.ontv/.Home\n<x>.y/z"
+        self.assertEqual(tvprofile.parse_apps(out, "org.c.d/.M"), ["com.a.b", "org.c.d"])
+        many = "\n".join(f"com.x.p{i}/.M" for i in range(400))
+        self.assertEqual(len(tvprofile.parse_apps(many)), 300)
+        self.assertEqual(tvprofile.clean({"apps": ["com.ok.app", 5, "no", "a b.c"]})["apps"], ["com.ok.app"])
+        self.assertEqual(tvprofile.clean({"apps": "x"})["apps"], [])
+        self.assertEqual(tvprofile.guess({})["apps"], [])
 
     def test_fire_never_offers_the_home_role(self):
         p = tvprofile.from_facts({"fire": True, "sdk": 30, "maker": "Amazon"}, "", "", "")
