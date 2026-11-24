@@ -5,8 +5,8 @@ import android.content.Intent
 
 /**
  * This TV's link to a Couch TV Studio account, and the design code Couch TV Setup brought with it
- * (the same two start extras the Android home takes, tv-home AccountLink.kt; here on SetupActivity or the
- * home, `am start -n dev.couchtv.ontv/.SetupActivity --es account_link <token> --es design_code CTV1-...`).
+ * (the same two extras the Android home takes, tv-home AccountLink.kt; here only through SetupLink, which only a
+ * computer over ADB can reach: `am broadcast -n dev.couchtv.ontv/.SetupLink --es account_link <token> --es design_code CTV1-...`).
  *
  *  - account_link: a token for this TV only (32 to 128 of A-Z a-z 0-9 _ -). It is a password: kept in its
  *    own private preferences file "account"; this app has allowBackup="false" and data_extraction_rules.xml
@@ -51,7 +51,34 @@ object AccountLink {
 
     fun readExtras(ctx: Context, i: Intent?): Boolean {
         if (i == null || !(i.hasExtra("account_link") || i.hasExtra("design_code"))) return false
-        return readExtras(kv(ctx), i.getStringExtra("account_link")?.trim(), i.getStringExtra("design_code")?.trim(), System.currentTimeMillis())
+        val kv = kv(ctx)
+        val had = token(kv)
+        val took = readExtras(kv, i.getStringExtra("account_link")?.trim(), i.getStringExtra("design_code")?.trim(), System.currentTimeMillis())
+        if (had != null && had != token(kv)) letGo(had)
+        return took
+    }
+
+    fun sha(s: String): String = java.security.MessageDigest.getInstance("SHA-256").digest(s.toByteArray()).joinToString("") { "%02x".format(it) }
+
+    /** What the TV shows Setup so it knows this link is kept, without saying the link itself. */
+    fun proof(link: String): String = sha(link).take(16)
+
+    /** Tells Studio this TV no longer holds [token] (unlinked here, or another link took its place), so the account
+     *  does not go on showing it as linked. Once, in the background; nothing depends on the answer. */
+    fun letGo(token: String) {
+        Thread {
+            runCatching {
+                val c = java.net.URL("$STUDIO/v1/setup/leave").openConnection() as java.net.HttpURLConnection
+                try {
+                    c.instanceFollowRedirects = false
+                    c.connectTimeout = 10000
+                    c.readTimeout = 15000
+                    c.requestMethod = "POST"
+                    c.setRequestProperty("Authorization", "Bearer $token")
+                    c.responseCode
+                } finally { c.disconnect() }
+            }
+        }.start()
     }
 
     fun linked(kv: Kv): Boolean = cleanLink(kv.get(K_LINK)) != null
@@ -114,6 +141,12 @@ object AccountLink {
         return out.put("state", "none").put("poll", poll)
     }
 
+    /** A 401 is about the link that was asked with: a newer one written meanwhile stays. */
+    fun answered(kv: Kv, asked: String, r: org.json.JSONObject) {
+        if (r.optString("state") != "unlinked") return
+        if (token(kv) == asked) unlink(kv) else r.put("state", "error")
+    }
+
     /** Asks the inbox once. Blocking: off the main thread. A 401 forgets the link here and now. */
     fun inbox(kv: Kv): org.json.JSONObject {
         val token = token(kv) ?: return org.json.JSONObject().put("state", "unlinked")
@@ -141,7 +174,7 @@ object AccountLink {
                 readInbox(code, body, c.getHeaderField("Retry-After"))
             } finally { c.disconnect() }
         } catch (e: Exception) { org.json.JSONObject().put("state", "error") }
-        if (r.optString("state") == "unlinked") unlink(kv)
+        answered(kv, token, r)
         return r
     }
 }

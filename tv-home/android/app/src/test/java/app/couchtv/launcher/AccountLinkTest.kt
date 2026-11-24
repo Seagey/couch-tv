@@ -129,4 +129,65 @@ class AccountLinkTest {
         assertFalse(AccountLink.linked(kv))
         assertNull(AccountLink.token(kv))
     }
+
+    // ---- the security gate, 25 Nov 2026 ----
+
+    @Test fun theProofIsNotTheLink() {
+        assertEquals(16, AccountLink.proof(link).length)
+        assertFalse(link.contains(AccountLink.proof(link)))
+        assertEquals("ba7816bf8f01cfea", AccountLink.proof("abc"))      // sha256("abc"), as Setup works it out
+    }
+
+    @Test fun aRefusalOfTheOldLinkNeverForgetsTheNewOne() {
+        val kv = Mem()
+        AccountLink.readExtras(kv, link, null, 1L)
+        val newer = "n".repeat(43)
+        AccountLink.readExtras(kv, newer, null, 2L)                     // relinked while the old one was being asked about
+        val r = org.json.JSONObject().put("state", "unlinked")
+        AccountLink.answered(kv, link, r)
+        assertEquals(newer, AccountLink.token(kv))
+        assertEquals("error", r.optString("state"))
+        AccountLink.answered(kv, newer, org.json.JSONObject().put("state", "unlinked"))
+        assertFalse(AccountLink.linked(kv))
+    }
+
+    @Test fun whoStartedIt() {
+        val who = StartRules.Who.UNKNOWN
+        assertEquals(StartRules.Who.COMPUTER, StartRules.who(30, "com.android.shell"))
+        assertEquals(StartRules.Who.COMPUTER, StartRules.who(34, "com.android.shell"))
+        assertEquals(StartRules.Who.APP, StartRules.who(31, "com.some.game"))
+        assertEquals(who, StartRules.who(31, null))
+        // Android 10 and older (Fire OS 7 is 9): the name is only what the caller says
+        assertEquals(who, StartRules.who(28, "com.android.shell"))
+        assertEquals(who, StartRules.who(29, "com.android.shell"))
+    }
+
+    @Test fun whatHappensToAStart() {
+        val take = StartRules.Do.TAKE; val ask = StartRules.Do.ASK; val drop = StartRules.Do.DROP
+        for (link in listOf(true, false)) for (setUp in listOf(true, false)) {
+            assertEquals(take, StartRules.decide(StartRules.Who.COMPUTER, false, link, setUp))
+            assertEquals(drop, StartRules.decide(StartRules.Who.APP, false, link, setUp))
+            for (w in StartRules.Who.values()) assertEquals("a replay", drop, StartRules.decide(w, true, link, setUp))
+        }
+        val u = StartRules.Who.UNKNOWN
+        assertEquals("the first set up asks nothing", take, StartRules.decide(u, false, false, false))
+        assertEquals(ask, StartRules.decide(u, false, false, true))
+        assertEquals("never a link from nobody", ask, StartRules.decide(u, false, true, false))
+        assertEquals(ask, StartRules.decide(u, false, true, true))
+    }
+
+    @Test fun theSameStartIsDealtWithOnce() {
+        val kv = Mem()
+        val x = mapOf("bridge" to "none", "config_b64" to "e30=", "account_link" to null)
+        val a = StartRules.startId(x, 7, 3)
+        assertEquals(a, StartRules.startId(x.toList().reversed().toMap(), 7, 3))
+        assertFalse(StartRules.seen(kv, a))
+        assertTrue("after the process died, the same task's intent again", StartRules.seen(kv, a))
+        assertFalse("a new am start of the same words is a new task", StartRules.seen(kv, StartRules.startId(x, 8, 3)))
+        assertFalse("or another boot", StartRules.seen(kv, StartRules.startId(x, 7, 4)))
+        assertFalse(StartRules.seen(kv, StartRules.startId(x + ("bridge" to "http://192.0.2.1"), 7, 3)))
+        assertTrue(StartRules.seen(kv, a))
+        repeat(40) { StartRules.seen(kv, "s$it") }
+        assertTrue(kv.get("starts")!!.split(",").size <= 12)
+    }
 }

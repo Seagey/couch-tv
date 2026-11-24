@@ -126,7 +126,6 @@ class SetupActivity : Activity() {
         // Back from "Update to ..." (Update.kt): the shell line on the TV opens this screen once the new
         // version is on, because the home screen is not exported. The home was on screen, so it goes back there.
         if (backFromUpdate(intent)) { finish(); return }
-        AccountLink.readExtras(this, intent)   // Couch TV Setup's link to the account and design code (AccountLink.kt)
         look = SetupLook(this); screens = SetupScreens(look)
         frame = FrameLayout(this).apply { setBackgroundColor(SetupLook.WALL) }
         setContentView(frame)
@@ -433,7 +432,6 @@ class SetupActivity : Activity() {
     override fun onNewIntent(i: Intent) {
         super.onNewIntent(i)
         if (backFromUpdate(i)) return
-        AccountLink.readExtras(this, i)
         if (i.getBooleanExtra("pin", false)) show(SetupSteps.Screen.SETTINGS, SetupSettings.Item.PHONE)
         else if (i.getBooleanExtra(PHONE_REMOTE, false)) { fromHome = true; show(SetupSteps.Screen.SETTINGS, SetupSettings.Item.PHONE) }
         else refresh()

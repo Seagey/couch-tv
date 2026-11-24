@@ -6,7 +6,9 @@ How Setup gets signed in (no password ever typed into Setup):
    ABCD-EFGH for a person whose browser could not open the app.
 2. Device code: Setup shows a 6 letter code and opens <studio>/link-setup, where the signed in person
    presses Allow (like signing in to a TV app).
-Either way Setup ends up with a short lived setup token for that account, kept in memory only.
+Either way Setup ends up with a short lived setup token for that account, kept in memory only. Before that the
+person is shown whose account it is (POST /v1/setup/who looks at a code without using it) and says Yes: a code that
+came in by itself (a link anyone can make) never signs Setup in (server.py, /api/link-yes).
 
 Then, once the TV is connected (DREAM-SETUP-BUILD.md has the whole contract):
 - POST /v1/setup/tv  {tv: <tv profile>, name}  -> {tv_id, link, code, design, home}
@@ -15,7 +17,8 @@ Then, once the TV is connected (DREAM-SETUP-BUILD.md has the whole contract):
   code: a send code (CTV1) for the account's design, made for this tv_id, so the TV's own fetch gets
         the design and the home pack (HOME-DETAILS-PAYLOAD.md);
   home: the same home pack, so Setup can hand people and town to TV apps that predate the pack.
-- POST /v1/setup/done {tv_id, ok, couchtv}  -> the website's My TVs shows "Living room TV is ready".
+- POST /v1/setup/done {tv_id, ok, couchtv, linked, link}  -> linked: true (the TV said it took the link), "sent"
+  (an older Couch TV cannot say) or false (it did not: the link the TV had before still works); the website's My TVs shows "Living room TV is ready".
 
 The Studio API is live, and linking is ON in every build (25 Nov 2026: it was off unless an environment variable
 said "live", which no release ever set, so no Setup ever linked an account). COUCHTV_SETUP_STUDIO=off switches it
@@ -218,15 +221,55 @@ def call(path, body, token=None, timeout=15):
         raise TvError("Could not reach your Couch TV account. Check the internet and try again.", "studio_down") from e
 
 
+OLD_SITE = "The website is not ready for this Setup yet. Try again later."
+
+
+def clean_account(acct):
+    """The account as the page may show it: name, covered email ("s***@example.com") and design name."""
+    acct = acct if isinstance(acct, dict) else {}
+    mail = acct.get("email")
+    ok = isinstance(mail, str) and re.fullmatch(r"[^\s@<>\x00-\x1f]{1,4}\*\*\*@[A-Za-z0-9.-]{1,80}", mail)
+    return {"name": re.sub(r"[\x00-\x1f\x7f<>]", "", str(acct.get("name") or ""))[:40] or None,
+            "email": mail if ok else None,
+            "design": re.sub(r"[\x00-\x1f\x7f<>]", "", str(acct.get("design") or ""))[:60] or None}
+
+
+def who(code):
+    """Whose account a code from the website is for, WITHOUT using it. A website from before this answers 404:
+    then nothing is used and nothing is linked."""
+    c = read_code(code)
+    if not c:
+        raise TvError("That is not a code from the Couch TV website. It looks like ABCD-EFGH.", "bad_code")
+    try:
+        ans = call("/v1/setup/who", {"handoff": c})
+    except TvError as e:
+        if e.code in ("not_found", "method_not_allowed"):
+            raise TvError(OLD_SITE, "studio_old") from e
+        raise
+    acct = clean_account(ans.get("account") if isinstance(ans, dict) else None)
+    if not acct["email"]:
+        raise TvError(OLD_SITE, "studio_old")
+    return c, acct
+
+
+def end(link):
+    """Signs this Setup out at the account too. Never raises: it is forgotten here either way."""
+    if not link or not link.token:
+        return False
+    try:
+        call("/v1/setup/end", {}, link.token, timeout=6)
+        return True
+    except TvError:
+        return False
+
+
 def _signed_in(link, ans):
     tok = ans.get("token") if isinstance(ans, dict) else None
     if not isinstance(tok, str) or not LONG_RE.match(tok):
         raise TvError("Your Couch TV account sent back something unexpected. Try the button on the website again.",
                       "studio_bad")
     link.token = tok
-    acct = ans.get("account") if isinstance(ans.get("account"), dict) else {}
-    link.account = {"name": re.sub(r"[\x00-\x1f\x7f<>]", "", str(acct.get("name") or ""))[:40] or None,
-                    "design": re.sub(r"[\x00-\x1f\x7f<>]", "", str(acct.get("design") or ""))[:60] or None}
+    link.account = clean_account(ans.get("account"))
     return link.account
 
 
@@ -277,7 +320,7 @@ def register_tv(link, profile, name, tv_id=None):
     try:
         ans = call("/v1/setup/tv", body, link.token)
     except TvError as e:
-        if "tv_id" not in body or e.code in ("studio_down", "slow_down", "studio_off"):
+        if "tv_id" not in body or e.code != "not_found":
             raise
         # an id another account made, or a row deleted since: set it up as a new TV of this account
         del body["tv_id"]
@@ -297,14 +340,25 @@ def register_tv(link, profile, name, tv_id=None):
     return out
 
 
-def report_done(link, ok, couchtv=None, profile=None):
-    """Tells the account the TV is set up, with the TV profile again now that it has the measured speed."""
+def report_done(link, ok, couchtv=None, profile=None, linked=None):
+    """Tells the account the TV is set up, with the TV profile again now that it has the measured speed.
+    linked: True, "sent" or False, for the link this run registered (the module's words above)."""
     if not link.token or not link.tv or not link.tv.get("tv_id"):
         return False
     try:
-        call("/v1/setup/done", {"tv_id": link.tv["tv_id"], "ok": bool(ok), "couchtv": couchtv, "tv": profile},
-             link.token)
+        call("/v1/setup/done", {"tv_id": link.tv["tv_id"], "ok": bool(ok), "couchtv": couchtv, "tv": profile,
+                                "linked": linked, "link": link.tv.get("link")}, link.token)
         return True
+    except TvError:
+        return False
+
+
+def tv_seen(link):
+    """Has the TV used its new link yet? False when it has not, or when nobody can say."""
+    if not link.token or not link.tv or not link.tv.get("tv_id"):
+        return False
+    try:
+        return call("/v1/setup/seen", {"tv_id": link.tv["tv_id"]}, link.token).get("linked") is True
     except TvError:
         return False
 

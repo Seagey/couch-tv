@@ -52,7 +52,6 @@ class HomeActivity : Activity() {
     override fun onCreate(b: Bundle?) {
         super.onCreate(b)
         App.startService(this)
-        AccountLink.readExtras(this, intent)   // Couch TV Setup's link to the account and design code
         Auth.onPin(pinListener)
         WebView.setWebContentsDebuggingEnabled(BuildConfig.DEBUG)
         CookieManager.getInstance().setCookie(base, "couchtv_token=${Auth.internalToken}; path=/")
@@ -175,8 +174,6 @@ class HomeActivity : Activity() {
     @Volatile private var front = false
     override fun onNewIntent(i: Intent) {
         super.onNewIntent(i)
-        // Couch TV Setup's link to the account and design code (AccountLink.kt): the page gets the design now
-        if (AccountLink.readExtras(this, i)) { js("window.tv && tv.setupDesign && tv.setupDesign()"); return }
         js("window.tv && tv.home()")
     }
 
@@ -274,7 +271,13 @@ class HomeActivity : Activity() {
         @JavascriptInterface fun accountLinked(): Boolean = AccountLink.linked(AccountLink.kv(this@HomeActivity))
         @JavascriptInterface fun setupDesignCode(): String = AccountLink.pendingCode(AccountLink.kv(this@HomeActivity), System.currentTimeMillis()) ?: ""
         @JavascriptInterface fun setupDesignDone() = AccountLink.codeDone(AccountLink.kv(this@HomeActivity))
-        @JavascriptInterface fun unlinkAccount(): Boolean { AccountLink.unlink(AccountLink.kv(this@HomeActivity)); return true }
+        @JavascriptInterface fun unlinkAccount(): Boolean {
+            val kv = AccountLink.kv(this@HomeActivity)
+            val had = AccountLink.token(kv)
+            AccountLink.unlink(kv)
+            had?.let { AccountLink.letGo(it) }
+            return true
+        }
         // the account's TV inbox, asked from Kotlin so the link never reaches the page (answer: tv.accountInbox)
         @JavascriptInterface fun accountInbox(): Boolean {
             val kv = AccountLink.kv(this@HomeActivity)
@@ -396,6 +399,8 @@ class HomeActivity : Activity() {
     }
 
     companion object {
+        /** Couch TV Setup left a design code (SetupLink.kt): the page, when it is up, gets the design now. */
+        fun setupDesign() { shown?.get()?.let { a -> a.main.post { a.js("window.tv && tv.setupDesign && tv.setupDesign()") } } }
         @Volatile private var shown: java.lang.ref.WeakReference<HomeActivity>? = null
 
         /** True while the home is resumed (in front). FireHome checks this after a move to front on Android 10 (issue #202). */

@@ -30,7 +30,8 @@ class Pretend(http.server.BaseHTTPRequestHandler):
     def do_POST(self):
         body = json.loads(self.rfile.read(int(self.headers.get("Content-Length") or 0)) or b"{}")
         got.append((self.path, body))
-        ans = {"/v1/setup/handoff": {"token": "t" * 43, "account": {"name": "Sam", "design": None}},
+        ans = {"/v1/setup/who": {"account": {"name": "Sam", "email": "s***@example.test", "design": None}},
+               "/v1/setup/handoff": {"token": "t" * 43, "account": {"name": "Sam", "email": "s***@example.test", "design": None}},
                "/v1/setup/device": {"device_code": "d" * 43, "user_code": CODE, "interval": 5}}.get(self.path)
         raw = json.dumps(ans or {"error": "not_found"}).encode()
         self.send_response(200 if ans else 404)
@@ -95,7 +96,7 @@ def main(program):
         acct = s.api("/api/account")
         assert acct.get("mode") == "live", "this build ships with account linking switched off: " + json.dumps(acct)
         assert acct.get("studio") == STUDIO, "this build talks to the wrong Studio: " + json.dumps(acct)
-        for el in ("acct-box", "acct-code", "acct-device", "link-now", "link-go", "link-signed-go"):
+        for el in ("acct-box", "acct-code", "acct-device", "link-now", "link-go", "link-signed-go", "link-ask", "link-ask-yes", "link-ask-no"):
             assert f'id="{el}"' in s.page, "the page has no " + el
         said = s.api("/api/link-tv")
         assert said.get("started") == "link", "no link step in this build: " + json.dumps(said)
@@ -106,10 +107,14 @@ def main(program):
             dev = s.api("/api/device/start")
             assert dev.get("user_code") == CODE, "the device sign in did not work: " + json.dumps(dev)
             r = s.api("/api/handoff", {"code": CODE})
-            assert (r.get("account") or {}).get("name") == "Sam", "a typed code did not sign in: " + json.dumps(r)
+            ask = r.get("ask") or {}
+            assert (ask.get("account") or {}).get("email") == "s***@example.test", "a typed code did not ask whose account: " + json.dumps(r)
+            assert not s.api("/api/account").get("account"), "signed in before the Yes"
+            r = s.api("/api/link-yes", {"id": ask["id"]})
+            assert (r.get("account") or {}).get("name") == "Sam", "Yes did not sign in: " + json.dumps(r)
             assert (s.api("/api/account").get("account") or {}).get("name") == "Sam", "the sign in was not kept"
-        assert [p for p, _ in got] == ["/v1/setup/device", "/v1/setup/handoff"], got
-        assert got[1][1] == {"handoff": CODE}, got
+        assert [p for p, _ in got] == ["/v1/setup/device", "/v1/setup/who", "/v1/setup/handoff"], got
+        assert got[1][1] == got[2][1] == {"handoff": CODE}, got
     finally:
         srv.shutdown()
         srv.server_close()

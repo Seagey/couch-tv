@@ -164,9 +164,12 @@ Privacy clean is about the TV's own apps. For couch-tv's own apps, the README ha
   apps' manifests, when it is granted and what it is for, and the services the TV home talks to.
 - [couch-tv Studio (optional)](../README.md#couch-tv-studio-optional): the hosted design website.
   It is off until someone at the TV turns it on, to get a design the TV sends the code you typed and, from the Android apps, its Couch TV
-  version and memory size, and from 0.13.13 the kind of TV (platform, Android version, screen size and model name)
+  version and memory size, and from 0.13.13 the kind of TV (platform, Android version, screen size and model name) and the package names of its apps that have an icon
   (so Couch TV Studio can say whether a design will play on it; no serial number, no ids, no location), and your
   watch history, people, things typed at home and a Home Assistant token never go to it.
+  If you say Yes to linking the TV in Couch TV Setup, the TV also holds a link to your account, and asks Studio
+  for designs you sent it: when it wakes, when you press Check for new designs now, and at least once a week.
+  [What Setup sends when you link](../setup-app/README.md#what-stays-on-your-computer), and for how long it is kept.
   The other way is your choice: if you keep names, small photos, your town or a guest Wi-Fi in a Couch TV
   Studio account (Your home) and send a design to one of your own TVs, that TV keeps a copy in Home settings,
   marked From your account, and draws the photos. They are never part of the design or Share this home. Home

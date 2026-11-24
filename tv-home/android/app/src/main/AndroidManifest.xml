@@ -157,6 +157,18 @@
             </intent-filter>
         </activity>
 
+        <!-- Settings and the account link from a computer over ADB (FromComputer.kt). android.permission.DUMP is
+             held by ADB's shell and by no TV app, so nothing else on the TV reaches these two. -->
+        <activity
+            android:name=".FromComputer"
+            android:exported="true"
+            android:permission="android.permission.DUMP"
+            android:theme="@android:style/Theme.NoDisplay"
+            android:taskAffinity=""
+            android:noHistory="true"
+            android:excludeFromRecents="true" />
+        <receiver android:name=".SetupLink" android:exported="true" android:permission="android.permission.DUMP" />
+
         <!-- What Android's installer says about an update (Updater.kt). Only reachable through the
              app's own PendingIntent. -->
         <receiver android:name=".Updater$Result" android:exported="false" />

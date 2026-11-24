@@ -15,8 +15,17 @@
   <header>
     <div class="logo">Couch TV <span>Setup</span></div>
     <span class="acct" id="acct-top" hidden></span>
+    <button id="acct-out" class="link" hidden>Sign out</button>
     <button id="close-top" class="link">Close setup</button>
   </header>
+
+  <!-- whose account: asked before the code is used, on any screen -->
+  <div class="card" id="link-ask" role="alertdialog" aria-labelledby="link-ask-who" hidden>
+    <h2 id="link-ask-who" tabindex="-1">Link to this account?</h2>
+    <p id="link-ask-mail"></p>
+    <p>Linking sends this TV's model, speed and installed app names to your account.</p>
+    <div class="actions"><button id="link-ask-no">Not me</button><button class="primary" id="link-ask-yes">Yes, link it</button></div>
+  </div>
 
   <!-- welcome -->
   <section data-step="welcome">
@@ -345,6 +354,7 @@
       </div>
       <div class="actions" id="link-now-signed" hidden><button class="primary" id="link-signed-go">Link this TV</button></div>
       <p class="hint" id="link-now-status"></p>
+      <div class="actions" id="link-fix" hidden><button id="link-fix-go">Find the TV</button></div>
     </div>
     <p id="link-done" hidden><a id="open-editor" target="_blank" rel="noopener">Open Couch TV Studio and send a design</a></p>
     <p>Press <b>Home</b> on your TV remote. You should see couch-tv. On Google TV and Fire TV the TV's own home may flash up first: that is normal.</p>

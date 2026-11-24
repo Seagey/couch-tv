@@ -12,6 +12,7 @@ on the TV in /data/local/tmp/couchtv-setup/ (survives restarts, belongs to ADB's
 on this computer in the setup's own folder.
 """
 import base64
+import hashlib
 import json
 import re
 import time
@@ -22,6 +23,10 @@ from .tv import TvError
 
 HOME_PKG = "app.couchtv.launcher"
 HOME_ACT = f"{HOME_PKG}/.MainActivity"
+# Only a computer over ADB can open these two (android.permission.DUMP, which the shell holds and TV apps do not):
+FROM_COMPUTER = f"{HOME_PKG}/.FromComputer"   # the same settings as MainActivity used to take from anyone (0.13.15)
+SETUP_LINK = f"{HOME_PKG}/.SetupLink"         # the account link, and it answers that it has it (0.13.15)
+LINK_SINCE = (0, 13, 13)                      # the first Couch TV that keeps an account link
 WATCH = f"{HOME_PKG}/.FireWatch"
 ONTV_PKG = "dev.couchtv.ontv"
 ONTV_ALIAS = f"{ONTV_PKG}/{ONTV_PKG}.HomeAlias"
@@ -273,6 +278,15 @@ def watch_warning(names):
 
 # ---- records, on the TV and here ----
 
+def tv_key(tv):
+    """Which TV this is, wherever its address moves to: a hash, kept on this computer only and never sent. None when
+    the TV has nothing to tell it apart by."""
+    ids = [tv.prop("ro.serialno"), tv.shell("settings get secure android_id").strip()]
+    ids = [i for i in ids if i and i.lower() not in ("null", "unknown", "0")]
+    return hashlib.sha256("|".join(["couchtv-setup", *ids]).encode()).hexdigest()[:32] if ids else None
+
+
+
 def serial(tv):
     s = tv.prop("ro.serialno") or tv.ip
     return re.sub(r"[^A-Za-z0-9_.-]", "_", s)
@@ -390,12 +404,52 @@ def account_extras(account):
 
 def link_account(tv, account):
     """Writes the account link (and the design code) into Couch TV that is already on the TV, with no
-    reinstall and no change to its settings: the app keeps them and, for an intent with only these two extras,
-    fetches the design at once (tv-home MainActivity onNewIntent). Raises when there is nothing to write."""
+    reinstall and no change to its settings: the app keeps them and fetches the design at once.
+    True: the TV answered that it holds this link (Couch TV 0.13.15 and newer, SetupLink.kt). "sent": an older Couch
+    TV took the start, which says nothing about the link. Anything else is raised."""
     extras = account_extras(account)
     if "account_link" not in extras:
         raise TvError("Your Couch TV account did not give this TV a link. Try again.", "studio_bad")
-    tv.shell(f"am start -n {HOME_ACT}{extras}")
+    need_link_version(tv)
+    want = hashlib.sha256(account["link"].encode()).hexdigest()[:16]
+    for attempt in range(2):
+        out = tv.shell(f"am broadcast --include-stopped-packages -n {SETUP_LINK}{extras}")
+        said = re.search(r'data="(couchtv-link [^"]*)"', out)
+        if said and said.group(1) == "couchtv-link ok " + want:
+            return True
+        if said:
+            raise TvError("The TV did not keep the link. Try again.", "link_failed", said.group(1))
+        if attempt == 0:
+            if not version_at_least(app_version(tv, HOME_PKG), (0, 13, 15)):
+                break                        # 0.13.13 and 0.13.14 have nothing to answer with
+            start_activity(tv, HOME_ACT)     # some TVs hold a message for an app that is not running: open it, ask again
+            time.sleep(3)
+    start_activity(tv, HOME_ACT, extras)
+    return "sent"
+
+
+def version_at_least(have, want):
+    m = re.match(r"^v?(\d+)\.(\d+)(?:\.(\d+))?", str(have or ""))
+    return bool(m) and tuple(int(x or 0) for x in m.groups()) >= want
+
+
+def need_link_version(tv):
+    ver = app_version(tv, HOME_PKG)
+    if not ver:
+        raise TvError("Couch TV is not on this TV yet. Run the setup first.", "not_installed")
+    if not version_at_least(ver, LINK_SINCE):
+        raise TvError("Couch TV on this TV is too old to link. Update it first.", "old_app",
+                      f"Couch TV {ver} on the TV")
+    return ver
+
+
+def start_activity(tv, act, extras="", before=""):
+    """am start, and what it says is read: Android answers a start that did not happen with words, not a failure."""
+    out = tv.shell(f"{before}am start -n {act}{extras}") or ""
+    if "Starting: Intent" not in out or re.search(r"(?m)^\s*(Error|Exception|java\.lang|Security exception)|does not exist|"
+                                                  r"Permission Denial|SecurityException", out):
+        raise TvError("The TV did not open Couch TV. Try again.", "not_started", out.strip()[-300:])
+    return out
 
 
 def make_home(tv, apk_path, ambient_off=True, people=None, weather=None, progress=lambda f, msg=None: None,
@@ -464,7 +518,21 @@ def make_home(tv, apk_path, ambient_off=True, people=None, weather=None, progres
     if tv.shell(f"appops get {HOME_PKG} SYSTEM_ALERT_WINDOW").find("allow") >= 0:
         tv.shell(f"appops set {HOME_PKG} SYSTEM_ALERT_WINDOW default")   # no doorbell card in this setup
     cfg = home_config(people, weather)
-    tv.shell(f'am force-stop {HOME_PKG}; am start -n {HOME_ACT} --es bridge none --es config_b64 {cfg} --es ha_b64 none --es key ""' + account_extras(account))
+    sets = f' --es bridge none --es config_b64 {cfg} --es ha_b64 none --es key ""'
+    stop = f"am force-stop {HOME_PKG}; "
+    try:
+        start_activity(tv, FROM_COMPUTER, sets, stop)
+    except TvError as e:
+        if e.code != "not_started":
+            raise
+        start_activity(tv, HOME_ACT, sets, stop)      # Couch TV 0.13.14 and older
+    link, link_error = None, None
+    if account and account.get("link"):
+        time.sleep(3)                                 # the home is up, so its answer comes from the running app
+        try:
+            link = link_account(tv, account)
+        except TvError as e:
+            link, link_error = False, e.payload()
     if facts_tcl(tv):
         tv.shell(f"appops set {HOME_PKG} AUTO_START allow")
         done.append("TCL: AUTO_START allowed")
@@ -499,7 +567,7 @@ def make_home(tv, apk_path, ambient_off=True, people=None, weather=None, progres
     return {"changed": done, "front": result["ok"], "home_key_opens": "couch-tv" if resolved.startswith(HOME_PKG + "/") else resolved,
             "watch": watch, "watch_bound": bound, "fire": fire, "disabled": rec["disabled"],
             "warning": watch_warning(other_watches(tv)), "other_front": result.get("other_front"),
-            "ontv_alias_left": alias_left}
+            "ontv_alias_left": alias_left, "link": link, "link_error": link_error}
 
 
 WATCH_LABEL = "Home button watch"   # FireWatch's android:label in tv-home's AndroidManifest.xml
