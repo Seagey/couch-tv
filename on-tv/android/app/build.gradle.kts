@@ -85,6 +85,14 @@ dependencies {
     testImplementation("org.robolectric:robolectric:4.14.1")
 }
 
+// On a computer, Robolectric starts Conscrypt from its own desktop build (conscrypt-openjdk-uber, native code for Linux, macOS
+// and Windows inside). The app's conscrypt-android has the same classes but looks for libconscrypt_jni on the Java library
+// path, which only exists on a phone or TV: with both on the test classpath, every Robolectric test (SetupShotsTest, VoiceKeysTest)
+// failed on the Linux CI runner with "no conscrypt_jni in java.library.path". Leave the Android one out of the unit-test run only.
+configurations.matching { it.name.endsWith("UnitTestRuntimeClasspath") }.configureEach {
+    exclude(group = "org.conscrypt", module = "conscrypt-android")
+}
+
 // The phone remote and the TV home are built elsewhere in the repo. Copy them in before every build.
 // Order: -PremoteDist=..., then the repo layout (on-tv/ next to remote/), then a staging copy in ../repo.
 val repoRoot = listOf(file("../../.."), file("../../../repo")).firstOrNull { File(it, "remote/dist/index.html").isFile } ?: file("../../..")
