@@ -113,6 +113,11 @@
     })();
   }
 
+  var HELPER_NAMES = { samsung: "Samsung", lg: "LG", roku: "Roku" };
+  function helperKind(t) {
+    return ({ Tizen: "samsung", webOS: "lg", "Roku OS": "roku" })[t.other] || null;
+  }
+
   function drawRows(tvs) {
     var box = $("found");
     var before = rows; rows = {};
@@ -136,8 +141,15 @@
       row.appendChild(who); row.appendChild(pill);
       if (t.status === "other") {
         var note = document.createElement("small");
-        note.textContent = "Couch TV goes on this TV another way. See the guide on GitHub.";
+        var kind = helperKind(t);
+        note.textContent = kind ? "Needs the helper." : "Couch TV goes on this TV another way. See the guide on GitHub.";
         who.appendChild(document.createElement("br")); who.appendChild(note);
+        if (kind) {
+          var hb = document.createElement("button");
+          hb.textContent = "Set up the helper";
+          hb.addEventListener("click", function () { state.helperTv = { ip: t.ip, kind: kind, name: t.label }; text("helper-tv-title", "Your " + HELPER_NAMES[kind] + " TV needs the helper."); show("helper-tv"); });
+          row.appendChild(hb);
+        }
       } else {
         var go = document.createElement("button");
         go.className = t.status === "ready" ? "primary" : "";
@@ -689,6 +701,23 @@
     }, function (e) { show("undo"); fail(e); });
   });
 
+  // ---- extra features (Couch TV Helper) ----
+  function helperOn(autostart, extra) {
+    return api("/api/helper/on", { autostart: !!autostart }).then(function () {
+      text("helper-on-line", OS === "mac" ? "Look for it in your menu bar." : "Look for it in your tray.");
+      show("helper-on");
+    }, fail);
+  }
+  $("finish-go").addEventListener("click", function () { show("extras"); });
+  $("extras-done").addEventListener("click", function () { closeSetup(); });
+  $("extras-on").addEventListener("click", function () { helperOn($("extras-autostart").checked); });
+  $("helper-on-done").addEventListener("click", function () { closeSetup(); });
+  $("helper-tv-go").addEventListener("click", function () {
+    var t = state.helperTv;
+    api("/api/helper/add-tv", t).then(function () { return helperOn($("helper-tv-autostart").checked); }, fail);
+  });
+  $("helper-later-go").addEventListener("click", function () { show("extras"); });
+
   function closeSetup() {
     api("/api/quit").then(function () { show("closed"); }, fail);
   }
@@ -698,4 +727,10 @@
   $("close-top").addEventListener("click", closeSetup);
 
   show("welcome");
+  // Turn on later: Setup reopened while extra features are off, or opened by couchtv://helper/on
+  api("/api/info").then(function (i) {
+    var h = i.helper || {};
+    $("helper-later").hidden = h.mode === "helper";
+    if (h.intent === "helper" && h.mode !== "helper") show("extras");
+  }, function () {});
 })();
