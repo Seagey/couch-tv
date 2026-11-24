@@ -290,6 +290,54 @@ class Idle(unittest.TestCase):
         steps.make_home(tv2, APK, ambient_off=False)            # and the new default leaves it alone
         self.assertEqual(disables(tv2), [])
 
+    def tcl_android_11(self, **kw):
+        """The owner's TCL: Android TV 11, no dreamx, Backdrop is the idle screen, com.android.dreams.basic disabled."""
+        tv = FakeTv("android", disabled={"com.android.dreams.basic"}, **kw)
+        tv.packages |= {tidy.steps.BACKDROP, "com.android.dreams.basic"}
+        tv.secure = {"screensaver_enabled": "1", "screensaver_components": "com.google.android.backdrop/com.google.android.backdrop.DreamActivity"}
+        return tv
+
+    def test_backdrop_on_android_tv_is_offered_switched_off_and_read_back(self):
+        tv = self.tcl_android_11()
+        self.assertIn("idle", [x["id"] for x in tidy.state(tv)["switches"]])
+        r = result(tv, idle=True)["idle"]
+        self.assertEqual(r["status"], "done")
+        self.assertIn(tidy.steps.BACKDROP, tv.disabled)
+        self.assertIn("com.android.dreams.basic", tv.disabled)              # not ours: never touched
+        self.assertEqual(r["report"]["off"], [tidy.steps.BACKDROP])
+        self.assertIn("backdrop/com.google.android.backdrop.DreamActivity", r["words"])   # what the TV says it uses
+        self.assertEqual(disables(tv), [tidy.steps.BACKDROP])
+        self.assertEqual(tv.secure["screensaver_enabled"], "1")             # the setting is left alone when the app went off
+        self.assertEqual(result(tv, idle=False)["idle"]["status"], "off")
+        self.assertNotIn(tidy.steps.BACKDROP, tv.disabled)
+        self.assertIn("com.android.dreams.basic", tv.disabled)
+
+    def test_backdrop_refused_falls_back_to_the_setting_and_says_so(self):
+        tv = self.tcl_android_11()
+        tv.refuse_disable = {tidy.steps.BACKDROP}
+        r = result(tv, idle=True)["idle"]
+        self.assertEqual(r["status"], "partial")
+        self.assertEqual(tv.secure["screensaver_enabled"], "0")
+        self.assertIn("would not switch", r["words"])
+        self.assertIn("tell us", r["words"])
+        self.assertEqual(result(tv, idle=False)["idle"]["status"], "off")
+        self.assertEqual(tv.secure["screensaver_enabled"], "1")             # put back as it was
+
+    def test_backdrop_and_the_setting_both_refused_is_refused_and_leaves_no_record(self):
+        tv = self.tcl_android_11()
+        tv.refuse_disable = {tidy.steps.BACKDROP}
+        tv.refuse_secure = {"screensaver_enabled"}
+        r = result(tv, idle=True)["idle"]
+        self.assertEqual(r["status"], "refused")
+        self.assertIn("refused", r["words"])
+        self.assertFalse(tidy.has_record(tv))
+        self.assertEqual(tv.secure["screensaver_enabled"], "1")
+
+    def test_setup_plan_names_backdrop_too(self):
+        tv = self.tcl_android_11()
+        steps.make_home(tv, APK, ambient_off=True)
+        self.assertIn(tidy.steps.BACKDROP, tv.disabled)
+
     def test_refused_idle(self):
         tv = FakeTv("google")
         tv.refuse_disable = {AMBIENT}

@@ -20,6 +20,8 @@ def sign_in(pg):
     pg.wait_for_selector("#acct-box:not([hidden])")
     pg.fill("#acct-code", "ABCD-EFGH")
     pg.click("#acct-go")
+    pg.wait_for_selector("#link-ask:not([hidden])")      # whose account: nothing is used until Yes
+    pg.click("#link-ask-yes")
     pg.wait_for_selector("#acct-top:not([hidden])")
 
 

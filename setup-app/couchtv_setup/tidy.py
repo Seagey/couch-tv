@@ -37,7 +37,11 @@ UNSET = "UNSET"
 VAL_RE = re.compile(r"^-?[0-9]{1,4}(\.[0-9]{1,4})?$")
 RECORD_FILE = steps.RECORD_DIR + "/tidy"           # on the TV, one token per line
 SWITCHES = ("ads", "anim", "idle")
+IDLE_PKGS = steps.AMBIENT_PKGS     # Google TV's ambient mode, and Android TV's Backdrop screen
 IDLE_PKG = steps.AMBIENT
+SECURE = {"secure.screensaver_enabled": "0"}      # Settings.Secure, used only when the TV refuses to switch the app off
+ALLOWED = set(SETTINGS) | set(SECURE)
+COMP_RE = re.compile(r"^[A-Za-z0-9_.$/,{}:-]{1,300}$")
 ADS_PKGS = [p for p, _ in PRIVACY]
 KIND_WORDS = {"ads": "ad", "viewing": "viewing", "reports": "report"}
 LOCK = threading.RLock()
@@ -89,7 +93,7 @@ def _clean(rec):
     """Only well formed entries: a record file on the TV is data, never trusted."""
     out = {"settings": {}, "pkgs": []}
     for name, v in ((rec or {}).get("settings") or {}).items():
-        if name in SETTINGS and isinstance(v, dict) and isinstance(v.get("prev"), str) and isinstance(v.get("set"), str) \
+        if name in ALLOWED and isinstance(v, dict) and isinstance(v.get("prev"), str) and isinstance(v.get("set"), str) \
                 and (v["prev"] == UNSET or VAL_RE.match(v["prev"])) and VAL_RE.match(v["set"]):
             out["settings"][name] = {"prev": v["prev"], "set": v["set"]}
     for p in (rec or {}).get("pkgs") or []:
@@ -151,9 +155,9 @@ def has_record(tv):
 
 def _get(tv, name):
     """The setting's value, UNSET when it has none, None when the TV's answer is not a setting value."""
-    if name not in SETTINGS:
+    if name not in ALLOWED:
         return None
-    out = tv.shell(f"settings get global {name}").strip()
+    out = tv.shell(f"settings get {_ns(name)}").strip()
     if out == "null":
         return UNSET
     return out if VAL_RE.match(out) else None
@@ -167,11 +171,18 @@ def _same(a, b):
     return abs(float(a) - float(b)) < 1e-6
 
 
+def _ns(name):
+    """"secure.screensaver_enabled" -> "secure screensaver_enabled"; a plain name is a Settings.Global one."""
+    return "secure " + name[7:] if name.startswith("secure.") else "global " + name
+
+
 def _put(tv, name, value):
+    if name not in ALLOWED:
+        return
     if value == UNSET:
-        tv.shell(f"settings delete global {name}")
+        tv.shell(f"settings delete {_ns(name)}")
     else:
-        tv.shell(f"settings put global {name} {value}")
+        tv.shell(f"settings put {_ns(name)} {value}")
 
 
 def _disabled(tv):
@@ -185,13 +196,41 @@ def _ads_candidates(tv):
     return [(p, kinds[p]) for p in ADS_PKGS if p in present and not protected(tv, p, homes)]
 
 
-def _idle_present(tv):
+def _idle_pkgs(tv):
+    """The idle screen apps this TV has (Google TV's ambient mode, Android TV's Backdrop) that may be switched off."""
     present = steps._packages(tv)
-    return IDLE_PKG in present and not protected(tv, IDLE_PKG, _homes(tv))
+    homes = _homes(tv)
+    return [p for p in IDLE_PKGS if p in present and not protected(tv, p, homes)]
+
+
+def _idle_present(tv):
+    return bool(_idle_pkgs(tv))
 
 
 def _idle_ours(tv, rec, disabled):
-    return IDLE_PKG in disabled and (IDLE_PKG in rec["pkgs"] or IDLE_PKG in steps.record(tv)["disabled"])
+    srec = steps.record(tv)["disabled"]
+    return any(p in disabled and (p in rec["pkgs"] or p in srec) for p in IDLE_PKGS) or \
+        ("secure.screensaver_enabled" in rec["settings"] and _same(_get(tv, "secure.screensaver_enabled"), "0"))
+
+
+def _clip(text):
+    """One line from the TV, only if it looks like a setting value or a component name."""
+    t = (text or "").strip().splitlines()[0].strip() if (text or "").strip() else ""
+    return t if COMP_RE.match(t) else ("not set" if t in ("", "null") else "unreadable")
+
+
+def idle_report(tv):
+    """What the TV says about its idle screen right now: the screen saver component(s) it is set to, whether the
+    screen saver is on, the app(s) of ours that are switched off, and what is dreaming (read only)."""
+    disabled = _disabled(tv)
+    present = steps._packages(tv)
+    dream = tv.shell("dumpsys dreams")
+    m = re.search(r"mCurrentDream(?:Name|Component)=(?:ComponentInfo\{)?([A-Za-z0-9_.$]+/[A-Za-z0-9_.$]+)", dream or "")
+    return {"components": _clip(tv.shell("settings get secure screensaver_components")),
+            "enabled": _clip(tv.shell("settings get secure screensaver_enabled")),
+            "off": [p for p in IDLE_PKGS if p in present and p in disabled],
+            "on": [p for p in IDLE_PKGS if p in present and p not in disabled],
+            "dreaming": m.group(1) if m else "nothing"}
 
 
 # ---- the screen's state ----
@@ -216,7 +255,7 @@ def state(tv):
             out.append({"id": "anim", "on": on})
     if _idle_present(tv):
         on = _idle_ours(tv, rec, disabled)
-        if on or IDLE_PKG not in disabled:
+        if on or any(p not in disabled for p in _idle_pkgs(tv)):
             out.append({"id": "idle", "on": on})
     return {"switches": out, "speed": steps.HOME_PKG in steps._packages(tv),
             "undo": bool(rec["settings"] or rec["pkgs"] or _idle_ours(tv, rec, disabled))}
@@ -284,12 +323,37 @@ def _on_ads(tv, rec):
 def _on_idle(tv, rec):
     if not _idle_present(tv):
         return {"status": "unsupported", "words": "This TV does not have an idle screen to switch off."}
-    if IDLE_PKG in _disabled(tv):
+    disabled = _disabled(tv)
+    todo = [p for p in _idle_pkgs(tv) if p not in disabled]
+    if not todo:
         return {"status": "unchanged", "words": "Already off. Nothing changed."}
-    ok, bad = _disable_pkgs(tv, rec, [IDLE_PKG])
-    if ok:
-        return {"status": "done", "words": "The idle screen is off. Checked on the TV."}
-    return {"status": "refused", "words": "The TV refused this change. Nothing was changed."}
+    ok, bad = _disable_pkgs(tv, rec, todo)
+    if not bad:
+        rep = idle_report(tv)
+        return {"status": "done", "report": rep,
+                "words": "The idle screen app is switched off (" + ", ".join(ok) + "). Checked on the TV. "
+                         "Its screen saver setting reads: " + rep["components"] + "."}
+    # The TV kept the app on. Try the screen saver setting itself, note it first, and read both back.
+    cur = _get(tv, "secure.screensaver_enabled")
+    took = False
+    if cur is not None and not _same(cur, "0"):
+        rec["settings"]["secure.screensaver_enabled"] = {"prev": cur, "set": "0"}
+        save(tv, rec)
+        _put(tv, "secure.screensaver_enabled", "0")
+        took = _same(_get(tv, "secure.screensaver_enabled"), "0")
+        if not took:
+            _put(tv, "secure.screensaver_enabled", cur)
+            rec["settings"].pop("secure.screensaver_enabled", None)
+            save(tv, rec)
+    rep = idle_report(tv)
+    if took or ok:
+        return {"status": "partial", "report": rep,
+                "words": "The TV would not switch the idle screen app off (" + ", ".join(bad) + "). "
+                         + ("Its screen saver setting is off now, but a TV can ignore that. "
+                            if took else "") +
+                         "Its screen saver is set to " + rep["components"] + ". If adverts still show when it is idle, tell us."}
+    return {"status": "refused", "report": rep,
+            "words": "The TV refused this change. Nothing was changed. Its screen saver is set to " + rep["components"] + "."}
 
 
 # ---- putting things back ----
@@ -351,17 +415,20 @@ def _off(tv, rec, which):
     elif which == "ads":
         back, refused = _restore_pkgs(tv, rec, ADS_PKGS)
     elif which == "idle":
-        back, refused = _restore_pkgs(tv, rec, [IDLE_PKG])
+        back, refused = _restore_pkgs(tv, rec, list(IDLE_PKGS))
+        b2, l2, r2 = _restore_settings(tv, rec, list(SECURE))
+        back, left, refused = back + b2, left + l2, refused + r2
         sr = steps.record(tv)                       # switched off by Setup's own plan (older callers)
-        if IDLE_PKG in sr["disabled"] and not refused:
-            if IDLE_PKG in _disabled(tv):
-                tv.shell(f"pm enable {IDLE_PKG}")
-            if IDLE_PKG in _disabled(tv):
-                refused += 1
-            else:
-                back += 1 if not back else 0
-                sr["disabled"] = [p for p in sr["disabled"] if p != IDLE_PKG]
-                steps._write_record(tv, sr)
+        for pkg in IDLE_PKGS:
+            if pkg in sr["disabled"] and not refused:
+                if pkg in _disabled(tv):
+                    tv.shell(f"pm enable {pkg}")
+                if pkg in _disabled(tv):
+                    refused += 1
+                else:
+                    back += 1 if not back else 0
+                    sr["disabled"] = [p for p in sr["disabled"] if p != pkg]
+                    steps._write_record(tv, sr)
     save(tv, rec)
     return {"status": "refused" if refused else ("left" if left and not back else "off"),
             "words": _off_words(back, left, refused)}

@@ -49,6 +49,9 @@ class FakeTv:
         self.refuse_settings = set() # names the TV ignores writes to (and deletes of)
         self.refuse_disable = set()  # packages the TV will not switch off (Fire OS protects some)
         self.gfxinfo = ""
+        self.secure = {}             # Settings.Secure values for the screen saver; a missing name is "null"
+        self.refuse_secure = set()   # names the TV ignores writes to
+        self.dreams = ""             # what `dumpsys dreams` prints
 
     # what the steps call
     def prop(self, name):
@@ -161,6 +164,18 @@ class FakeTv:
         if c.startswith("settings delete secure enabled_accessibility_services"):
             self.a11y = "null"
             return ""
+        m = re.match(r"settings (get|put|delete) secure (screensaver_\w+)(?: (\S+))?$", c)
+        if m:
+            if m.group(1) == "get":
+                return self.secure.get(m.group(2), "null")
+            if m.group(2) not in self.refuse_secure:
+                if m.group(1) == "put":
+                    self.secure[m.group(2)] = m.group(3)
+                else:
+                    self.secure.pop(m.group(2), None)
+            return ""
+        if c == "dumpsys dreams":
+            return self.dreams
         m = re.match(r"settings get global (\S+)$", c)
         if m:
             return self.settings.get(m.group(1), "null")

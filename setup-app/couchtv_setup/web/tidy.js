@@ -121,7 +121,7 @@
       if (!p) return;
       p.textContent = results[id].words;
       p.hidden = false;
-      p.className = "tidy-result" + (/refused|^left|not put/i.test(results[id].status + " " + results[id].words) ? " tidy-bad" : "");
+      p.className = "tidy-result" + (/refused|^left|not put|would not/i.test(results[id].status + " " + results[id].words) ? " tidy-bad" : "");
     });
   }
 

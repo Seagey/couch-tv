@@ -33,7 +33,9 @@ ONTV_ALIAS = f"{ONTV_PKG}/{ONTV_PKG}.HomeAlias"
 ONTV_WATCH = f"{ONTV_PKG}/{ONTV_PKG}.WatchService"
 WIZARD = "com.google.android.tungsten.setupwraith"
 NEVER_OFF = ["com.google.android.apps.tv.launcherx", "com.google.android.tvlauncher", WIZARD]
-AMBIENT = "com.google.android.apps.tv.dreamx"
+AMBIENT = "com.google.android.apps.tv.dreamx"          # Google TV's ambient mode
+BACKDROP = "com.google.android.backdrop"                 # Android TV's idle screen (a TCL on Android 11 shows it; there is no dreamx there)
+AMBIENT_PKGS = (AMBIENT, BACKDROP)
 STOCK_HOMES = ["com.google.android.apps.tv.launcherx", "com.google.android.tvlauncher", "com.amazon.tv.launcher"]
 RESOLVE = "cmd package resolve-activity --brief -a android.intent.action.MAIN -c android.intent.category.HOME"
 QUERY_HOMES = "pm query-activities --brief -a android.intent.action.MAIN -c android.intent.category.HOME"
@@ -238,7 +240,7 @@ def plan(tv, f, ambient_off=True, ontv_home_off=True):
     if back_on:
         items.append("Switch the TV's own home and setup app back on (an older Couch TV switched them off; that is the fix "
                      "for TVs that loop after a restart).")
-    if ambient_off and AMBIENT in present and AMBIENT not in disabled:
+    if ambient_off and any(p in present and p not in disabled for p in AMBIENT_PKGS):
         items.append("Switch off ambient mode (the adverts and photos the TV shows when idle). It is switched off, not deleted.")
     if any(p in present for p in STOCK_HOMES):
         items.append("Switch on Couch TV's Home button watch. It only notices when the TV's own home comes forward and puts "
@@ -507,7 +509,7 @@ def make_home(tv, apk_path, ambient_off=True, people=None, weather=None, progres
             tv.shell(f"pm enable {p}")
             done.append("switched back on: " + p)
     homes = {l.split("/", 1)[0] for l in _lines(tv.shell(QUERY_HOMES)) if "/" in l}
-    want = [AMBIENT] if ambient_off else []
+    want = list(AMBIENT_PKGS) if ambient_off else []
     for p in want:
         if p not in present:
             continue
