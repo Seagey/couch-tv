@@ -38,4 +38,9 @@ def data():
 def cache():
     p = Path(os.environ["COUCHTV_SETUP_HOME"]) / "cache" if os.environ.get("COUCHTV_SETUP_HOME") else _base_cache()
     p.mkdir(parents=True, exist_ok=True)
+    if os.environ.get("COUCHTV_SETUP_HOME"):   # Remove everything empties this folder only when it carries the marker
+        try:
+            (p / ".couchtv-setup").touch()
+        except OSError:
+            pass
     return p

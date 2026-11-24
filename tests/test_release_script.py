@@ -44,9 +44,18 @@ SETUP = ["couch-tv-Setup-mac-apple-silicon.zip", "couch-tv-Setup-mac-intel.zip",
          "couch-tv-Setup-linux.tar.gz", "SHA256SUMS-setup.txt"]
 # release view --json assets: the asset names (FAKE_ASSETS, default every Setup file; after a rerun FAKE_ASSETS_AFTER);
 # run list: "id status conclusion" (FAKE_RUN)
+ARCHIVES = SETUP[:4]
+HASHES = {n: "%064x" % (i + 1) for i, n in enumerate(ARCHIVES)}
+SUMS_TEXT = "".join("%s  %s\n" % (HASHES[n], n) for n in ARCHIVES)
+DIGESTS = "".join("%s sha256:%s\n" % (n, HASHES[n]) for n in ARCHIVES)
+# the tag's commit (FAKE_TAG_COMMIT), the Setup workflow run's commit (FAKE_RUN_SHA), the sums file on the release
+# (FAKE_SUMS) and each asset's GitHub digest (FAKE_DIGESTS); the defaults agree with one another
 FAKE_GH = """#!/bin/bash
 echo "gh $*" >> "$CALLS"
 [ "$1" = auth ] && exit "${FAKE_GH_AUTH:-0}"
+[ "$1" = api ] && { printf "%s\\n" "${FAKE_TAG_COMMIT:-$FAKE_HEAD}"; exit 0; }
+case "$*" in *headSha*) printf "%s" "${FAKE_RUN_SHA-$FAKE_HEAD}"; exit 0 ;; esac
+case "$*" in *'.digest'*) printf "%s" "${FAKE_DIGESTS-}"; exit 0 ;; esac
 if [ "$1 $2" = "release view" ] && [ "$7" = assets ]; then
   if [ -n "${FAKE_ASSETS_AFTER+x}" ] && grep -q "^gh run rerun" "$CALLS"; then printf "%b" "$FAKE_ASSETS_AFTER"; else printf "%b" "${FAKE_ASSETS-SETUP_DEFAULT}"; fi
 fi
@@ -55,7 +64,7 @@ if [ "$1 $2" = "release download" ]; then
   [ -n "${FAKE_DOWNLOAD_RC:-}" ] && exit "$FAKE_DOWNLOAD_RC"
   dir=""; pats=""; prev=""
   for a in "$@"; do [ "$prev" = --dir ] && dir=$a; [ "$prev" = --pattern ] && pats="$pats $a"; prev=$a; done
-  for f in $pats; do echo "content of $f" > "$dir/$f"; done
+  for f in $pats; do echo "content of $f" > "$dir/$f"; [ "$f" = SHA256SUMS-setup.txt ] && printf "%s" "${FAKE_SUMS-}" > "$dir/$f"; done
 fi
 exit 0
 """.replace("SETUP_DEFAULT", "\\\\n".join(SETUP) + "\\\\n")
@@ -135,7 +144,7 @@ class ReleaseScript(unittest.TestCase):
         self.lock = self.r / "gradle.lock"
         self.env = dict(os.environ, PATH=f"{b}:{os.environ['PATH']}", CALLS=str(self.calls), ANDROID_HOME="/nonexistent",
                         FAKE_HEAD=HEAD, JAVA_HOME=str(self.r), SAMSUNG_PYTHON=str(self.r / "fake-samsung"),
-                        COUCHTV_SIGNING_KEY=str(self.r / "fake-signing-key.pem"))
+                        COUCHTV_SIGNING_KEY=str(self.r / "fake-signing-key.pem"), FAKE_SUMS=SUMS_TEXT, FAKE_DIGESTS=DIGESTS)
         for k in ("REPO", "REMOTE", "GRADLE_LOCK", "CONFIG", "STUB_RC"):
             self.env.pop(k, None)
 
@@ -425,7 +434,7 @@ class ReleaseScript(unittest.TestCase):
     def test_setup_needs_no_previous_and_passes_when_all_four_are_there(self):
         rc, out = self.setup_step()
         self.assertEqual(rc, 0, out)
-        self.assertEqual([l for l in self.log() if " run " in l], [])
+        self.assertEqual([l for l in self.log() if l.startswith("gh run rerun")], [])
 
     def test_setup_signs_the_sums_on_the_release_and_uploads_the_sig(self):
         rc, out = self.setup_step()
@@ -444,6 +453,39 @@ class ReleaseScript(unittest.TestCase):
         self.assertGreater(verifies[1], upload)
         self.assertFalse((self.dist / "setup-sign").exists(), "the working folder is cleaned up")
         self.assertNotIn("not a key", out, "the key is never printed")
+
+    def test_setup_signs_nothing_when_the_sums_hold_a_fifth_name(self):
+        rc, out = self.setup_step(FAKE_SUMS=SUMS_TEXT + "%s  extra.apk\n" % ("f" * 64))
+        self.assertEqual(rc, 8, out)
+        self.assertIn("NOT SIGNING", out)
+        self.assertEqual([l for l in self.log() if l.startswith("sign-setup-sums") or l.startswith("gh release upload")], [])
+
+    def test_setup_signs_nothing_when_an_archive_is_missing_from_the_sums(self):
+        rc, out = self.setup_step(FAKE_SUMS="".join(SUMS_TEXT.splitlines(True)[:3]))
+        self.assertEqual(rc, 8, out)
+        self.assertEqual([l for l in self.log() if l.startswith("sign-setup-sums") or l.startswith("gh release upload")], [])
+
+    def test_setup_signs_nothing_when_a_hash_is_not_githubs_digest(self):
+        rc, out = self.setup_step(FAKE_DIGESTS=DIGESTS.replace(HASHES[ARCHIVES[2]], "e" * 64))
+        self.assertEqual(rc, 8, out)
+        self.assertIn(ARCHIVES[2], out)
+        self.assertEqual([l for l in self.log() if l.startswith("sign-setup-sums") or l.startswith("gh release upload")], [])
+
+    def test_setup_signs_nothing_when_github_has_no_digest(self):
+        rc, out = self.setup_step(FAKE_DIGESTS="")
+        self.assertEqual(rc, 8, out)
+        self.assertEqual([l for l in self.log() if l.startswith("sign-setup-sums") or l.startswith("gh release upload")], [])
+
+    def test_setup_signs_nothing_when_the_workflow_ran_on_another_commit(self):
+        rc, out = self.setup_step(FAKE_RUN_SHA="b" * 40)
+        self.assertEqual(rc, 8, out)
+        self.assertIn("NOT SIGNING", out)
+        self.assertEqual([l for l in self.log() if l.startswith("sign-setup-sums") or l.startswith("gh release upload")], [])
+
+    def test_setup_signs_nothing_when_there_is_no_workflow_run(self):
+        rc, out = self.setup_step(FAKE_RUN_SHA="")
+        self.assertEqual(rc, 8, out)
+        self.assertEqual([l for l in self.log() if l.startswith("sign-setup-sums") or l.startswith("gh release upload")], [])
 
     def test_setup_without_the_signing_key_exits_8_and_uploads_nothing(self):
         rc, out = self.setup_step(COUCHTV_SIGNING_KEY=str(self.r / "no-such-key.pem"))

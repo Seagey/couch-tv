@@ -15,6 +15,7 @@ import os
 import platform
 import re
 import shutil
+import stat
 import subprocess
 import sys
 import tarfile
@@ -25,6 +26,7 @@ from .. import __version__, paths, release
 from ..tv import TvError
 
 PUBLIC_KEY_B64 = "Zie/b41wh7LHnna3yaS4NSa3jLkuyn9SJOFfezNVKe0="
+MAX_DOWNLOAD = 500 * 1024 * 1024   # a Setup archive is far smaller; a hard stop even when the release reports no size
 SUMS = "SHA256SUMS-setup.txt"
 SIG = SUMS + ".sig"
 NAMES = {"mac-apple-silicon": "couch-tv-Setup-mac-apple-silicon.zip", "mac-intel": "couch-tv-Setup-mac-intel.zip",
@@ -109,6 +111,8 @@ def stage(rel, progress=lambda f, m=None: None, system=None, machine=None, stagi
             for chunk in iter(lambda: r.read(256 * 1024), b""):
                 f.write(chunk)
                 got += len(chunk)
+                if got > MAX_DOWNLOAD:   # never more than this, whatever the release says (or leaves out)
+                    raise OSError("longer than any update can be")
                 if total and got > total:   # more than the release says it is: stop, do not fill the disk
                     raise OSError("longer than the release says")
                 if total:
@@ -130,11 +134,17 @@ def unpack(archive, into, system=None):
     into.mkdir(parents=True, exist_ok=True)
     archive = str(archive)
     bad = TvError("The update held a file outside its folder, so it was not used.", "bad_archive")
+    if any(into.iterdir()):   # always a fresh, empty folder: nothing there for a link in the archive to write through
+        raise bad
     if archive.endswith(".zip"):
         with zipfile.ZipFile(archive) as z:
-            for n in z.namelist():
-                if into not in (into / n).resolve().parents:
+            for info in z.infolist():
+                if into not in (into / info.filename).resolve().parents:
                     raise bad
+                if stat.S_ISLNK(info.external_attr >> 16):   # a link pointing outside is a write-through for the next entry
+                    target = z.read(info).decode("utf-8", "replace").replace("\\", "/")
+                    if target.startswith("/") or re.match(r"^[A-Za-z]:", target) or ".." in target.split("/"):
+                        raise bad
             if (system or sys.platform) == "darwin":
                 # a .app holds symlinks and run permissions, which zipfile drops: ditto made the zip, ditto opens it
                 subprocess.run(["/usr/bin/ditto", "-x", "-k", archive, str(into)], check=True, capture_output=True, timeout=300)
@@ -174,16 +184,32 @@ def _q(s):
     return "'" + str(s).replace("'", "'\\''") + "'"
 
 
+def _w(s):
+    """A value inside a .cmd file: % starts a variable there, so it is doubled."""
+    return str(s).replace("%", "%%")
+
+
 def swap_script(old, new, keep, pid, relaunch, system=None):
     """The script that waits for this program to exit, keeps the old version as `keep`, puts the new one in
-    its place and starts it. On a failed move the old one is put back."""
+    its place and starts it. On a failed move the old one is put back and started again."""
     if (system or sys.platform) == "win32":
-        return ('@echo off\r\n:wait\r\ntasklist /FI "PID eq %d" 2>NUL | find "%d" >NUL\r\nif not errorlevel 1 (timeout /t 1 >NUL & goto wait)\r\n'
-                'if exist "%s" rmdir /S /Q "%s"\r\nmove "%s" "%s" || goto done\r\nmove "%s" "%s" || move "%s" "%s"\r\n:done\r\nstart "" %s\r\n'
-                % (pid, pid, keep, keep, old, keep, new, old, keep, old, relaunch))
+        # the UTF-8 code page first, so a user name like José reads in the file as it does in the path
+        return ('@echo off\r\nchcp 65001 >NUL\r\n:wait\r\ntasklist /FI "PID eq %d" 2>NUL | find "%d" >NUL\r\n'
+                'if not errorlevel 1 (timeout /t 1 >NUL & goto wait)\r\n'
+                'if exist "%s" rmdir /S /Q "%s"\r\nmove "%s" "%s" || goto restore\r\n'
+                'move "%s" "%s" || goto restore\r\ngoto done\r\n'
+                ':restore\r\nif not exist "%s" move "%s" "%s"\r\n:done\r\nstart "" %s\r\n'
+                % (pid, pid, _w(keep), _w(keep), _w(old), _w(keep), _w(new), _w(old),
+                   _w(old), _w(keep), _w(old), _w(relaunch)))
     q = _q
     return ("#!/bin/sh\nwhile kill -0 %d 2>/dev/null; do sleep 1; done\nrm -rf %s\n"
-            "mv %s %s || exit 1\nmv %s %s || mv %s %s\n%s &\n" % (pid, q(keep), q(old), q(keep), q(new), q(old), q(keep), q(old), relaunch))
+            "mv %s %s || { %s & exit 1; }\nmv %s %s || mv %s %s\n%s &\n"
+            % (pid, q(keep), q(old), q(keep), relaunch, q(new), q(old), q(keep), q(old), relaunch))
+
+
+def write_script(path, text):
+    """As bytes, not text mode (Windows would turn \\r\\n into \\r\\r\\n); UTF-8, which the .cmd's chcp 65001 reads."""
+    Path(path).write_bytes(text.encode("utf-8"))
 
 
 def apply(staging=None, spawn=subprocess.Popen, system=None):
@@ -216,14 +242,14 @@ def apply(staging=None, spawn=subprocess.Popen, system=None):
     plat = system or sys.platform
     if plat == "win32":
         script = folder / "swap.cmd"
-        relaunch = '"%s" --helper' % str(old / Path(sys.executable).name).replace("%", "%%")
+        relaunch = '"%s" --helper' % (old / Path(sys.executable).name)   # swap_script doubles any % for the .cmd
     else:
         script = folder / "swap.sh"
         if plat == "darwin":
             relaunch = "open -a %s --args --helper" % _q(old)
         else:
             relaunch = "%s --helper" % _q(old / Path(sys.executable).name)
-    script.write_text(swap_script(old, items[0], keep, os.getpid(), relaunch, system), encoding="utf-8")
+    write_script(script, swap_script(old, items[0], keep, os.getpid(), relaunch, system))
     os.chmod(script, 0o700)
     spawn(["cmd", "/c", str(script)] if (system or sys.platform) == "win32" else ["/bin/sh", str(script)],
           stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)

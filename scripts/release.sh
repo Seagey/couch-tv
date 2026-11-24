@@ -247,12 +247,38 @@ setup_missing() {  # <tag>: the Setup files the release does not have, one a lin
 # file that is on the release, checks the signature the way an installed helper does, uploads the .sig, then downloads
 # both again and checks once more. Without the .sig on the release, installed helpers say "Could not check for updates".
 SETUP_SUMS=SHA256SUMS-setup.txt
+SETUP_ARCHIVES="couch-tv-Setup-mac-apple-silicon.zip couch-tv-Setup-mac-intel.zip couch-tv-Setup-windows.zip couch-tv-Setup-linux.tar.gz"
+# Signing makes whatever is in the sums file trusted by every installed helper, so first: it lists exactly the four
+# archives, each hash is the one GitHub itself reports for that asset (the digest), and the Setup app workflow run
+# that built them ran on the commit the tag points at. Any doubt: nothing is signed.
+check_setup_sums() {  # <tag> <sums file>; prints why and returns 1 when it must not be signed
+  local tag=$1 file=$2 names digests tag_sha run_sha sha name got
+  awk 'NF && (NF != 2 || $1 !~ /^[0-9a-f]{64}$/) { bad = 1 } END { exit bad }' "$file" \
+    || { echo "NOT SIGNING: $SETUP_SUMS has a line that is not '<sha256>  <file name>'"; return 1; }
+  names=$(awk 'NF { n = $2; sub(/^\*/, "", n); print n }' "$file" | sort)
+  [ "$names" = "$(printf '%s\n' $SETUP_ARCHIVES | sort)" ] \
+    || { echo "NOT SIGNING: $SETUP_SUMS must list exactly: $SETUP_ARCHIVES"; return 1; }
+  digests=$(gh release view "$tag" --repo "$REPO" --json assets --jq '.assets[] | "\(.name) \(.digest)"') \
+    || { echo "NOT SIGNING: could not read the digests of the assets on $tag"; return 1; }
+  while read -r sha name; do
+    name=${name#\*}
+    got=$(printf '%s\n' "$digests" | awk -v n="$name" '$1 == n { print $2 }')
+    [ "$got" = "sha256:$sha" ] || { echo "NOT SIGNING: $name is $sha in $SETUP_SUMS but GitHub reports '${got:-nothing}' for it"; return 1; }
+  done < <(awk 'NF' "$file")
+  tag_sha=$(gh api "repos/$REPO/commits/$tag" --jq .sha 2> /dev/null) || tag_sha=""
+  run_sha=$(gh run list --repo "$REPO" --workflow setup-app.yml --event release --branch "$tag" --limit 1 \
+    --json headSha --jq '.[0].headSha // empty' 2> /dev/null) || run_sha=""
+  { [ -n "$tag_sha" ] && [ "$tag_sha" = "$run_sha" ]; } \
+    || { echo "NOT SIGNING: the Setup app workflow run is on '${run_sha:-no run}', the tag $tag is on '${tag_sha:-unknown}'"; return 1; }
+  echo "SETUP SUMS CHECKED on $tag: the four archives, GitHub's digests, and the workflow run on ${tag_sha:0:12}"
+}
 sign_setup_sums() {  # <tag>
   local tag=$1 key=${COUCHTV_SIGNING_KEY:-$HOME/.couch-tv-signing/update-ed25519.pem} dir="$DIST/setup-sign" f
   [ -f "$key" ] || { echo "The Setup signing key is not on this computer (COUCHTV_SIGNING_KEY or ~/.couch-tv-signing/update-ed25519.pem): not signing"; exit 8; }
   mkdir -p "$dir"
   for f in $SETUP_SUMS $SETUP_SUMS.sig; do [ -f "$dir/$f" ] && rm "$dir/$f"; done
   gh release download "$tag" --repo "$REPO" --pattern "$SETUP_SUMS" --dir "$dir" || { echo "Could not download $SETUP_SUMS from $tag"; exit 8; }
+  check_setup_sums "$tag" "$dir/$SETUP_SUMS" || { rm -f "$dir/$SETUP_SUMS"; rmdir "$dir" 2> /dev/null; exit 8; }
   python3 "$ROOT/scripts/sign-setup-sums.py" "$dir/$SETUP_SUMS" "$tag" > /dev/null || { echo "SIGNING $SETUP_SUMS FAILED"; exit 8; }
   python3 "$ROOT/scripts/verify-setup-sig.py" "$dir/$SETUP_SUMS" "$dir/$SETUP_SUMS.sig" "$tag" || { echo "The new signature does not check against the public key in the app"; exit 8; }
   gh release upload "$tag" "$dir/$SETUP_SUMS.sig" --repo "$REPO" --clobber || { echo "Could not upload $SETUP_SUMS.sig to $tag"; exit 8; }

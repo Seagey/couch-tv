@@ -91,7 +91,8 @@ if [ "$HAS_GIT" = 1 ]; then
     awk '/^@@commit /{c=$2; next} /^\+\+\+ b\//{f=substr($0,7); next} /^[+-]/ && !/^(\+\+\+|---) /{print c " " f ": " substr($0,2)}' > "$TMP/history.txt"
   for rule in "${RULES[@]}"; do
     name="${rule%%|*}"; re="${rule#*|}"
-    hits=$(grep -aE "$re" "$TMP/history.txt" | grep -vE "$ALLOW" | cut -d: -f1 | sort -u)
+    # the same hash-line skip as the working tree pass: a pip "--hash=sha256:" line in setup-app/requirements*.txt
+    hits=$(grep -aE "$re" "$TMP/history.txt" | grep -vE "$ALLOW" | grep -vE '^[0-9a-f]+ setup-app/requirements[a-z-]*\.txt: +--hash=sha256:[0-9a-f]{64}( \\)?$' | cut -d: -f1 | sort -u)
     if [ -n "$hits" ]; then
       while IFS= read -r h; do note "$name  git history, commit $h"; done <<< "$hits"
     fi

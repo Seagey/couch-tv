@@ -20,8 +20,8 @@ def _own_folder(p):
     env = os.environ.get("COUCHTV_SETUP_HOME")
     if env:   # tests and portable installs: that folder when it holds Setup's own files, and its cache folder
         here, root = p.resolve(), Path(env).resolve()
-        if here == root / "cache":
-            return True
+        if here == root / "cache":   # only a cache folder Setup itself made: it leaves a marker or its update folder
+            return (here / ".couchtv-setup").exists() or (here / "helper-update").is_dir()
         return here == root and any((root / n).exists() for n in ("helper.json", "known-tvs.json", "helper-data", "helper-bridge-config.json"))
     return p.name in KEEP_WORDS or p.parent.name in KEEP_WORDS
 

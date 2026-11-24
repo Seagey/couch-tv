@@ -4,12 +4,15 @@ import hashlib
 import io
 import json
 import os
+import stat
 import subprocess
 import sys
 import tarfile
 import tempfile
+import time
 import unittest
 import zipfile
+from unittest import mock
 from pathlib import Path
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -110,6 +113,21 @@ class Stage(unittest.TestCase):
             update.stage(self.rel, system="linux", staging=d, fetch=self.fetch())
         self.assertEqual(list(Path(d).glob("*.part")), [])
 
+    def test_a_download_has_a_hard_ceiling_even_with_no_size_in_the_release(self):
+        d = tempfile.mkdtemp()
+        rel = json.loads(json.dumps(self.rel))
+        del rel["assets"][0]["size"]
+        real = update.MAX_DOWNLOAD
+        update.MAX_DOWNLOAD = 1000
+        try:
+            release._open = lambda url, timeout=30: io.BytesIO(b"x" * 600000)
+            with self.assertRaises(TvError) as c:
+                update.stage(rel, system="linux", staging=d, fetch=self.fetch())
+        finally:
+            update.MAX_DOWNLOAD = real
+        self.assertEqual(c.exception.code, "offline")
+        self.assertEqual(list(Path(d).glob("*.part")), [])
+
     def test_a_changed_archive_is_deleted(self):
         d = tempfile.mkdtemp()
         release._open = lambda url, timeout=30: io.BytesIO(b"x" * len(self.archive))
@@ -144,6 +162,44 @@ class Unpack(unittest.TestCase):
         with self.assertRaises(TvError):
             update.unpack(t, os.path.join(d, "out"))
 
+    def _zip_with_link(self, d, target):
+        z = os.path.join(d, "l.zip")
+        with zipfile.ZipFile(z, "w") as f:
+            info = zipfile.ZipInfo("app/link")
+            info.create_system = 3
+            info.external_attr = (stat.S_IFLNK | 0o755) << 16
+            f.writestr(info, target)
+            f.writestr("app/readme.txt", "hi")
+        return z
+
+    def test_zip_symlinks_that_point_outside_are_refused_before_unpacking(self):
+        for target in ("/etc", "../../x", "a/../../b", "C:\\Windows"):
+            d = tempfile.mkdtemp()
+            z = self._zip_with_link(d, target)
+            with mock.patch.object(update.subprocess, "run") as run:
+                with self.assertRaises(TvError, msg=target):
+                    update.unpack(z, os.path.join(d, "out"), "darwin")
+                run.assert_not_called()
+            self.assertEqual(list(Path(d, "out").iterdir()), [])
+
+    def test_a_zip_symlink_inside_the_app_is_allowed(self):
+        d = tempfile.mkdtemp()
+        z = self._zip_with_link(d, "readme.txt")
+        with mock.patch.object(update.subprocess, "run") as run:
+            update.unpack(z, os.path.join(d, "out"), "darwin")
+            self.assertEqual(run.call_args[0][0][:3], ["/usr/bin/ditto", "-x", "-k"])
+
+    def test_unpack_wants_a_fresh_empty_folder(self):
+        d = tempfile.mkdtemp()
+        z = os.path.join(d, "a.zip")
+        with zipfile.ZipFile(z, "w") as f:
+            f.writestr("app/readme.txt", "hi")
+        out = Path(d, "out")
+        out.mkdir()
+        (out / "left-behind").write_text("x")
+        with self.assertRaises(TvError):
+            update.unpack(z, out)
+
     def test_good_zip_unpacks(self):
         d = tempfile.mkdtemp()
         z = os.path.join(d, "a.zip")
@@ -164,6 +220,44 @@ class Swap(unittest.TestCase):
         subprocess.run(["/bin/sh", str(script)], check=True, timeout=20)
         self.assertEqual((old / "v").read_text(), "2")
         self.assertEqual((keep / "v").read_text(), "1")
+
+    @unittest.skipIf(sys.platform == "win32", "sh script")
+    def test_a_failed_first_move_starts_the_old_app_again(self):
+        d = Path(tempfile.mkdtemp())
+        old, new = d / "old", d / "new"
+        old.mkdir()
+        new.mkdir()
+        keep = d / "missing-folder" / "old"   # the parent is not there, so the first mv fails
+        marker = d / "started"
+        script = d / "s.sh"
+        script.write_text(update.swap_script(old, new, keep, 99999999, "touch '%s'" % marker, "linux"))
+        p = subprocess.run(["/bin/sh", str(script)], timeout=20)
+        deadline = time.monotonic() + 10   # (other tests may stub time.sleep, so wait on the clock)
+        while not marker.exists() and time.monotonic() < deadline:
+            time.sleep(0.05)
+        self.assertEqual(p.returncode, 1)
+        self.assertTrue(marker.exists(), "the old app is started again")
+        self.assertTrue(old.exists() and new.exists())
+
+    def test_windows_script_escapes_percent_and_survives_non_ascii(self):
+        old = "C:\\Users\\Jos\u00e9\\100%\\app"
+        keep = "C:\\Users\\Jos\u00e9\\100%\\prev\\app"
+        new = "C:\\Users\\Jos\u00e9\\100%\\new\\%TEMP%"
+        s = update.swap_script(old, new, keep, 42, '"%s\\x.exe" --helper' % old, "win32")
+        self.assertTrue(s.startswith("@echo off\r\nchcp 65001 >NUL\r\n"))
+        self.assertIn("100%%\\app", s)
+        self.assertIn("%%TEMP%%", s)
+        self.assertNotIn("%", s.replace("%%", ""), "no single percent is left")
+        self.assertIn(":restore", s)
+        self.assertIn("|| goto restore", s)
+        self.assertTrue(s.rstrip().splitlines()[-1].startswith('start ""'), "the old or the new app is started last")
+        f = Path(tempfile.mkdtemp(), "swap.cmd")
+        update.write_script(f, s)
+        raw = f.read_bytes()
+        self.assertFalse(raw.startswith(b"\xef\xbb\xbf"))
+        self.assertNotIn(b"\r\r\n", raw)
+        self.assertIn("Jos\u00e9".encode("utf-8"), raw)
+        self.assertEqual(raw.decode("utf-8"), s)
 
     def test_windows_script_text(self):
         s = update.swap_script("C:\\a", "C:\\n", "C:\\k", 42, '"C:\\a\\x.exe" --helper', "win32")
@@ -231,6 +325,7 @@ class Remove(unittest.TestCase):
         Path(data, "helper-data").mkdir()
         Path(data, "helper-data", "token").write_text("t")
         Path(cache, "apk").write_text("a")
+        Path(cache, ".couchtv-setup").write_text("")
         stopped = []
         gone = remove.everything(data, cache, disable=lambda: True, stop=lambda: stopped.append(1))
         self.assertEqual(stopped, [1])
@@ -261,6 +356,25 @@ class Remove(unittest.TestCase):
         link.symlink_to(target)
         remove.everything(link, link, disable=lambda: False)
         self.assertTrue((target / "mine.txt").exists())
+
+    def test_a_cache_folder_without_a_marker_is_left_alone(self):
+        home = Path(tempfile.mkdtemp())
+        (home / "helper.json").write_text("{}")
+        cache = home / "cache"
+        cache.mkdir()
+        (cache / "mine.txt").write_text("keep")
+        os.environ["COUCHTV_SETUP_HOME"] = str(home)
+        self.assertFalse(remove._own_folder(cache))
+        remove.everything(cache, cache, disable=lambda: False)
+        self.assertTrue((cache / "mine.txt").exists())
+        (cache / "helper-update").mkdir()   # the helper's own folder is a marker too
+        self.assertTrue(remove._own_folder(cache))
+
+    def test_paths_cache_leaves_the_marker(self):
+        os.environ["COUCHTV_SETUP_HOME"] = tempfile.mkdtemp()
+        from couchtv_setup import paths
+        self.assertTrue((paths.cache() / ".couchtv-setup").exists())
+        self.assertTrue(remove._own_folder(paths.cache()))
 
     def test_words(self):
         self.assertLessEqual(len(remove.FORGET.split(".")[0].split()), 14)
