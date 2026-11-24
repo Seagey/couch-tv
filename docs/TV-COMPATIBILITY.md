@@ -61,8 +61,13 @@ Not tested by the author. Each line is what someone said worked on their own dev
   App brought it back after the monitor was switched off and on. The install stopped printing at
   65% but the app was there. If the install service is unreachable after Developer Mode, unplug
   the monitor for a minute ([issue #93](https://github.com/Seagey/couch-tv/issues/93)).
+- **Samsung UN40KU6290 (KU6290, 2016, Tizen 2.4, US): works as an app with no computer left
+  running**, set up from Windows with `samsung/build.py` (no `--bridge`) and Apps2Samsung, Classic
+  look. The oldest Samsung so far. Its browser needed the old-engine fixes in
+  [SAMSUNG.md](SAMSUNG.md) ("On a real 2016 TV"); without them the home is a black screen. Apps whose
+  own icon the TV will not share show their name. The bridge and the Night scenes were not tried.
 - **Samsung UE49NU8005 (NU8000, 2018, Tizen 4.0): works as an app the bridge opens**, reported by
-  cvrpierre with the bridge on Ubuntu (Python 3.14). The oldest Samsung so far. Its One Remote has
+  cvrpierre with the bridge on Ubuntu (Python 3.14). Its One Remote has
   no number keys, and 1 2 3 4 5 on its on-screen 123 pad did not open the Developer Mode box here;
   the same digits sent through the bridge (`POST /api/key`, `1` to `5`, with the Apps screen open)
   did, once the TV had allowed the remote. Apps2Samsung's install stopped printing at 21 to 23% both
