@@ -72,7 +72,7 @@ asks once whether you trust it.
 **Linux:**
 1. Unpack it: `tar -xzf couch-tv-Setup-linux.tar.gz` (or open it in your file manager).
 2. Run `"couch-tv Setup/couch-tv Setup"` from a terminal, or double-click it in the folder. Keep it in its folder: it needs the `_internal` folder next to it.
-3. It opens the setup page in your browser. Nothing else to install: it talks to the TV over your Wi-Fi with its own ADB, so it needs no `adb` program, no USB cable and no udev rule.
+3. It opens the setup page in your browser. Nothing else to install: it talks to the TV over your Wi-Fi with its own ADB, so it needs no `adb` program, no USB cable and no udev rule. The website's Set up my TV button cannot open it on Linux: sign in with the code it shows instead.
 4. If a firewall is on (ufw, firewalld), allow it on your home network, or it cannot hear the TV: the app says "This computer blocked this app from finding the TV". With ufw: `sudo ufw allow 5353/udp` for the TV's name announcements.
 
 The app has no window of its own: the setup is the page in your browser. When you are done, press
@@ -97,9 +97,9 @@ off, puts the TV's own home back, then removes the couch-tv apps. Or by hand, wi
 ## What stays on your computer
 
 Its own folder: `~/Library/Application Support/couch-tv Setup/` on a Mac, `%APPDATA%\couch-tv Setup\`
-on Windows: the key the TV allowed (`adbkey`, `adbkey.pub` and a certificate made from it), and
+on Windows, `~/.local/share/couch-tv-setup/` on Linux: the key the TV allowed (`adbkey`, `adbkey.pub` and a certificate made from it), and
 `changed.json` (what it changed on which TV). The downloaded apps are cached in
-`~/Library/Caches/couch-tv Setup/` or `%LOCALAPPDATA%\couch-tv Setup\Cache\`. Delete the folders to
+`~/Library/Caches/couch-tv Setup/`, `%LOCALAPPDATA%\couch-tv Setup\Cache\` or `~/.cache/couch-tv-setup/`. Delete the folders to
 forget everything. The TV lists the key as **couch-tv-setup** under Wireless debugging, Paired
 devices, where you can Forget it.
 

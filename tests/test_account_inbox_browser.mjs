@@ -56,6 +56,7 @@ const PROFILE = { platform: "Google TV", sdk: 34, memMb: 1843, res: "1920x1080",
 // the bridge's side, kept in node so it lives across the home's restarts
 const app = { linked: true, inboxAsks: 0, answer: { state: "item", code: CODE, title: TITLE, poll: 30 }, unlinks: 0 };
 const fetched = [];
+let storeFail = 0;   // answer the next fetches 503 (Studio busy)
 
 const browser = await chromium.launch();
 try {
@@ -93,6 +94,7 @@ try {
     if (r.request().method() === "OPTIONS") return r.fulfill({ status: 204, headers: { "access-control-allow-origin": "*", "access-control-allow-headers": "content-type", "access-control-allow-methods": "POST" } });
     if (/\/v1\/designs\/fetch$/.test(u)) {
       fetched.push({ body: JSON.parse(body), headers: r.request().headers() });
+      if (storeFail > 0) { storeFail--; return json(503, {}); }
       return json(200, { design: DESIGN });
     }
     return json(404, {});
@@ -196,6 +198,28 @@ try {
   await page.waitForTimeout(600);
   ok(app.inboxAsks === asks0 + 1, "back to the front after a moment away: nothing asked");
   await press("Escape", 200); await press("Escape", 400);
+
+  // 4a3. A send whose fetch fails is kept (Studio hands each send out once) and fetched at the next look
+  const CODE2 = "CTV1-" + "Zz9-_".repeat(8) + "Ab3";
+  app.answer = { state: "item", code: CODE2, title: "Sunday morning", poll: 60 };
+  storeFail = 1;
+  await toDesigns();
+  ok(await toRow(/Check for new designs now/), "Check again");
+  await page.evaluate(() => localStorage.setItem("couchtv.inbox.last", String(Date.now() - 60000)));
+  let a1 = app.inboxAsks, f1 = fetched.length;
+  await press("Enter", 1500);
+  ok(app.inboxAsks === a1 + 1 && fetched.length === f1 + 1, "the press got the send and tried its design once");
+  ok(/Could not reach your Couch TV account/.test(await msgText()), "the failed fetch says so (" + (await msgText()) + ")");
+  const held = await page.evaluate(() => JSON.parse(localStorage.getItem("couchtv.inbox.pending") || "null"));
+  ok(held && held.code === CODE2 && held.title === "Sunday morning", "and the send is kept, not lost");
+  await page.evaluate(() => localStorage.setItem("couchtv.inbox.last", String(Date.now() - 60000)));
+  a1 = app.inboxAsks; f1 = fetched.length;
+  await press("Enter", 600);
+  await page.waitForTimeout(2500); await ready();
+  ok(app.inboxAsks === a1, "the next look fetches the kept send without asking Studio again");
+  ok(fetched.length === f1 + 1 && fetched[fetched.length - 1].body.code === CODE2, "its design is fetched");
+  ok(!(await page.evaluate(() => localStorage.getItem("couchtv.inbox.pending"))), "and then forgotten");
+  ok(await page.evaluate(() => !!localStorage.getItem("couchtv.design.fetched") && !/Use this design\?/.test(document.body.textContent)), "the design is on, with no question");
 
   // 4b. Unlink: asks once, then forgets the link; the inbox stops
   await toDesigns();

@@ -24,7 +24,7 @@ Your names, photos, town and guest Wi-Fi can now come to the TV from your Couch 
 ### Couch TV Setup finds the TV on your Wi-Fi
 
 - **No address to type.** Couch TV Setup lists every TV it hears on your Wi-Fi by name, and says what each one needs: Ready, Type the code, or 1 step on the TV with picture steps for that TV.
-- **Signed in from the website:** Set up my TV on the website opens Setup already signed in to your Couch TV account.
+- **Signed in from the website:** on a Mac or Windows, Set up my TV on the website opens Setup already signed in to your Couch TV account. On Linux, sign in with the code Setup shows.
 - Setup installs the newest Couch TV, checked against the release's sums, makes it the home, links the TV to your account, brings your home details and your design, and checks how smoothly it runs.
 - **Or sign in with a code:** Setup shows a code like ABCD-EFGH to type on the Couch TV website.
 - **Setting the same TV up again** keeps it as the same TV in your account, instead of adding a second one.

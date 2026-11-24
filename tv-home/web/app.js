@@ -6309,8 +6309,8 @@
     if (!next) { next = now + CouchDesignCode.INBOX_WEEK * 1000; inboxTime("next", next); }
     inboxLater(Math.max(1, (next - now) / 1000));
   }
-  // why: "open" (the page started), "front" (tv.resume), "now" (the person pressed Check), "week" (the timer),
-  // "setup" (Couch TV Setup just linked this TV). Answers whether the app was asked.
+  // why: "open" (the page started), "front" (tv.resume), "now" (the person pressed Check), "week" (the timer).
+  // Answers whether the app was asked (or a kept send is being fetched).
   function inboxAsk(why) {
     var now = Date.now();
     clearTimeout(ACCT_INBOX.timer); ACCT_INBOX.timer = 0;
@@ -6319,10 +6319,13 @@
     var away = !seen || seen > now || now - seen >= CouchDesignCode.INBOX_AWAY * 1000;
     var due = !!inboxTime("next") && now >= inboxTime("next");
     inboxTime("seen", now);
-    var go = why === "now" || why === "setup" || why === "week" || due || ((why === "open" || why === "front") && away);
+    var go = why === "now" || why === "week" || due || ((why === "open" || why === "front") && away);
     if (!go || now < inboxTime("wait")) { inboxArm(); return false; }
     inboxTime("last", now);
     inboxTime("next", now + CouchDesignCode.INBOX_WEEK * 1000);   // until the answer says otherwise
+    // a send kept from a fetch that failed: get that first, without asking Studio again
+    var held = inboxPending();
+    if (held) { ACCT_INBOX.shown = ACCT_INBOX.manual; ACCT_INBOX.manual = false; takeAccountDesign(held); inboxArm(); return true; }
     var asked = false;
     try { asked = TV.accountInbox() !== false; } catch (e) { asked = false; }
     inboxArm();
@@ -6343,7 +6346,7 @@
   }
   var INBOX_SAID = {
     none: "No new designs from your account.",
-    item: "A new design came from your account. The home starts again with it.",
+    item: "Getting the design...",
     wait: "Couch TV Studio asked this TV to wait. Try again in a few minutes.",
     fail: "Could not reach your Couch TV account. Check the TV is online, then try again.",   // "fail", not "error": a TV word, not an error sent to the phone
     unlinked: "This TV is no longer linked to your account. A typed code still works."
@@ -6356,6 +6359,7 @@
     if (ACCT_INBOX.manual) {
       ACCT_INBOX.manual = false;
       SET.msg = INBOX_SAID[a.state === "error" ? "fail" : a.state] || INBOX_SAID.fail;
+      ACCT_INBOX.shown = a.state === "item";   // the fetch that follows says how it went
       if (zone === "settings") renderSettings();
     }
     if (a.state === "unlinked") { inboxStop(); return; }   // the app forgot the link; a typed code still works
@@ -6371,8 +6375,31 @@
       // sent by the account to its own linked TV: on without a second question here (Undo is the way back)
       try { if (typeof CouchDesign !== "undefined" && CouchDesign.hashOf) localStorage.setItem("couchtv.design.ok", CouchDesign.hashOf(d)); } catch (e) {}
       if (LOOP) { ST.look = "night"; keep("tvhome.look", "night"); saveSettings(); }
+      inboxPending(null);
       setTimeout(restart, 300);
-    }, function () {});
+    }, function (e) {
+      // Studio hands each send out once: when only the fetch failed (no internet, busy, no room), keep its code
+      // (a send's code lasts 7 days) and get it at the next look instead of losing it. A code the store says is
+      // used, gone or not a design is dropped.
+      var again = !!e && ["offline", "slow", "paused", "full"].indexOf(e.kind) >= 0;
+      inboxPending(again ? { code: a.code, title: a.title || "", at: Date.now() } : null);
+      if (ACCT_INBOX.shown) { ACCT_INBOX.shown = false; SET.msg = INBOX_SAID.fail; if (zone === "settings") renderSettings(); }
+    });
+  }
+  // a send whose design could not be fetched yet: {code, title, at}, kept up to 7 days, checked again as read
+  function inboxPending(v) {
+    try {
+      if (v === undefined) {
+        var p = JSON.parse(localStorage.getItem("couchtv.inbox.pending") || "null"), now = Date.now();
+        var a = p && typeof p.at === "number" && now - p.at < 7 * 86400000 && now >= p.at ?
+          CouchDesignCode.readInboxAnswer({ state: "item", code: p.code, title: p.title }) : null;
+        if (a && a.state === "item") return a;
+        if (p) localStorage.removeItem("couchtv.inbox.pending");
+        return null;
+      }
+      if (v) localStorage.setItem("couchtv.inbox.pending", JSON.stringify(v)); else localStorage.removeItem("couchtv.inbox.pending");
+    } catch (e) {}
+    return null;
   }
   // once, as the home starts again with it
   function accountNewNotice() {
@@ -9318,7 +9345,7 @@
     homeAnswered: function (held) { homeAnswered(held); },
     // a calendar the launcher read for the Agenda widget (MainActivity.calendar)
     calendarText: function (id, ok, text) { calendarText(id, ok, text); },
-    setupDesign: function () { setupDesign(); ACCT_INBOX.stopped = false; inboxAsk("setup"); },
+    setupDesign: function () { setupDesign(); ACCT_INBOX.stopped = false; inboxArm(); },   // Setup brings its own design; the inbox keeps its times
     accountInbox: function (raw) { accountInbox(raw); },
     // words typed on the phone remote (Type on the TV) when the TV app cannot press keys (the on-TV app
     // with no ADB): they go into the typing box Home settings has open, at the cursor. False: no box open.

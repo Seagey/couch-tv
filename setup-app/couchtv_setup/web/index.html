@@ -92,6 +92,7 @@
     <p class="hint" id="find-help" hidden>Nothing yet? Check the TV is on and on the same Wi-Fi as this computer.
       <span data-os="mac">If the Mac asked to "find devices on your local network", it needs <b>Allow</b> (System Settings, Privacy and Security, Local Network).</span>
       <span data-os="windows">If Windows asked whether to allow couch-tv Setup on networks, it needs <b>Allow</b>. A guest or "Public" Wi-Fi can keep devices apart: use your home Wi-Fi.</span>
+      <span data-os="linux">If a firewall is on (ufw or firewalld), allow this app on your home network, or it cannot hear the TV. With ufw: <b>sudo ufw allow 5353/udp</b>.</span>
       A Fire TV only shows up once ADB debugging is on: pick <b>Type the TV's address</b>.</p>
     <div class="actions">
       <button data-go="welcome">Back</button>
