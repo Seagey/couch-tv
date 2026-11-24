@@ -76,7 +76,7 @@ class Stage(unittest.TestCase):
 
     def fetch(self, sums=None, sig=None):
         s = sums if sums is not None else self.sums
-        sg = sig if sig is not None else self.key.sign(s)
+        sg = sig if sig is not None else self.key.sign(update.signed_message("v0.13.99", s))
         return lambda rel, name, limit=0: s if name == update.SUMS else sg
 
     def test_good_update_is_staged(self):
@@ -87,11 +87,28 @@ class Stage(unittest.TestCase):
 
     def test_unsigned_or_wrongly_signed_sums_are_refused(self):
         d = tempfile.mkdtemp()
-        other = ed25519.Ed25519PrivateKey.generate().sign(self.sums)
+        other = ed25519.Ed25519PrivateKey.generate().sign(update.signed_message("v0.13.99", self.sums))
         with self.assertRaises(TvError) as c:
             update.stage(self.rel, system="linux", staging=d, fetch=self.fetch(sig=other))
         self.assertEqual(c.exception.code, "bad_signature")
         self.assertFalse(Path(d, "couch-tv-Setup-linux.tar.gz").exists())
+
+    def test_a_signature_made_for_another_release_is_refused(self):
+        d = tempfile.mkdtemp()
+        old = self.key.sign(update.signed_message("v0.13.14", self.sums))   # a real signature, but for 0.13.14
+        with self.assertRaises(TvError) as c:
+            update.stage(self.rel, system="linux", staging=d, fetch=self.fetch(sig=old))   # served as v0.13.99
+        self.assertEqual(c.exception.code, "bad_signature")
+        bare = self.key.sign(self.sums)   # the sums file alone, as before the tag was signed
+        with self.assertRaises(TvError):
+            update.stage(self.rel, system="linux", staging=d, fetch=self.fetch(sig=bare))
+
+    def test_a_download_longer_than_the_release_says_is_stopped(self):
+        d = tempfile.mkdtemp()
+        release._open = lambda url, timeout=30: io.BytesIO(self.archive + b"x" * 5000)
+        with self.assertRaises(TvError):
+            update.stage(self.rel, system="linux", staging=d, fetch=self.fetch())
+        self.assertEqual(list(Path(d).glob("*.part")), [])
 
     def test_a_changed_archive_is_deleted(self):
         d = tempfile.mkdtemp()
@@ -205,7 +222,10 @@ class Awake(unittest.TestCase):
 
 class Remove(unittest.TestCase):
     def test_removes_files_and_folders_and_the_login_item(self):
-        data, cache = tempfile.mkdtemp(), tempfile.mkdtemp()
+        data = tempfile.mkdtemp()
+        cache = Path(data, "cache")
+        cache.mkdir()
+        os.environ["COUCHTV_SETUP_HOME"] = data   # Setup's own folder and its cache folder
         Path(data, "helper.json").write_text("{}")
         Path(data, "adbkey").write_text("k")
         Path(data, "helper-data").mkdir()
@@ -214,8 +234,7 @@ class Remove(unittest.TestCase):
         stopped = []
         gone = remove.everything(data, cache, disable=lambda: True, stop=lambda: stopped.append(1))
         self.assertEqual(stopped, [1])
-        self.assertEqual(list(Path(data).iterdir()), [])
-        self.assertEqual(list(Path(cache).iterdir()), [])
+        self.assertEqual(list(Path(data).iterdir()), [])   # the cache folder inside it goes too
         self.assertIn("start with this computer", gone)
         self.assertIn("helper-data", gone)
 
@@ -229,6 +248,19 @@ class Remove(unittest.TestCase):
             self.assertTrue((d / "mine.txt").exists())
         finally:
             os.environ["COUCHTV_SETUP_HOME"] = tempfile.mkdtemp()
+
+    def test_refuses_the_home_folder_and_a_link_even_with_the_home_variable_set(self):
+        home = Path(tempfile.mkdtemp())
+        (home / "mine.txt").write_text("keep")
+        os.environ["COUCHTV_SETUP_HOME"] = str(home)
+        remove.everything(home, home, disable=lambda: False)   # a folder holding none of Setup's files
+        self.assertTrue((home / "mine.txt").exists())
+        target = Path(tempfile.mkdtemp())
+        (target / "mine.txt").write_text("keep")
+        link = Path(tempfile.mkdtemp(), "couch-tv Setup")
+        link.symlink_to(target)
+        remove.everything(link, link, disable=lambda: False)
+        self.assertTrue((target / "mine.txt").exists())
 
     def test_words(self):
         self.assertLessEqual(len(remove.FORGET.split(".")[0].split()), 14)

@@ -9,6 +9,7 @@ The private key lives at ~/.couch-tv-signing/update-ed25519.pem on the release c
 (scripts/sign-setup-sums.py uses it; COUCHTV_SIGNING_KEY names another file).
 """
 import base64
+import http.client
 import json
 import os
 import platform
@@ -62,6 +63,12 @@ def verify_signature(message, signature, public_key_b64=PUBLIC_KEY_B64):
         return False
 
 
+def signed_message(tag, sums):
+    """What the signature covers: the release tag and the sums file, so a signed file from one release cannot be
+    served as another's (an older signed build under a newer tag). scripts/sign-setup-sums.py makes the same."""
+    return b"couch-tv-setup-sums " + str(tag).encode("utf-8") + b"\n" + bytes(sums)
+
+
 def _asset_bytes(rel, name, limit=65536):
     asset = next((a for a in rel.get("assets", []) if a.get("name") == name), None)
     if not asset:
@@ -85,7 +92,7 @@ def stage(rel, progress=lambda f, m=None: None, system=None, machine=None, stagi
     Order matters: the signature on SHA256SUMS-setup.txt first, then the archive against that file."""
     name = NAMES[flavour(system, machine)]
     sums_raw, sig = fetch(rel, SUMS), fetch(rel, SIG)
-    if not verify_signature(sums_raw, sig):
+    if not verify_signature(signed_message(rel.get("tag_name") or "", sums_raw), sig):
         raise TvError("The update's checksum list is not signed by Couch TV, so it was not used.", "bad_signature")
     want = release.parse_sums(sums_raw.decode("utf-8", "replace")).get(name)
     asset = next((a for a in rel.get("assets", []) if a.get("name") == name), None)
@@ -102,9 +109,11 @@ def stage(rel, progress=lambda f, m=None: None, system=None, machine=None, stagi
             for chunk in iter(lambda: r.read(256 * 1024), b""):
                 f.write(chunk)
                 got += len(chunk)
+                if total and got > total:   # more than the release says it is: stop, do not fill the disk
+                    raise OSError("longer than the release says")
                 if total:
                     progress(min(1.0, got / total), "Downloading the update")
-    except OSError as e:
+    except (OSError, http.client.HTTPException) as e:
         part.unlink(missing_ok=True)
         raise TvError("The update download stopped part way.", "offline") from e
     if (asset.get("size") and part.stat().st_size != asset["size"]) or not release.verify(part, sha):
@@ -115,23 +124,36 @@ def stage(rel, progress=lambda f, m=None: None, system=None, machine=None, stagi
     return dest
 
 
-def unpack(archive, into):
+def unpack(archive, into, system=None):
     """Unpacks the verified archive. Refuses any member that would land outside `into`."""
     into = Path(into).resolve()
     into.mkdir(parents=True, exist_ok=True)
     archive = str(archive)
+    bad = TvError("The update held a file outside its folder, so it was not used.", "bad_archive")
     if archive.endswith(".zip"):
         with zipfile.ZipFile(archive) as z:
             for n in z.namelist():
                 if into not in (into / n).resolve().parents:
-                    raise TvError("The update held a file outside its folder, so it was not used.", "bad_archive")
-            z.extractall(into)
+                    raise bad
+            if (system or sys.platform) == "darwin":
+                # a .app holds symlinks and run permissions, which zipfile drops: ditto made the zip, ditto opens it
+                subprocess.run(["/usr/bin/ditto", "-x", "-k", archive, str(into)], check=True, capture_output=True, timeout=300)
+            else:
+                z.extractall(into)
     else:
         with tarfile.open(archive) as t:
             for m in t.getmembers():
-                if into not in (into / m.name).resolve().parents or m.issym() or m.islnk():
-                    raise TvError("The update held a file outside its folder, so it was not used.", "bad_archive")
-            t.extractall(into)
+                if into not in (into / m.name).resolve().parents or m.islnk():
+                    raise bad
+                if m.issym():   # a link is fine only when it points inside the unpacked folder (shared libraries)
+                    target = (into / m.name).parent / m.linkname
+                    if os.path.isabs(m.linkname) or into not in target.resolve().parents:
+                        raise bad
+            t.extractall(into, filter="data") if hasattr(tarfile, "data_filter") else t.extractall(into)
+    # never anything that is not inside `into` once unpacked (a link made by the archive itself)
+    for p in into.rglob("*"):
+        if p.is_symlink() and into not in p.resolve().parents:
+            raise bad
     return [p for p in into.iterdir()]
 
 
@@ -148,6 +170,10 @@ def app_location(exe=None, system=None):
     return exe.parent
 
 
+def _q(s):
+    return "'" + str(s).replace("'", "'\\''") + "'"
+
+
 def swap_script(old, new, keep, pid, relaunch, system=None):
     """The script that waits for this program to exit, keeps the old version as `keep`, puts the new one in
     its place and starts it. On a failed move the old one is put back."""
@@ -155,7 +181,7 @@ def swap_script(old, new, keep, pid, relaunch, system=None):
         return ('@echo off\r\n:wait\r\ntasklist /FI "PID eq %d" 2>NUL | find "%d" >NUL\r\nif not errorlevel 1 (timeout /t 1 >NUL & goto wait)\r\n'
                 'if exist "%s" rmdir /S /Q "%s"\r\nmove "%s" "%s" || goto done\r\nmove "%s" "%s" || move "%s" "%s"\r\n:done\r\nstart "" %s\r\n'
                 % (pid, pid, keep, keep, old, keep, new, old, keep, old, relaunch))
-    q = lambda s: "'" + str(s).replace("'", "'\\''") + "'"
+    q = _q
     return ("#!/bin/sh\nwhile kill -0 %d 2>/dev/null; do sleep 1; done\nrm -rf %s\n"
             "mv %s %s || exit 1\nmv %s %s || mv %s %s\n%s &\n" % (pid, q(keep), q(old), q(keep), q(new), q(old), q(keep), q(old), relaunch))
 
@@ -171,9 +197,17 @@ def apply(staging=None, spawn=subprocess.Popen, system=None):
     old = app_location(system=system)
     if not old:
         return False
+    archive = pending.get("archive")
+    if archive not in NAMES.values() or not re.fullmatch(r"[0-9a-f]{64}", str(pending.get("sha256") or "")) \
+            or not release.verify(folder / archive, pending["sha256"]):
+        return False   # not what stage() checked: use nothing
     out = folder / "new"
     shutil.rmtree(out, ignore_errors=True)
-    unpack(folder / pending["archive"], out)
+    try:
+        unpack(folder / archive, out, system)
+    except (TvError, subprocess.SubprocessError, OSError):
+        shutil.rmtree(out, ignore_errors=True)
+        return False
     items = [p for p in out.iterdir()]
     if len(items) != 1:
         return False
@@ -182,13 +216,13 @@ def apply(staging=None, spawn=subprocess.Popen, system=None):
     plat = system or sys.platform
     if plat == "win32":
         script = folder / "swap.cmd"
-        relaunch = '"%s" --helper' % (old / Path(sys.executable).name)
+        relaunch = '"%s" --helper' % str(old / Path(sys.executable).name).replace("%", "%%")
     else:
         script = folder / "swap.sh"
         if plat == "darwin":
-            relaunch = "open -a '%s' --args --helper" % old
+            relaunch = "open -a %s --args --helper" % _q(old)
         else:
-            relaunch = "'%s' --helper" % (old / Path(sys.executable).name)
+            relaunch = "%s --helper" % _q(old / Path(sys.executable).name)
     script.write_text(swap_script(old, items[0], keep, os.getpid(), relaunch, system), encoding="utf-8")
     os.chmod(script, 0o700)
     spawn(["cmd", "/c", str(script)] if (system or sys.platform) == "win32" else ["/bin/sh", str(script)],

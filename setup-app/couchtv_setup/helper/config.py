@@ -71,12 +71,19 @@ def clean_tvs(tvs):
     return out
 
 
+def _write_private(path, text):
+    """Created owner only from the start (the pairing key is in these files), not chmod after the write."""
+    fd = os.open(str(path), os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    with os.fdopen(fd, "w", encoding="utf-8") as f:
+        f.write(text)
+    os.chmod(path, 0o600)
+
+
 def save(cfg, data=None):
     p = _dir(data) / FILE
     p.parent.mkdir(parents=True, exist_ok=True)
     tmp = p.with_suffix(".tmp")
-    tmp.write_text(json.dumps(cfg, indent=2), encoding="utf-8")
-    os.chmod(tmp, 0o600)
+    _write_private(tmp, json.dumps(cfg, indent=2))
     os.replace(tmp, p)
     return p
 
@@ -143,8 +150,7 @@ def bridge_config(known, cfg):
 
 def write_bridge_config(known, cfg, data=None):
     p = _dir(data) / BRIDGE_FILE
-    p.write_text(json.dumps(bridge_config(known, cfg), indent=2), encoding="utf-8")
-    os.chmod(p, 0o600)
+    _write_private(p, json.dumps(bridge_config(known, cfg), indent=2))
     return p
 
 

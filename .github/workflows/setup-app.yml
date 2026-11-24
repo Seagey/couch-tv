@@ -149,6 +149,13 @@ jobs:
           fi
           python tests/smoke_helper.py "$PROGRAM"
 
+      # The helper's updater unpacks the archive it downloaded (update.unpack): prove that unpacked copy still runs.
+      # (Python's zipfile drops a Mac .app's symlinks and run permissions; the updater uses ditto there.)
+      - name: The archive unpacked as the updater does still runs
+        run: |
+          if [ "$RUNNER_OS" = "Linux" ]; then ARCHIVE="dist/couch-tv-Setup-${{ matrix.name }}.tar.gz"; else ARCHIVE="dist/couch-tv-Setup-${{ matrix.name }}.zip"; fi
+          HELPER_BUNDLED="${{ steps.helper.outputs.bundled }}" python tests/unpack_check.py "$ARCHIVE" "${PROGRAM#dist/}"
+
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02   # v4.6.2
         with:
           name: couch-tv-Setup-${{ matrix.name }}

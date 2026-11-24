@@ -15,7 +15,15 @@ KEEP_WORDS = ("couch-tv Setup", "couch-tv-setup")
 def _own_folder(p):
     """Only ever Setup's own folders: named for the app, or the one COUCHTV_SETUP_HOME names."""
     import os
-    return bool(os.environ.get("COUCHTV_SETUP_HOME")) or p.name in KEEP_WORDS or p.parent.name in KEEP_WORDS
+    if p.is_symlink() or p.resolve() in (Path.home().resolve(), Path(p.anchor).resolve()):
+        return False   # a link could lead anywhere; never the home folder or the root
+    env = os.environ.get("COUCHTV_SETUP_HOME")
+    if env:   # tests and portable installs: that folder when it holds Setup's own files, and its cache folder
+        here, root = p.resolve(), Path(env).resolve()
+        if here == root / "cache":
+            return True
+        return here == root and any((root / n).exists() for n in ("helper.json", "known-tvs.json", "helper-data", "helper-bridge-config.json"))
+    return p.name in KEEP_WORDS or p.parent.name in KEEP_WORDS
 
 
 def everything(data=None, cache=None, disable=autostart.disable, stop=None):

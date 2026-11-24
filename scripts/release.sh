@@ -253,13 +253,13 @@ sign_setup_sums() {  # <tag>
   mkdir -p "$dir"
   for f in $SETUP_SUMS $SETUP_SUMS.sig; do [ -f "$dir/$f" ] && rm "$dir/$f"; done
   gh release download "$tag" --repo "$REPO" --pattern "$SETUP_SUMS" --dir "$dir" || { echo "Could not download $SETUP_SUMS from $tag"; exit 8; }
-  python3 "$ROOT/scripts/sign-setup-sums.py" "$dir/$SETUP_SUMS" > /dev/null || { echo "SIGNING $SETUP_SUMS FAILED"; exit 8; }
-  python3 "$ROOT/scripts/verify-setup-sig.py" "$dir/$SETUP_SUMS" "$dir/$SETUP_SUMS.sig" || { echo "The new signature does not check against the public key in the app"; exit 8; }
+  python3 "$ROOT/scripts/sign-setup-sums.py" "$dir/$SETUP_SUMS" "$tag" > /dev/null || { echo "SIGNING $SETUP_SUMS FAILED"; exit 8; }
+  python3 "$ROOT/scripts/verify-setup-sig.py" "$dir/$SETUP_SUMS" "$dir/$SETUP_SUMS.sig" "$tag" || { echo "The new signature does not check against the public key in the app"; exit 8; }
   gh release upload "$tag" "$dir/$SETUP_SUMS.sig" --repo "$REPO" --clobber || { echo "Could not upload $SETUP_SUMS.sig to $tag"; exit 8; }
   # what is on the release now, not what is on this disk
   for f in $SETUP_SUMS $SETUP_SUMS.sig; do rm "$dir/$f"; done
   gh release download "$tag" --repo "$REPO" --pattern "$SETUP_SUMS" --pattern "$SETUP_SUMS.sig" --dir "$dir" || { echo "Could not download the signed files again"; exit 8; }
-  python3 "$ROOT/scripts/verify-setup-sig.py" "$dir/$SETUP_SUMS" "$dir/$SETUP_SUMS.sig" || { echo "The signature on $tag does not check"; exit 8; }
+  python3 "$ROOT/scripts/verify-setup-sig.py" "$dir/$SETUP_SUMS" "$dir/$SETUP_SUMS.sig" "$tag" || { echo "The signature on $tag does not check"; exit 8; }
   for f in $SETUP_SUMS $SETUP_SUMS.sig; do rm "$dir/$f"; done
   rmdir "$dir"
   echo "SETUP SUMS SIGNED on $tag: $SETUP_SUMS.sig checked against the key in the app"
