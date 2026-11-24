@@ -365,3 +365,7 @@ footer a { color: var(--ink3); }
   .findbar { align-items: flex-start; }
 }
 @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
+
+/* the Tidy up screen (tidy.css, another change) uses plain buttons for its links */
+.tidy-link { box-shadow: none; border-radius: 0; padding: 0; background: none; display: inline; }
+.tidy-link:hover { box-shadow: none; }
