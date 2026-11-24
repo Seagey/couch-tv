@@ -375,24 +375,30 @@
   function unlink() { var T = window.TVOS; try { return !!(T && T.unlinkAccount && T.unlinkAccount()); } catch (e) { return false; } }
   // ---- The account's TV inbox (DREAM-SETUP-BUILD.md, "TV inbox"): Send to Living room TV, no code ----
   // The app asks it (AccountLink.kt, the link stays in Kotlin) and hands the page only a state, one CTV1
-  // code and its title. Read again here as untrusted. inboxDelay: seconds to the next look (0: stop).
+  // code and its title. Read again here as untrusted. inboxDelay: seconds to the next look by itself (0: stop).
+  // When the TV looks (owner, 24 Nov 2026): when it wakes or the home opens after 30 minutes or more away
+  // (INBOX_AWAY), when the person presses Check for new designs now, and otherwise once a week (INBOX_WEEK).
+  // Studio's "poll" is honoured only when it is longer than a week (at most 20 days, so a browser timer can
+  // hold it); a 429's wait is honoured as a time before which the TV does not look at all.
+  var INBOX_WEEK = 604800, INBOX_AWAY = 1800, INBOX_POLL_MAX = 1728000, INBOX_WAIT_MAX = 86400;
+  function secsIn(v, lo, hi) { return typeof v === "number" && isFinite(v) ? Math.max(lo, Math.min(hi, Math.round(v))) : 0; }
   function readInboxAnswer(raw) {
     var j = typeof raw === "string" ? parse(raw) : raw && typeof raw === "object" && !Array.isArray(raw) ? raw : null;
     if (!j) return { state: "error" };
-    var poll = typeof j.poll === "number" && isFinite(j.poll) ? Math.max(30, Math.min(3600, Math.round(j.poll))) : 60;
+    var poll = Math.max(INBOX_WEEK, secsIn(j.poll, 0, INBOX_POLL_MAX));
     if (j.state === "item" && typeof j.code === "string" && j.code.length === 48 && SETUP_CODE.test(j.code))
       return { state: "item", code: j.code, title: cleanWords(j.title, 60), poll: poll };
     if (j.state === "none") return { state: "none", poll: poll };
     if (j.state === "unlinked") return { state: "unlinked" };
-    if (j.state === "wait") return { state: "wait", wait: typeof j.wait === "number" && isFinite(j.wait) ? Math.max(30, Math.min(3600, Math.round(j.wait))) : 300 };
+    if (j.state === "wait") return { state: "wait", wait: secsIn(j.wait, 30, INBOX_WAIT_MAX) || 900 };
     return { state: "error" };
   }
-  // after an error: 1, 2, 4 ... minutes, at most 30, so a TV with no internet does not keep asking
-  function inboxDelay(a, fails) {
+  // the next look by itself: a week, or Studio's longer poll; after an error or a wait, a week too (waking
+  // the TV or pressing Check looks sooner)
+  function inboxDelay(a) {
     if (!a || a.state === "unlinked") return 0;
-    if (a.state === "item" || a.state === "none") return a.poll;
-    if (a.state === "wait") return a.wait;
-    return Math.min(1800, 60 * Math.pow(2, Math.max(0, Math.min(5, fails | 0))));
+    if (a.state === "item" || a.state === "none") return Math.max(INBOX_WEEK, Math.min(INBOX_POLL_MAX, a.poll || 0));
+    return INBOX_WEEK;
   }
   // Undo for a design that came from the account: what was there before (the design got by code, the
   // answer to "Use this design?", designs switched off, and the Designs choice app.js keeps), held a day.
@@ -536,6 +542,6 @@
 
   window.CouchDesignCode = { base: base, readCode: readCode, checkCode: checkCode, get: get, kept: kept, forget: forget, accept: accept, lockImages: lockImages, mediaSources: mediaSources,
     openInbox: openInbox, takeInbox: takeInbox, tvReport: tvReport, fromSetup: fromSetup, linked: linked, unlink: unlink,
-    readInboxAnswer: readInboxAnswer, inboxDelay: inboxDelay, snapshot: snapshot, holdUndo: holdUndo, undoHeld: undoHeld, undoFresh: undoFresh, undoNew: undoNew, dropUndo: dropUndo,
+    readInboxAnswer: readInboxAnswer, inboxDelay: inboxDelay, INBOX_WEEK: INBOX_WEEK, INBOX_AWAY: INBOX_AWAY, snapshot: snapshot, holdUndo: holdUndo, undoHeld: undoHeld, undoFresh: undoFresh, undoNew: undoNew, dropUndo: dropUndo,
     readHome: readHome, takeHome: takeHome, mergeHome: mergeHome, fromAccount: fromAccount, photoOf: photoOf, wifiFromAccount: wifiFromAccount };
 })();

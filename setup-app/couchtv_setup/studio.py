@@ -33,6 +33,7 @@ from .tv import TvError
 DEFAULT_STUDIO = "https://couchtv.joshuaseage.com"
 SHORT = "23456789ABCDEFGHJKMNPQRSTVWXYZ"   # the same letters the TV's design codes use (no 0 1 I L O U)
 LONG_RE = re.compile(r"^[A-Za-z0-9_-]{32,128}$")
+TV_ID_RE = re.compile(r"[A-Za-z0-9_-]{4,64}")   # a My TVs row id
 SCHEMES = ("couchtv", "couchtv-setup")
 
 
@@ -201,8 +202,16 @@ def call(path, body, token=None, timeout=15):
             said = {}
         if e.code == 428:
             return {"pending": True}
-        raise TvError(str(said.get("error") or "Your Couch TV account said no. Try the button on the website again.")[:200],
-                      said.get("code") or ("expired" if e.code in (401, 410) else "studio_said")) from e
+        # Studio's errors are {error: "<short code>", message: "<words>"} (DREAM-SETUP-BUILD.md, "Studio side as
+        # built"): the words are shown, the short code is kept as the code. Older answers put words in "error".
+        said = said if isinstance(said, dict) else {}
+        err = said.get("error") if isinstance(said.get("error"), str) else ""
+        short = err if re.fullmatch(r"[a-z_]{2,40}", err) else ""
+        words = said.get("message") if isinstance(said.get("message"), str) and said.get("message").strip() else \
+            (err if err and not short else "Your Couch TV account said no. Try the button on the website again.")
+        code = said.get("code") if isinstance(said.get("code"), str) else \
+            ("slow_down" if e.code == 429 else short or ("expired" if e.code in (401, 410) else "studio_said"))
+        raise TvError(re.sub(r"[\x00-\x1f\x7f<>]", "", str(words))[:200], code) from e
     except (urllib.error.URLError, OSError, ValueError) as e:
         raise TvError("Could not reach your Couch TV account. Check the internet and try again.", "studio_down") from e
 
@@ -229,7 +238,7 @@ def handoff(link, code):
 def device_start(link):
     ans = call("/v1/setup/device", {})
     code, dev = str(ans.get("user_code") or ""), str(ans.get("device_code") or "")
-    if not (re.fullmatch(r"[A-Z0-9]{3}-?[A-Z0-9]{3}", code) and LONG_RE.match(dev)):
+    if not (re.fullmatch(r"[A-Z0-9]{4}-?[A-Z0-9]{4}", code) and LONG_RE.match(dev)):
         raise TvError("Your Couch TV account sent back something unexpected.", "studio_bad")
     link.device = dev
     verify = str(ans.get("verify") or base() + "/link-setup")
@@ -241,21 +250,38 @@ def device_start(link):
 def device_poll(link):
     if not link.device:
         raise TvError("Start signing in first.", "no_device")
-    ans = call("/v1/setup/device/poll", {"device_code": link.device})
+    try:
+        ans = call("/v1/setup/device/poll", {"device_code": link.device})
+    except TvError as e:
+        if e.code == "slow_down":      # 429: asked a little early; the next look is soon enough
+            return {"pending": True}
+        raise
     if ans.get("pending"):
         return {"pending": True}
     link.device = None
     return {"account": _signed_in(link, ans)}
 
 
-def register_tv(link, profile, name):
+def register_tv(link, profile, name, tv_id=None):
     """Tells the account about this TV and gets what goes onto it. Returns
     {"tv_id", "link", "code", "design", "home"} with every part checked."""
     if not link.token:
         raise TvError("Sign in to your Couch TV account first.", "no_account")
-    ans = call("/v1/setup/tv", {"tv": profile, "name": str(name or "")[:40]}, link.token)
+    body = {"tv": profile, "name": str(name or "")[:40]}
+    # Setting this TV up again: its My TVs row, so Studio uses that row (and makes a new link for it)
+    # instead of making "Living room TV 2". Only a well formed id goes.
+    if isinstance(tv_id, str) and TV_ID_RE.fullmatch(tv_id):
+        body["tv_id"] = tv_id
+    try:
+        ans = call("/v1/setup/tv", body, link.token)
+    except TvError as e:
+        if "tv_id" not in body or e.code in ("studio_down", "slow_down", "studio_off"):
+            raise
+        # an id another account made, or a row deleted since: set it up as a new TV of this account
+        del body["tv_id"]
+        ans = call("/v1/setup/tv", body, link.token)
     out = {"tv_id": None, "link": None, "code": None, "design": None, "home": None}
-    if isinstance(ans.get("tv_id"), str) and re.fullmatch(r"[A-Za-z0-9_-]{4,64}", ans["tv_id"]):
+    if isinstance(ans.get("tv_id"), str) and TV_ID_RE.fullmatch(ans["tv_id"]):
         out["tv_id"] = ans["tv_id"]
     if isinstance(ans.get("link"), str) and LONG_RE.match(ans["link"]):
         out["link"] = ans["link"]

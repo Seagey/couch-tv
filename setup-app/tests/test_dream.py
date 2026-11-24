@@ -351,15 +351,91 @@ class Account(unittest.TestCase):
         self.assertEqual(reg, {"tv_id": None, "link": None, "code": None, "design": None, "home": None})
 
     def test_device_code(self):
-        answers = {"/v1/setup/device": {"device_code": "d" * 40, "user_code": "ABC-DEF", "verify": "https://evil.example/x"},
+        # Studio as built (DREAM-SETUP-BUILD.md, "Studio side as built"): an 8 character code, ABCD-EFGH
+        answers = {"/v1/setup/device": {"device_code": "d" * 40, "user_code": "KQ7M-4PXR", "verify": "https://evil.example/x",
+                                        "interval": 5},
                    "/v1/setup/device/poll": {"token": TOKEN, "account": {"name": "Sam"}}}
         with self.stub(answers):
             link = studio.Link()
             start = studio.device_start(link)
-            self.assertEqual(start["user_code"], "ABC-DEF")
+            self.assertEqual(start["user_code"], "KQ7M-4PXR")
+            self.assertEqual(start["interval"], 5)
             self.assertTrue(start["verify"].startswith(studio.DEFAULT_STUDIO))   # never another site
             self.assertEqual(studio.device_poll(link)["account"]["name"], "Sam")
         self.assertEqual(link.token, TOKEN)
+
+    def test_device_code_shapes(self):
+        for good in ("ABCDEFGH", "ABCD-EFGH", "2345-6789"):
+            with self.stub({"/v1/setup/device": {"device_code": "d" * 40, "user_code": good}}):
+                self.assertEqual(studio.device_start(studio.Link())["user_code"], good)
+        for bad in ("ABC-DEF", "ABCD-EFG", "abcd-efgh", "ABCD EFGH", "ABCD-EFGH-", "<b>D-EFGH", ""):
+            with self.stub({"/v1/setup/device": {"device_code": "d" * 40, "user_code": bad}}):
+                with self.assertRaises(TvError, msg=bad):
+                    studio.device_start(studio.Link())
+
+    def test_account_name_may_be_null(self):
+        # Studio sends the display name or null, never the email
+        for acct in ({"name": None, "design": None}, {"design": "Sunday"}, {}, None):
+            with self.stub({"/v1/setup/handoff": {"token": TOKEN, "account": acct}}):
+                link = studio.Link()
+                got = studio.handoff(link, "ABCD-EFGH")
+            self.assertIsNone(got["name"])
+            self.assertEqual(link.token, TOKEN)
+        with open(os.path.join(os.path.dirname(studio.__file__), "web", "app.js"), encoding="utf-8") as f:
+            js = f.read()
+        self.assertIn('"Signed in to your Couch TV account"', js)
+        self.assertNotIn('|| "you"', js)
+
+    def test_tv_id_sent_when_setting_up_again(self):
+        sent = []
+        answer = {"tv_id": "tv_123", "link": LINK, "code": CODE, "design": None, "home": None}
+
+        def fake_call(path, body, token=None, timeout=15):
+            sent.append(dict(body))
+            if body.get("tv_id") == "tv_gone":
+                raise TvError("That TV is not in your account.", "not_found")
+            return answer
+        link = studio.Link()
+        link.token = TOKEN
+        with mock.patch.object(studio, "call", side_effect=fake_call):
+            self.assertEqual(studio.register_tv(link, {}, "Living room TV")["tv_id"], "tv_123")
+            self.assertNotIn("tv_id", sent[-1])                         # a first setup sends none
+            studio.register_tv(link, {}, "Living room TV", "tv_123")
+            self.assertEqual(sent[-1]["tv_id"], "tv_123")               # again: its My TVs row
+            studio.register_tv(link, {}, "Living room TV", "x; rm -rf")
+            self.assertNotIn("tv_id", sent[-1])                         # a bad id never goes
+            sent.clear()
+            self.assertEqual(studio.register_tv(link, {}, "Living room TV", "tv_gone")["tv_id"], "tv_123")
+            self.assertEqual([("tv_id" in b) for b in sent], [True, False])   # refused: set up as a new TV
+
+    def test_studio_errors_as_built(self):
+        import io
+        import urllib.error
+
+        def opener_for(status, body):
+            class O:
+                def open(self, req, timeout=None):
+                    raise urllib.error.HTTPError(req.full_url, status, "x", {}, io.BytesIO(json.dumps(body).encode()))
+            return O()
+        cases = [(401, {"error": "expired", "message": "That sign in ran out. Press the button on the website again."},
+                  "expired", "That sign in ran out"),
+                 (429, {"error": "slow_down", "retry_after": 5}, "slow_down", "Your Couch TV account said no"),
+                 (409, {"error": "tv_limit", "message": "This account has 10 TVs."}, "tv_limit", "10 TVs"),
+                 (403, {"error": "Not allowed <b>here</b>"}, "studio_said", "Not allowed bhere/b")]
+        with mock.patch.dict(os.environ, {"COUCHTV_SETUP_STUDIO": "live", "COUCHTV_SETUP_STUDIO_STUB": ""}):
+            for status, body, code, words in cases:
+                with mock.patch.object(studio.urllib.request, "build_opener", return_value=opener_for(status, body)):
+                    with self.assertRaises(TvError) as e:
+                        studio.call("/v1/setup/handoff", {"handoff": "ABCD-EFGH"})
+                self.assertEqual(e.exception.code, code)
+                self.assertIn(words, str(e.exception))
+            # a 429 while waiting for the website is only "not yet"
+            link = studio.Link()
+            link.device = "d" * 40
+            with mock.patch.object(studio.urllib.request, "build_opener", return_value=opener_for(429, {"error": "slow_down"})):
+                self.assertEqual(studio.device_poll(link), {"pending": True})
+            with mock.patch.object(studio.urllib.request, "build_opener", return_value=opener_for(428, {"error": "pending"})):
+                self.assertEqual(studio.device_poll(link), {"pending": True})
 
     def test_studio_address_must_be_https(self):
         with mock.patch.dict(os.environ, {"COUCHTV_SETUP_STUDIO_URL": "http://evil.example"}):

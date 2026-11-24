@@ -99,20 +99,25 @@ function app(code, linked) {
     const { C } = load([]);
     const r = (x) => JSON.parse(JSON.stringify(C.readInboxAnswer(x)));
     assert.deepStrictEqual(r(JSON.stringify({ state: "item", code: CODE, title: " Sunday <b>morning</b>\u0007 ", poll: 60 })),
-      { state: "item", code: CODE, title: "Sunday bmorning/b", poll: 60 });
-    assert.deepStrictEqual(r({ state: "none", poll: 5 }), { state: "none", poll: 30 }, "never under 30 s");
-    assert.deepStrictEqual(r({ state: "none", poll: 99999 }), { state: "none", poll: 3600 });
-    assert.deepStrictEqual(r({ state: "none" }), { state: "none", poll: 60 });
+      { state: "item", code: CODE, title: "Sunday bmorning/b", poll: 604800 }, "Studio says 60: the TV still looks once a week by itself");
+    const WEEK = 604800;
+    assert.strictEqual(C.INBOX_WEEK, WEEK); assert.strictEqual(C.INBOX_AWAY, 1800, "30 minutes away");
+    assert.deepStrictEqual(r({ state: "none", poll: 5 }), { state: "none", poll: WEEK }, "never more often than a week");
+    assert.deepStrictEqual(r({ state: "none", poll: 2 * WEEK }), { state: "none", poll: 2 * WEEK }, "a longer poll is honoured");
+    assert.deepStrictEqual(r({ state: "none", poll: 1e12 }), { state: "none", poll: 1728000 }, "at most 20 days, so a timer can hold it");
+    assert.deepStrictEqual(r({ state: "none" }), { state: "none", poll: WEEK });
     assert.deepStrictEqual(r({ state: "unlinked" }), { state: "unlinked" });
-    assert.deepStrictEqual(r({ state: "wait", wait: 120 }), { state: "wait", wait: 120 });
-    assert.deepStrictEqual(r({ state: "wait" }), { state: "wait", wait: 300 });
+    assert.deepStrictEqual(r({ state: "wait", wait: 120 }), { state: "wait", wait: 120 }, "a 429 wait is kept as it is");
+    assert.deepStrictEqual(r({ state: "wait", wait: 1 }), { state: "wait", wait: 30 });
+    assert.deepStrictEqual(r({ state: "wait", wait: 1e9 }), { state: "wait", wait: 86400 });
+    assert.deepStrictEqual(r({ state: "wait" }), { state: "wait", wait: 900 });
     for (const bad of [null, "", "x", "[]", { state: "item", code: "ABCDE-FGHJK" }, { state: "item", code: CODE + "x" }, { state: "boom" }])
       assert.deepStrictEqual(r(bad), { state: "error" }, JSON.stringify(bad));
-    assert.strictEqual(C.inboxDelay({ state: "none", poll: 60 }, 0), 60);
-    assert.strictEqual(C.inboxDelay({ state: "item", code: CODE, poll: 90 }, 0), 90);
-    assert.strictEqual(C.inboxDelay({ state: "wait", wait: 600 }, 0), 600);
-    assert.strictEqual(C.inboxDelay({ state: "unlinked" }, 0), 0, "unlinked: stop asking");
-    assert.deepStrictEqual([0, 1, 2, 3, 4, 5, 9].map((f) => C.inboxDelay({ state: "error" }, f)), [60, 120, 240, 480, 960, 1800, 1800], "backs off to 30 minutes");
+    assert.strictEqual(C.inboxDelay({ state: "none", poll: 60 }), WEEK, "never sooner than a week, even unread");
+    assert.strictEqual(C.inboxDelay({ state: "item", code: CODE, poll: 2 * WEEK }), 2 * WEEK);
+    assert.strictEqual(C.inboxDelay({ state: "wait", wait: 600 }), WEEK, "after a wait: the next look by itself is a week away");
+    assert.strictEqual(C.inboxDelay({ state: "error" }), WEEK, "after an error too: no retry loop");
+    assert.strictEqual(C.inboxDelay({ state: "unlinked" }), 0, "unlinked: stop asking");
   }
 
   // ---- 4. Undo for a design from the account ----
@@ -168,7 +173,7 @@ function app(code, linked) {
   // ---- 5. app.js wiring and privacy ----
   const appJs = fs.readFileSync(path.join(web, "app.js"), "utf8");
   const dc = fs.readFileSync(path.join(web, "design-code.js"), "utf8");
-  for (const s of ["setupDesign();", "inboxAsk();", "accountNewNotice();", "accountInbox: function (raw)", "inboxLater(0); },", "key: \"dz-unlink\"", "key: \"dz-undo\""])
+  for (const s of ["setupDesign();", "inboxAsk(\"open\");", "inboxAsk(\"front\");", "inboxAway(); },", "accountNewNotice();", "accountInbox: function (raw)", "key: \"dz-unlink\"", "key: \"dz-undo\"", "key: \"dz-inbox-now\"", "Check for new designs now"])
     assert.ok(appJs.includes(s), "app.js has " + s);
   // the link never reaches the page: nothing here asks for it, names the extra, or the Studio inbox address
   // (app.js has its own "Bearer" for the home computer's key, so only the Studio words are looked for there)

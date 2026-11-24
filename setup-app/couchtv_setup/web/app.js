@@ -446,7 +446,7 @@
     var t = rows[state.ip];
     if (t && !$("tv-room").value && t.known && t.known.room) $("tv-room").value = t.known.room;
     if (state.account) {
-      $("plan-account").textContent = "Signed in as " + (state.account.name || "you") + ". Couch TV gets your home details" +
+      $("plan-account").textContent = signedInWords(state.account.name) + ". Couch TV gets your home details" +
         (state.account.design ? " and \"" + state.account.design + "\"" : "") + " as it goes on.";
     }
     $("plan-account").hidden = !state.account;
@@ -601,11 +601,16 @@
 
   // ---- the Couch TV account (only when this Setup links accounts) ----
 
+  // The account's display name, or null when it has none (Couch TV Studio never sends the email)
+  function signedInWords(name) {
+    return name ? "Signed in as " + name : "Signed in to your Couch TV account";
+  }
+
   function signedIn(acct) {
     state.account = acct;
-    text("acct-top", "Signed in as " + (acct.name || "you"));
+    text("acct-top", signedInWords(acct.name));
     $("acct-top").hidden = false;
-    text("acct-line", "Signed in as " + (acct.name || "you") + ". Your design and home details go on the TV too.");
+    text("acct-line", signedInWords(acct.name) + ". Your design and home details go on the TV too.");
     $("acct-ask").hidden = true;
   }
 

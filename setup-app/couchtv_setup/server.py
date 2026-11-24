@@ -142,14 +142,16 @@ def _known():
         return {}
 
 
-def _remember(ip, f=None, route=None, room=None):
+def _remember(ip, f=None, route=None, room=None, tv_id=None):
     """What this TV turned out to be, so the list and the kind question know it next time: its model,
     kind, the way in that worked ("tls" means Wireless debugging is paired with this computer) and the
-    room name the person gave it ("Living room TV")."""
+    room name the person gave it ("Living room TV"), and its My TVs row id once an account set it up
+    (sent again when Setup sets the same TV up again)."""
     k = _known()
     old = k.get(ip) or {}
     k[ip] = {"name": (f or {}).get("name") or old.get("name"), "kind": (f or {}).get("kind") or old.get("kind"),
-             "route": route or old.get("route"), "room": room if room is not None else old.get("room")}
+             "route": route or old.get("route"), "room": room if room is not None else old.get("room"),
+             "tv_id": tv_id or old.get("tv_id")}
     try:
         (paths.data() / "known-tvs.json").write_text(json.dumps(k), encoding="utf-8")
     except OSError:
@@ -175,11 +177,16 @@ def _from_account(progress):
     """Registers the connected TV with the signed in account and gets what goes onto it. A failure
     here never stops the setup: Couch TV still goes on, without the account parts."""
     progress(0.26, "Linking the TV to your Couch TV account")
-    name = (_known().get(S.ip) or {}).get("room") or (S.facts or {}).get("name") or "TV"
+    known = _known().get(S.ip) or {}
+    name = known.get("room") or (S.facts or {}).get("name") or "TV"
+    # set up here before: its My TVs row, but only when the TV at this address is still the same model
+    same = known.get("name") and known.get("name") == (S.facts or {}).get("name")
     try:
-        reg = studio.register_tv(S.link, tvprofile.clean(S.profile), name)
+        reg = studio.register_tv(S.link, tvprofile.clean(S.profile), name, known.get("tv_id") if same else None)
     except TvError:
         return None
+    if reg.get("tv_id"):
+        _remember(S.ip, tv_id=reg["tv_id"])
     people, town = studio.setup_inputs(reg["home"])
     return {"people": people, "weather": _town_weather(town), "design": reg["design"],
             "extras": {"link": reg["link"], "code": reg["code"]}}

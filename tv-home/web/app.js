@@ -6277,31 +6277,90 @@
     }, function () {});
   }
   // The account's TV inbox (Send to Living room TV in Couch TV Studio, no code): asked by the app with the
-  // link Setup wrote (AccountLink.kt), at start, when the home comes back to the front, and every "poll"
-  // seconds (Studio says 60; never under 30) only while the home is in front. Nothing while another app or
-  // the screensaver is in front; after an error it waits 1, 2, 4 ... up to 30 minutes. A design that comes
-  // is got like a typed code (its home pack too) and goes on at once, as the account owner asked for it on
-  // their own TV: "New design from your account", with Undo in Home settings, Designs for a day.
-  var INBOX = { timer: 0, fails: 0, stopped: false };
+  // link Setup wrote (AccountLink.kt). When (owner, 24 Nov 2026), and never more often:
+  //  1. the TV wakes, or the home opens or comes back to the front, after 30 minutes or more away;
+  //  2. the person presses Check for new designs now in Home settings, Designs;
+  //  3. otherwise once a week (Studio's "poll" only when it is longer, design-code.js inboxDelay).
+  // A 429's wait is a time before which the TV does not look at all. Nothing while another app or the
+  // screensaver is in front. The times are kept in the page's storage, so a restart of the home is not "away".
+  // A design that comes is got like a typed code (its home pack too) and goes on at once, as the account owner
+  // asked for it on their own TV: "New design from your account", with Undo in Home settings, Designs for a day.
+  // ACCT_INBOX, not INBOX: INBOX is the phone inbox's (Get a design from your phone) above.
+  var ACCT_INBOX = { timer: 0, stopped: false, manual: false, pausedAt: 0 };
+  var INBOX_PRESS_MS = 30000, IK = { last: "couchtv.inbox.last", next: "couchtv.inbox.next", wait: "couchtv.inbox.wait", seen: "couchtv.inbox.seen" };
+  function inboxTime(k, v) {
+    try {
+      if (v === undefined) { var n = Number(localStorage.getItem(IK[k])); return isFinite(n) && n > 0 ? n : 0; }
+      if (v) localStorage.setItem(IK[k], String(Math.round(v))); else localStorage.removeItem(IK[k]);
+    } catch (e) {}
+    return 0;
+  }
   function inboxCan() {
     return !(MOCK || PREVIEW || /[?&]designer=1\b/.test(Q)) && TV && typeof TV.accountInbox === "function" &&
       typeof CouchDesignCode !== "undefined" && CouchDesignCode.readInboxAnswer && CouchDesignCode.linked();
   }
-  function inboxLater(secs) { clearTimeout(INBOX.timer); INBOX.timer = secs > 0 ? setTimeout(inboxAsk, secs * 1000) : 0; }
-  function inboxAsk() {
-    clearTimeout(INBOX.timer); INBOX.timer = 0;
-    if (INBOX.stopped || PAGE_PAUSED || !inboxCan()) return;
-    try { TV.accountInbox(); } catch (e) { inboxLater(CouchDesignCode.inboxDelay({ state: "error" }, INBOX.fails++)); }
+  // the timer for the weekly look; it stops while the home is away (tv.pause), and "next" keeps when it is due
+  function inboxLater(secs) {
+    clearTimeout(ACCT_INBOX.timer);
+    ACCT_INBOX.timer = secs > 0 ? setTimeout(function () { inboxAsk("week"); }, Math.min(secs, 1728000) * 1000) : 0;
   }
-  function inboxStop() { INBOX.stopped = true; inboxLater(0); }
+  function inboxArm() {
+    var next = inboxTime("next"), now = Date.now();
+    if (!next) { next = now + CouchDesignCode.INBOX_WEEK * 1000; inboxTime("next", next); }
+    inboxLater(Math.max(1, (next - now) / 1000));
+  }
+  // why: "open" (the page started), "front" (tv.resume), "now" (the person pressed Check), "week" (the timer),
+  // "setup" (Couch TV Setup just linked this TV). Answers whether the app was asked.
+  function inboxAsk(why) {
+    var now = Date.now();
+    clearTimeout(ACCT_INBOX.timer); ACCT_INBOX.timer = 0;
+    if (ACCT_INBOX.stopped || PAGE_PAUSED || !inboxCan()) return false;
+    var seen = why === "front" ? ACCT_INBOX.pausedAt || inboxTime("seen") : inboxTime("seen");
+    var away = !seen || seen > now || now - seen >= CouchDesignCode.INBOX_AWAY * 1000;
+    var due = !!inboxTime("next") && now >= inboxTime("next");
+    inboxTime("seen", now);
+    var go = why === "now" || why === "setup" || why === "week" || due || ((why === "open" || why === "front") && away);
+    if (!go || now < inboxTime("wait")) { inboxArm(); return false; }
+    inboxTime("last", now);
+    inboxTime("next", now + CouchDesignCode.INBOX_WEEK * 1000);   // until the answer says otherwise
+    var asked = false;
+    try { asked = TV.accountInbox() !== false; } catch (e) { asked = false; }
+    inboxArm();
+    return asked;
+  }
+  function inboxStop() { ACCT_INBOX.stopped = true; inboxLater(0); }
+  function inboxAway() { ACCT_INBOX.pausedAt = Date.now(); inboxTime("seen", ACCT_INBOX.pausedAt); inboxLater(0); }
+  // the home starting again in front (a restart for a new design or a setting) is not time away
+  window.addEventListener("pagehide", function () { if (!PAGE_PAUSED && inboxTime("seen")) inboxTime("seen", Date.now()); });
+  // Home settings, Designs, Check for new designs now
+  function inboxCheckNow() {
+    var now = Date.now();
+    if (now < inboxTime("wait")) { SET.msg = "Couch TV Studio asked this TV to wait. Try again in a few minutes."; return; }
+    if (now - inboxTime("last") < INBOX_PRESS_MS) { SET.msg = "Looked a moment ago. Try again in a minute."; return; }
+    ACCT_INBOX.manual = true;
+    if (inboxAsk("now")) SET.msg = "Looking for new designs from your account.";
+    else { ACCT_INBOX.manual = false; SET.msg = "Could not look just now. Try again in a minute."; }
+  }
+  var INBOX_SAID = {
+    none: "No new designs from your account.",
+    item: "A new design came from your account. The home starts again with it.",
+    wait: "Couch TV Studio asked this TV to wait. Try again in a few minutes.",
+    error: "Could not reach your Couch TV account. Check the TV is online, then try again.",
+    unlinked: "This TV is no longer linked to your account. A typed code still works."
+  };
   function accountInbox(raw) {
     if (typeof CouchDesignCode === "undefined" || !CouchDesignCode.readInboxAnswer) return;
-    var a = CouchDesignCode.readInboxAnswer(raw);
-    var wait = CouchDesignCode.inboxDelay(a, INBOX.fails);
-    INBOX.fails = a.state === "error" ? INBOX.fails + 1 : 0;
+    var a = CouchDesignCode.readInboxAnswer(raw), now = Date.now();
+    inboxTime("wait", a.state === "wait" ? now + a.wait * 1000 : 0);
+    if (a.state !== "unlinked") inboxTime("next", now + CouchDesignCode.inboxDelay(a) * 1000);
+    if (ACCT_INBOX.manual) {
+      ACCT_INBOX.manual = false;
+      SET.msg = INBOX_SAID[a.state] || INBOX_SAID.error;
+      if (zone === "settings") renderSettings();
+    }
     if (a.state === "unlinked") { inboxStop(); return; }   // the app forgot the link; a typed code still works
     if (a.state === "item") takeAccountDesign(a);
-    if (!PAGE_PAUSED && !INBOX.stopped) inboxLater(wait);
+    if (!PAGE_PAUSED && !ACCT_INBOX.stopped) inboxArm();
   }
   function takeAccountDesign(a) {
     var snap = CouchDesignCode.snapshot(typeof CouchDesigner !== "undefined" ? kept(CouchDesigner.KEY) : null);
@@ -6338,6 +6397,8 @@
     if (u) rows.push({ kind: "action", key: "dz-undo", label: "Undo the new design", sub: "Puts back what this TV had before " +
       (u.title ? "“" + u.title + "”" : "the design") + " came from your account", act: undoAccountDesign });
     if (!CouchDesignCode.linked()) return;
+    if (inboxCan()) rows.push({ kind: "action", key: "dz-inbox-now", label: "Check for new designs now",
+      sub: "Designs you send from your account come by themselves when the TV wakes, or once a week. This looks now", act: inboxCheckNow });
     var asking = UNLINK_ASK && Date.now() - UNLINK_ASK < 15000;
     rows.push({ kind: "action", key: "dz-unlink", label: asking ? "Press OK again to unlink" : "Unlink this TV from your account",
       sub: asking ? "This TV stops getting designs your Couch TV Studio account sends. What is on it now stays." :
@@ -9240,10 +9301,10 @@
     phoneLink: function () { PHONE_QR.url = ""; phoneQr(); if (typeof CouchDesign !== "undefined" && CouchDesign.nav && CouchDesign.nav.phoneAgain) CouchDesign.nav.phoneAgain(); },
     // also the on-TV app's HomeActivity.refresh() after a phone or setup save, with the home already in front
     // and never paused: that redraws, but only a resume after tv.pause() is the home coming to the front
-    resume: function () { var front = PAGE_PAUSED; PAGE_PAUSED = false; clock(); designVideo("away", false); toggleScreenOff(false); setIdleAmbient(false); resetSmartIdle(); okReset(); refresh(); if (!OFFLINE) refreshQuick(); refreshWeather(); startVideo(); clipWake(); sceneVideos(true); refreshMusic(); refreshCards(true); if (window.AmbientWeather) window.AmbientWeather.resume(); resetIdlePhoto(); kwArtAgain(); if (front) updFront(); setupDesign(); if (front) inboxAsk(); },
+    resume: function () { var front = PAGE_PAUSED; PAGE_PAUSED = false; clock(); designVideo("away", false); toggleScreenOff(false); setIdleAmbient(false); resetSmartIdle(); okReset(); refresh(); if (!OFFLINE) refreshQuick(); refreshWeather(); startVideo(); clipWake(); sceneVideos(true); refreshMusic(); refreshCards(true); if (window.AmbientWeather) window.AmbientWeather.resume(); resetIdlePhoto(); kwArtAgain(); if (front) updFront(); setupDesign(); if (front) inboxAsk("front"); },
     // an app is in front: the video background stops until the home is back
     // (and a design's video background lets go of the TV's decoder, which the app may need)
-    pause: function () { saveFocusNow(); PAGE_PAUSED = true; pauseVideo(); designVideo("away", true); inboxLater(0); },
+    pause: function () { saveFocusNow(); PAGE_PAUSED = true; pauseVideo(); designVideo("away", true); inboxAway(); },
     scene: function (pick) { return phoneScene(pick); },
     // the launcher's file picker has copied the chosen photos into its own storage (Home settings)
     photosAdded: function (names) { photosAdded(names); },
@@ -9257,7 +9318,7 @@
     homeAnswered: function (held) { homeAnswered(held); },
     // a calendar the launcher read for the Agenda widget (MainActivity.calendar)
     calendarText: function (id, ok, text) { calendarText(id, ok, text); },
-    setupDesign: function () { setupDesign(); INBOX.stopped = false; inboxAsk(); },
+    setupDesign: function () { setupDesign(); ACCT_INBOX.stopped = false; inboxAsk("setup"); },
     accountInbox: function (raw) { accountInbox(raw); },
     // words typed on the phone remote (Type on the TV) when the TV app cannot press keys (the on-TV app
     // with no ADB): they go into the typing box Home settings has open, at the cursor. False: no box open.
@@ -10151,7 +10212,7 @@
     welcomeStart(freshTv);   // a TV never set up: the first-run welcome, over everything else
     setupDesign();           // Couch TV Setup's design code, if it brought one: no typing
     accountNewNotice();      // a design the account just sent: say so once, with where Undo is
-    inboxAsk();              // the account's TV inbox, when this TV is linked
+    inboxAsk("open");        // the account's TV inbox, when this TV is linked (after 30 minutes away, or due)
     // Home settings gets an Updates section, before About, where the launcher can update itself
     if (updRead() && UPD.supported) SECS.splice(SECS.length - 1, 0, ["updates", "download"]);
     // back from Update to ... on the on-TV app: say so once

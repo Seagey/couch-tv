@@ -79,6 +79,14 @@ object AccountLink {
     // The page gets only what readInbox keeps: one checked CTV1 code and its title, or a state.
     const val STUDIO = "https://couchtv.joshuaseage.com"
     private const val INBOX_MAX = 64 * 1024
+    // When the TV asks is the page's (design-code.js, app.js: after 30 minutes away, a press, or once a week; Studio's
+    // poll only when longer). Here the numbers are only kept sane: poll 30 s to 20 days (a week when missing),
+    // a 429's Retry-After 30 s to a day (15 minutes when missing or a date).
+    const val POLL_MIN = 30L
+    const val POLL_MAX = 1728000L
+    const val POLL_DEFAULT = 604800L
+    const val WAIT_MAX = 86400L
+    const val WAIT_DEFAULT = 900L
     private val TITLE_DROP = Regex("[\\u0000-\\u001f\\u007f<>]")
 
     private fun clampSecs(v: Long?, lo: Long, hi: Long, dflt: Long): Long = if (v == null) dflt else v.coerceIn(lo, hi)
@@ -91,11 +99,11 @@ object AccountLink {
         val out = org.json.JSONObject()
         when {
             status == 401 -> return out.put("state", "unlinked")
-            status == 429 -> return out.put("state", "wait").put("wait", clampSecs(retryAfter?.trim()?.toLongOrNull(), 30, 3600, 300))
+            status == 429 -> return out.put("state", "wait").put("wait", clampSecs(retryAfter?.trim()?.toLongOrNull(), POLL_MIN, WAIT_MAX, WAIT_DEFAULT))
             status != 200 || body == null || body.length > INBOX_MAX -> return out.put("state", "error")
         }
         val j = try { org.json.JSONObject(body) } catch (e: Exception) { return out.put("state", "error") }
-        val poll = clampSecs(j.opt("poll").let { if (it is Number) it.toLong() else null }, 30, 3600, 60)
+        val poll = clampSecs(j.opt("poll").let { if (it is Number) it.toLong() else null }, POLL_MIN, POLL_MAX, POLL_DEFAULT)
         val items = j.optJSONArray("items") ?: return out.put("state", "error")
         for (i in items.length() - 1 downTo maxOf(0, items.length() - 5)) {
             val it = items.optJSONObject(i) ?: continue
