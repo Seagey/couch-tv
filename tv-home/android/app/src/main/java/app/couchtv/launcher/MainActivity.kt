@@ -84,6 +84,7 @@ class MainActivity : Activity() {
     private val bingDailyPhoto by lazy { BingDailyPhoto(File(filesDir, "bing-daily-photo"), io) }
     private val spotifyPlayer by lazy { SpotifyPlayer(applicationContext) }
     private var spotifyPush: ((org.json.JSONObject) -> Unit)? = null   // this activity's SpotifyMediaListener callback
+    private var savedMusicVolume: Int? = null
     private val fotMobScores by lazy { FotMobScores(io) }
 
     /**
@@ -1164,6 +1165,97 @@ class MainActivity : Activity() {
         @JavascriptInterface
         fun spotifyHasPermission(): Boolean {
             return SpotifyMediaListener.hasNotificationAccess(this@MainActivity)
+        }
+
+        @JavascriptInterface
+        fun spotifyOpenApp(): Boolean {
+            return SpotifyMediaListener.instance?.openSessionApp(this@MainActivity) ?: false
+        }
+
+        @JavascriptInterface
+        fun audioOutputInfo(): String {
+            return try {
+                val am = getSystemService(AUDIO_SERVICE) as android.media.AudioManager
+                val devs = am.getDevices(android.media.AudioManager.GET_DEVICES_OUTPUTS)
+                // Priority: Bluetooth -> HDMI/ARC -> USB/Wired -> Built-in speaker
+                val bt = devs.firstOrNull {
+                    it.type == android.media.AudioDeviceInfo.TYPE_BLUETOOTH_A2DP ||
+                    it.type == android.media.AudioDeviceInfo.TYPE_BLUETOOTH_SCO ||
+                    (Build.VERSION.SDK_INT >= 31 && (it.type == 26 || it.type == 27)) // BLE_HEADSET / BLE_SPEAKER
+                }
+                val hdmi = devs.firstOrNull {
+                    it.type == android.media.AudioDeviceInfo.TYPE_HDMI ||
+                    it.type == android.media.AudioDeviceInfo.TYPE_HDMI_ARC ||
+                    (Build.VERSION.SDK_INT >= 31 && it.type == 29) // TYPE_HDMI_EARC
+                }
+                val wired = devs.firstOrNull {
+                    it.type == android.media.AudioDeviceInfo.TYPE_WIRED_HEADSET ||
+                    it.type == android.media.AudioDeviceInfo.TYPE_WIRED_HEADPHONES ||
+                    it.type == android.media.AudioDeviceInfo.TYPE_USB_DEVICE ||
+                    it.type == android.media.AudioDeviceInfo.TYPE_USB_HEADSET ||
+                    it.type == android.media.AudioDeviceInfo.TYPE_LINE_DIGITAL
+                }
+                val chosen = bt ?: hdmi ?: wired ?: devs.firstOrNull {
+                    it.type == android.media.AudioDeviceInfo.TYPE_BUILTIN_SPEAKER
+                }
+                val type = when {
+                    bt != null -> "bluetooth"
+                    hdmi != null -> "hdmi"
+                    wired != null -> "wired"
+                    else -> "speaker"
+                }
+                val name = chosen?.productName?.toString()?.trim()?.takeIf { it.isNotEmpty() } ?: ""
+                JSONObject().apply {
+                    put("type", type)
+                    put("name", name)
+                }.toString()
+            } catch (e: Exception) {
+                """{"type":"speaker","name":""}"""
+            }
+        }
+
+        @JavascriptInterface
+        fun openAudioOutput(): Boolean {
+            return openSettingsScreen("bluetooth") || startSettings(Intent(Settings.ACTION_SOUND_SETTINGS))
+        }
+
+        @JavascriptInterface
+        fun musicFadeStart(): Boolean {
+            return try {
+                val am = getSystemService(AUDIO_SERVICE) as android.media.AudioManager
+                savedMusicVolume = am.getStreamVolume(android.media.AudioManager.STREAM_MUSIC)
+                true
+            } catch (e: Exception) {
+                false
+            }
+        }
+
+        @JavascriptInterface
+        fun musicFadeStep(fraction: Float): Boolean {
+            return try {
+                val am = getSystemService(AUDIO_SERVICE) as android.media.AudioManager
+                val base = savedMusicVolume ?: am.getStreamVolume(android.media.AudioManager.STREAM_MUSIC).also {
+                    savedMusicVolume = it
+                }
+                val target = (base * fraction.coerceIn(0f, 1f)).toInt()
+                am.setStreamVolume(android.media.AudioManager.STREAM_MUSIC, target, 0)
+                true
+            } catch (e: Exception) {
+                false
+            }
+        }
+
+        @JavascriptInterface
+        fun musicFadeRestore(): Boolean {
+            return try {
+                val orig = savedMusicVolume ?: return true
+                savedMusicVolume = null
+                val am = getSystemService(AUDIO_SERVICE) as android.media.AudioManager
+                am.setStreamVolume(android.media.AudioManager.STREAM_MUSIC, orig, 0)
+                true
+            } catch (e: Exception) {
+                false
+            }
         }
 
         // Reminders (reminders.js): Android's own speech screen (Google's "Speak now" on Google TV),

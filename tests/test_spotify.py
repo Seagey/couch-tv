@@ -13,33 +13,67 @@ from server import _sessions, STATES  # noqa: E402
 class TestSpotifyIntegration(unittest.TestCase):
 
     def test_spotify_config_defaults(self):
-        self.assertEqual(
-            config._spotify(None),
-            {"enabled": False, "seek_seconds": 10, "hide_idle": False, "title_mode": "pingpong", "show_app": True, "align": "classic"}
-        )
-        self.assertEqual(
-            config._spotify({}),
-            {"enabled": False, "seek_seconds": 10, "hide_idle": False, "title_mode": "pingpong", "show_app": True, "align": "classic"}
-        )
+        expected = {
+            "enabled": False,
+            "seek_seconds": 10,
+            "hide_idle": False,
+            "title_mode": "pingpong",
+            "show_app": True,
+            "align": "classic",
+            "mini_align": "classic",
+            "mini_art": "wide",
+            "scrub_bar": True,
+            "show_shuffle_repeat": True,
+            "adaptive_tint": True,
+            "waveform": True,
+            "card_style": "compact",
+            "show_up_next": True,
+            "show_jump_app": True,
+            "show_sleep_timer": True,
+            "show_audio_output": True,
+            "separate_row": True,
+            "sync_theme_colors": False,
+        }
+        self.assertEqual(config._spotify(None), expected)
+        self.assertEqual(config._spotify({}), expected)
 
     def test_spotify_config_custom(self):
-        cfg = {"enabled": True, "seek_seconds": 15, "hide_idle": True, "title_mode": "continuous", "show_app": False, "align": "center"}
+        cfg = {
+            "enabled": True,
+            "seek_seconds": 15,
+            "hide_idle": True,
+            "title_mode": "continuous",
+            "show_app": False,
+            "align": "dock_center",
+            "mini_align": "right",
+            "mini_art": "square",
+            "scrub_bar": False,
+            "show_shuffle_repeat": False,
+            "adaptive_tint": False,
+            "waveform": False,
+            "card_style": "mini",
+            "show_up_next": False,
+            "show_jump_app": False,
+            "show_sleep_timer": False,
+            "show_audio_output": False,
+            "separate_row": False,
+            "sync_theme_colors": True,
+        }
+        self.assertEqual(config._spotify(cfg), cfg)
+        # Clamping / validation of seek_seconds, title_mode, align, mini_align, mini_art, and card_style
         self.assertEqual(
-            config._spotify(cfg),
-            {"enabled": True, "seek_seconds": 15, "hide_idle": True, "title_mode": "continuous", "show_app": False, "align": "center"}
+            config._spotify({"seek_seconds": -5, "title_mode": "invalid", "align": "weird", "mini_align": "center", "mini_art": "circle", "card_style": "huge"}),
+            config._spotify({})
         )
-        # Clamping / validation of seek_seconds, title_mode, and align
-        self.assertEqual(
-            config._spotify({"seek_seconds": -5, "title_mode": "invalid", "align": "weird"}),
-            {"enabled": False, "seek_seconds": 10, "hide_idle": False, "title_mode": "pingpong", "show_app": True, "align": "classic"}
-        )
+        dots_expected = dict(config._spotify({}))
+        dots_expected["title_mode"] = "dots"
         self.assertEqual(
             config._spotify({"seek_seconds": 300, "title_mode": "dots", "show_app": True, "align": "classic"}),
-            {"enabled": False, "seek_seconds": 10, "hide_idle": False, "title_mode": "dots", "show_app": True, "align": "classic"}
+            dots_expected
         )
         self.assertEqual(
             config._spotify({"seek_seconds": "invalid"}),
-            {"enabled": False, "seek_seconds": 10, "hide_idle": False, "title_mode": "pingpong", "show_app": True, "align": "classic"}
+            config._spotify({})
         )
 
     def test_spotify_media_session_parsing(self):

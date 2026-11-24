@@ -782,7 +782,17 @@ The Spotify rows in Home settings show only where the card works: the Couch TV h
   "hide_idle": false,
   "title_mode": "pingpong",
   "show_app": true,
-  "align": "classic"
+  "align": "classic",
+  "card_style": "compact",
+  "separate_row": true,
+  "adaptive_tint": true,
+  "waveform": true,
+  "scrub_bar": true,
+  "show_shuffle_repeat": true,
+  "show_up_next": true,
+  "show_jump_app": true,
+  "show_sleep_timer": true,
+  "show_audio_output": true
 }
 ```
 
@@ -794,6 +804,16 @@ The Spotify rows in Home settings show only where the card works: the Couch TV h
 | `title_mode` ["pingpong"] | Display mode for long song titles: `"dots"` (standard `...` truncation), `"pingpong"` (ping-pong marquee sliding), or `"continuous"` (continuous scrolling marquee). |
 | `show_app` [true] | `true` displays the "SPOTIFY" label above the song title; `false` hides it and proportionally centers and sizes the playback controls and track details. |
 | `align` ["classic"] | Shelf layout alignment for the Spotify card and Keep watching items: `"classic"` aligns left starting from the screen safe margin; `"center"` centers inline with the dock/app bar. |
+| `card_style` ["compact"] | Layout style for the Now Playing card: `"compact"` (wide horizontal bar) or `"mini"` (square artwork-first mini-player). |
+| `separate_row` [true] | `true` labels and presents the Now Playing card in its own dedicated "Now playing" environment rather than under "Keep watching". |
+| `adaptive_tint` [true] | `true` extracts the dominant color from album art to subtly tint the frosted-glass card and progress glow. |
+| `waveform` [true] | `true` renders a subtle animated equalizer / ambient waveform while playing. |
+| `scrub_bar` [true] | `true` allows stepping onto the progress bar with the remote to scrub and seek to any timestamp. |
+| `show_shuffle_repeat` [true] | `true` displays Shuffle and Repeat toggle buttons when supported. |
+| `show_up_next` [true] | `true` displays an "Up next" track preview when queue metadata is available. |
+| `show_jump_app` [true] | `true` displays an "Open app" button (long-pressing OK on the card also jumps into the playing app). |
+| `show_sleep_timer` [true] | `true` displays a Music Sleep Timer button with gentle volume fade-out. |
+| `show_audio_output` [true] | `true` displays the active audio output (TV speakers, HDMI/ARC, or Bluetooth) with a quick-switch shortcut. |
 
 ### Permissions & Setup
 The integration reads local media sessions via a `NotificationListenerService` belonging to Couch TV (listed in Android as Couch TV Spotify Now playing). On Android TV / Google TV, grant Notification Access once over ADB:

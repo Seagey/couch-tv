@@ -787,23 +787,54 @@ def spotify_seek(v):
 
 def _spotify(raw):
     """Configuration for Spotify local media session integration."""
+    defaults = {
+        "enabled": False,
+        "seek_seconds": 10,
+        "hide_idle": False,
+        "title_mode": "pingpong",
+        "show_app": True,
+        "align": "classic",
+        "mini_align": "classic",
+        "mini_art": "wide",
+        "scrub_bar": True,
+        "show_shuffle_repeat": True,
+        "adaptive_tint": True,
+        "waveform": True,
+        "card_style": "compact",
+        "show_up_next": True,
+        "show_jump_app": True,
+        "show_sleep_timer": True,
+        "show_audio_output": True,
+        "separate_row": True,
+        "sync_theme_colors": False,
+    }
     if not isinstance(raw, dict):
-        return {"enabled": False, "seek_seconds": 10, "hide_idle": False, "title_mode": "pingpong", "show_app": True, "align": "classic"}
+        return dict(defaults)
     out = {}
     out["enabled"] = bool(raw.get("enabled", False))
     out["seek_seconds"] = spotify_seek(raw.get("seek_seconds")) or 10
     out["hide_idle"] = bool(raw.get("hide_idle", False))
     mode = raw.get("title_mode")
-    if mode in ("dots", "pingpong", "continuous"):
-        out["title_mode"] = mode
-    else:
-        out["title_mode"] = "pingpong"
+    out["title_mode"] = mode if mode in ("dots", "pingpong", "continuous") else "pingpong"
     out["show_app"] = bool(raw.get("show_app", True))
     align = raw.get("align")
-    if align in ("classic", "center"):
-        out["align"] = align
-    else:
-        out["align"] = "classic"
+    out["align"] = align if align in ("classic", "center", "dock_center") else "classic"
+    mini_align = raw.get("mini_align")
+    out["mini_align"] = mini_align if mini_align in ("classic", "right") else "classic"
+    mini_art = raw.get("mini_art")
+    out["mini_art"] = mini_art if mini_art in ("square", "wide") else "wide"
+    out["scrub_bar"] = bool(raw.get("scrub_bar", True))
+    out["show_shuffle_repeat"] = bool(raw.get("show_shuffle_repeat", True))
+    out["adaptive_tint"] = bool(raw.get("adaptive_tint", True))
+    out["waveform"] = bool(raw.get("waveform", True))
+    style = raw.get("card_style")
+    out["card_style"] = style if style in ("compact", "mini") else "compact"
+    out["show_up_next"] = bool(raw.get("show_up_next", True))
+    out["show_jump_app"] = bool(raw.get("show_jump_app", True))
+    out["show_sleep_timer"] = bool(raw.get("show_sleep_timer", True))
+    out["show_audio_output"] = bool(raw.get("show_audio_output", True))
+    out["separate_row"] = bool(raw.get("separate_row", True))
+    out["sync_theme_colors"] = bool(raw.get("sync_theme_colors", False))
     return out
 
 

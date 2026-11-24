@@ -583,6 +583,17 @@ html.who-gentle.scene-fog .mood:not(.dark) .mood-hi { text-shadow: 0 0 0.5rem rg
 
 /* Keep watching: three glass cards */
 .theme-night .shelf { top: 40rem; left: var(--safe-x); right: var(--safe-x); }
+html.spotify-align-dock-center .theme-night .shelf,
+html.spotify-align-dock-center.theme-night .shelf {
+  left: 50%;
+  right: auto;
+  transform: translateX(-50%);
+  width: auto;
+  max-width: calc(100vw - 2 * var(--safe-x));
+}
+html.spotify-align-dock-center.theme-night .shelf-head { justify-content: center; padding-right: 0; }
+html.spotify-align-dock-center.theme-night .shelf-row { justify-content: center; }
+html.spotify-align-dock-center.theme-night .shelf.kw-empty .shelf-clip { display: none; }
 html.spotify-align-center .theme-night .shelf,
 html.spotify-align-center.theme-night .shelf {
   left: 50%;
@@ -803,12 +814,13 @@ html.kw-poster.theme-night .shelf .show .caption span { margin-left: 0.75rem; fo
 .setting .tile.focus .face, .setting .tile.focus .face::after { animation: none; }
 .set-side { display: flex; flex-direction: column; min-height: 0; }
 .set-title { margin: 2.25rem 0 2.5rem 1.25rem; font-size: 2.875rem; line-height: 3.75rem; font-weight: 700; letter-spacing: -0.022em; white-space: nowrap; }
-.set-secs { display: flex; flex-direction: column; gap: 0.375rem; }
+.set-secs { display: flex; flex-direction: column; flex: 1; min-height: 0; gap: 0.25rem; overflow-y: auto; scrollbar-width: none; padding: 0.25rem 0.25rem 0.5rem; margin: -0.25rem -0.25rem 0; }
+.set-secs::-webkit-scrollbar { display: none; }
 /* on-TV app only: Change this on your phone. Never focusable, so it costs no presses. */
 .set-phone { display: none; align-items: center; gap: 1rem; margin: -1.5rem 0 1.25rem 1.25rem; }
 .set-phone.on { display: flex; }
 .set-phone.on + .set-secs { gap: 0.25rem; }
-.set-phone.on + .set-secs .ssec { min-height: 4.375rem; }   /* ten sections (with Updates) still fit under the QR */
+.set-phone.on + .set-secs .ssec { min-height: 3.625rem; }
 .set-phone-qr { flex: none; width: 7.5rem; height: 7.5rem; border-radius: 0.75rem; overflow: hidden; background: #fff; }
 .set-phone-qr svg { display: block; width: 100%; height: 100%; }
 .set-phone p { margin: 0; display: flex; flex-direction: column; gap: 0.25rem; min-width: 0; }
@@ -817,11 +829,11 @@ html.kw-poster.theme-night .shelf .show .caption span { margin-left: 0.75rem; fo
 .set-phone small.set-phone-pc { color: #fff; font-weight: 600; unicode-bidi: plaintext; }
 .set-phone small.set-phone-pc:empty { display: none; }
 .ssec {
-  display: flex; align-items: center; gap: 1.25rem; min-height: 4.75rem; padding: 0.5rem 1.5rem 0.5rem 0.875rem; border-radius: 1.5rem;
-  font-size: 1.75rem; line-height: 2.25rem; font-weight: 600; color: rgba(255, 255, 255, 0.76);
+  display: flex; flex: none; align-items: center; gap: 1.125rem; min-height: 4rem; padding: 0.4375rem 1.25rem 0.4375rem 0.75rem; border-radius: 1.375rem;
+  font-size: 1.625rem; line-height: 2.125rem; font-weight: 600; color: rgba(255, 255, 255, 0.76);
   transition: transform 200ms var(--ease), background 200ms var(--ease), box-shadow 200ms var(--ease);
 }
-.ssec i { display: flex; flex: none; align-items: center; justify-content: center; width: 3.25rem; height: 3.25rem; border-radius: 1rem; background: rgba(255, 255, 255, 0.1); }
+.ssec i { display: flex; flex: none; align-items: center; justify-content: center; width: 2.875rem; height: 2.875rem; border-radius: 0.875rem; background: rgba(255, 255, 255, 0.1); }
 .ssec svg { width: 1.875rem; height: 1.875rem; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
 .ssec.on { background: rgba(255, 255, 255, 0.13); color: #fff; }
 .ssec.focus { background: #fff; color: #111; transform: scale(1.04); box-shadow: 0 1rem 2.25rem rgba(0, 0, 0, 0.45); }
@@ -1251,6 +1263,12 @@ html.kw-poster.theme-night .shelf .show .caption span { margin-left: 0.75rem; fo
   overflow: hidden;
   text-overflow: ellipsis;
 }
+.np-title-wrap:not(.overflowing) .np-title-dup,
+.np-title-wrap:not(.overflowing) .np-title-spacer,
+html.lighter .np-title-dup,
+html.lighter .np-title-spacer {
+  display: none !important;
+}
 .np-title-wrap.mode-pingpong.overflowing .np-title-track {
   display: inline-block;
   white-space: nowrap;
@@ -1430,6 +1448,171 @@ html.gearing #football-scores, html.apping #football-scores, html.expanded #foot
 .theme-night .np.no-app .np-ctl { align-self: center; gap: 0.5625rem; }
 .theme-night .np.no-app .nb { width: 3.25rem; height: 3.25rem; }
 .theme-night .np.no-app .nb svg { width: 1.4375rem; height: 1.4375rem; }
+
+/* Music Controls Suite: adaptive tint, scrubbing, mini-player, waveform, up next, output & sleep */
+.np { flex-wrap: wrap; }
+.np-main-row { display: flex; align-items: center; gap: 1rem; width: 100%; min-width: 0; }
+.theme-night .np { width: 41rem; }
+.np.adaptive-tint {
+  background: linear-gradient(135deg, var(--np-tint, rgba(255, 255, 255, 0.12)), rgba(20, 18, 28, 0.62)) !important;
+  box-shadow: 0 0.75rem 2.25rem rgba(0, 0, 0, 0.38), inset 0 0 0 0.0625rem var(--np-border, rgba(255, 255, 255, 0.2));
+}
+.np.adaptive-tint .np-fill { background: var(--np-glow, #fff); }
+
+/* Interactive Progress Bar Scrubbing */
+.np-prog-wrap { position: relative; cursor: pointer; }
+.np-bar { transition: height 150ms var(--ease), background 150ms var(--ease), box-shadow 150ms var(--ease); }
+.np-prog-wrap.focus .np-bar {
+  height: 0.5rem;
+  border-radius: 0.25rem;
+  background: rgba(255, 255, 255, 0.32);
+  box-shadow: 0 0 0 0.125rem #fff;
+  overflow: visible;
+}
+.np-prog-wrap.focus .np-fill { background: var(--np-glow, #fff); border-radius: 0.25rem; }
+.np-scrub-tip {
+  display: none;
+  position: absolute;
+  top: -1.85rem;
+  transform: translateX(-50%);
+  padding: 0.15rem 0.5rem;
+  border-radius: 0.5rem;
+  background: #fff;
+  color: #111;
+  font-size: 0.875rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  box-shadow: 0 0.25rem 0.75rem rgba(0, 0, 0, 0.45);
+  pointer-events: none;
+}
+.np-prog-wrap.focus .np-scrub-tip { display: block; }
+
+/* Subtle Equalizer & Ambient Waveform */
+.np-app-row { display: flex; align-items: center; gap: 0.5rem; }
+.np-eq { display: inline-flex; align-items: flex-end; gap: 0.125rem; height: 0.875rem; flex: none; }
+.np-eq i {
+  display: block; width: 0.15rem; height: 35%; border-radius: 0.075rem;
+  background: var(--np-glow, rgba(255, 255, 255, 0.85));
+  transition: height 200ms ease;
+}
+.np-eq.playing i:nth-child(1) { animation: npEq1 0.85s ease-in-out infinite alternate; }
+.np-eq.playing i:nth-child(2) { animation: npEq2 0.65s ease-in-out infinite alternate 0.15s; }
+.np-eq.playing i:nth-child(3) { animation: npEq3 0.95s ease-in-out infinite alternate 0.3s; }
+.np-eq.playing i:nth-child(4) { animation: npEq2 0.75s ease-in-out infinite alternate 0.1s; }
+@keyframes npEq1 { from { height: 25%; } to { height: 95%; } }
+@keyframes npEq2 { from { height: 40%; } to { height: 100%; } }
+@keyframes npEq3 { from { height: 20%; } to { height: 80%; } }
+
+.amb-wave {
+  display: none;
+  position: fixed;
+  left: 50%;
+  bottom: 0;
+  transform: translateX(-50%);
+  width: 78vw;
+  height: 4.75rem;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 0.75rem;
+  z-index: 0;
+  pointer-events: none;
+  opacity: 0.68;
+}
+html.waveform-on .amb-wave { display: flex; }
+html.idle-photo.waveform-on .amb-wave { opacity: 0.85; height: 6rem; }
+.amb-wave span {
+  flex: 1;
+  max-width: 1.5rem;
+  height: 22%;
+  border-radius: 0.5rem 0.5rem 0 0;
+  background: linear-gradient(to top, var(--np-glow, rgba(255, 255, 255, 0.55)), transparent);
+  animation: ambWave 1.4s ease-in-out infinite alternate;
+}
+.amb-wave span:nth-child(2n) { animation-duration: 1.1s; animation-delay: 0.2s; }
+.amb-wave span:nth-child(3n) { animation-duration: 1.7s; animation-delay: 0.45s; }
+.amb-wave span:nth-child(5n) { animation-duration: 1.25s; animation-delay: 0.7s; }
+@keyframes ambWave { from { height: 18%; opacity: 0.4; } to { height: 95%; opacity: 0.95; } }
+@media (prefers-reduced-motion: reduce) {
+  .amb-wave span, .np-eq.playing i { animation: none !important; height: 55%; }
+}
+
+/* Extra Footer Row inside Now Playing: Up Next, Shuffle/Repeat/Sleep/Output/Open */
+.np-extra {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  width: 100%;
+  margin-top: 0.5rem;
+  padding-top: 0.5rem;
+  border-top: 0.0625rem solid rgba(255, 255, 255, 0.12);
+}
+.np-up-next {
+  min-width: 0;
+  flex: 1;
+  font-size: 0.9375rem;
+  line-height: 1.25rem;
+  color: rgba(255, 255, 255, 0.72);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.np-up-next b { color: rgba(255, 255, 255, 0.94); font-weight: 600; }
+.np-sub-ctl { display: flex; align-items: center; gap: 0.375rem; flex: none; margin-left: auto; }
+.theme-night .np .nb.nb-sm, .nb.nb-sm { flex: none; width: auto; min-width: 2.25rem; height: 2.25rem; padding: 0 0.5rem; border-radius: 1.125rem; font-size: 0.875rem; gap: 0.3rem; }
+.theme-night .np .nb.nb-sm svg, .nb.nb-sm svg { width: 1.05rem; height: 1.05rem; flex: none; }
+.nb svg:not(.solid) { fill: none; stroke: currentColor; stroke-width: 1.85; stroke-linecap: round; stroke-linejoin: round; }
+.nb.active { color: #1db954; background: rgba(29, 185, 84, 0.24); box-shadow: inset 0 0 0 0.0625rem rgba(29, 185, 84, 0.6); }
+.nb.active.np-smart { color: #b794f4; background: rgba(159, 122, 234, 0.26); box-shadow: inset 0 0 0 0.0625rem rgba(183, 148, 244, 0.65); }
+.nb.active.focus { background: #fff; color: #111; }
+.nb-label { font-size: 0.8125rem; font-weight: 600; white-space: nowrap; max-width: none; overflow: hidden; text-overflow: ellipsis; }
+.np.np-mini .nb-label { max-width: 9.5rem; }
+
+/* Full-Artwork / Mini-Player Toggle */
+.theme-night .np.np-mini {
+  width: 25.5rem;
+  flex-direction: column;
+  align-items: stretch;
+  padding: 1rem 1.125rem;
+  gap: 0.5rem;
+}
+.theme-night .np.np-mini .np-main-row { flex-direction: column; align-items: stretch; gap: 0.625rem; }
+.theme-night .np.np-mini .np-art { width: 100%; height: 11.5rem; border-radius: 1.125rem; }
+.theme-night .np.np-mini .np-t,
+.theme-night .np.np-mini.no-app .np-t { min-height: 0; }
+.theme-night .np.np-mini .np-ctl { justify-content: center; width: 100%; gap: 0.625rem; }
+.theme-night .np.np-mini .np-extra { margin-top: 0.25rem; padding-top: 0.5rem; flex-wrap: wrap; }
+.theme-night .np.np-mini .np-sub-ctl { width: 100%; justify-content: space-between; margin-left: 0; }
+.theme-night .np.np-mini.np-art-square .np-art { height: 23.25rem; }
+html.np-mini-mode.theme-night .shelf { top: 32.5rem; }
+html.np-mini-mode.np-mini-square.theme-night .shelf { top: 20.5rem; }
+html.np-mini-mode.np-mini-right.theme-night .shelf-head { justify-content: flex-end; padding-right: 0; }
+html.np-mini-mode.np-mini-right.theme-night .shelf-head .status { display: none; }
+html.np-mini-mode.np-mini-right.theme-night .shelf-row { flex-direction: row-reverse; justify-content: flex-start; }
+html.np-mini-mode.np-mini-right.theme-night .shelf.kw-empty .shelf-clip { display: none; }
+html.np-mini-mode.theme-night .np-slot { align-items: flex-start; }
+
+/* Sync Theme Colours to Album Artwork */
+html.np-sync-colors.theme-night .grid {
+  background: linear-gradient(135deg, var(--np-sync-bg, rgba(30, 22, 34, 0.28)), rgba(18, 16, 24, 0.56)) !important;
+  box-shadow: 0 1rem 2.5rem rgba(0, 0, 0, 0.38), inset 0 0 0 0.0625rem var(--np-sync-border, rgba(255, 255, 255, 0.22)) !important;
+}
+html.np-sync-colors.theme-night .people:not(.focus),
+html.np-sync-colors.theme-night .qbtn:not(.focus) {
+  background: linear-gradient(135deg, var(--np-sync-bg, rgba(30, 22, 34, 0.28)), rgba(18, 16, 24, 0.46)) !important;
+  box-shadow: inset 0 0 0 0.0625rem var(--np-sync-border, rgba(255, 255, 255, 0.22)) !important;
+}
+html.np-sync-colors.theme-night .date {
+  text-shadow: 0 0.125rem 1.25rem var(--np-sync-shadow, rgba(0, 0, 0, 0.45)) !important;
+}
+html.np-sync-colors.theme-night .gclock {
+  color: var(--np-sync-clock, rgba(255, 255, 255, 0.36)) !important;
+  text-shadow: 0 0 3.5rem var(--np-sync-shadow, rgba(0, 0, 0, 0.25)) !important;
+}
+html.np-sync-colors.theme-night .shelf-head h2 {
+  text-shadow: 0 0.125rem 1.25rem var(--np-sync-shadow, rgba(0, 0, 0, 0.45)) !important;
+}
 
 /* ================= Lighter home (Home settings, Look, Lighter home; home.lighter) =================
    #58: for a slow box (a Xiaomi Mi Box, a Fire stick). Nothing is blurred, no tile casts a soft

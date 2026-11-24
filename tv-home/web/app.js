@@ -133,7 +133,13 @@
   var WX_AMBIENT = true, WX_SUN_GRADE = true;
   // Now playing (#31), on unless switched off; the navigation sound: system, soft or off (#32)
   var NP_ON = true, KW_ON = true, SOUND_STYLE = "system", START_FOCUS = "people",
-    SPOTIFY = { enabled: false, show_card: true, controls: true, seek_seconds: 10, hide_idle: false, title_mode: "pingpong", show_app: true, align: "classic" };
+    SPOTIFY = {
+      enabled: false, show_card: true, controls: true, seek_seconds: 10, hide_idle: false,
+      title_mode: "pingpong", show_app: true, align: "classic", mini_align: "classic", mini_art: "wide",
+      scrub_bar: true, show_shuffle_repeat: true, adaptive_tint: true, waveform: true,
+      card_style: "compact", show_up_next: true, show_jump_app: true,
+      show_sleep_timer: true, show_audio_output: true, separate_row: true, sync_theme_colors: false
+    };
   var KW_POSTER = false;   // Night: Keep watching as Classic poster tiles, not wide cards (home.keep_watching_style, #192)
   // Keep watching follows the app the remote is on (home.shelf_follows_app), off unless switched on
   var SHELF_FOLLOW = false;
@@ -466,6 +472,9 @@
     pause: '<svg viewBox="0 0 24 24" class="solid"><path d="M6.5 5h4v14h-4zM13.5 5h4v14h-4z"/></svg>',
     rewind: '<svg viewBox="0 0 24 24" class="solid"><path d="M11 6v12l-9-6zM21 6v12l-9-6z"/></svg>',
     ff: '<svg viewBox="0 0 24 24" class="solid"><path d="M3 6v12l9-6zM13 6v12l9-6z"/></svg>',
+    shuffle: '<svg viewBox="0 0 24 24"><path d="M16 3h5v5M4 20L21 3M21 16v5h-5M15 15l6 6M4 4l5 5"/></svg>',
+    repeat: '<svg viewBox="0 0 24 24"><path d="M17 1l4 4-4 4"/><path d="M3 11V9a4 4 0 0 1 4-4h14M7 23l-4-4 4-4"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>',
+    repeatOne: '<svg viewBox="0 0 24 24"><path d="M17 1l4 4-4 4"/><path d="M3 11V9a4 4 0 0 1 4-4h14M7 23l-4-4 4-4"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/><path d="M12 9v6M10.5 10.5L12 9"/></svg>',
     spotify: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M7 9.5c3.5-1 7.5-.7 10.5 1M7.5 12.5c3-.8 6.5-.5 9 1M8 15.5c2.3-.6 5-.4 7 .8" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>',
     note: '<svg viewBox="0 0 24 24"><path d="M9 18V6l11-2v12"/><circle cx="6" cy="18" r="3"/><circle cx="17" cy="16" r="3"/></svg>',
     updown: '<svg viewBox="0 0 24 24"><path d="M8 9.5l4-4 4 4M8 14.5l4 4 4-4"/></svg>',
@@ -741,7 +750,20 @@
       hide_idle: typeof spRaw.hide_idle === "boolean" ? spRaw.hide_idle : false,
       title_mode: ["dots", "pingpong", "continuous"].indexOf(spRaw.title_mode) >= 0 ? spRaw.title_mode : "pingpong",
       show_app: typeof spRaw.show_app === "boolean" ? spRaw.show_app : true,
-      align: ["classic", "center"].indexOf(spRaw.align) >= 0 ? spRaw.align : "classic"
+      align: ["classic", "center", "dock_center"].indexOf(spRaw.align) >= 0 ? spRaw.align : "classic",
+      mini_align: ["classic", "right"].indexOf(spRaw.mini_align) >= 0 ? spRaw.mini_align : "classic",
+      mini_art: ["square", "wide"].indexOf(spRaw.mini_art) >= 0 ? spRaw.mini_art : "wide",
+      scrub_bar: typeof spRaw.scrub_bar === "boolean" ? spRaw.scrub_bar : true,
+      show_shuffle_repeat: typeof spRaw.show_shuffle_repeat === "boolean" ? spRaw.show_shuffle_repeat : true,
+      adaptive_tint: typeof spRaw.adaptive_tint === "boolean" ? spRaw.adaptive_tint : true,
+      waveform: typeof spRaw.waveform === "boolean" ? spRaw.waveform : true,
+      card_style: ["compact", "mini"].indexOf(spRaw.card_style) >= 0 ? spRaw.card_style : "compact",
+      show_up_next: typeof spRaw.show_up_next === "boolean" ? spRaw.show_up_next : true,
+      show_jump_app: typeof spRaw.show_jump_app === "boolean" ? spRaw.show_jump_app : true,
+      show_sleep_timer: typeof spRaw.show_sleep_timer === "boolean" ? spRaw.show_sleep_timer : true,
+      show_audio_output: typeof spRaw.show_audio_output === "boolean" ? spRaw.show_audio_output : true,
+      separate_row: (spRaw.separate_row === false || spRaw.separate_row === "kw") ? "kw" : (spRaw.separate_row === "none" ? "none" : "np"),
+      sync_theme_colors: typeof spRaw.sync_theme_colors === "boolean" ? spRaw.sync_theme_colors : false
     };
     applySpotifyAlign();
     // the Keep watching row: Home settings win over home.keep_watching; off hides it and stops fetching it
@@ -847,8 +869,14 @@
     if (document.documentElement.classList.contains("no-clock") !== off) document.documentElement.classList.toggle("no-clock", off);
   }
   function applySpotifyAlign() {
-    var isCenter = (SPOTIFY.align || "classic") === "center";
+    var isMini = (SPOTIFY.card_style || "compact") === "mini";
+    var al = SPOTIFY.align || "classic";
+    var isCenter = !isMini && al === "center";
+    var isDockCenter = !isMini && al === "dock_center";
+    var isMiniRight = isMini && (SPOTIFY.mini_align || "classic") === "right";
     document.documentElement.classList.toggle("spotify-align-center", isCenter);
+    document.documentElement.classList.toggle("spotify-align-dock-center", isDockCenter);
+    document.documentElement.classList.toggle("np-mini-right", isMiniRight);
     if (NIGHT) {
       var sEl = $("shelf-section");
       if (sEl) {
@@ -2563,8 +2591,109 @@
   }
 
   // ---------------- Now playing (#31) + Spotify local integration ----------------
-  var music = null, npI = 2, npSrc = "", currentNpBtns = [], npProgressTimer = null;
+  var music = null, npI = 2, npPrimaryCount = 0, npSub = "btns", npScrubPos = 0, npSrc = "", currentNpBtns = [], npProgressTimer = null;
+  var localShuffle = "off", localRepeat = "off";
+  var musicSleepEnd = 0, musicSleepMin = 0, musicSleepTimer = null, musicFadeTimer = null;
+  var audioOutput = { type: "speaker", name: "" }, audioOutAt = 0;
+  var npTintCache = {};
   var LOCAL_SPOTIFY = false, SPOTIFY_TV = "com.spotify.tv.android";
+
+  function extractArtworkTint(dataUrl, cb) {
+    if (!dataUrl || dataUrl.indexOf("data:image/") !== 0) { cb(null); return; }
+    if (npTintCache[dataUrl]) { cb(npTintCache[dataUrl]); return; }
+    var img = new Image();
+    img.onload = function () {
+      try {
+        var c = document.createElement("canvas");
+        c.width = 16; c.height = 16;
+        var ctx = c.getContext("2d");
+        ctx.drawImage(img, 0, 0, 16, 16);
+        var d = ctx.getImageData(0, 0, 16, 16).data;
+        var bestR = 0, bestG = 0, bestB = 0, bestScore = -1;
+        var sumR = 0, sumG = 0, sumB = 0, cnt = 0;
+        for (var i = 0; i < d.length; i += 4) {
+          var r = d[i], g = d[i + 1], b = d[i + 2];
+          var max = Math.max(r, g, b), min = Math.min(r, g, b);
+          var lum = (max + min) / 2;
+          if (lum < 25 || lum > 235) continue;
+          sumR += r; sumG += g; sumB += b; cnt++;
+          var sat = max === 0 ? 0 : (max - min) / max;
+          var score = sat * (1 - Math.abs(lum - 128) / 140);
+          if (score > bestScore) { bestScore = score; bestR = r; bestG = g; bestB = b; }
+        }
+        var res = bestScore > 0.15 ? [bestR, bestG, bestB]
+          : (cnt > 0 ? [Math.round(sumR / cnt), Math.round(sumG / cnt), Math.round(sumB / cnt)] : null);
+        npTintCache[dataUrl] = res;
+        cb(res);
+      } catch (e) { cb(null); }
+    };
+    img.onerror = function () { cb(null); };
+    img.src = dataUrl;
+  }
+
+  function refreshAudioOutput(force) {
+    if (!TV || !TV.audioOutputInfo) return;
+    if (!force && Date.now() - audioOutAt < 5000) return;
+    audioOutAt = Date.now();
+    try {
+      var info = JSON.parse(TV.audioOutputInfo());
+      if (info && info.type) audioOutput = info;
+    } catch (e) {}
+  }
+
+  function cancelMusicSleep() {
+    clearTimeout(musicSleepTimer); musicSleepTimer = null;
+    clearInterval(musicFadeTimer); musicFadeTimer = null;
+    musicSleepEnd = 0; musicSleepMin = 0;
+    try { if (TV && TV.musicFadeRestore) TV.musicFadeRestore(); } catch (e) {}
+  }
+
+  function toggleMusicSleep() {
+    var steps = [0, 15, 30, 45, 60];
+    var idx = steps.indexOf(musicSleepMin);
+    var nextMin = steps[(idx + 1) % steps.length];
+    cancelMusicSleep();
+    if (!nextMin) {
+      toast(t("music_sleep_off"));
+      renderNp();
+      return;
+    }
+    musicSleepMin = nextMin;
+    musicSleepEnd = Date.now() + nextMin * 60000;
+    var fadeMs = 30000;
+    var fadeStartAt = Math.max(0, nextMin * 60000 - fadeMs);
+    toast(t("music_sleep_set", { m: nextMin }));
+    renderNp();
+    musicSleepTimer = setTimeout(function () {
+      try { if (TV && TV.musicFadeStart) TV.musicFadeStart(); } catch (e) {}
+      var t0 = Date.now();
+      musicFadeTimer = setInterval(function () {
+        var frac = Math.max(0, 1 - (Date.now() - t0) / fadeMs);
+        try { if (TV && TV.musicFadeStep) TV.musicFadeStep(frac); } catch (e) {}
+        if (frac <= 0) {
+          clearInterval(musicFadeTimer); musicFadeTimer = null;
+          try {
+            if (TV && TV.spotifyControl) TV.spotifyControl("pause", 0);
+            else if (!OFFLINE) api("POST", "/api/spotify/control", { action: "pause", interval: 0 });
+          } catch (e) {}
+          setTimeout(function () {
+            try { if (TV && TV.musicFadeRestore) TV.musicFadeRestore(); } catch (e) {}
+          }, 800);
+          musicSleepMin = 0; musicSleepEnd = 0;
+          renderNp();
+        }
+      }, 1000);
+    }, fadeStartAt);
+  }
+
+  function jumpIntoMusicApp() {
+    if (!music) return;
+    try {
+      if (TV && TV.spotifyOpenApp && TV.spotifyOpenApp()) return;
+    } catch (e) {}
+    var pkg = (music.app && (music.app.package || music.app.id)) || SPOTIFY_TV;
+    if (pkg) launch(pkg);
+  }
   var FOOTBALL_LEAGUES = [
     { id: "47", name: "Premier League" }, { id: "55", name: "Serie A" },
     { id: "42", name: "Champions League" }, { id: "73", name: "Europa League" },
@@ -2857,6 +2986,7 @@
 
   function updateNpProgress() {
     if (!music || !music.duration || music.duration <= 0) return;
+    if (zone === "np" && npSub === "bar") return;
     var pos = getPlaybackPosition();
     var curEl = $("np-pos");
     var fillEl = $("np-fill");
@@ -2881,6 +3011,7 @@
     else if (NIGHT) {
       var anyone = rowHasCards();
       $("shelf-section").classList.toggle("empty", !anyone && !on);
+      $("shelf-section").classList.toggle("kw-empty", !anyone);
       $("np-slot").classList.toggle("on", on);
       if (KW_ON && !data.shows.length && !CARDS.length) {   // renderShelf's empty line, never over custom cards
         var track = $("shelf");
@@ -2889,21 +3020,90 @@
           track.innerHTML = on ? "" : ('<p class="shelf-none">' + esc(peopleCount() < 2 ? t("nothing_yet") : t("nothing_for", { name: name })) + "</p>");
         }
       }
+      var stEl = $("shelf-title");
+      if (stEl) {
+        var headMode = SPOTIFY.separate_row === false || SPOTIFY.separate_row === "kw" ? "kw" : (SPOTIFY.separate_row === "none" ? "none" : "np");
+        if (on && headMode === "none") {
+          stEl.textContent = anyone ? t("keep_watching") : "";
+        } else if (on && headMode === "np") {
+          stEl.textContent = anyone ? (t("np_head") + " · " + t("keep_watching")) : t("np_head");
+        } else {
+          stEl.textContent = t("keep_watching");
+        }
+      }
     }
+    var playing = !!(on && music && music.state === "playing");
+    var isMiniOn = !!(NIGHT && on && SPOTIFY.card_style === "mini");
+    var isMiniSquare = isMiniOn && (SPOTIFY.mini_art || "wide") === "square";
+    document.documentElement.classList.toggle("waveform-on", !!(on && playing && SPOTIFY.waveform !== false));
+    document.documentElement.classList.toggle("np-mini-mode", isMiniOn);
+    document.documentElement.classList.toggle("np-mini-square", isMiniSquare);
     if (!on) {
       clearInterval(npProgressTimer);
       el.innerHTML = "";
+      el.classList.remove("adaptive-tint", "np-mini", "np-art-square");
+      el.style.removeProperty("--np-tint");
+      el.style.removeProperty("--np-glow");
+      el.style.removeProperty("--np-border");
+      document.documentElement.classList.remove("np-sync-colors");
+      document.documentElement.style.removeProperty("--np-glow");
+      document.documentElement.style.removeProperty("--np-sync-bg");
+      document.documentElement.style.removeProperty("--np-sync-border");
+      document.documentElement.style.removeProperty("--np-sync-clock");
+      document.documentElement.style.removeProperty("--np-sync-shadow");
       currentNpBtns = [];
+      npSub = "btns";
       npFit("");
       return;
     }
 
-    var playing = music.state === "playing";
     var cover = music.art || (music.source === "spotify-tv" ? iconUrl(SPOTIFY_TV) : "");
     var art = cover ? '<img class="np-art" src="' + esc(cover) + '" alt="" decoding="async" data-err="np">' :
       '<span class="np-art">' + ICONS.note + "</span>";
 
-    var btns = [];
+    if ((SPOTIFY.adaptive_tint !== false || SPOTIFY.sync_theme_colors) && cover && cover.indexOf("data:image/") === 0) {
+      extractArtworkTint(cover, function (rgb) {
+        var card = $("np");
+        if (!card) return;
+        if (rgb && SPOTIFY.adaptive_tint !== false) {
+          card.classList.add("adaptive-tint");
+          card.style.setProperty("--np-tint", "rgba(" + rgb[0] + "," + rgb[1] + "," + rgb[2] + ",0.32)");
+          card.style.setProperty("--np-glow", "rgb(" + rgb[0] + "," + rgb[1] + "," + rgb[2] + ")");
+          card.style.setProperty("--np-border", "rgba(" + rgb[0] + "," + rgb[1] + "," + rgb[2] + ",0.45)");
+          document.documentElement.style.setProperty("--np-glow", "rgb(" + rgb[0] + "," + rgb[1] + "," + rgb[2] + ")");
+        } else {
+          card.classList.remove("adaptive-tint");
+          if (rgb) document.documentElement.style.setProperty("--np-glow", "rgb(" + rgb[0] + "," + rgb[1] + "," + rgb[2] + ")");
+        }
+        if (rgb && SPOTIFY.sync_theme_colors) {
+          document.documentElement.classList.add("np-sync-colors");
+          document.documentElement.style.setProperty("--np-sync-bg", "rgba(" + rgb[0] + "," + rgb[1] + "," + rgb[2] + ",0.22)");
+          document.documentElement.style.setProperty("--np-sync-border", "rgba(" + rgb[0] + "," + rgb[1] + "," + rgb[2] + ",0.38)");
+          var lr = Math.min(255, rgb[0] + 125), lg = Math.min(255, rgb[1] + 125), lb = Math.min(255, rgb[2] + 125);
+          document.documentElement.style.setProperty("--np-sync-clock", "rgba(" + lr + "," + lg + "," + lb + ",0.38)");
+          document.documentElement.style.setProperty("--np-sync-shadow", "rgba(" + rgb[0] + "," + rgb[1] + "," + rgb[2] + ",0.35)");
+        } else {
+          document.documentElement.classList.remove("np-sync-colors");
+          document.documentElement.style.removeProperty("--np-sync-bg");
+          document.documentElement.style.removeProperty("--np-sync-border");
+          document.documentElement.style.removeProperty("--np-sync-clock");
+          document.documentElement.style.removeProperty("--np-sync-shadow");
+        }
+      });
+    } else {
+      el.classList.remove("adaptive-tint");
+      el.style.removeProperty("--np-tint");
+      el.style.removeProperty("--np-glow");
+      el.style.removeProperty("--np-border");
+      document.documentElement.classList.remove("np-sync-colors");
+      document.documentElement.style.removeProperty("--np-glow");
+      document.documentElement.style.removeProperty("--np-sync-bg");
+      document.documentElement.style.removeProperty("--np-sync-border");
+      document.documentElement.style.removeProperty("--np-sync-clock");
+      document.documentElement.style.removeProperty("--np-sync-shadow");
+    }
+
+    var primaryBtns = [];
     if (music.isSpotify && SPOTIFY.controls) {
       var actions = music.actions || 0;
       var canPrev = !actions || (actions & 16) !== 0;
@@ -2912,39 +3112,86 @@
       var canFF = !actions || (actions & 256) !== 0 || (actions & 64) !== 0;
       var canNext = !actions || (actions & 32) !== 0;
 
-      if (canPrev) btns.push({ act: "previous", label: t("np_prev"), icon: ICONS.prev });
-      if (canRewind) btns.push({ act: "rewind", label: t("np_rewind", { s: SPOTIFY.seek_seconds }), icon: ICONS.rewind });
-      if (canPlay) btns.push({ act: "play_pause", label: playing ? t("np_pause") : t("np_play"), icon: playing ? ICONS.pause : ICONS.play });
-      if (canFF) btns.push({ act: "fast_forward", label: t("np_ff", { s: SPOTIFY.seek_seconds }), icon: ICONS.ff });
-      if (canNext) btns.push({ act: "next", label: t("np_next"), icon: ICONS.next });
+      if (canPrev) primaryBtns.push({ act: "previous", label: t("np_prev"), icon: ICONS.prev });
+      if (canRewind) primaryBtns.push({ act: "rewind", label: t("np_rewind", { s: SPOTIFY.seek_seconds }), icon: ICONS.rewind });
+      if (canPlay) primaryBtns.push({ act: "play_pause", label: playing ? t("np_pause") : t("np_play"), icon: playing ? ICONS.pause : ICONS.play });
+      if (canFF) primaryBtns.push({ act: "fast_forward", label: t("np_ff", { s: SPOTIFY.seek_seconds }), icon: ICONS.ff });
+      if (canNext) primaryBtns.push({ act: "next", label: t("np_next"), icon: ICONS.next });
     } else if (music.isSpotify) {
-      btns = [
+      primaryBtns = [
         { act: "previous", label: t("np_prev"), icon: ICONS.prev },
         { act: "play_pause", label: playing ? t("np_pause") : t("np_play"), icon: playing ? ICONS.pause : ICONS.play },
         { act: "next", label: t("np_next"), icon: ICONS.next }
       ];
     } else {
-      // any other song: npButtons() as before (media keys, Open Spotify, Play on TV, the full screen view),
-      // the same list npPress acts on
-      btns = npButtons().map(function (b) { return { act: b[0], label: b[1], icon: ICONS[b[0]] }; });
+      primaryBtns = npButtons().map(function (b) { return { act: b[0], label: b[1], icon: ICONS[b[0]] }; });
     }
+
+    var extraBtns = [];
+    if (music.isSpotify) {
+      if (SPOTIFY.show_shuffle_repeat !== false) {
+        if (music.can_shuffle) {
+          var shufMode = music.shuffle || null;
+          extraBtns.push({
+            act: "shuffle", label: t("np_shuffle"), icon: ICONS.shuffle,
+            text: shufMode === "smart" ? t("np_shuffle_smart_short") : "",
+            active: shufMode === "normal" || shufMode === "smart", smart: shufMode === "smart", sm: true
+          });
+        }
+        if (music.can_repeat) {
+          var repMode = music.repeat || "off";
+          extraBtns.push({
+            act: "repeat", label: t("np_repeat"),
+            icon: repMode === "one" ? ICONS.repeatOne : ICONS.repeat,
+            active: repMode !== "off", sm: true
+          });
+        }
+      }
+      if (SPOTIFY.show_sleep_timer !== false) {
+        var sleepRem = musicSleepEnd > Date.now() ? Math.max(1, Math.ceil((musicSleepEnd - Date.now()) / 60000)) : musicSleepMin;
+        extraBtns.push({
+          act: "music_sleep", label: t("music_sleep"), icon: ICONS.moon,
+          text: sleepRem > 0 ? (sleepRem + "m") : "", active: sleepRem > 0, sm: true
+        });
+      }
+      if (SPOTIFY.show_audio_output !== false && TV && TV.audioOutputInfo) {
+        var outIcon = audioOutput.type === "bluetooth" ? ICONS.bluetooth : (audioOutput.type === "hdmi" ? ICONS.hdmi : ICONS.soundscape);
+        var rawOut = (audioOutput.name || "").replace(/^[-\s]+/, "").trim();
+        var outName = (audioOutput.type === "bluetooth" && rawOut) ? rawOut : t("audio_out_" + (audioOutput.type || "speaker"));
+        extraBtns.push({ act: "audio_output", label: t("audio_output"), icon: outIcon, text: outName, sm: true });
+      }
+      if (SPOTIFY.show_jump_app !== false) {
+        extraBtns.push({ act: "open_app", label: t("np_open_app"), icon: ICONS.launch, sm: true });
+      }
+    }
+
+    var btns = primaryBtns.concat(extraBtns);
+    npPrimaryCount = primaryBtns.length;
     currentNpBtns = music.isSpotify ? btns : [];
     if (npI >= btns.length) npI = Math.max(0, btns.length - 1);
 
     var curPos = getPlaybackPosition();
     var hasDuration = music.duration && music.duration > 0;
+    var dispPos = (zone === "np" && npSub === "bar") ? npScrubPos : curPos;
+    var pct = hasDuration ? Math.min(100, Math.max(0, (dispPos / music.duration) * 100)) : 0;
     var progHtml = hasDuration ? (
-      '<div class="np-prog-wrap">' +
-        '<span class="np-time" id="np-pos">' + fmtTime(curPos) + '</span>' +
-        '<div class="np-bar"><div class="np-fill" id="np-fill" style="width:' + Math.min(100, Math.max(0, (curPos / music.duration) * 100)) + '%"></div></div>' +
+      '<div class="np-prog-wrap' + (zone === "np" && npSub === "bar" ? " focus" : "") + '" id="np-prog-wrap">' +
+        '<span class="np-time" id="np-pos">' + fmtTime(dispPos) + '</span>' +
+        '<div class="np-bar" id="np-bar">' +
+          '<div class="np-fill" id="np-fill" style="width:' + pct + '%"></div>' +
+          '<div class="np-scrub-tip" id="np-scrub-tip" style="left:' + pct + '%">' + fmtTime(dispPos) + '</div>' +
+        '</div>' +
         '<span class="np-time">' + fmtTime(music.duration) + '</span>' +
       '</div>'
     ) : '';
 
     var showApp = SPOTIFY.show_app !== false;
     el.classList.toggle("no-app", !showApp);
+    el.classList.toggle("np-mini", NIGHT && SPOTIFY.card_style === "mini");
+    el.classList.toggle("np-art-square", !!(NIGHT && SPOTIFY.card_style === "mini" && (SPOTIFY.mini_art || "wide") === "square"));
     var appLabel = (music.app && music.app.name) || (music.isSpotify ? "Spotify" : t("np_head"));
     var appHtml = showApp ? ('<span class="np-app">' + esc(appLabel) + "</span>") : '';
+
     var titleMode = SPOTIFY.title_mode || "pingpong";
     var titleContent = "";
     if (titleMode === "continuous") {
@@ -2968,12 +3215,31 @@
       '</div>';
     }
 
-    el.innerHTML = art + '<div class="np-t">' + appHtml +
+    var primaryHtml = primaryBtns.map(function (b, i) {
+      return '<span class="nb' + (zone === "np" && npSub === "btns" && i === npI ? " focus" : "") + '" role="button" aria-label="' + esc(b.label) + '">' + b.icon + "</span>";
+    }).join("");
+
+    var upNextHtml = (SPOTIFY.show_up_next !== false && music.up_next_title) ? (
+      '<div class="np-up-next">' + esc(t("np_up_next")) + ' <b>' + esc(music.up_next_title) + '</b>' +
+      (music.up_next_artist ? (' · ' + esc(music.up_next_artist)) : '') + '</div>'
+    ) : '';
+
+    var extraHtml = (upNextHtml || extraBtns.length) ? (
+      '<div class="np-extra">' + upNextHtml +
+        (extraBtns.length ? ('<div class="np-sub-ctl">' + extraBtns.map(function (b, j) {
+          var idx = primaryBtns.length + j;
+          return '<span class="nb nb-sm' + (b.active ? " active" : "") + (b.smart ? " np-smart" : "") + (zone === "np" && npSub === "btns" && idx === npI ? " focus" : "") +
+            '" role="button" aria-label="' + esc(b.label) + '">' + b.icon +
+            (b.text ? ('<span class="nb-label">' + esc(b.text) + '</span>') : '') + "</span>";
+        }).join("") + '</div>') : '') +
+      '</div>'
+    ) : '';
+
+    el.innerHTML = '<div class="np-main-row">' + art + '<div class="np-t">' + appHtml +
       titleContent + "<small>" + esc(music.artist || music.album || "") + "</small>" +
       progHtml + "</div>" +
-      '<div class="np-ctl">' + btns.map(function (b, i) {
-        return '<span class="nb' + (zone === "np" && i === npI ? " focus" : "") + '" role="button" aria-label="' + esc(b.label) + '">' + b.icon + "</span>";
-      }).join("") + "</div>";
+      '<div class="np-ctl">' + primaryHtml + "</div></div>" + extraHtml;
+
     updateTitleMarquee();
     startProgressTimer();
     npFit([music.title, music.artist || music.album || "", btns.length].join("\n"));
@@ -2989,8 +3255,16 @@
       return;
     }
     var wrapWidth = wrap.clientWidth;
+    if (wrapWidth === 0) {
+      if (!wrap.dataset.mqRetry) {
+        wrap.dataset.mqRetry = "1";
+        requestAnimationFrame(updateTitleMarquee);
+      }
+      wrap.classList.remove("overflowing");
+      return;
+    }
     var titleWidth = titleEl.scrollWidth;
-    if (wrapWidth > 0 && titleWidth > wrapWidth + 4) {
+    if (titleWidth > wrapWidth + 4) {
       wrap.classList.add("overflowing");
       var overflow = titleWidth - wrapWidth;
       wrap.style.setProperty("--marquee-overflow", overflow + "px");
@@ -3038,8 +3312,15 @@
       speed: s.speed || 0.0,
       actions: s.actions || 0,
       art: s.art || null,
+      up_next_title: s.up_next_title || null,
+      up_next_artist: s.up_next_artist || null,
+      shuffle: s.shuffle || null,
+      repeat: s.repeat || null,
+      can_shuffle: !!s.can_shuffle,
+      can_repeat: !!s.can_repeat,
       app: { name: "Spotify", package: s.package || "com.spotify.tv.android" }
     };
+    refreshAudioOutput(false);
     renderNp();
     if (had !== !!music && zone === "np" && !music) paintFocus();
   }
@@ -3134,12 +3415,37 @@
     });
   }
 
+  function npCommitSeek(targetMs) {
+    if (!music) return;
+    music.position = targetMs;
+    music.lastUpdateLocal = Date.now();
+    npSub = "btns";
+    renderNp();
+    if (TV && TV.spotifyControl) {
+      TV.spotifyControl("seek", targetMs);
+      setTimeout(refreshSpotify, 600);
+    } else if (!OFFLINE) {
+      api("POST", "/api/spotify/control", { action: "seek", position: targetMs }).catch(function (e) { note(e.message); });
+      setTimeout(refreshSpotify, 600);
+    }
+  }
+
   function npPress() {
     if (!music) return;
+    if (music.isSpotify && npSub === "bar") {
+      npCommitSeek(npScrubPos);
+      return;
+    }
     if (music.isSpotify && currentNpBtns.length) {
       var btn = currentNpBtns[npI];
       if (!btn) return;
       var act = btn.act;
+      if (act === "music_sleep") { toggleMusicSleep(); return; }
+      if (act === "open_app") { jumpIntoMusicApp(); return; }
+      if (act === "audio_output") {
+        if (TV && TV.openAudioOutput) TV.openAudioOutput();
+        return;
+      }
       if (TV && TV.spotifyControl) {
         if (act === "play_pause") {
           music.state = music.state === "playing" ? "paused" : "playing";
@@ -3150,6 +3456,20 @@
           TV.spotifyControl("rewind", SPOTIFY.seek_seconds * 1000);
         } else if (act === "fast_forward") {
           TV.spotifyControl("fast_forward", SPOTIFY.seek_seconds * 1000);
+        } else if (act === "shuffle") {
+          var curS = music.shuffle;
+          var nextS = !curS ? null : (curS === "off" ? "normal" : (curS === "normal" ? "smart" : "off"));
+          TV.spotifyControl("shuffle", nextS === "off" ? 0 : (nextS === "smart" ? 2 : 1));
+          toast(nextS ? t("np_shuffle_" + nextS) : t("np_shuffle_toggled"));
+          setTimeout(refreshSpotify, 350);
+          return;
+        } else if (act === "repeat") {
+          var curR = music.repeat || "off";
+          var nextR = curR === "off" ? "all" : (curR === "all" ? "one" : "off");
+          TV.spotifyControl("repeat", nextR === "all" ? 2 : (nextR === "one" ? 1 : 0));
+          toast(t("np_repeat_" + nextR));
+          setTimeout(refreshSpotify, 350);
+          return;
         } else {
           TV.spotifyControl(act, 0);
         }
@@ -4061,7 +4381,15 @@
     // custom cards keep the row (and its heading) even with Keep watching switched off
     document.documentElement.classList.toggle("kw-off", !KW_ON && !CARDS.length);
     var following = followName();
-    $("shelf-title").textContent = following ? t("recently_on", { app: following }) : t(data.shows.length || !CARDS.length ? "keep_watching" : "custom_cards");
+    var kwText = following ? t("recently_on", { app: following }) : t(data.shows.length || !CARDS.length ? "keep_watching" : "custom_cards");
+    var headMode = SPOTIFY.separate_row === false || SPOTIFY.separate_row === "kw" ? "kw" : (SPOTIFY.separate_row === "none" ? "none" : "np");
+    if (NIGHT && npVisible() && headMode === "none") {
+      $("shelf-title").textContent = rowHasCards() ? kwText : "";
+    } else if (NIGHT && npVisible() && headMode === "np") {
+      $("shelf-title").textContent = rowHasCards() ? (t("np_head") + " · " + kwText) : t("np_head");
+    } else {
+      $("shelf-title").textContent = kwText;
+    }
     shelfShown = shelfKey();
     renderPeople();
     if (!KW_ON) { track.innerHTML = ""; shelfEls = []; addCards(track); return; }   // row switched off: only the custom cards, if any
@@ -4853,7 +5181,7 @@
       if (NIGHT) {
         var gEl = $("grid"), sEl = $("shelf-section");
         if (gEl && sEl) {
-          if ((SPOTIFY.align || "classic") === "center") {
+          if ((SPOTIFY.card_style || "compact") !== "mini" && (SPOTIFY.align || "classic") === "center") {
             var gw = gEl.offsetWidth;
             if (gw > 0) sEl.style.width = gw + "px";
           } else {
@@ -5117,7 +5445,52 @@
       return;
     }
     if (zone === "np") {
+      var isMini = NIGHT && SPOTIFY.card_style === "mini";
+      var hasBar = !!(music && music.isSpotify && music.duration > 0 && SPOTIFY.scrub_bar !== false && $("np-prog-wrap"));
       var maxNp = Math.max(0, (currentNpBtns.length || npButtons().length) - 1);
+      var pCount = music && music.isSpotify ? Math.min(npPrimaryCount || (maxNp + 1), maxNp + 1) : (maxNp + 1);
+      var hasExtra = music && music.isSpotify && (maxNp + 1 > pCount);
+      var inExtra = npSub === "btns" && hasExtra && npI >= pCount;
+
+      if (music && music.isSpotify && npSub === "bar") {
+        if (dx) {
+          var stepMs = (SPOTIFY.seek_seconds || 10) * 1000;
+          npScrubPos = Math.max(0, Math.min(music.duration || 0, npScrubPos + dx * stepMs));
+          var pct = music.duration ? Math.min(100, Math.max(0, (npScrubPos / music.duration) * 100)) : 0;
+          var posEl = $("np-pos"), fillEl = $("np-fill"), tipEl = $("np-scrub-tip");
+          if (posEl) posEl.textContent = fmtTime(npScrubPos);
+          if (fillEl) fillEl.style.width = pct + "%";
+          if (tipEl) { tipEl.style.left = pct + "%"; tipEl.textContent = fmtTime(npScrubPos); }
+          return;
+        }
+        if (dy < 0) {
+          npSub = "btns";
+          if (isMini) {
+            if (peopleOn()) toPeople(); else if (hasQuick()) { zone = "quick"; qi = 0; }
+          } else {
+            npI = hasExtra ? pCount : 0;
+          }
+          paintFocus();
+          return;
+        }
+        if (dy > 0) {
+          npSub = "btns";
+          if (isMini) {
+            npI = Math.min(npI, pCount - 1);
+            paintFocus();
+            return;
+          }
+          // Compact: Down from bar exits to grid
+          if (gridEls.length) {
+            var npBox = $("np").getBoundingClientRect();
+            g = nearestInRow(0, npBox.left + npBox.width / 2);
+            zone = "grid";
+          }
+          paintFocus();
+          return;
+        }
+      }
+
       if (LOOP) {
         if (dx > 0 && npI === maxNp) { if (hasQuick()) { zone = "quick"; qi = 0; } }
         else if (dx) npI = Math.max(0, Math.min(maxNp, npI + dx));
@@ -5131,15 +5504,38 @@
           }
         }
       } else if (NIGHT) {
-        if (dx > 0 && npI === maxNp) { if (footballEnabled && !LOOP) zone = "football"; else if (cards.length) { zone = "shelf"; s = 0; } }
-        else if (dx) npI = Math.max(0, Math.min(maxNp, npI + dx));
-        else if (dy < 0) { if (peopleOn()) toPeople(); else if (hasQuick()) { zone = "quick"; qi = 0; } }
-        else if (dy > 0 && gridEls.length) {
-          var btns = $("np") ? $("np").querySelectorAll(".nb") : [];
-          var bEl = btns[npI];
-          var midX = bEl ? (bEl.getBoundingClientRect().left + bEl.getBoundingClientRect().width / 2) : ($("np").getBoundingClientRect().left + $("np").getBoundingClientRect().width / 2);
-          g = nearestInRow(0, midX);
-          zone = "grid";
+        if (dx) {
+          var rowMin = inExtra ? pCount : 0;
+          var rowMax = inExtra ? maxNp : (pCount - 1);
+          if (dx > 0 && npI === rowMax) {
+            if (footballEnabled && !LOOP) zone = "football";
+            else if (cards.length) { zone = "shelf"; s = 0; }
+          } else {
+            npI = Math.max(rowMin, Math.min(rowMax, npI + dx));
+          }
+        } else if (dy < 0) {
+          if (inExtra) {
+            npI = Math.min(pCount - 1, Math.max(0, npI - pCount));
+          } else if (isMini && hasBar) {
+            npSub = "bar";
+            npScrubPos = getPlaybackPosition();
+          } else {
+            if (peopleOn()) toPeople();
+            else if (hasQuick()) { zone = "quick"; qi = 0; }
+          }
+        } else if (dy > 0) {
+          if (!inExtra && hasExtra) {
+            npI = Math.min(maxNp, pCount + Math.min(npI, maxNp - pCount));
+          } else if (!isMini && hasBar) {
+            npSub = "bar";
+            npScrubPos = getPlaybackPosition();
+          } else if (gridEls.length) {
+            var btns = $("np") ? $("np").querySelectorAll(".nb") : [];
+            var bEl = btns[npI];
+            var midX = bEl ? (bEl.getBoundingClientRect().left + bEl.getBoundingClientRect().width / 2) : ($("np").getBoundingClientRect().left + $("np").getBoundingClientRect().width / 2);
+            g = nearestInRow(0, midX);
+            zone = "grid";
+          }
         }
       } else {
         // Classic: top right, under the quick buttons
@@ -5426,6 +5822,7 @@
     if (zone === "pmenu") { if (plift) dropPeople(); else closePop(); paintFocus(); return; }
     if (zone === "menu") { closeMenu(); paintFocus(); return; }   // BACK just closes the sleep choices
     if (zone === "inputs") { closeInputMenu(); paintFocus(); return; }
+    if (zone === "np" && npSub === "bar") { npSub = "btns"; paintFocus(); return; }
     if (expanded) {
       expanded = false; renderGrid();
       if (dockBack) {   // opened from the More apps tile: Back lands on that tile in the dock again
@@ -5454,6 +5851,7 @@
       return true;
     }
     if (zone === "shelf") return openShelfMenu();
+    if (zone === "np") { jumpIntoMusicApp(); return true; }
     if (zone === "grid" && NIGHT) return holdApp();
     return false;
   }
@@ -5632,7 +6030,7 @@
   // Saved on this TV (page storage and the launcher's own store, TVOS.keep) and, with a bridge,
   // also on the computer (/api/settings), so the phone and the TV agree.
   var ST_KEY = "tvhome.settings";
-  var SECS = [["language", "globe"], ["location", "pin"], ["weather", "cloud"], ["look", "look"],
+  var SECS = [["language", "globe"], ["location", "pin"], ["weather", "cloud"], ["look", "look"], ["music", "note"],
     ["apps", "apps"], ["people", "person"], ["quick", "bolt"], ["designer", "designer"], ["about", "info"]];
   var SET = { col: "secs", sec: 0, ri: 0, keyFocus: null, sub: null, lift: null, confirm: null, dirty: false, typing: null,
     msg: "", geo: { q: "", list: null, busy: false, err: false } };
@@ -5941,6 +6339,7 @@
     if (id === "location") return locationRows();
     if (id === "weather") return weatherRows();
     if (id === "look") return lookRows();
+    if (id === "music") return musicRows();
     if (id === "spotify") return spotifyRows();
     if (id === "designer") return designerRows();
     if (id === "apps") return appsRows();
@@ -6811,19 +7210,6 @@
       VIDEO_ON = !!VIDEO_URL && (typeof ST.video === "boolean" ? ST.video : true) && !LOOP;
       startVideo(); sceneVideos(true);
     } });
-    // Now playing (#31): the card with the song and its buttons; it needs the computer or the on-TV app
-    rows.push(head(t("np_head")));
-    rows.push({ kind: "toggle", key: "now-playing", label: t("np_show"), value: NP_ON ? t("on") : t("off"), act: function () {
-      NP_ON = !NP_ON; ST.now_playing = NP_ON; saveSettings(); refreshMusic();
-    } });
-    rows.push({ kind: "toggle", key: "ambient-music", label: t("ambient_music"), value: AMBIENT_MUSIC ? t("on") : t("off"), act: function () {
-      AMBIENT_MUSIC = !AMBIENT_MUSIC; ST.ambient_music = AMBIENT_MUSIC; saveSettings(); renderAmbientMusic();
-    } });
-    rows = rows.concat(npLookRows());
-    rows.push(info("np-note", t(OFFLINE ? "np_note_offline" : "np_note")));
-    // the local Spotify card (#321) sits under Now playing here, not in a section of its own: one more
-    // section pushed the last one off a 1080 screen
-    rows = rows.concat(spotifyRows());
     rows.push(head(t("photos_head")));
     rows.push(info("photos-count", photoCountText()));
     if (canPick()) rows.push({ kind: "action", key: "photo-pick", label: t("photos_pick"), sub: t("photos_pick_sub"), act: pickPhotos });
@@ -6971,9 +7357,57 @@
   // App name, Long titles and Card alignment shape every music app's Now playing card (and align the Night
   // look's Keep watching row), so they sit under Now playing on every home, not only where Spotify's card
   // works. They are still kept in ST.spotify, where 0.13.11 saved them.
+  function musicRows() {
+    var rows = [];
+    rows.push(head(t("np_head")));
+    rows.push({ kind: "toggle", key: "now-playing", label: t("np_show"), value: NP_ON ? t("on") : t("off"), act: function () {
+      NP_ON = !NP_ON; ST.now_playing = NP_ON; saveSettings(); refreshMusic();
+    } });
+    rows.push({ kind: "toggle", key: "ambient-music", label: t("ambient_music"), value: AMBIENT_MUSIC ? t("on") : t("off"), act: function () {
+      AMBIENT_MUSIC = !AMBIENT_MUSIC; ST.ambient_music = AMBIENT_MUSIC; saveSettings(); renderAmbientMusic();
+    } });
+    rows = rows.concat(npLookRows());
+    rows.push(info("np-note", t(OFFLINE ? "np_note_offline" : "np_note")));
+    rows = rows.concat(spotifyRows());
+    return rows;
+  }
+
   function npLookRows() {
     function keep(k, v) { ST.spotify = ST.spotify || {}; ST.spotify[k] = v; saveSettings(); }
-    return [
+    var isMini = (SPOTIFY.card_style || "compact") === "mini";
+    var headMode = SPOTIFY.separate_row === false || SPOTIFY.separate_row === "kw" ? "kw" : (SPOTIFY.separate_row === "none" ? "none" : "np");
+    var rows = [
+      { kind: "cycle", key: "spotify-separate-row", label: t("spotify_separate_row"), value: t("spotify_heading_" + headMode), act: function () {
+        var cur = SPOTIFY.separate_row === false || SPOTIFY.separate_row === "kw" ? "kw" : (SPOTIFY.separate_row === "none" ? "none" : "np");
+        var choices = ["np", "kw", "none"];
+        SPOTIFY.separate_row = choices[(choices.indexOf(cur) + 1) % choices.length];
+        keep("separate_row", SPOTIFY.separate_row); renderNp(); renderShelf(); renderSettings();
+      } },
+      { kind: "cycle", key: "spotify-card-style", label: t("spotify_card_style"), value: t("spotify_style_" + (SPOTIFY.card_style || "compact")), act: function () {
+        var choices = ["compact", "mini"];
+        SPOTIFY.card_style = choices[(choices.indexOf(SPOTIFY.card_style || "compact") + 1) % choices.length];
+        keep("card_style", SPOTIFY.card_style); applySpotifyAlign(); renderNp(); renderGrid(); renderShelf(); renderSettings();
+      } }
+    ];
+    if (isMini) {
+      rows.push({ kind: "cycle", key: "spotify-mini-align", label: t("spotify_mini_align"), value: t("spotify_mini_align_" + (SPOTIFY.mini_align || "classic")), act: function () {
+        var choices = ["classic", "right"];
+        SPOTIFY.mini_align = choices[(choices.indexOf(SPOTIFY.mini_align || "classic") + 1) % choices.length];
+        keep("mini_align", SPOTIFY.mini_align); applySpotifyAlign(); renderNp(); renderShelf();
+      } });
+      rows.push({ kind: "cycle", key: "spotify-mini-art", label: t("spotify_mini_art"), value: t("spotify_mini_art_" + (SPOTIFY.mini_art || "wide")), act: function () {
+        var choices = ["wide", "square"];
+        SPOTIFY.mini_art = choices[(choices.indexOf(SPOTIFY.mini_art || "wide") + 1) % choices.length];
+        keep("mini_art", SPOTIFY.mini_art); renderNp();
+      } });
+    } else {
+      rows.push({ kind: "cycle", key: "spotify-align", label: t("spotify_align"), value: t("spotify_align_" + (SPOTIFY.align || "classic")), act: function () {
+        var choices = ["classic", "center", "dock_center"];
+        SPOTIFY.align = choices[(choices.indexOf(SPOTIFY.align || "classic") + 1) % choices.length];
+        keep("align", SPOTIFY.align); applySpotifyAlign(); renderGrid(); renderShelf();
+      } });
+    }
+    return rows.concat([
       { kind: "toggle", key: "spotify-show-app", label: t("spotify_show_app"), value: SPOTIFY.show_app !== false ? t("on") : t("off"), act: function () {
         SPOTIFY.show_app = SPOTIFY.show_app === false; keep("show_app", SPOTIFY.show_app); renderNp();
       } },
@@ -6982,12 +7416,16 @@
         SPOTIFY.title_mode = choices[(choices.indexOf(SPOTIFY.title_mode || "pingpong") + 1) % choices.length];
         keep("title_mode", SPOTIFY.title_mode); renderNp();
       } },
-      { kind: "cycle", key: "spotify-align", label: t("spotify_align"), value: t("spotify_align_" + (SPOTIFY.align || "classic")), act: function () {
-        var choices = ["classic", "center"];
-        SPOTIFY.align = choices[(choices.indexOf(SPOTIFY.align || "classic") + 1) % choices.length];
-        keep("align", SPOTIFY.align); applySpotifyAlign(); renderGrid(); renderShelf();
+      { kind: "toggle", key: "spotify-adaptive-tint", label: t("spotify_adaptive_tint"), value: SPOTIFY.adaptive_tint !== false ? t("on") : t("off"), act: function () {
+        SPOTIFY.adaptive_tint = SPOTIFY.adaptive_tint === false; keep("adaptive_tint", SPOTIFY.adaptive_tint); renderNp();
+      } },
+      { kind: "toggle", key: "spotify-sync-colors", label: t("spotify_sync_colors"), value: SPOTIFY.sync_theme_colors ? t("on") : t("off"), act: function () {
+        SPOTIFY.sync_theme_colors = !SPOTIFY.sync_theme_colors; keep("sync_theme_colors", SPOTIFY.sync_theme_colors); renderNp();
+      } },
+      { kind: "toggle", key: "spotify-waveform", label: t("spotify_waveform"), value: SPOTIFY.waveform !== false ? t("on") : t("off"), act: function () {
+        SPOTIFY.waveform = SPOTIFY.waveform === false; keep("waveform", SPOTIFY.waveform); renderNp();
       } }
-    ];
+    ]);
   }
 
   function spotifyRows() {
@@ -7047,6 +7485,84 @@
           SPOTIFY.controls = !SPOTIFY.controls;
           ST.spotify = ST.spotify || {};
           ST.spotify.controls = SPOTIFY.controls;
+          saveSettings();
+          renderNp();
+        }
+      });
+      rows.push({
+        kind: "toggle",
+        key: "spotify-scrub-bar",
+        label: t("spotify_scrub_bar"),
+        value: SPOTIFY.scrub_bar !== false ? t("on") : t("off"),
+        act: function () {
+          SPOTIFY.scrub_bar = SPOTIFY.scrub_bar === false;
+          ST.spotify = ST.spotify || {};
+          ST.spotify.scrub_bar = SPOTIFY.scrub_bar;
+          saveSettings();
+          renderNp();
+        }
+      });
+      rows.push({
+        kind: "toggle",
+        key: "spotify-shuffle-repeat",
+        label: t("spotify_shuffle_repeat"),
+        value: SPOTIFY.show_shuffle_repeat !== false ? t("on") : t("off"),
+        act: function () {
+          SPOTIFY.show_shuffle_repeat = SPOTIFY.show_shuffle_repeat === false;
+          ST.spotify = ST.spotify || {};
+          ST.spotify.show_shuffle_repeat = SPOTIFY.show_shuffle_repeat;
+          saveSettings();
+          renderNp();
+        }
+      });
+      rows.push({
+        kind: "toggle",
+        key: "spotify-up-next",
+        label: t("spotify_up_next"),
+        value: SPOTIFY.show_up_next !== false ? t("on") : t("off"),
+        act: function () {
+          SPOTIFY.show_up_next = SPOTIFY.show_up_next === false;
+          ST.spotify = ST.spotify || {};
+          ST.spotify.show_up_next = SPOTIFY.show_up_next;
+          saveSettings();
+          renderNp();
+        }
+      });
+      rows.push({
+        kind: "toggle",
+        key: "spotify-jump-app",
+        label: t("spotify_jump_app"),
+        value: SPOTIFY.show_jump_app !== false ? t("on") : t("off"),
+        act: function () {
+          SPOTIFY.show_jump_app = SPOTIFY.show_jump_app === false;
+          ST.spotify = ST.spotify || {};
+          ST.spotify.show_jump_app = SPOTIFY.show_jump_app;
+          saveSettings();
+          renderNp();
+        }
+      });
+      rows.push({
+        kind: "toggle",
+        key: "spotify-sleep-timer",
+        label: t("spotify_sleep_timer"),
+        value: SPOTIFY.show_sleep_timer !== false ? t("on") : t("off"),
+        act: function () {
+          SPOTIFY.show_sleep_timer = SPOTIFY.show_sleep_timer === false;
+          ST.spotify = ST.spotify || {};
+          ST.spotify.show_sleep_timer = SPOTIFY.show_sleep_timer;
+          saveSettings();
+          renderNp();
+        }
+      });
+      rows.push({
+        kind: "toggle",
+        key: "spotify-audio-output",
+        label: t("spotify_audio_output"),
+        value: SPOTIFY.show_audio_output !== false ? t("on") : t("off"),
+        act: function () {
+          SPOTIFY.show_audio_output = SPOTIFY.show_audio_output === false;
+          ST.spotify = ST.spotify || {};
+          ST.spotify.show_audio_output = SPOTIFY.show_audio_output;
           saveSettings();
           renderNp();
         }
@@ -7938,6 +8454,8 @@
       var cls = "ssec" + (i === SET.sec ? (SET.col === "secs" ? " focus" : " on") : "");
       return '<div class="' + cls + '"><i>' + ICONS[sc[1]] + "</i><span>" + esc(secName(sc[0])) + "</span></div>";
     }).join("");
+    var curSecEl = $("set-secs").querySelector(".ssec.focus, .ssec.on");
+    if (curSecEl && curSecEl.scrollIntoView) curSecEl.scrollIntoView({ block: "nearest" });
     $("set-crumb").textContent = SET.sub ? SET.sub.crumb : "";
     $("set-head").textContent = SET.sub ? SET.sub.title() : secName(secsNow()[SET.sec][0]);
     var box = $("set-rows");
