@@ -6376,6 +6376,7 @@
         if (CLOCK24 !== clock24()) { CLOCK24 = !CLOCK24; glassShown = ""; clock(); }
       } };
     }) : [];
+    if (inboxCan()) rows.unshift(inboxRow("top-inbox-now"));   // a linked TV: Get my new design, at the top
     rows.push(info("lang-note", t("lang_note")));
     return rows;
   }
@@ -6719,7 +6720,8 @@
     if (!next) { next = now + CouchDesignCode.INBOX_WEEK * 1000; inboxTime("next", next); }
     inboxLater(Math.max(1, (next - now) / 1000));
   }
-  // why: "open" (the page started), "front" (tv.resume), "now" (the person pressed Check), "week" (the timer).
+  // why: "open" (the page started), "front" (tv.resume), "now" (the person pressed Get my new design), "week" (the timer),
+  // "card" (the Make it yours card is open on a linked TV: makeitCheck).
   // Answers whether the app was asked (or a kept send is being fetched).
   function inboxAsk(why) {
     var now = Date.now();
@@ -6729,7 +6731,7 @@
     var away = !seen || seen > now || now - seen >= CouchDesignCode.INBOX_AWAY * 1000;
     var due = !!inboxTime("next") && now >= inboxTime("next");
     inboxTime("seen", now);
-    var go = why === "now" || why === "week" || due || ((why === "open" || why === "front") && away);
+    var go = why === "now" || why === "card" || why === "week" || due || ((why === "open" || why === "front") && away);
     if (!go || now < inboxTime("wait")) { inboxArm(); return false; }
     inboxTime("last", now);
     inboxTime("next", now + CouchDesignCode.INBOX_WEEK * 1000);   // until the answer says otherwise
@@ -6748,18 +6750,20 @@
   // Home settings, Designs, Check for new designs now
   function inboxCheckNow() {
     var now = Date.now();
+    if (!inboxCan()) { SET.msg = INBOX_SAID.unlinked; return; }
     if (now < inboxTime("wait")) { SET.msg = "Couch TV Studio asked this TV to wait. Try again in a few minutes."; return; }
-    if (now - inboxTime("last") < INBOX_PRESS_MS) { SET.msg = "Looked a moment ago. Try again in a minute."; return; }
+    // one press is one look, and the next one waits 30 s (INBOX_PRESS_MS) from the last look of any kind
+    if (now - inboxTime("last") < INBOX_PRESS_MS) { SET.msg = "Looked a moment ago. Try again in 30 seconds."; return; }
     ACCT_INBOX.manual = true;
-    if (inboxAsk("now")) SET.msg = "Looking for new designs from your account.";
-    else { ACCT_INBOX.manual = false; SET.msg = "Could not look just now. Try again in a minute."; }
+    if (inboxAsk("now")) SET.msg = "Looking for your new design.";
+    else { ACCT_INBOX.manual = false; SET.msg = INBOX_SAID.fail; }
   }
   var INBOX_SAID = {
-    none: "No new designs from your account.",
-    item: "Getting the design...",
+    none: "Nothing new yet.",
+    item: "A new design arrived. Getting it...",
     wait: "Couch TV Studio asked this TV to wait. Try again in a few minutes.",
-    fail: "Could not reach your Couch TV account. Check the TV is online, then try again.",   // "fail", not "error": a TV word, not an error sent to the phone
-    unlinked: "This TV is no longer linked to your account. A typed code still works."
+    fail: "No internet. Check the TV is online, then try again.",   // "fail", not "error": a TV word, not an error sent to the phone
+    unlinked: "This TV is not linked to your account."
   };
   function accountInbox(raw) {
     if (typeof CouchDesignCode === "undefined" || !CouchDesignCode.readInboxAnswer) return;
@@ -6772,6 +6776,7 @@
       ACCT_INBOX.shown = a.state === "item";   // the fetch that follows says how it went
       if (zone === "settings") renderSettings();
     }
+    makeitAnswered(a);
     if (a.state === "unlinked") { inboxStop(); return; }   // the app forgot the link; a typed code still works
     if (a.state === "item") takeAccountDesign(a);
     if (!PAGE_PAUSED && !ACCT_INBOX.stopped) inboxArm();
@@ -6828,14 +6833,19 @@
   // press asks, a second press unlinks: the TV stops getting what the account sends; the design and the
   // names already here stay (Home settings, People takes the account's names off).
   var UNLINK_ASK = 0;
+  // Get my new design: one press is one look at the account's inbox (30 s between looks), with a plain answer.
+  // Also the first row of Home settings (languageRows) on a linked TV, so it is Settings, Right, OK.
+  function inboxRow(key) {
+    return { kind: "action", key: key, label: "Get my new design",
+      sub: "Sent a design from your account? This looks for it now. It also comes by itself when the TV wakes, or once a week", act: inboxCheckNow };
+  }
   function accountRows(rows) {
     if (typeof CouchDesignCode === "undefined" || !CouchDesignCode.linked) return;
     var u = CouchDesignCode.undoHeld && CouchDesignCode.undoHeld();
     if (u) rows.push({ kind: "action", key: "dz-undo", label: "Undo the new design", sub: "Puts back what this TV had before " +
       (u.title ? "“" + u.title + "”" : "the design") + " came from your account", act: undoAccountDesign });
     if (!CouchDesignCode.linked()) return;
-    if (inboxCan()) rows.push({ kind: "action", key: "dz-inbox-now", label: "Check for new designs now",
-      sub: "Designs you send from your account come by themselves when the TV wakes, or once a week. This looks now", act: inboxCheckNow });
+    if (inboxCan()) rows.push(inboxRow("dz-inbox-now"));
     var asking = UNLINK_ASK && Date.now() - UNLINK_ASK < 15000;
     rows.push({ kind: "action", key: "dz-unlink", label: asking ? "Press OK again to unlink" : "Unlink this TV from your account",
       sub: asking ? "This TV stops getting designs your Couch TV Studio account sends. What is on it now stays." :
@@ -8193,16 +8203,64 @@
     document.body.appendChild(el);
     if (makeitAway) clearTimeout(makeitAway);
     makeitAway = setTimeout(makeitClose, MAKEIT_AWAY);
+    makeitWindowStart();
   }
   function makeitClose() {
     if (zone !== "makeit") return;
     if (makeitAway) { clearTimeout(makeitAway); makeitAway = 0; }
+    makeitWindowStop();
     var el = $("makeit");
     if (el && el.parentNode) el.parentNode.removeChild(el);   // out of the page, nothing left behind
     var p = makeitPrev; makeitPrev = null;
     if (p && (p.zone === "grid" || p.zone === "shelf" || p.zone === "people" || p.zone === "quick")) { zone = p.zone; s = p.s; g = p.g; paintFocus(); }
     else { zone = "grid"; startFocus(); paintFocus(); }
   }
+  // ---- the look for a design while the Make it yours card is open (owner, 25 Nov 2026) ----
+  // The TV asks the account's inbox only when someone expects a design. While the card is open and in front, on a
+  // linked TV, it looks every 20 s, at most 45 looks (15 minutes) in the whole life of the TV: the count is kept, so a
+  // restart, or the card shown again from Home settings, goes on from what is left and never starts over. It stops the
+  // moment a design arrives, the card closes (Back, OK, Home, Settings, a pointer click, an app, the screensaver, screen
+  // off, sleep), the page is hidden, or the TV goes offline; it comes on again only while the card is still open and
+  // in front. A TV that is not linked asks nothing. If Setup links the TV while the card is open (the app's start
+  // from Setup with the link calls tv.setupDesign), it starts then. A look that fails (no internet, a busy server) waits twice as long
+  // each time, up to 160 s, and still counts. A 429 (the app answers "wait") ends the window for good.
+  // Nothing else in the home starts a look: the Home key, opening the home and the weekly look are as they were.
+  var MAKEIT_CHK = "tvhome.makeit.looks", MAKEIT_MAX = 45;
+  var MAKEIT_EVERY = (MOCK || PREVIEW) && /[?&]makeitevery=(\d+)/.test(Q) ? +RegExp.$1 : 20000;
+  var makeitTick = 0, makeitBack = 0;
+  function makeitLooks() { var n = +kept(MAKEIT_CHK); return n > 0 ? Math.min(n, MAKEIT_MAX) : 0; }
+  function makeitWindowOk() {
+    return zone === "makeit" && !document.hidden && !PAGE_PAUSED && !screenOffActive && !idleAmbientActive &&
+      navigator.onLine !== false && makeitLooks() < MAKEIT_MAX && inboxCan() && Date.now() >= inboxTime("wait");
+  }
+  function makeitWindowStop() { if (makeitTick) clearTimeout(makeitTick); makeitTick = 0; makeitBack = 0; }
+  function makeitWindowStart() {
+    if (makeitTick || !makeitWindowOk()) return;
+    makeitBack = 0;
+    makeitTick = setTimeout(makeitCheck, MAKEIT_EVERY);
+    // a linked TV keeps the card up for the whole window (the same 3 minutes as before when it is not linked)
+    if (makeitAway) { clearTimeout(makeitAway); makeitAway = setTimeout(makeitClose, (MAKEIT_MAX - makeitLooks()) * MAKEIT_EVERY + 60000); }
+  }
+  function makeitCheck() {
+    makeitTick = 0;
+    if (!makeitWindowOk()) return;
+    keep(MAKEIT_CHK, makeitLooks() + 1);   // counted before the look, so a crash cannot give extra looks
+    var asked = inboxAsk("card");
+    if (!asked) makeitBack = Math.min(makeitBack + 1, 3);
+    if (makeitLooks() < MAKEIT_MAX) makeitTick = setTimeout(makeitCheck, MAKEIT_EVERY * Math.pow(2, makeitBack));
+  }
+  // the app's answer to a look: a design closes the card; a failure backs off; a wait or an unlinked TV ends it
+  function makeitAnswered(a) {
+    if (zone !== "makeit" || !a) return;
+    if (a.state === "item") { makeitWindowStop(); makeitClose(); return; }
+    if (a.state === "wait") { keep(MAKEIT_CHK, MAKEIT_MAX); makeitWindowStop(); return; }
+    if (a.state === "unlinked") { makeitWindowStop(); return; }
+    if (a.state === "error") { makeitBack = Math.min(makeitBack + 1, 3); if (makeitTick) { clearTimeout(makeitTick); makeitTick = makeitLooks() < MAKEIT_MAX ? setTimeout(makeitCheck, MAKEIT_EVERY * Math.pow(2, makeitBack)) : 0; } }
+    else makeitBack = 0;
+  }
+  document.addEventListener("visibilitychange", function () { if (document.hidden) makeitWindowStop(); else makeitWindowStart(); });
+  window.addEventListener("offline", makeitWindowStop);
+  window.addEventListener("online", makeitWindowStart);
   function makeitKey(e) {
     if (isSettings(e)) { e.preventDefault(); if (!e.repeat) settingsKey(); return; }
     if (isBack(e) || isOk(e) || arrowOf(e)) {
@@ -9962,7 +10020,7 @@
     homeAnswered: function (held) { homeAnswered(held); },
     // a calendar the launcher read for the Agenda widget (MainActivity.calendar)
     calendarText: function (id, ok, text) { calendarText(id, ok, text); },
-    setupDesign: function () { setupDesign(); ACCT_INBOX.stopped = false; inboxArm(); },   // Setup brings its own design; the inbox keeps its times
+    setupDesign: function () { setupDesign(); ACCT_INBOX.stopped = false; inboxArm(); makeitWindowStart(); },   // Setup brings its own design; the inbox keeps its times
     accountInbox: function (raw) { accountInbox(raw); },
     // words typed on the phone remote (Type on the TV) when the TV app cannot press keys (the on-TV app
     // with no ADB): they go into the typing box Home settings has open, at the cursor. False: no box open.
