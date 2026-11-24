@@ -54,6 +54,7 @@ def main(program):
         json.dump({"v": 1, "mode": "helper", "port": BRIDGE_PORT, "autostart": False, "updates": False, "tvs": []}, f)
     env = dict(os.environ, COUCHTV_SETUP_HOME=home, COUCHTV_SETUP_NO_BROWSER="1", COUCHTV_HELPER_NO_TRAY="1")
     p = subprocess.Popen([program, "--helper"], env=env)
+    stopped = False
     try:
         url_file = os.path.join(home, "helper-menu-url.txt")
         url = wait_for(lambda: open(url_file, encoding="utf-8").read().strip(), 60, "the menu page address")
@@ -79,10 +80,13 @@ def main(program):
         except (OSError, urllib.error.URLError):
             pass
         print("helper smoke test ok")
+        stopped = True
     finally:
         if p.poll() is None:
             p.kill()
-            sys.exit("the helper did not stop on Quit")
+            print("the helper was still running and was killed", file=sys.stderr)
+            if stopped:
+                sys.exit(1)
 
 
 if __name__ == "__main__":
