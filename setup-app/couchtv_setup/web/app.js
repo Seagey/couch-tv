@@ -37,7 +37,7 @@
       return new Promise(function (resolve, reject) {
         (function tick() {
           api("/api/job").then(function (j) {
-            if (onProgress) onProgress(j.progress || 0, j.message || "");
+            if (onProgress) onProgress(j.progress || 0, j.message || "", j);
             if (j.running) return setTimeout(tick, 700);
             if (j.error) return reject(problem(j));
             resolve(j.result);
@@ -96,13 +96,35 @@
     lookAgain();
   }
 
+  // The next look: after ms, while the list is still on screen. An error or a busy answer never ends the
+  // looking for good (only the app being closed, or the blocked screen, does).
+  function lookSoon(ms) {
+    clearTimeout(poll);
+    poll = setTimeout(function () { if (onFind()) lookAgain(); }, ms);
+  }
+
   function lookAgain() {
     clearTimeout(poll);
-    job("/api/scan").then(function (r) {
+    var early = false;
+    job("/api/scan", null, function (pr, msg, j) {
+      // the TVs' own announcements arrive before the knocking is done: show them once, at once
+      if (early || !j || !j.partial || !(j.partial.tvs || []).length) return;
       if (!onFind() || state.mode !== "setup" && state.mode !== "undo") return;
+      early = true;
+      drawRows(j.partial.tvs);
+    }).then(function (r) {
+      if (!onFind() || state.mode !== "setup" && state.mode !== "undo") return;
+      $("error").hidden = true;
       drawRows(r.tvs || []);
-      poll = setTimeout(function () { if (onFind()) lookAgain(); }, 6000);
-    }, function (e) { if (onFind()) { fail(e); $("find-help").hidden = false; } });
+      lookSoon(6000);
+    }, function (e) {
+      if (!onFind()) return;
+      if (e && e.code === "busy") return lookSoon(1500);   // another step is finishing: look again soon, say nothing
+      fail(e);
+      $("find-help").hidden = false;
+      if (e && e.code === "lost_app") return;              // the app was closed: nothing to look again with
+      lookSoon(10000);
+    });
   }
 
   function stopLooking(then) {
@@ -136,7 +158,7 @@
       small.textContent = [t.model && t.model !== t.label ? t.model : "", t.ip].filter(Boolean).join(", ");
       who.appendChild(b); who.appendChild(small);
       var pill = document.createElement("span");
-      var p = PILL[t.status] || PILL["switch"];
+      var p = t.stale ? ["Looking for it again", "step"] : (PILL[t.status] || PILL["switch"]);
       pill.className = "pill " + p[1]; pill.textContent = p[0];
       row.appendChild(who); row.appendChild(pill);
       if (t.status === "other") {

@@ -9,13 +9,12 @@ import ipaddress
 import json
 import re
 import socket
-import subprocess
-import sys
+import struct
 import time
 import urllib.request
 from concurrent.futures import ThreadPoolExecutor
 
-from . import errors, mdns
+from . import errors, mdns, netinfo
 from .tv import TvError
 
 ANDROID_REMOTE = "_androidtvremote2._tcp.local."
@@ -31,42 +30,41 @@ PORTS = {
 }
 
 
-def _primary_ip():
-    """The address this computer uses to reach other networks. Connecting a UDP socket only picks a
-    route: nothing is sent."""
+_primary_ip = netinfo.primary_ip
+MAX_HOME_NETWORKS = 4
+SMALLEST_PREFIX = 22   # the biggest network scanned is a /22 (1022 addresses)
+
+
+def network_for(ip, prefix):
+    """The network to scan for one address of this computer: its own netmask (a /24 when the system did
+    not say), never bigger than a /22, nothing for a single-address or point-to-point link, and nothing
+    when the "address" is the network or broadcast address itself."""
     try:
-        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
-            sock.connect(("192.0.2.1", 9))   # a documentation address, never really reached
-            return sock.getsockname()[0]
-    except OSError:
+        addr = ipaddress.ip_address(ip)
+    except (TypeError, ValueError):
         return None
-
-
-def _listed_ips():
-    if sys.platform == "win32":
-        cmd, flags = ["ipconfig"], 0x08000000   # CREATE_NO_WINDOW
-    else:
-        cmd, flags = ["ifconfig"], 0
-    try:
-        out = subprocess.run(cmd, capture_output=True, text=True, timeout=5, creationflags=flags).stdout
-    except Exception:
-        return []
-    return re.findall(r"\b(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})\b", out or "")
+    if addr.version != 4 or not addr.is_private or addr.is_loopback or addr.is_link_local:
+        return None
+    prefix = 24 if prefix is None else max(int(prefix), SMALLEST_PREFIX)
+    if prefix > 30:
+        return None
+    net = ipaddress.ip_network(f"{addr}/{prefix}", strict=False)
+    if addr in (net.network_address, net.broadcast_address):
+        return None
+    return net
 
 
 def home_networks():
-    """The /24 home networks this computer is on, the one it uses first."""
+    """The home networks this computer is on, the one it uses first: each with its own netmask, capped
+    at a /22, private ranges only. (The broadcast address in the interface listing is never read as an
+    address of this computer, so a /22 is scanned whole and not as 4.x and 7.x.)"""
     nets = []
-    for raw in [_primary_ip()] + _listed_ips():
-        try:
-            ip = ipaddress.ip_address(raw)
-        except (TypeError, ValueError):
+    for ip, prefix in netinfo.interfaces():
+        net = network_for(ip, prefix)
+        if net is None or any(net.subnet_of(n) for n in nets):
             continue
-        if ip.is_private and not ip.is_loopback and not ip.is_link_local and not str(ip).endswith(".0"):
-            net = ipaddress.ip_network(f"{ip}/24", strict=False)
-            if net not in nets:
-                nets.append(net)
-    return nets
+        nets = [n for n in nets if not n.subnet_of(net)] + [net]
+    return nets[:MAX_HOME_NETWORKS]
 
 
 def knock(ip, port, timeout=0.5):
@@ -146,9 +144,9 @@ def is_adb_answer(header):
     return cmd in (A_CNXN, A_AUTH, A_STLS) and magic == cmd ^ 0xFFFFFFFF and length <= 1 << 20
 
 
-def adb_handshake(ip, port=5555, timeout=1.5):
-    """Says CONNECT and reads the reply header, then hangs up. It never sends a key or a command, so
-    nothing happens on the TV. Used only to tell a real ADB port from anything else on 5555."""
+def _handshake_once(ip, port, timeout):
+    """One try: "adb" (a real ADB answer), "other" (some other service answered), "eof" (it closed on us
+    without a word) or "silent" (no answer in time, or the connection broke)."""
     try:
         with socket.create_connection((str(ip), port), timeout=timeout) as s:
             s.settimeout(timeout)
@@ -159,9 +157,34 @@ def adb_handshake(ip, port=5555, timeout=1.5):
                 if not part:
                     break
                 got += part
-            return is_adb_answer(got)
+            if not got:
+                return "eof"
+            return "adb" if is_adb_answer(got) else "other"
     except OSError:
+        return "silent"
+
+
+HANDSHAKE_TRIES = ((1.5, 0.0), (3.0, 0.4))   # (timeout, pause before it): a TV that was slow gets a second go
+
+
+def adb_handshake(ip, port=5555, timeout=1.5, tries=None):
+    """Says CONNECT and reads the reply header, then hangs up. It never sends a key or a command, so
+    nothing happens on the TV. Used only to tell a real ADB port from anything else on 5555.
+    True: it is ADB. False: something else answered (or it closed twice without a word). None: no
+    answer either time, so nobody can say. A slow answer gets one more try."""
+    seen = []
+    for t, pause in (tries or ((timeout, 0.0),) + HANDSHAKE_TRIES[1:]):
+        if pause:
+            time.sleep(pause)
+        r = _handshake_once(ip, port, t)
+        seen.append(r)
+        if r in ("adb", "other"):
+            break
+    if "adb" in seen:
+        return True
+    if "other" in seen or seen.count("eof") == len(seen):
         return False
+    return None
 
 
 def adb_serial(instance_label):
@@ -180,7 +203,7 @@ def merge(heard, knocks, dial=None, known=None, confirmed=None):
     heard: mdns.browse records; knocks: [(ip, port)] that answered; dial: {ip: name};
     known: {ip: {"name", "kind", "route", "room"}} from earlier runs; confirmed: {ip: True/False} from
     adb_handshake. Each row says how far the TV is from ready:
-    - "ready": ADB answers (5555 confirmed, or Wireless debugging on a TV this computer paired before);
+    - "ready": ADB answers (5555 confirmed by adb_handshake, or Wireless debugging on a TV this computer paired before);
     - "code": the TV shows "Pair device with pairing code" right now (type the 6 numbers);
     - "pair": Wireless debugging is on, not paired with this computer yet;
     - "switch": the TV is there but debugging is off (1 step on the TV)."""
@@ -228,10 +251,13 @@ def merge(heard, knocks, dial=None, known=None, confirmed=None):
         t["model"] = t["model"] or d.get("model")
         t["maker"] = d.get("maker")
         t["other"] = None if (t["remote"] or t["wireless_debugging"] or t["pairing_port"]) else other_platform(d)
-        t["adb_5555"] = 5555 in t["ports"] and confirmed.get(ip, True)
-        t["android"] = bool(t["remote"] or 6466 in t["ports"] or t["adb_5555"]
+        state = confirmed.get(ip, True)   # True: ADB. False: something else. None: nobody could say
+        t["adb_5555"] = 5555 in t["ports"] and state is True
+        # port 5555 open but the check got no answer: kept in the list, never Ready
+        t["adb_unconfirmed"] = 5555 in t["ports"] and state is None
+        t["android"] = bool(t["remote"] or 6466 in t["ports"] or t["adb_5555"] or t["adb_unconfirmed"]
                             or t["wireless_debugging"] or t["pairing_port"])
-        if t["cast"] and not (t["remote"] or t["adb_5555"] or t["wireless_debugging"] or t["pairing_port"]):
+        if t["cast"] and not (t["remote"] or t["adb_5555"] or t["adb_unconfirmed"] or t["wireless_debugging"] or t["pairing_port"]):
             t["android"] = False   # a speaker or a plain Chromecast says Cast too; only a TV says more
         if t["other"]:
             t["android"] = False
@@ -249,7 +275,7 @@ def merge(heard, knocks, dial=None, known=None, confirmed=None):
             t["status"] = "switch"
         out.append(t)
     order = {"ready": 0, "code": 1, "pair": 2, "switch": 3, "other": 4}
-    out = [t for t in out if t["android"] or t["other"] or t["adb_5555"]]
+    out = [t for t in out if t["android"] or t["other"]]
     return sorted(out, key=lambda t: (order[t["status"]], socket.inet_aton(t["ip"])))
 
 
@@ -263,32 +289,168 @@ def friendly_name(t, known=None):
     return "TV with debugging on" if t.get("adb_5555") else "Android TV"
 
 
-def scan(nets=None, wait=3.0, confirm=True, known=None):
+KNOCK_WORKERS = 128     # sockets open at once while knocking; far under macOS's default of 256 open files
+RETRY_TIMEOUT = 1.0     # the second knock waits twice as long as the first (0.5 s)
+RETRY_MAX = 1024        # at most this many second knocks per scan (a /24 and a half)
+SEEN_TTL = 30.0         # a TV that was found stays in the list this long after a scan misses it
+
+
+def raise_fd_limit(want=1024):
+    """Lets this program have up to `want` files open (a Mac starts at 256). Best effort; never fails."""
+    try:
+        import resource
+        soft, hard = resource.getrlimit(resource.RLIMIT_NOFILE)
+        if soft < want:
+            resource.setrlimit(resource.RLIMIT_NOFILE, (want if hard == resource.RLIM_INFINITY else min(want, hard), hard))
+    except Exception:
+        pass
+
+
+def is_timeout(result):
+    """True for a knock that got no answer in time (not for "refused" or "no route": those are answers)."""
+    return isinstance(result, (socket.timeout, TimeoutError))
+
+
+def retry_order(timed_out, hinted, own_ips=()):
+    """The knocks to try again, the likeliest first: addresses something already pointed at (an earlier
+    TV, an announcement), then this computer's own neighbourhood (same first three numbers), then the
+    rest, never more than RETRY_MAX."""
+    hinted = set(hinted)
+    near = {ip.rsplit(".", 1)[0] for ip in own_ips if ip}
+
+    def rank(hp):
+        ip = str(hp[0])
+        return 0 if ip in hinted else 1 if ip.rsplit(".", 1)[0] in near else 2
+    return sorted(timed_out, key=rank)[:RETRY_MAX]
+
+
+def scan_networks(nets):
+    """The networks a scan may knock on: private, /22 or smaller. Anything else is left out."""
+    out = []
+    for n in nets:
+        if n.version == 4 and n.is_private and n.prefixlen >= SMALLEST_PREFIX and n not in out:
+            out.append(n)
+    return out
+
+
+def scan(nets=None, wait=3.0, confirm=True, known=None, on_partial=None, diag=None, hints=(), own_ips=None):
     """Every likely TV, by every way at once, merged by address (merge() says how): the TVs' own
     announcements (Android TV Remote, Cast, Wireless debugging, the pairing screen, plain ADB), a
-    knock on 5555 and 6466 across this computer's /24, and DIAL names. An open 5555 is checked with
-    adb_handshake() when confirm is on, so a printer on 5555 is not called a TV."""
+    knock on 5555 and 6466 across this computer's networks, and DIAL names. A knock that times out is
+    tried once more, slower. An open 5555 is checked with adb_handshake() (which tries twice) when
+    confirm is on, so a printer on 5555 is not called a TV, and a TV that did not answer the check is
+    listed but never Ready.
+    on_partial(rows) is called as soon as the announcements are in (about `wait` seconds), before the
+    knocking is finished. diag, a dict, is filled with what happened (the scan log is made from it).
+    hints: addresses worth a second knock first (TVs seen before)."""
+    d = diag if diag is not None else {}
+    t0 = time.monotonic()
+    raise_fd_limit()
+    nets = scan_networks(nets if nets is not None else home_networks())
+    known = known or {}
+    d.update({"networks": [str(n) for n in nets], "mdns": {}, "knock": {}, "handshake": {}, "dial": 0})
+
+    def heard_done(fut):
+        if on_partial is None or fut.exception() is not None:
+            return
+        try:
+            on_partial(merge(fut.result(), [], {}, known, {}))
+        except Exception:
+            pass
+
+    def timed_browse():
+        mdns.last_info.clear()
+        try:
+            return _browse(SERVICES, wait)
+        finally:
+            d["mdns"] = dict(mdns.last_info, seconds=round(time.monotonic() - t0, 2))
+
     with ThreadPoolExecutor(max_workers=3) as two:
-        heard = two.submit(_browse, SERVICES, wait)
+        heard = two.submit(timed_browse)
+        heard.add_done_callback(heard_done)
         dial = two.submit(dial_names, 2.0)
-        hosts = [(h, p) for n in (nets or home_networks()) for h in n.hosts() for p in SCAN_PORTS]
-        with ThreadPoolExecutor(max_workers=96) as pool:
+        wanted_hints = set(known) | set(hints)
+        hosts = [(h, p) for n in nets for h in n.hosts() if is_home_address(str(h)) for p in SCAN_PORTS]
+        hosts.sort(key=lambda hp: str(hp[0]) not in wanted_hints)   # stable: the likely ones answer first
+        with ThreadPoolExecutor(max_workers=KNOCK_WORKERS) as pool:
             results = list(pool.map(lambda hp: knock(*hp), hosts))
+            timed_out = [hp for hp, r in zip(hosts, results) if is_timeout(r)]
+            heard_so_far = []
+            if heard.done() and heard.exception() is None:
+                heard_so_far = [r.get("ip") for r in heard.result()]
+            own = (own_ips if own_ips is not None else [ip for ip, _ in netinfo.interfaces()]) if timed_out else []
+            again = retry_order(timed_out, wanted_hints | set(heard_so_far), own)
+            retry_results = list(pool.map(lambda hp: knock(hp[0], hp[1], RETRY_TIMEOUT), again))
+        index = {hp: i for i, hp in enumerate(hosts)}
+        recovered = []
+        for hp, r in zip(again, retry_results):
+            results[index[hp]] = r
+            if r == 0:
+                recovered.append(f"{hp[0]}:{hp[1]}")
         knocks = [hp for hp, r in zip(hosts, results) if r == 0]
+        d["knock"] = {"hosts": len(hosts) // len(SCAN_PORTS), "first_timeouts": len(timed_out), "retried": len(again),
+                      "found_on_retry": recovered, "hits": [f"{h}:{p}" for h, p in knocks]}
         heard_list = heard.result()   # raises the plain Local Network message when the Mac blocked it
         if not knocks and not heard_list and knocks_blocked(results):
+            d["error"] = "local_network_blocked"
             raise blocked(next(r for r in results if r))
     try:
         dial_found = dial.result()
     except Exception:
         dial_found = {}
+    d["dial"] = len(dial_found)
     confirmed = {}
     if confirm:
         open_5555 = [str(h) for h, p in knocks if p == 5555]
         if open_5555:
             with ThreadPoolExecutor(max_workers=16) as pool:
                 confirmed = dict(zip(open_5555, pool.map(adb_handshake, open_5555)))
-    return merge(heard_list, knocks, dial_found, known, confirmed)
+        d["handshake"] = {"tried": len(open_5555), "adb": [i for i, v in confirmed.items() if v is True],
+                          "other": [i for i, v in confirmed.items() if v is False],
+                          "no_answer": [i for i, v in confirmed.items() if v is None]}
+    rows = merge(heard_list, knocks, dial_found, known, confirmed)
+    d["tvs"] = [{"ip": t["ip"], "status": t["status"]} for t in rows]
+    d["seconds"] = round(time.monotonic() - t0, 2)
+    return rows
+
+
+def stale_copy(row):
+    """A TV from an earlier scan, shown again because a scan missed it: never Ready, never "type the
+    code", only "look for it again". Everything that would start a setup is switched off."""
+    t = dict(row)
+    if t.get("status") != "other":
+        t["status"] = "switch"
+    t["adb_5555"] = False
+    t["adb_unconfirmed"] = False
+    t["pairing_port"] = None
+    t["stale"] = True
+    return t
+
+
+STATUS_ORDER = {"ready": 0, "code": 1, "pair": 2, "switch": 3, "other": 4}
+
+
+class Seen:
+    """TVs recent scans found, kept SEEN_TTL seconds after a scan misses them, so one unlucky scan does
+    not make a TV vanish and come back. A kept TV is marked stale and is never Ready."""
+
+    def __init__(self, ttl=SEEN_TTL, clock=time.monotonic):
+        self.ttl, self.clock, self.rows = ttl, clock, {}
+
+    def ips(self):
+        now = self.clock()
+        return [ip for ip, (at, _) in self.rows.items() if now - at <= self.ttl]
+
+    def apply(self, tvs):
+        """Notes the TVs found now and returns them plus the ones seen within the last SEEN_TTL seconds."""
+        now = self.clock()
+        fresh = {t["ip"]: t for t in tvs}
+        for ip, t in fresh.items():
+            self.rows[ip] = (now, t)
+        for ip in [ip for ip, (at, _) in self.rows.items() if now - at > self.ttl]:
+            del self.rows[ip]
+        out = list(tvs) + [stale_copy(r) for ip, (_, r) in self.rows.items() if ip not in fresh]
+        return sorted(out, key=lambda t: (STATUS_ORDER.get(t["status"], 3), socket.inet_aton(t["ip"])))
 
 
 DIAL_ST = "urn:dial-multiscreen-org:service:dial:1"
