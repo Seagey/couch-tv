@@ -2,9 +2,21 @@
 
 Everything that changed in couch-tv, newest first.
 
-The newest release is **0.13.12**. The TV apps come from [the Releases page](https://github.com/Seagey/couch-tv/releases). The bridge, and with option B the home's own screen, run from your copy of this repo, so `git pull` brings their changes.
+The newest release is **0.13.13**. The TV apps come from [the Releases page](https://github.com/Seagey/couch-tv/releases). The bridge, and with option B the home's own screen, run from your copy of this repo, so `git pull` brings their changes.
 
 ## November 2026
+
+### 24 November 2026: release 0.13.13, your home from your Couch TV account, Setup finds the TV for you, and Glass text
+
+0.13.13 is on [the Releases page](https://github.com/Seagey/couch-tv/releases). Option C: Home settings, Updates, Update to; it carries the same key as 0.13.12, so a TV on 0.13.12, 0.13.11 or 0.13.10 updates as normal. Other Android TVs: Home settings, Updates. Option B: `git pull` and restart the bridge. Full notes: [RELEASE-NOTES-0.13.13.md](../RELEASE-NOTES-0.13.13.md).
+
+- **Your home details from your account:** a design sent from your Couch TV account to your own TV can bring the names, colours, kids, town and guest Wi-Fi, marked "From your account" in Home settings, with a row to take them off this TV.
+- **Photos on People:** a photo from your account shows in the head icon, Home settings, People, kids mode and the People widget, and stays on the TV.
+- **Couch TV Setup finds the TV on your Wi-Fi:** no address to type; Setup lists the TVs it hears by name, says what each needs, installs Couch TV, links the TV to your account and brings your design.
+- **Your account inbox, one click Send:** a TV Setup linked picks up a design you send from your account when it wakes, when you press Check for new designs now, or once a week, with Undo for 24 hours and Unlink in Home settings, Designs.
+- **Glass and Liquid glass text:** two new text colours for widgets, frosted glass words, and clear glass letters with the photo showing through.
+- **The kind of TV:** getting a design by code also sends the platform, Android version, screen size and model name, for Couch TV Studio's "Will it play on your TV?". No serial number, no ids.
+- **Credits:** the Open-Meteo.com and GeoNames credits from 0.13.12 stay where they were.
 
 ### 24 November 2026: release 0.13.12, the TV tells Couch TV Studio it has Couch TV, and a steadier Now playing card
 
