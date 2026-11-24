@@ -562,6 +562,7 @@
         text("debug-why", state.route === "tls" ?
           "this switches Wireless debugging off. Skip it if you add the phone remote: that needs it on." :
           "this switches debugging off. Skip it if you add the phone remote and want it to press keys.");
+        linkCard(!!(r.account && r.account.linked));
         show("done");
       }, function (e) { show("plan"); fail(e); });
   });
@@ -627,7 +628,8 @@
   }
 
   api("/api/account").then(function (a) {
-    if (a.mode === "off") return;
+    state.studio = a.studio || null;
+    if (a.mode === "off") { state.studio = null; return; }
     $("acct-box").hidden = false;
     if (a.account) return signedIn(a.account);
     if (a.handoff) {
@@ -671,6 +673,58 @@
         }, function (e) { clearInterval(devicePoll); fail(e); });
       }, d.interval * 1000);
     }, fail);
+  });
+
+  // ---- link this TV (the last screen): Couch TV is already on the TV, so one step, no reinstall ----
+  // Shown while the TV is not linked to the account. Signed in already (the website's button, or a code typed
+  // earlier): one button. Not signed in: the code from the website, or the website's own Allow.
+  var linkTimer = null;
+  function linkCard(linked) {
+    state.linked = linked;
+    var offered = !linked && !!$("link-now") && state.studio !== null;
+    $("link-now").hidden = !offered;
+    $("link-done").hidden = !(linked && state.studio);
+    if (linked && state.studio) $("open-editor").href = state.studio + "/design/";
+    $("link-now-signed").hidden = !state.account;
+    $("link-now-ask").hidden = !!state.account;
+    if (state.account) text("link-now-line", signedInWords(state.account.name) + ". Press the button and this TV is linked.");
+  }
+  function linkRun() {
+    text("link-now-status", "Linking…");
+    job("/api/link-tv", {}, function (f, m) { if (m) text("link-now-status", m + "…"); }).then(function (r) {
+      text("link-now-status", "");
+      linkCard(!!(r.account && r.account.linked));
+      if (r.account && r.account.linked) {
+        var ul = $("done-account"); ul.textContent = "";
+        ["Linked to your Couch TV account"].concat(r.account.design ? ["Sent \"" + r.account.design + "\" to the TV"] : []).forEach(function (l) {
+          var li = document.createElement("li"); li.textContent = l; ul.appendChild(li);
+        });
+        ul.hidden = false;
+      }
+    }, function (e) { text("link-now-status", e.message || "That did not work. Try again."); });
+  }
+  $("link-signed-go").addEventListener("click", linkRun);
+  $("link-go").addEventListener("click", function () {
+    text("link-now-status", "Signing in…");
+    api("/api/handoff", { code: $("link-code").value }).then(function (r) { signedIn(r.account); linkCard(false); linkRun(); },
+      function (e) { text("link-now-status", e.message || "That code did not work."); });
+  });
+  $("link-device").addEventListener("click", function () {
+    api("/api/device/start").then(function (d) {
+      var p = $("link-device-code"); p.textContent = "";
+      p.appendChild(document.createTextNode("On the Couch TV website, press Allow for the code "));
+      var b = document.createElement("b"); b.textContent = d.user_code; p.appendChild(b);
+      p.appendChild(document.createTextNode(". "));
+      var a = document.createElement("a"); a.href = d.verify; a.target = "_blank"; a.rel = "noopener"; a.textContent = "Open the website"; p.appendChild(a);
+      p.hidden = false;
+      window.open(d.verify, "_blank", "noopener");
+      clearInterval(linkTimer);
+      linkTimer = setInterval(function () {
+        api("/api/device/poll").then(function (r) {
+          if (r.account) { clearInterval(linkTimer); $("link-device-code").hidden = true; signedIn(r.account); linkCard(false); linkRun(); }
+        }, function (e) { clearInterval(linkTimer); text("link-now-status", e.message || "That did not work. Try again."); });
+      }, d.interval * 1000);
+    }, function (e) { text("link-now-status", e.message || "That did not work. Try again."); });
   });
 
   // ---- undo ----

@@ -320,7 +320,7 @@ class Account(unittest.TestCase):
         return mock.patch.dict(os.environ, {"COUCHTV_SETUP_STUDIO_STUB": f.name, "COUCHTV_SETUP_STUDIO": ""})
 
     def test_off_sends_nothing(self):
-        with mock.patch.dict(os.environ, {"COUCHTV_SETUP_STUDIO": "", "COUCHTV_SETUP_STUDIO_STUB": ""}), \
+        with mock.patch.dict(os.environ, {"COUCHTV_SETUP_STUDIO": "off", "COUCHTV_SETUP_STUDIO_STUB": ""}), \
                 mock.patch.object(studio.urllib.request, "build_opener", side_effect=AssertionError("network")):
             self.assertEqual(studio.mode(), "off")
             with self.assertRaises(TvError) as e:

@@ -334,6 +334,19 @@
     <h1 id="done-title">Couch TV is your home screen</h1>
     <p class="lead" id="done-line"></p>
     <ul class="ticks" id="done-account" hidden></ul>
+    <!-- not linked to the account yet: one step, no reinstall (the TV already has Couch TV) -->
+    <div class="card" id="link-now" hidden>
+      <h2>Link this TV to your Couch TV account</h2>
+      <p id="link-now-line">Then you can send designs to it from the website.</p>
+      <div id="link-now-ask">
+        <label>The code from the Couch TV website<span class="row"><input id="link-code" autocomplete="off" placeholder="for example ABCD-EFGH" maxlength="12"><button class="primary" id="link-go">Link this TV</button></span></label>
+        <p class="small">No code? <button class="link" id="link-device">Sign in on the website instead</button></p>
+        <p class="lead" id="link-device-code" hidden></p>
+      </div>
+      <div class="actions" id="link-now-signed" hidden><button class="primary" id="link-signed-go">Link this TV</button></div>
+      <p class="hint" id="link-now-status"></p>
+    </div>
+    <p id="link-done" hidden><a id="open-editor" target="_blank" rel="noopener">Open Couch TV Studio and send a design</a></p>
     <p>Press <b>Home</b> on your TV remote. You should see couch-tv. On Google TV and Fire TV the TV's own home may flash up first: that is normal.</p>
     <div class="actions"><button id="check-go">Check it again</button></div>
     <h2>Phone remote (optional)</h2>

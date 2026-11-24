@@ -175,17 +175,48 @@ def _town_weather(town):
     return {"lat": town["lat"], "lon": town["lon"], "place": town["name"], "timezone": near[0]["timezone"]}
 
 
-def _from_account(progress):
-    """Registers the connected TV with the signed in account and gets what goes onto it. A failure
-    here never stops the setup: Couch TV still goes on, without the account parts."""
-    progress(0.26, "Linking the TV to your Couch TV account")
+def _register(strict=False):
+    """Tells the account about the connected TV. strict: a failure is raised (the link step on the last screen
+    shows it); otherwise None (a setup goes on without the account parts)."""
     known = _known().get(S.ip) or {}
     name = known.get("room") or (S.facts or {}).get("name") or "TV"
     # set up here before: its My TVs row, but only when the TV at this address is still the same model
     same = known.get("name") and known.get("name") == (S.facts or {}).get("name")
     try:
-        reg = studio.register_tv(S.link, tvprofile.clean(S.profile), name, known.get("tv_id") if same else None)
+        return studio.register_tv(S.link, tvprofile.clean(S.profile), name, known.get("tv_id") if same else None)
     except TvError:
+        if strict:
+            raise
+        return None
+
+
+def _link_now(progress):
+    """The last screen's "Link this TV": Couch TV is already on the TV, so nothing is installed. The account
+    gives the TV its link (and its design), the link goes into the app over ADB, and Setup tells the account
+    the TV is ready. One step for a person who finished the install before they signed in."""
+    tv = need_tv()
+    if not S.link.token:
+        raise TvError("Sign in to your Couch TV account first.", "no_account")
+    ver = steps.app_version(tv, steps.HOME_PKG)
+    if not ver:
+        raise TvError("Couch TV is not on this TV yet. Run the setup first.", "not_installed")
+    progress(0.2, "Linking the TV to your Couch TV account")
+    reg = _register(strict=True)
+    if reg.get("tv_id"):
+        _remember(S.ip, tv_id=reg["tv_id"])
+    progress(0.6, "Sending the link to the TV")
+    steps.link_account(tv, {"link": reg["link"], "code": reg["code"]})
+    progress(0.9, "Telling your account the TV is ready")
+    reported = studio.report_done(S.link, True, ver, tvprofile.clean(S.profile))
+    return {"account": {"linked": True, "design": reg["design"], "reported": reported}}
+
+
+def _from_account(progress):
+    """Registers the connected TV with the signed in account and gets what goes onto it. A failure
+    here never stops the setup: Couch TV still goes on, without the account parts."""
+    progress(0.26, "Linking the TV to your Couch TV account")
+    reg = _register()
+    if reg is None:
         return None
     if reg.get("tv_id"):
         _remember(S.ip, tv_id=reg["tv_id"])
@@ -310,8 +341,11 @@ def api(method, path, body):
         _remember(ip, room=room or None)
         return {"ok": True}
     if path == "/api/account":
-        return {"mode": studio.mode(), "account": S.link.account if S.link.token else None,
+        return {"mode": studio.mode(), "studio": studio.base() if studio.mode() == "live" else None,
+                "account": S.link.account if S.link.token else None,
                 "handoff": bool(S.handoff), "tv": S.link.tv and {k: S.link.tv.get(k) for k in ("tv_id", "design")}}
+    if path == "/api/link-tv":
+        return run_job("link", _link_now)
     if path in ("/api/handoff", "/api/handoff-in"):
         code = studio.read_code(body.get("code"))
         if path == "/api/handoff-in":

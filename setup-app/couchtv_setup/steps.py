@@ -388,6 +388,16 @@ def account_extras(account):
     return out
 
 
+def link_account(tv, account):
+    """Writes the account link (and the design code) into Couch TV that is already on the TV, with no
+    reinstall and no change to its settings: the app keeps them and, for an intent with only these two extras,
+    fetches the design at once (tv-home MainActivity onNewIntent). Raises when there is nothing to write."""
+    extras = account_extras(account)
+    if "account_link" not in extras:
+        raise TvError("Your Couch TV account did not give this TV a link. Try again.", "studio_bad")
+    tv.shell(f"am start -n {HOME_ACT}{extras}")
+
+
 def make_home(tv, apk_path, ambient_off=True, people=None, weather=None, progress=lambda f, msg=None: None,
               ontv_home_switch_off=True, account=None):
     done = []

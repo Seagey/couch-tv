@@ -152,7 +152,7 @@ COUCHTV_SETUP_ADBKEY=~/.android/adbkey .venv/bin/python tests/emulator_check.py 
 | `COUCHTV_SETUP_NO_BROWSER=1` | Do not open the browser |
 | `COUCHTV_SETUP_HOME` | Keep the setup's own files somewhere else |
 | `COUCHTV_SETUP_ADBKEY` | Use another ADB key file |
-| `COUCHTV_SETUP_STUDIO=live` | Talk to the Couch TV Studio account API (off until that API exists) |
+| `COUCHTV_SETUP_STUDIO=off` | Do not talk to the Couch TV Studio account API (linking is on by default) |
 | `COUCHTV_SETUP_STUDIO_URL` | Another Studio address (https, or http on 127.0.0.1 for development) |
 | `COUCHTV_SETUP_STUDIO_STUB=<file.json>` | Answer the account calls from a file instead (development) |
 | `COUCHTV_SETUP_FAKE_SCAN=<file.json>` | Use recorded discovery answers instead of the network (screenshots) |

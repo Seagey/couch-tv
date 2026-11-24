@@ -17,9 +17,10 @@ Then, once the TV is connected (DREAM-SETUP-BUILD.md has the whole contract):
   home: the same home pack, so Setup can hand people and town to TV apps that predate the pack.
 - POST /v1/setup/done {tv_id, ok, couchtv}  -> the website's My TVs shows "Living room TV is ready".
 
-The Studio API is not live yet. Nothing is sent anywhere unless COUCHTV_SETUP_STUDIO=live.
-COUCHTV_SETUP_STUDIO_STUB=<file.json> answers from a file instead (development and tests); without
-either, Setup works as before with no account.
+The Studio API is live, and linking is ON in every build (25 Nov 2026: it was off unless an environment variable
+said "live", which no release ever set, so no Setup ever linked an account). COUCHTV_SETUP_STUDIO=off switches it
+off (development, and the tests that must send nothing). COUCHTV_SETUP_STUDIO_STUB=<file.json> answers from a
+file instead (development and tests).
 """
 import json
 import os
@@ -38,12 +39,13 @@ SCHEMES = ("couchtv", "couchtv-setup")
 
 
 def mode():
-    """ "live", "stub" or "off"."""
-    if os.environ.get("COUCHTV_SETUP_STUDIO", "").lower() == "live":
-        return "live"
+    """ "live" (the default), "stub" or "off"."""
+    v = os.environ.get("COUCHTV_SETUP_STUDIO", "").lower()
+    if v == "off":
+        return "off"
     if os.environ.get("COUCHTV_SETUP_STUDIO_STUB"):
         return "stub"
-    return "off"
+    return "live"
 
 
 def base():
