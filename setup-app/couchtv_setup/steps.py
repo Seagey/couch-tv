@@ -587,6 +587,11 @@ def debugging_off(tv, route):
 
 # ---- 5. undo (undo.sh, then remove-all.sh) ----
 
+def tidy_has_record(tv):
+    from . import tidy
+    return tidy.has_record(tv)
+
+
 def undo_plan(tv):
     rec = record(tv)
     present = _packages(tv)
@@ -596,11 +601,17 @@ def undo_plan(tv):
         "home_installed": HOME_PKG in present, "ontv_installed": ONTV_PKG in present,
         "switch_back_on": sorted(set(back)), "home": rec["home"] or "the TV's own home",
         "home_name": friendly_home(rec["home"]) if rec["home"] else "the TV's own home",
+        "tidy_changes": tidy_has_record(tv),
     }
 
 
 def undo(tv, progress=lambda f, msg=None: None):
     done = []
+    from . import tidy      # the Tidy up step's own record: put back first, exactly as it was
+    progress(0.05, "Putting back the tidy up changes")
+    tidied = tidy.restore_all(tv)
+    if any(r["status"] in ("off", "left") for r in tidied["results"].values()):
+        done.append("tidy up changes put back")
     rec = record(tv)
     present = _packages(tv)
     pkgs = list(NEVER_OFF) + (rec["disabled"] or [AMBIENT])
@@ -646,4 +657,4 @@ def undo(tv, progress=lambda f, msg=None: None):
     time.sleep(2)
     now = (_lines(tv.shell(RESOLVE)) or [""])[-1]
     progress(1.0, "Done")
-    return {"changed": done, "home_now": now}
+    return {"changed": done, "home_now": now, "tidy": tidied["results"]}

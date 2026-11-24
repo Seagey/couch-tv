@@ -9,6 +9,7 @@
 <meta name="setup-key" content="__SETUP_KEY__">
 <meta name="setup-os" content="__SETUP_OS__">
 <link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="tidy.css">
 </head>
 <body>
 <main>
@@ -306,7 +307,8 @@
     <p class="lead" id="device-line"></p>
     <ul id="plan-list" class="plan"></ul>
     <label class="tick" id="ontv-row" hidden><input type="checkbox" id="ontv-off" checked> Switch off the on-TV app's home and watch (it stays installed). Untick to keep it as the home: nothing is installed then.</label>
-    <label class="tick"><input type="checkbox" id="ambient" checked> Switch off ambient mode (the adverts and photos when the TV is idle)</label>
+    <label class="tick" hidden><input type="checkbox" id="ambient"> Switch off ambient mode (the adverts and photos when the TV is idle)</label>
+    <p><button type="button" id="tidy-open" data-tidy-open="plan">Tidy up your TV (optional)</button></p>
     <p class="card small" id="plan-account" hidden></p>
     <label>What do you call this TV?<input id="tv-room" autocomplete="off" maxlength="30" placeholder="for example Living room TV"></label>
     <h2>Make it yours (you can skip this)</h2>
@@ -452,5 +454,6 @@
   <footer>Free and open source. <a href="https://github.com/Seagey/couch-tv" target="_blank" rel="noopener">couch-tv on GitHub</a></footer>
 </main>
 <script src="app.js"></script>
+<script src="tidy.js"></script>
 </body>
 </html>
