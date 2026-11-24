@@ -1,11 +1,11 @@
 // Getting a design by code (Home settings, Look, Get a design). The TV PULLS a design from couch-tv
 // Studio's store: it asks one server, the one in config.json "design_store", and nothing ever
 // connects to the TV. The store never learns anything about this home (no address it keeps, no
-// Wi-Fi, no devices, no names): the request carries the code and, on the Android apps, two numbers
+// Wi-Fi, no devices, no names): the request carries the code and, on the Android apps, a few facts
 // about the TV and nothing else (no cookies, no referrer): tv { v: the Couch TV version x.y.z,
-// mem: the total memory Android sees, in MB }. Couch TV Studio keeps them on the person's TV in My TVs
-// so "Will it play on your TV?" can answer for the real TV (tvReport below). No ids, no model, no
-// location. A store that does not know "tv" reads only "code" and ignores it.
+// mem: the total memory Android sees, in MB, and from 0.13.13 profile: the kind of TV, see tvProfile }. Couch TV Studio keeps them on the person's TV in My TVs
+// so "Will it play on your TV?" can answer for the real TV (tvReport below). No serial, no ids, no address,
+// no location. A store that does not know "tv" reads only "code" and ignores it.
 //
 // What comes back is untrusted. Only its "design" is kept; the only picture allowed is a JPEG
 // inside it (the store re-draws every upload as a clean JPEG), checked by its first bytes; then
@@ -283,7 +283,34 @@
       var mb = T.memoryMb ? Number(T.memoryMb()) : 0;
       if (mb % 1 === 0 && mb >= 64 && mb <= 65536) { out.mem = mb; any = true; }
     } catch (e) {}
+    var p = tvProfile(T);
+    if (p) { out.profile = p; any = true; }
     return any ? out : null;
+  }
+
+  // The kind of TV (from 0.13.13): TVOS.tvProfile() gives a JSON string with platform ("Google TV",
+  // "Android TV", "Fire OS"), sdk (Android's API level), memMb, res ("1920x1080", the size Android draws
+  // the home at) and model (Android's model name, such as "Smart TV Pro"). Only those five keys, each checked
+  // the way Couch TV Studio checks them (HOME-DETAILS-PAYLOAD.md, "What the TV says about itself"); a key that
+  // fails is left out, and no profile at all when none passes. Never a serial, an address or an id.
+  function whole(n, lo, hi) { return typeof n === "number" && n % 1 === 0 && n >= lo && n <= hi; }
+  function tvProfile(T) {
+    var raw, p = {}, any = false;
+    try { raw = T.tvProfile ? JSON.parse(String(T.tvProfile() || "")) : null; } catch (e) { return null; }
+    if (!raw || typeof raw !== "object" || Array.isArray(raw)) return null;
+    if (typeof raw.platform === "string" && /^[A-Za-z0-9 ._-]{1,24}$/.test(raw.platform) && raw.platform.trim()) {
+      p.platform = raw.platform; any = true;
+    }
+    if (whole(raw.sdk, 1, 99)) { p.sdk = raw.sdk; any = true; }
+    if (whole(raw.memMb, 64, 65536)) { p.memMb = raw.memMb; any = true; }
+    var r = typeof raw.res === "string" ? /^([1-9]\d{2,4})x([1-9]\d{2,4})$/.exec(raw.res) : null;
+    if (r && +r[1] <= 16384 && +r[2] <= 16384) { p.res = raw.res; any = true; }
+    if (typeof raw.model === "string") {
+      // eslint-disable-next-line no-control-regex
+      var m = raw.model.replace(/[\u0000-\u001f\u007f-\u009f]/g, " ").replace(/[<>]/g, "").replace(/\s+/g, " ").trim();
+      if (m && m.length <= 40) { p.model = m; any = true; }
+    }
+    return any ? p : null;
   }
   function fetchBody(code) {
     var body = { code: code }, t = tvReport();

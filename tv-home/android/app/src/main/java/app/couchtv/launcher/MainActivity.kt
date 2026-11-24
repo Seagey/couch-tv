@@ -920,6 +920,10 @@ class MainActivity : Activity() {
         @JavascriptInterface
         fun memoryMb(): Int = TvReport.memoryMb(this@MainActivity)
 
+        /** The kind of TV (platform, sdk, memMb, res, model) as JSON, sent with a design fetch only (TvReport.profileJson). */
+        @JavascriptInterface
+        fun tvProfile(): String = TvReport.profileJson(this@MainActivity)
+
         // Couch TV Setup's link to the account (AccountLink.kt). The page only learns whether there is one,
         // never the link itself; the design code Setup brought is handed over until the page says it is done.
         @JavascriptInterface

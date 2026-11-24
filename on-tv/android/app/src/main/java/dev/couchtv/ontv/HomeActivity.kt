@@ -268,6 +268,8 @@ class HomeActivity : Activity() {
         @JavascriptInterface fun version(): String = BuildConfig.VERSION_NAME
         /** Total memory in MB (0 if unknown), sent with a design fetch only (design-code.js, TvReport.kt). */
         @JavascriptInterface fun memoryMb(): Int = TvReport.memoryMb(this@HomeActivity)
+        /** The kind of TV (platform, sdk, memMb, res, model) as JSON, sent with a design fetch only (TvReport.profileJson). */
+        @JavascriptInterface fun tvProfile(): String = TvReport.profileJson(this@HomeActivity)
         // Couch TV Setup's link to the account (AccountLink.kt): only whether there is one reaches the page
         @JavascriptInterface fun accountLinked(): Boolean = AccountLink.linked(AccountLink.kv(this@HomeActivity))
         @JavascriptInterface fun setupDesignCode(): String = AccountLink.pendingCode(AccountLink.kv(this@HomeActivity), System.currentTimeMillis()) ?: ""
