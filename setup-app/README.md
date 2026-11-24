@@ -64,11 +64,11 @@ asks once whether you trust it.
 1. Double-click **Couch TV Setup**. macOS says it cannot check it for malicious software. Press **Done** (or OK).
 2. Open **System Settings, Privacy and Security**. Scroll down to the message about Couch TV Setup and press **Open Anyway**. Type your Mac password if it asks.
 3. Double-click the app again and press **Open**.
-4. When it asks to **find devices on your local network**, press **Allow**. That is how it reaches the TV. If you missed it, the app says "Your Mac blocked this app from finding the TV": open **System Settings, Privacy and Security, Local Network**, switch on **couch-tv Setup**, then press **Look again**.
+4. When it asks to **find devices on your local network**, press **Allow**. That is how it reaches the TV. If you missed it, the app says "Your Mac blocked this app from finding the TV": open **System Settings, Privacy and Security, Local Network**, switch on **Couch TV Setup**, then press **Look again**.
 
 **Windows:**
 1. Double-click **Couch TV Setup.exe**. If "Windows protected your PC" (SmartScreen) shows, press **More info**, then **Run anyway**.
-2. If Windows asks whether couch-tv Setup may use networks, allow **Private networks**.
+2. If Windows asks whether Couch TV Setup may use networks, allow **Private networks**.
 3. Keep `Couch TV Setup.exe` in its folder: it needs the `_internal` folder next to it.
 
 **Linux:**

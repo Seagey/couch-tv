@@ -1,6 +1,6 @@
-# Third party code in couch-tv Setup
+# Third party code in Couch TV Setup
 
-couch-tv Setup is part of couch-tv (MIT, see `../LICENSE`). It also contains or bundles the work
+Couch TV Setup is part of couch-tv (MIT, see `../LICENSE`). It also contains or bundles the work
 below. Each package's own licence file travels inside the built app (PyInstaller `--copy-metadata`).
 
 ## couch-tv-setup by killy10o10

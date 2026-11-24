@@ -40,7 +40,8 @@ THREE = [row("192.0.2.21", "Lounge TV 2", "ready", "AI PONT"), row("192.0.2.22",
 
 
 class Harness:
-    def __init__(self, rows=None, stub=None, kind="google", slow=0.0, features=None):
+    def __init__(self, rows=None, stub=None, kind="google", slow=0.0, features=None, partial=0.0):
+        self.partial = partial         # seconds the full scan takes after the TVs' own announcements are in
         self.rows = rows if rows is not None else list(THREE)
         self.stub = stub               # Couch TV Studio's answers, or None for "no account on this Setup"
         self.kind = kind
@@ -65,6 +66,9 @@ class Harness:
 
         def scan(**kw):
             h.scans += 1
+            if h.partial and kw.get("on_partial"):
+                kw["on_partial"]([dict(r) for r in h.rows[:1]])     # the announcements are in; the knocking goes on
+                real_sleep(h.partial)
             return [dict(r) for r in h.rows]
 
         def make_tv(ip, ident, route="tcp", port=5555, allow_wait_s=45):
@@ -116,6 +120,7 @@ class Harness:
         server.S.tv = server.S.ip = server.S.route = server.S.facts = server.S.profile = None
         server.S.job = {"running": False}
         server.S.link = server.studio.Link()
+        server.S.tv_seen = server.finder.Seen()   # what an earlier test's scans found must not show here
         self.httpd = ThreadingHTTPServer(("127.0.0.1", 0), server.Handler)
         server.S.httpd, server.S.port = self.httpd, self.httpd.server_address[1]
         orig = server.api

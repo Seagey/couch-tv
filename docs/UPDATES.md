@@ -34,7 +34,7 @@ The newest release is **0.13.14**. The TV apps come from [the Releases page](htt
 
 - **The TV tells Couch TV Studio it has Couch TV:** getting a design by code on an Android TV also sends the Couch TV version and the TV's memory, nothing else, for Studio's "Will it play on your TV?".
 - **Fixes from a beginner run:** the on-TV app's "Allow USB debugging?" box no longer comes back in a loop and its words match the TV's, the home's Settings menu has Phone remote, and the Hold OK menu on a design is solid and fits the screen.
-- **couch-tv Setup on every release:** `scripts/release.sh publish` now checks the Setup zips are on the release.
+- **Couch TV Setup on every release:** `scripts/release.sh publish` now checks the Setup zips are on the release.
 - **Credits:** the forecast, air quality and surf a widget opens say "Weather data by Open-Meteo.com", and Home settings, Location says "Location data based on GeoNames".
 - **Now playing reaches every music app:** since 0.13.11 the wider Night card, the progress bar and scrolling long titles show for every music app, not only Spotify, and App name, Long titles and Card alignment sit under Now playing on every home.
 - **Spotify's card:** follows a song change at once, never loads a cover from Spotify, shows its Home settings rows only where it works, shows the adb line only with no computer at home, and takes a skip step of 5, 10, 15 or 30 seconds everywhere.

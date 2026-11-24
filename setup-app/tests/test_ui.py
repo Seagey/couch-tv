@@ -9,6 +9,7 @@ nothing is fetched from outside this computer; the words follow the text rules.
 import os
 import re
 import sys
+import time
 import unittest
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -66,6 +67,9 @@ class Page(unittest.TestCase):
         if name:
             pg.fill("#tv-room", name)
         pg.click("#setup-go")
+        # Tidy up your TV is the optional step between the progress screen and Finish: skip it
+        pg.wait_for_selector('section[data-step="tidy"]:not([hidden])', timeout=30000)
+        pg.click("#tidy-skip")
         pg.wait_for_selector('section[data-step="done"]:not([hidden])', timeout=30000)
 
     def no_sideways_scroll(self, pg, label):
@@ -111,6 +115,8 @@ class Page(unittest.TestCase):
         self.assertIn("Back is off while Couch TV installs.", visible_text(pg))
         pg.keyboard.press("Alt+ArrowLeft")           # the browser's own back does not leave either
         self.assertEqual(step(pg), "work")
+        pg.wait_for_selector('section[data-step="tidy"]:not([hidden])', timeout=30000)   # Tidy comes after the progress
+        pg.click("#tidy-skip")
         pg.wait_for_selector('section[data-step="done"]:not([hidden])', timeout=30000)
         self.assertTrue(pg.is_enabled("#back"))
 
@@ -166,6 +172,9 @@ class Page(unittest.TestCase):
         pg.wait_for_selector('section[data-step="plan"]:not([hidden])', timeout=20000)
         self.assertEqual(pg.input_value("#tv-room"), "Guest Room TV")
         pg.click("#setup-go")
+        # Tidy up your TV is the optional step between the progress screen and Finish: skip it
+        pg.wait_for_selector('section[data-step="tidy"]:not([hidden])', timeout=30000)
+        pg.click("#tidy-skip")
         pg.wait_for_selector('section[data-step="done"]:not([hidden])', timeout=30000)
         items = pg.locator("#session-list li")
         self.assertEqual(items.count(), 2)
@@ -185,6 +194,55 @@ class Page(unittest.TestCase):
             self.assertEqual(step(pg), "done")
         finally:
             server.S.job = {"running": False}
+
+    def test_a_partial_first_look_shows_the_first_tv_before_the_scan_ends(self):
+        rows = [uh.row("192.0.2.61", "Early TV", "ready"), uh.row("192.0.2.62", "Late TV", "ready"),
+                uh.row("192.0.2.63", "Missed TV", "switch", adb_5555=False, stale=True)]
+        pg = self.open(uh.Harness(rows=rows, partial=4.0))
+        pg.click("#setup-start")
+        pg.wait_for_selector("#found .tvc", timeout=3500)
+        self.assertEqual(pg.locator("#found .tvc").count(), 1, "only the early announcement so far")
+        self.assertIn("Early TV", pg.inner_text("#found"))
+        deadline = time.monotonic() + 15
+        while pg.locator("#found .tvc").count() != 3 and time.monotonic() < deadline:
+            time.sleep(0.2)
+        self.assertEqual(pg.locator("#found .tvc").count(), 3)
+        self.assertEqual(pg.get_by_role("button", name="Set up this TV").count(), 2, "the stale one is never offered")
+        self.assertEqual(pg.locator("#found .pill", has_text="Looking for it again").count(), 1)
+        pg.get_by_role("button", name="Set up this TV").nth(0).click()
+        pg.wait_for_selector('section[data-step="plan"]:not([hidden])', timeout=20000)
+
+    # ---- linking is off in this release candidate ----
+
+    def test_with_linking_off_the_finish_is_truthful_and_has_no_dead_end(self):
+        pg = self.open(uh.Harness(features=["reset-tv"]))
+        self.to_plan(pg)
+        plan = visible_text(pg).lower()
+        self.assertNotIn("ambient", plan, "Tidy's switch is the only ambient switch")
+        self.assertTrue(pg.is_hidden("#ambient"))
+        pg.click("#setup-go")
+        # progress, then Tidy, then Finish: never Finish first
+        pg.wait_for_selector('section[data-step="tidy"]:not([hidden])', timeout=30000)
+        self.assertEqual(pg.locator("#tidy-idle").count(), 1)
+        self.assertEqual(pg.locator("#ambient:visible").count(), 0)
+        pg.click("#tidy-skip")
+        pg.wait_for_selector('section[data-step="done"]:not([hidden])')
+        body = visible_text(pg).lower()
+        for bad in ("linked", "link it", "your account", "sign in"):
+            self.assertNotIn(bad, body)
+        self.assertTrue(pg.is_hidden("#steps"), "no Account, Set up, Design bar")
+        self.assertTrue(pg.is_hidden("#link-cta"))
+        self.assertTrue(pg.is_visible("#studio-cta"))
+        self.assertIn("Design your own screen", pg.inner_text("#studio-cta"))
+        self.assertTrue(pg.get_attribute("#studio-cta", "href").endswith("/design/"))
+        cap = pg.inner_text("#fin-cap")
+        self.assertTrue(cap and len(cap.split()) <= 14, cap)
+        self.assertIn("code", cap)
+        self.assertNotIn("Installed, not linked", pg.inner_text("#session-list"))
+        self.assertNotIn("Studio uses this", pg.inner_text("body"), "the speed check is not sent anywhere")
+        pg.click("#health-look")
+        pg.wait_for_selector('section[data-step="health"]:not([hidden])')
+        self.assertNotIn("link your", visible_text(pg).lower())
 
     # ---- linked or not ----
 
@@ -218,7 +276,6 @@ class Page(unittest.TestCase):
         self.to_plan(pg)
         self.install(pg)
         self.assertTrue(pg.is_hidden("#link-cta"))
-        self.assertTrue(pg.is_hidden("#tidy-go"))
         self.assertNotIn("Linked to your Couch TV account", visible_text(pg))
 
     def test_link_it_runs_the_hook_and_trusts_only_its_answer(self):
@@ -302,9 +359,9 @@ class Page(unittest.TestCase):
         pg.wait_for_selector("#found .tvc")
         self.assertEqual(pg.get_by_role("button", name="Set up this TV").count(), 0)
         self.assertEqual(pg.locator("#found .pill", has_text="Looking for it again").count(), 2)
-        stale = pg.locator("#found .tvc").nth(0)
+        stale = pg.locator("#found .tvc", has_text="Missed TV")
         self.assertTrue(stale.locator("button.btn").is_disabled())
-        pg.locator("#found .tvc").nth(1).get_by_role("button", name="Show me how").click()
+        pg.locator("#found .tvc", has_text="Silent TV").get_by_role("button", name="Show me how").click()
         pg.wait_for_selector("#guide:not([hidden])")
         self.assertEqual(self.h.log.count("/api/connect"), 0)
 
@@ -450,6 +507,8 @@ class Page(unittest.TestCase):
         pg.wait_for_selector('section[data-step="plan"]:not([hidden])', timeout=20000)
         pg.fill("#tv-room", "Keyboard TV")
         pg.keyboard.press("Enter")                   # Enter in the name box starts the setup
+        pg.wait_for_selector('section[data-step="tidy"]:not([hidden])', timeout=30000)
+        pg.click("#tidy-skip")
         pg.wait_for_selector('section[data-step="done"]:not([hidden])', timeout=30000)
 
     # ---- layout ----

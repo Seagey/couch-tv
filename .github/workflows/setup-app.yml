@@ -117,6 +117,9 @@ jobs:
         if: runner.os == 'macOS'
         run: |
           APP="dist/Couch TV Setup.app"
+          # An old Helper's updater puts this app where the old "couch-tv Setup.app" was; the names inside the app
+          # (compat_names.py) are what it is called wherever the file name is not shown.
+          python compat_names.py mac "$APP"
           # No Dock icon or window of its own: the setup is the browser page, and the app stops by
           # itself on Close setup or a few minutes after the page is closed.
           plutil -insert LSUIElement -bool true "$APP/Contents/Info.plist"
@@ -137,6 +140,10 @@ jobs:
         run: |
           # A folder with "Couch TV Setup.exe" in it, not one big .exe: antivirus programs flag those far more.
           echo "PROGRAM=dist/Couch TV Setup/Couch TV Setup.exe" >> "$GITHUB_ENV"
+          # A Helper from 0.13.14 or older has the old updater: it starts "couch-tv Setup.exe" after the swap, so the
+          # folder also holds a copy under that name (compat_names.py, tests/test_old_updater.py).
+          python compat_names.py windows "dist/Couch TV Setup"
+          echo "PROGRAM_OLD=dist/Couch TV Setup/couch-tv Setup.exe" >> "$GITHUB_ENV"
           python -c "import shutil; shutil.make_archive('dist/couch-tv-Setup-${{ matrix.name }}', 'zip', 'dist', 'Couch TV Setup')"
 
       - name: Package (Linux)
@@ -144,6 +151,9 @@ jobs:
         run: |
           # A folder with the "Couch TV Setup" program in it, as on Windows; tar keeps its run permission.
           echo "PROGRAM=dist/Couch TV Setup/Couch TV Setup" >> "$GITHUB_ENV"
+          # The old updater starts "couch-tv Setup" after the swap: a launcher under that name (compat_names.py)
+          python compat_names.py linux "dist/Couch TV Setup"
+          echo "PROGRAM_OLD=dist/Couch TV Setup/couch-tv Setup" >> "$GITHUB_ENV"
           # A desktop file beside the program (it opens the program in its own folder) and the icon.
           cp "assets/linux/Couch TV Setup.desktop" "dist/Couch TV Setup/"
           chmod +x "dist/Couch TV Setup/Couch TV Setup.desktop"
@@ -152,6 +162,11 @@ jobs:
 
       - name: Smoke test the built app
         run: python tests/smoke.py "$PROGRAM"
+
+      # What an old Helper's updater starts after it swaps this version in (Windows and Linux; a Mac starts the .app)
+      - name: Smoke test the program under the old name
+        if: runner.os != 'macOS'
+        run: python tests/smoke.py "$PROGRAM_OLD"
 
       # Couch TV Helper: the built app started with --helper. The bundled bridge runs as its child process and
       # answers, the menu page loads and says Running, and Quit stops both. A release must carry the helper.
