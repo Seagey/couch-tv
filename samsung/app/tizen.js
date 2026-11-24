@@ -191,7 +191,12 @@
     (function attempt(i) {
       if (i >= ids.length) { send("log", "launch failed for " + pkg + ", asking the bridge"); bridgeLaunch(pkg); return; }
       try {
-        tizen.application.launch(ids[i], function () { send("log", "launched " + ids[i]); },
+        tizen.application.launch(ids[i], function () {
+            send("log", "launched " + ids[i]);
+            // Some store apps (SVT Play, #327) report success and open nothing. If our page is still
+            // in front a few seconds later, ask the bridge to launch it over REST instead.
+            setTimeout(function () { if (!document.hidden) { send("log", ids[i] + " did not open, asking the bridge"); bridgeLaunch(pkg); } }, 3500);
+          },
           function (err) { send("log", "launch " + ids[i] + ": " + (err && err.name)); attempt(i + 1); });
       } catch (e) { send("log", "launch " + ids[i] + " threw " + e); attempt(i + 1); }
     })(0);
