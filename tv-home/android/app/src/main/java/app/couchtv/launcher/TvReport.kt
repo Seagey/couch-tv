@@ -7,6 +7,7 @@ import android.hardware.display.DisplayManager
 import android.os.Build
 import android.util.DisplayMetrics
 import android.view.Display
+import android.content.Intent
 import org.json.JSONObject
 
 /**
@@ -33,7 +34,7 @@ object TvReport {
         memoryMb(info.totalMem)
     }.getOrDefault(0)
 
-    // The kind of TV (0.13.13): TVOS.tvProfile() hands design-code.js a JSON string with five keys, the TV
+    // The kind of TV (0.13.13): TVOS.tvProfile() hands design-code.js a JSON string with these keys, the TV
     // profile Couch TV Studio keeps on the My TVs row (HOME-DETAILS-PAYLOAD.md, "What the TV says about
     // itself"): platform, sdk, memMb, res and model. Same names and ranges as Couch TV Setup's profile.
     // Never a serial, an address, an Android id or anything else; the page checks each key again.
@@ -66,14 +67,35 @@ object TvReport {
         return if (clean.isEmpty()) null else clean.take(MODEL_MAX).trim()
     }
 
-    /** The five keys, left out when unknown. A plain map so the unit tests need no Android. */
-    fun profile(platform: String?, sdk: Int?, memMb: Int, res: String?, model: String?): Map<String, Any> {
+    // Installed apps (TV-APPS.md): package names of the apps with a launcher icon, so Studio's editor can show
+    // "On Living room TV" apps first. Names only, at most 300; nothing about what is signed in inside them.
+    const val APPS_MAX = 300
+    private val PKG = Regex("[A-Za-z][A-Za-z0-9_]*(\\.[A-Za-z0-9_]+)+")
+
+    /** Package names that look like Android ones, no repeats, this app left out, first 300. */
+    fun cleanApps(raw: List<String>, self: String = "app.couchtv.launcher"): List<String> =
+        raw.filter { it.length <= 200 && PKG.matches(it) && it != self && it != "dev.couchtv.ontv" }.distinct().take(APPS_MAX)
+
+    /** TV launcher apps first, then ordinary launcher apps. */
+    fun apps(context: Context): List<String> = runCatching {
+        val pm = context.packageManager
+        val names = ArrayList<String>()
+        for (cat in listOf(Intent.CATEGORY_LEANBACK_LAUNCHER, Intent.CATEGORY_LAUNCHER)) {
+            val q = Intent(Intent.ACTION_MAIN).addCategory(cat)
+            pm.queryIntentActivities(q, 0).forEach { names.add(it.activityInfo.packageName) }
+        }
+        cleanApps(names, context.packageName)
+    }.getOrDefault(emptyList())
+
+    /** The keys, left out when unknown. A plain map so the unit tests need no Android. */
+    fun profile(platform: String?, sdk: Int?, memMb: Int, res: String?, model: String?, apps: List<String> = emptyList()): Map<String, Any> {
         val out = LinkedHashMap<String, Any>()
         platform?.let { out["platform"] = it }
         sdk?.let { out["sdk"] = it }
         if (memMb in MIN_MB..MAX_MB) out["memMb"] = memMb
         res?.let { out["res"] = it }
         model?.let { out["model"] = it }
+        cleanApps(apps).let { if (it.isNotEmpty()) out["apps"] = it }
         return out
     }
 
@@ -92,6 +114,6 @@ object TvReport {
                 .getDisplay(Display.DEFAULT_DISPLAY).getRealMetrics(dm)
             res(dm.widthPixels, dm.heightPixels)
         }.getOrNull()
-        JSONObject(profile(p, sdk(Build.VERSION.SDK_INT), memoryMb(context), size, model(Build.MODEL))).toString()
+        JSONObject(profile(p, sdk(Build.VERSION.SDK_INT), memoryMb(context), size, model(Build.MODEL), apps(context))).toString()
     }.getOrDefault("{}")
 }

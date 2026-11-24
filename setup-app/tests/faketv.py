@@ -94,6 +94,10 @@ class FakeTv:
             if self.chosen and self.chosen.split("/")[0] in self.packages:
                 return "priority=0\n" + self.chosen
             return "priority=0\n" + self.home
+        if c.startswith("pm query-activities") and "LAUNCHER" in c:
+            if "LEANBACK" in c:
+                return "priority=0 preferredOrder=0\ncom.netflix.ninja/.MainActivity\ncom.google.android.youtube.tv/.Main"
+            return "priority=0\ncom.spotify.tv.android/.Main\ncom.netflix.ninja/.MainActivity"
         if c.startswith("pm query-activities"):
             homes = [self.home] + [p + "/.Home" for p in self.other_homes]
             if self.ontv_alias and "dev.couchtv.ontv" in self.packages:
