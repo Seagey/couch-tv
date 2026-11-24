@@ -99,7 +99,7 @@ try {
   ok(await decode() === URL_CONST, "the QR decodes to the one constant, a plain https address, nothing more");
   ok(!/[?#=]/.test(URL_CONST) && /^https:\/\/[a-z.]+\/go$/.test(URL_CONST), "the address has no query, code, token or device id");
   ok(await page.evaluate(() => document.activeElement === document.body || !document.querySelector("#makeit [tabindex]")), "nothing on the card takes the focus");
-  await page.screenshot({ path: process.env.MAKEIT_SHOTS ? path.join(process.env.MAKEIT_SHOTS, "make-it-yours-1920x1080.png") : "/dev/null" });
+  if (process.env.MAKEIT_SHOTS) await page.screenshot({ path: path.join(process.env.MAKEIT_SHOTS, "make-it-yours-1920x1080.png") });
 
   // 2. Back closes it for good
   await press("Escape", 400);
