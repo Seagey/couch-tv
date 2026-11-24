@@ -19,6 +19,14 @@
 .cw-paper { color: #1d1b18; --ink: #1d1b18; --sub: rgba(29, 27, 24, 0.74); --faint: rgba(29, 27, 24, 0.45); }
 .cw-paper > .cw-bg { background: var(--paperbg); }
 .cw-tint > .cw-bg { background: var(--tile, #0a84ff); }
+/* Glass words (style.ink "glass", widgets.js shell): see through white with a light top edge and a soft
+   shadow, or smoked dark glass on a light box. A slower TV (lighter, glass lite) draws them solid. */
+.cw-ink-glass, .cw-ink-glass * { text-shadow: 0 -1px 0 rgba(255, 255, 255, 0.5), 0 1px 2px rgba(0, 0, 0, 0.3), 0 6px 24px rgba(0, 0, 0, 0.34) !important; }
+.cw-ink-smoke, .cw-ink-smoke * { text-shadow: 0 1px 0 rgba(255, 255, 255, 0.75), 0 -1px 1px rgba(0, 0, 0, 0.12) !important; }
+html.lighter .cw-ink-glass, html.glass-lite .cw-ink-glass { --ink: #fff !important; --sub: rgba(255, 255, 255, 0.78) !important; }
+html.lighter .cw-ink-glass, html.lighter .cw-ink-glass *, html.glass-lite .cw-ink-glass, html.glass-lite .cw-ink-glass * { text-shadow: 0 2px 6px rgba(0, 0, 0, 0.35) !important; }
+html.lighter .cw-ink-smoke, html.glass-lite .cw-ink-smoke { --ink: #1d1b18 !important; --sub: rgba(29, 27, 24, 0.74) !important; }
+html.lighter .cw-ink-smoke, html.lighter .cw-ink-smoke *, html.glass-lite .cw-ink-smoke, html.glass-lite .cw-ink-smoke * { text-shadow: none !important; }
 .cw-bare { padding: 0; border-radius: 0; overflow: visible; }
 .cw-photo { padding: 0; }
 .cw-sh-soft { box-shadow: 0 18px 44px rgba(0, 0, 0, 0.22); }

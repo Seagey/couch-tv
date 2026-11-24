@@ -587,7 +587,19 @@
     } else if (panel === "paper") { tile = rgbOf(look.paper) || [246, 242, 234]; ink = INK_DARK; }
     else if (panel === "solid") { tile = rgbOf(look.solid) || [22, 22, 27]; }
     if (st.ink === "white") ink = WHITE; else if (st.ink === "ink") ink = INK_DARK; else if (st.ink === "accent") ink = rgbOf(st.accent || look.accent) || [255, 214, 10];
-    if (ink) {
+    else if (st.ink === "glass") {
+      // Glass words (owner approved 24 Nov 2026): frosted white with a light top edge and a soft shadow, or
+      // smoked dark glass where Auto would pick dark words (paper, a pale colour, a light page). The colour
+      // is see through (widgets.css .cw-ink-glass); a slower TV (lighter, glass lite) draws it solid.
+      var base = ink || rgbOf(look.ink) || WHITE, dark = contrast(base, INK_DARK) < contrast(base, WHITE);
+      root.classList.add(dark ? "cw-ink-smoke" : "cw-ink-glass");
+      root.style.setProperty("--ink", dark ? "rgba(18, 18, 24, 0.84)" : "rgba(255, 255, 255, 0.9)");
+      root.style.setProperty("--sub", dark ? "rgba(18, 18, 24, 0.7)" : "rgba(255, 255, 255, 0.74)");
+      root.style.setProperty("--faint", dark ? "rgba(18, 18, 24, 0.5)" : "rgba(255, 255, 255, 0.52)");
+      root.style.color = "var(--ink)";
+      ink = dark ? INK_DARK : WHITE;
+    }
+    if (ink && st.ink !== "glass") {
       root.style.setProperty("--ink", rgba(ink, 1)); root.style.setProperty("--sub", rgba(ink, 0.76)); root.style.setProperty("--faint", rgba(ink, 0.5));
       root.style.color = rgba(ink, 1);
     }

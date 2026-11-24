@@ -97,6 +97,37 @@ const cost = plain(CD.cost({ objects: [{ id: "a", type: "widget", kind: "slidesh
 const wline = cost.filter((c) => c[2] === "widgets")[0];
 ok(wline && wline[1] >= 5, "widgets are on the speed list, a slideshow weighing more than a clock");
 
+// 8b. Glass words (style.ink "glass", 24 Nov 2026): the gate keeps it, on a widget and on a stack item, and still
+// drops a text colour not on the list; the speed list charges 1 for each widget with glass words, nothing without
+const ink = (v) => (san({ id: "i", type: "widget", kind: "clock", style: { ink: v } })[0].style || {}).ink;
+ok(ink("glass") === "glass", "text colour Glass is kept");
+["auto", "white", "ink", "accent"].forEach((v) => ok(ink(v) === v, "text colour " + v + " is still kept"));
+ok(ink("frosted") === undefined && ink("glass;color:red") === undefined && ink("GLASS") === undefined, "a text colour not on the list is still dropped");
+const gst = san({ id: "s", type: "widget", kind: "stack", items: [{ kind: "clock", style: { ink: "glass" } }, { kind: "moon", style: { ink: "smoke" } }] })[0];
+ok(gst.items[0].style.ink === "glass" && (gst.items[1].style || {}).ink === undefined, "a stack item keeps Glass and drops a made up colour");
+const gline = (objs) => plain(CD.cost({ objects: objs })).filter((c) => c[2] === "glasstext")[0];
+ok(gline(san({ id: "a", type: "widget", kind: "clock", w: 360, h: 160 })) === undefined, "no glass words, nothing on the speed list for them");
+const g3 = gline([{ id: "a", type: "widget", kind: "clock", w: 360, h: 160, style: { ink: "glass" } },
+  { id: "b", type: "widget", kind: "rain", w: 360, h: 360, style: { ink: "glass" } },
+  { id: "c", type: "widget", kind: "moon", w: 360, h: 360, style: { ink: "white" } },
+  { id: "d", type: "widget", kind: "stack", w: 360, h: 360, items: [{ kind: "moon" }, { kind: "clock", style: { ink: "glass" } }] }]);
+ok(g3 && g3[0] === "Glass words (3)" && g3[1] === 3, "Glass words cost 1 a widget, a stack with a glass item counting once");
+ok(gline([{ id: "a", type: "widget", kind: "clock", hidden: true, style: { ink: "glass" } }]) === undefined, "a hidden widget's glass words cost nothing");
+
+// 8c. widgets.css draws them: see through words with a light top edge, smoked glass on a light box, and solid
+// words on a slower TV (html.lighter, html.glass-lite) with no see through colour and no glow under smoke
+const css = fs.readFileSync(path.join(web, "widgets.css"), "utf8");
+const rule = (sel) => { const m = css.split("\n").filter((l) => l.split("{")[0].split(",").map((s) => s.trim()).indexOf(sel) >= 0); return m.join("\n"); };
+ok(/text-shadow: 0 -1px 0 rgba\(255, 255, 255, 0\.5\)/.test(rule(".cw-ink-glass")) && rule(".cw-ink-glass *") === rule(".cw-ink-glass"), ".cw-ink-glass: a light top edge and a soft shadow on every word inside");
+ok(/text-shadow: 0 1px 0 rgba\(255, 255, 255, 0\.75\)/.test(rule(".cw-ink-smoke")) && rule(".cw-ink-smoke *") === rule(".cw-ink-smoke"), ".cw-ink-smoke: smoked glass with a light edge under");
+["lighter", "glass-lite"].forEach((h) => {
+  ok(/--ink: #fff !important/.test(rule("html." + h + " .cw-ink-glass")), "html." + h + ": glass words go solid white");
+  ok(/--ink: #1d1b18 !important/.test(rule("html." + h + " .cw-ink-smoke")), "html." + h + ": smoked words go solid dark");
+  ok(/text-shadow: 0 2px 6px/.test(rule("html." + h + " .cw-ink-glass *")), "html." + h + ": glass words keep one cheap shadow");
+  ok(/text-shadow: none !important/.test(rule("html." + h + " .cw-ink-smoke *")), "html." + h + ": smoked words lose their shadow");
+});
+ok(!/backdrop-filter|filter:/.test(css.split("\n").filter((l) => /cw-ink-(glass|smoke)/.test(l)).join("\n")), "glass words never blur what is behind them");
+
 // 9. every preset passes the gate with no notes and keeps all its widgets
 const presets = JSON.parse(fs.readFileSync(path.join(__dirname, "fixtures/design-presets.json"), "utf8"));
 ok(presets.length === 17, "17 presets in the fixture");
