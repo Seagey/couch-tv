@@ -3,7 +3,7 @@ unpacked copy. A Mac .app holds symlinks and run permissions that Python's zipfi
 found the updater would have left every Mac helper unable to start. Used by the build workflow on each computer type.
 
     python setup-app/tests/unpack_check.py <archive> <the program's path inside the archive>   (HELPER_BUNDLED=yes also runs smoke_helper.py)
-    (the program's path is relative to the folder the archive was made from, e.g. "couch-tv Setup/couch-tv Setup")
+    (the program's path is relative to the folder the archive was made from, e.g. "Couch TV Setup/Couch TV Setup")
 """
 import os
 import subprocess

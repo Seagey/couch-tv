@@ -90,7 +90,17 @@ jobs:
             for m in aiohttp androidtvremote2 zeroconf airtouch5py; do HELPER="$HELPER --copy-metadata $m"; done
             if [ "$RUNNER_OS" = "macOS" ]; then HELPER="$HELPER --hidden-import rumps"; else HELPER="$HELPER --hidden-import pystray"; fi
           fi
-          pyinstaller --noconfirm --windowed --name "couch-tv Setup" $ARGV \
+          # The app's icon (the sofa on a TV, setup-app/assets/icon). PyInstaller uses .icns on a Mac and .ico on
+          # Windows; on Linux it ignores an icon, and the png goes into the folder (see Package (Linux)).
+          ICON=""
+          [ "$RUNNER_OS" = "macOS" ] && ICON="--icon assets/icon/couch-tv-setup.icns"
+          [ "$RUNNER_OS" = "Windows" ] && ICON="--icon assets/icon/couch-tv-setup.ico"
+          # The program, its folder and the Mac app are all called "Couch TV Setup" (0.13.15; they were "couch-tv Setup").
+          # Only the name inside the release files changed: the zip and tar.gz names stay couch-tv-Setup-*, because the
+          # website, SHA256SUMS-setup.txt and the helper's updater look for those. The helper's updater puts the new
+          # copy under its own name and moves the start with the computer entry and the Windows link (helper/update.py,
+          # helper/autostart.py refresh).
+          pyinstaller --noconfirm --windowed --name "Couch TV Setup" $ARGV $ICON \
             --version-file version.txt \
             --osx-bundle-identifier app.couchtv.setup \
             --add-data "couchtv_setup/web${SEP}couchtv_setup/web" \
@@ -106,7 +116,10 @@ jobs:
       - name: Package (Mac)
         if: runner.os == 'macOS'
         run: |
-          APP="dist/couch-tv Setup.app"
+          APP="dist/Couch TV Setup.app"
+          # An old Helper's updater puts this app where the old "couch-tv Setup.app" was; the names inside the app
+          # (compat_names.py) are what it is called wherever the file name is not shown.
+          python compat_names.py mac "$APP"
           # No Dock icon or window of its own: the setup is the browser page, and the app stops by
           # itself on Close setup or a few minutes after the page is closed.
           plutil -insert LSUIElement -bool true "$APP/Contents/Info.plist"
@@ -119,25 +132,41 @@ jobs:
           python stamp_version.py mac-plist "$APP/Contents/Info.plist"
           # Ad hoc signature only (no paid Apple account): macOS asks once, see setup-app/README.md.
           codesign --force --deep --sign - "$APP"
-          echo "PROGRAM=$APP/Contents/MacOS/couch-tv Setup" >> "$GITHUB_ENV"
+          echo "PROGRAM=$APP/Contents/MacOS/Couch TV Setup" >> "$GITHUB_ENV"
           ditto -c -k --keepParent "$APP" "dist/couch-tv-Setup-${{ matrix.name }}.zip"
 
       - name: Package (Windows)
         if: runner.os == 'Windows'
         run: |
-          # A folder with "couch-tv Setup.exe" in it, not one big .exe: antivirus programs flag those far more.
-          echo "PROGRAM=dist/couch-tv Setup/couch-tv Setup.exe" >> "$GITHUB_ENV"
-          python -c "import shutil; shutil.make_archive('dist/couch-tv-Setup-${{ matrix.name }}', 'zip', 'dist', 'couch-tv Setup')"
+          # A folder with "Couch TV Setup.exe" in it, not one big .exe: antivirus programs flag those far more.
+          echo "PROGRAM=dist/Couch TV Setup/Couch TV Setup.exe" >> "$GITHUB_ENV"
+          # A Helper from 0.13.14 or older has the old updater: it starts "couch-tv Setup.exe" after the swap, so the
+          # folder also holds a copy under that name (compat_names.py, tests/test_old_updater.py).
+          python compat_names.py windows "dist/Couch TV Setup"
+          echo "PROGRAM_OLD=dist/Couch TV Setup/couch-tv Setup.exe" >> "$GITHUB_ENV"
+          python -c "import shutil; shutil.make_archive('dist/couch-tv-Setup-${{ matrix.name }}', 'zip', 'dist', 'Couch TV Setup')"
 
       - name: Package (Linux)
         if: runner.os == 'Linux'
         run: |
-          # A folder with the "couch-tv Setup" program in it, as on Windows; tar keeps its run permission.
-          echo "PROGRAM=dist/couch-tv Setup/couch-tv Setup" >> "$GITHUB_ENV"
-          tar -czf "dist/couch-tv-Setup-${{ matrix.name }}.tar.gz" -C dist "couch-tv Setup"
+          # A folder with the "Couch TV Setup" program in it, as on Windows; tar keeps its run permission.
+          echo "PROGRAM=dist/Couch TV Setup/Couch TV Setup" >> "$GITHUB_ENV"
+          # The old updater starts "couch-tv Setup" after the swap: a launcher under that name (compat_names.py)
+          python compat_names.py linux "dist/Couch TV Setup"
+          echo "PROGRAM_OLD=dist/Couch TV Setup/couch-tv Setup" >> "$GITHUB_ENV"
+          # A desktop file beside the program (it opens the program in its own folder) and the icon.
+          cp "assets/linux/Couch TV Setup.desktop" "dist/Couch TV Setup/"
+          chmod +x "dist/Couch TV Setup/Couch TV Setup.desktop"
+          cp assets/icon/couch-tv-setup-linux.png "dist/Couch TV Setup/couch-tv-setup.png"
+          tar -czf "dist/couch-tv-Setup-${{ matrix.name }}.tar.gz" -C dist "Couch TV Setup"
 
       - name: Smoke test the built app
         run: python tests/smoke.py "$PROGRAM"
+
+      # What an old Helper's updater starts after it swaps this version in (Windows and Linux; a Mac starts the .app)
+      - name: Smoke test the program under the old name
+        if: runner.os != 'macOS'
+        run: python tests/smoke.py "$PROGRAM_OLD"
 
       # Couch TV Helper: the built app started with --helper. The bundled bridge runs as its child process and
       # answers, the menu page loads and says Running, and Quit stops both. A release must carry the helper.

@@ -1,0 +1,7 @@
+[Desktop Entry]
+Type=Application
+Name=Couch TV Setup
+Comment=Put Couch TV on your TV
+Exec=sh -c 'exec "$(dirname "$1")/Couch TV Setup"' sh %k
+Terminal=false
+Categories=Utility;

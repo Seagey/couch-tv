@@ -1,4 +1,4 @@
-# couch-tv Setup
+# Couch TV Setup
 
 The free, official way to put couch-tv on your TV **without a command line and without an AI
 agent**. You open one app on your computer, it opens a page in your browser, and it walks you
@@ -44,10 +44,12 @@ for your computer and unzip it:
 
 | Computer | Download | Open |
 |---|---|---|
-| Mac with Apple silicon (M1 and newer) | `couch-tv-Setup-mac-apple-silicon.zip` | **couch-tv Setup** |
-| Mac with an Intel chip | `couch-tv-Setup-mac-intel.zip` | **couch-tv Setup** |
-| Windows 10 or 11 | `couch-tv-Setup-windows.zip` | **couch-tv Setup.exe**, inside the unzipped folder |
-| Linux, 64 bit Intel or AMD (Ubuntu 22.04 or newer, Debian 12, Fedora, Arch and Omarchy) | `couch-tv-Setup-linux.tar.gz` (from 0.13.13) | **couch-tv Setup**, inside the unpacked folder |
+| Mac with Apple silicon (M1 and newer) | `couch-tv-Setup-mac-apple-silicon.zip` | **Couch TV Setup** |
+| Mac with an Intel chip | `couch-tv-Setup-mac-intel.zip` | **Couch TV Setup** |
+| Windows 10 or 11 | `couch-tv-Setup-windows.zip` | **Couch TV Setup.exe**, inside the unzipped folder |
+| Linux, 64 bit Intel or AMD (Ubuntu 22.04 or newer, Debian 12, Fedora, Arch and Omarchy) | `couch-tv-Setup-linux.tar.gz` (from 0.13.13) | **Couch TV Setup**, inside the unpacked folder |
+
+From 0.13.15 the app, its folder and the program are called **Couch TV Setup** (they were "couch-tv Setup"). The zip and tar.gz file names are unchanged. An installed Helper that updates itself moves its start with the computer entry (and the Windows link) to the new name.
 
 Not sure which Mac? Apple menu, **About This Mac**: "Chip: Apple M..." is Apple silicon,
 "Processor: ... Intel" is Intel. `SHA256SUMS-setup.txt` in the same release lists each file's
@@ -59,19 +61,19 @@ The app is free and not signed with a paid Apple or Microsoft developer account,
 asks once whether you trust it.
 
 **Mac:**
-1. Double-click **couch-tv Setup**. macOS says it cannot check it for malicious software. Press **Done** (or OK).
-2. Open **System Settings, Privacy and Security**. Scroll down to the message about couch-tv Setup and press **Open Anyway**. Type your Mac password if it asks.
+1. Double-click **Couch TV Setup**. macOS says it cannot check it for malicious software. Press **Done** (or OK).
+2. Open **System Settings, Privacy and Security**. Scroll down to the message about Couch TV Setup and press **Open Anyway**. Type your Mac password if it asks.
 3. Double-click the app again and press **Open**.
-4. When it asks to **find devices on your local network**, press **Allow**. That is how it reaches the TV. If you missed it, the app says "Your Mac blocked this app from finding the TV": open **System Settings, Privacy and Security, Local Network**, switch on **couch-tv Setup**, then press **Look again**.
+4. When it asks to **find devices on your local network**, press **Allow**. That is how it reaches the TV. If you missed it, the app says "Your Mac blocked this app from finding the TV": open **System Settings, Privacy and Security, Local Network**, switch on **Couch TV Setup**, then press **Look again**.
 
 **Windows:**
-1. Double-click **couch-tv Setup.exe**. If "Windows protected your PC" (SmartScreen) shows, press **More info**, then **Run anyway**.
-2. If Windows asks whether couch-tv Setup may use networks, allow **Private networks**.
-3. Keep `couch-tv Setup.exe` in its folder: it needs the `_internal` folder next to it.
+1. Double-click **Couch TV Setup.exe**. If "Windows protected your PC" (SmartScreen) shows, press **More info**, then **Run anyway**.
+2. If Windows asks whether Couch TV Setup may use networks, allow **Private networks**.
+3. Keep `Couch TV Setup.exe` in its folder: it needs the `_internal` folder next to it.
 
 **Linux:**
 1. Unpack it: `tar -xzf couch-tv-Setup-linux.tar.gz` (or open it in your file manager).
-2. Run `"couch-tv Setup/couch-tv Setup"` from a terminal, or double-click it in the folder. Keep it in its folder: it needs the `_internal` folder next to it.
+2. Run `"Couch TV Setup/Couch TV Setup"` from a terminal, or double-click it in the folder. Keep it in its folder: it needs the `_internal` folder next to it.
 3. It opens the setup page in your browser. Nothing else to install: it talks to the TV over your Wi-Fi with its own ADB, so it needs no `adb` program, no USB cable and no udev rule. The website's Set up my TV button cannot open it on Linux: sign in with the code it shows instead.
 4. If a firewall is on (ufw, firewalld), allow it on your home network, or it cannot hear the TV: the app says "This computer blocked this app from finding the TV". With ufw: `sudo ufw allow 5353/udp` for the TV's name announcements.
 

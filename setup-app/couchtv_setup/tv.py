@@ -166,7 +166,7 @@ class Tv:
         if "Success" in out:
             return out
         if "UPDATE_INCOMPATIBLE" in out or "SIGNATURES" in out:
-            raise TvError("This TV already has a couch-tv app signed with a different key (a test build, or "
+            raise TvError("This TV already has a Couch TV app signed with a different key (a test build, or "
                           "someone else's build), so it cannot be updated in place. Use Undo first, then set up again.",
                           "different_key")
         if "INSUFFICIENT_STORAGE" in out:

@@ -147,7 +147,7 @@ scenery: the peaks, the volcano and the misty hills overlap the digits, and on t
 floats with its reflection under the water. Or pick the Classic look, your own photos, or
 [a scene you design yourself](docs/MAKE-A-SCENE.md).
 
-## The easy way: couch-tv Setup
+## The easy way: Couch TV Setup
 
 A free app for Mac and Windows that puts couch-tv's home screen on a **Google TV, Android TV or
 Fire TV** with no command line and no AI agent. It opens a page in your browser and walks you
@@ -425,7 +425,7 @@ Everything else: [docs/](docs/README.md).
 - The Bluetooth and Network buttons, Amazon YouTube support and the Fire TV Stick guide came from
   the [killy10o10 fork](https://github.com/killy10o10/couch-tv); the unpaired TV guard from the
   [Justin1491 fork](https://github.com/Justin1491/couch-tv).
-- couch-tv Setup (`setup-app/`): the Fire TV setup builds on
+- Couch TV Setup (`setup-app/`): the Fire TV setup builds on
   [couch-tv-setup](https://github.com/killy10o10/couch-tv-setup) by killy10o10 (MIT); the reused
   parts and their notice are in `setup-app/THIRD-PARTY.md`.
 

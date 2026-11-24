@@ -24,12 +24,12 @@ VSVersionInfo(
   kids=[
     StringFileInfo([StringTable('040904B0', [
       StringStruct('CompanyName', 'couch-tv'),
-      StringStruct('FileDescription', 'couch-tv Setup'),
+      StringStruct('FileDescription', 'Couch TV Setup'),
       StringStruct('FileVersion', '{v}'),
-      StringStruct('InternalName', 'couch-tv Setup'),
+      StringStruct('InternalName', 'Couch TV Setup'),
       StringStruct('LegalCopyright', 'MIT licence, github.com/Seagey/couch-tv'),
-      StringStruct('OriginalFilename', 'couch-tv Setup.exe'),
-      StringStruct('ProductName', 'couch-tv Setup'),
+      StringStruct('OriginalFilename', 'Couch TV Setup.exe'),
+      StringStruct('ProductName', 'Couch TV Setup'),
       StringStruct('ProductVersion', '{v}')])]),
     VarFileInfo([VarStruct('Translation', [1033, 1200])])
   ]

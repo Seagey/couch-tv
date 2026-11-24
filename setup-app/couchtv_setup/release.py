@@ -121,7 +121,7 @@ def get(name, progress=lambda f, msg=None: None, release=None):
     rel = release or latest()
     asset = next((a for a in rel.get("assets", []) if a.get("name") == name), None)
     if not asset:
-        raise TvError(f"The newest couch-tv release has no {name}.", "no_asset")
+        raise TvError(f"The newest Couch TV release has no {name}.", "no_asset")
     want, how = expected(asset.get("digest"), _sums(rel).get(name))
     tag = rel.get("tag_name", "latest")
     safe_tag = "".join(c for c in tag if c.isalnum() or c in ".-_") or "latest"

@@ -42,7 +42,7 @@ receivers. So option B on a VIZIO is the phone remote and the assistant, not a h
 Home Assistant's Cast dashboards or a DashCast style tool can try showing couch-tv's page that way and report
 back ([VIZIO.md](VIZIO.md), "One open experiment"); couch-tv has no code for it.
 
-**couch-tv Setup** (the desktop app in `setup-app/`) does option A, plus the phone remote from option C, on
+**Couch TV Setup** (the desktop app in `setup-app/`) does option A, plus the phone remote from option C, on
 Google TV, Android TV 7.1 and newer and Fire OS. The other systems above have their own way (linked in the
 table), not through the app. When a TV never asks "Allow USB debugging?" over Wi-Fi, the app walks through
 the fixes and then the phone only way; Android 6 and 7.0 TVs are set up from a computer with docs/SETUP.md.

@@ -20,6 +20,15 @@ def run(data=None, no_tray=False):
         known = json.loads((paths.data() / "known-tvs.json").read_text(encoding="utf-8"))
     except (OSError, ValueError):
         known = {}
+    # An update that renamed the program leaves the start with the computer entry and (on Windows) the couchtv://
+    # link pointing at the old name: point them at this program. Never stops the helper.
+    try:
+        from . import autostart
+        from .. import linkin
+        autostart.refresh()
+        linkin.register_windows()
+    except Exception:
+        pass
     cfg_path = hconfig.write_bridge_config(known, cfg, data)
     sup = bridge_proc.Supervisor(bridge_proc.child_command(), bridge_proc.child_env(cfg_path, paths.data() / "helper-data", cfg["port"]))
     (paths.data() / "helper-data").mkdir(parents=True, exist_ok=True)

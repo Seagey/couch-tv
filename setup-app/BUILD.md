@@ -1,8 +1,8 @@
-# couch-tv Setup: BUILD
+# Couch TV Setup: BUILD
 
 ## Intent
 
-seagey, 11 November 2026: an official, free couch-tv Setup app in this repo, released from our
+seagey, 11 November 2026: an official, free Couch TV Setup app in this repo, released from our
 GitHub, so a non technical person can put couch-tv on their TV with **no AI and no command line**.
 It covers Google TV (the 6 digit Wireless debugging pairing code), Android TV and Fire TV.
 killy10o10 built a Fire TV setup app first; where his steps are good we reuse them and credit him,
@@ -159,7 +159,7 @@ dead end. seagey: every feature must work or say plainly what it needs, in plain
   Mac) or "Operation not permitted" (EPERM) on a send to a home address (192.168, 10, 172.16) or to the
   mDNS group, while the internet route is there, or nearly every knock on the /24 failing that way at
   once, now shows its own screen: "Your Mac blocked this app from finding the TV. Open System Settings,
-  Privacy and Security, Local Network, switch on couch-tv Setup, then press Look again." with a Look
+  Privacy and Security, Local Network, switch on Couch TV Setup, then press Look again." with a Look
   again button. Windows gets the firewall's Private networks wording.
 - **Google TV no longer assumes Wireless debugging.** Developer options first (both menu names, System
   and Device Preferences), then the person picks what the TV shows: Wireless debugging (Android 12 or
@@ -206,7 +206,7 @@ commit (CI builds them after a push).
 ## Couch TV Helper (extra features from this computer)
 
 Same app, same download. The last screen offers **Done** or **Add extra features**; the second sets
-`helper.json` to mode `helper` in Setup's own folder and starts `couch-tv Setup --helper`.
+`helper.json` to mode `helper` in Setup's own folder and starts `Couch TV Setup --helper`.
 
 - `couchtv_setup/helper/config.py`: `helper.json` and the bridge's config (written from `known-tvs.json` and the TVs that need the helper: Samsung, LG, Roku). The pairing key is made once and kept.
 - `bridge_proc.py`: runs `bridge/server.py` as a child process (`--bridge`, in the app's own Python) and restarts it with a growing wait.
@@ -227,3 +227,15 @@ Same app, same download. The last screen offers **Done** or **Add extra features
 ### Home Assistant without the helper (checked in the code, 24 Nov 2026)
 
 Works without the helper on Google TV, Android TV and Fire TV. The Couch TV home talks to Home Assistant through the launcher itself (`tv-home/web/smarthome.js`, `window.TVHA`, app.couchtv.ha), and the on-TV app answers `/api/ha/*` (`on-tv/.../Server.kt`, `HaPhone.kt`) so a phone can sign the TV in. The bridge's `/api/ha` (`bridge/smarthome.py`) is used only where there is no launcher (Samsung, LG, Roku, which need the helper anyway) and for Philips Hue and AirTouch 5, which are set up from the computer. Not run against a real Home Assistant here.
+
+## Changes to the plan: the light redesign (25 November 2026, branch setup-ui)
+
+The owner approved pictures for Setup's page (welcome, Which TV is yours, plan, progress, finish, installed but not linked, the app icon B). Built as:
+
+- **Page:** light brand theme (`web/style.css`), Nunito and Inter bundled in `web/fonts/` (no remote requests; the page's CSP still says `default-src 'self'`). Welcome with Start; TV cards (any number, none too) with Details; a "My TV isn't here" help page that holds the address box; a card for a TV Setup cannot install on, with its old action; the plan asks only the TV's name (people and weather place are no longer asked, but the server still takes them, so an account's home details and names already saved still go on the TV); progress with steps; Finish and the installed-not-linked Finish; Back on every screen (off while installing); a step bar; Set up another TV (`/api/reset-tv` forgets the connection, facts, report and the account's row for that TV, then the page clears its own per TV state); a session TV list; Open Couch TV Studio.
+- **Linked** is shown only when the server's setup answer says `account.linked`. The finish screen has a hook for "Link it to your account" (shown when `/api/info` lists the feature `link-tv`) and one for Tidy up (shown when `window.CouchTidy` exists).
+- **Icon B** is packaged as `assets/icon/couch-tv-setup.icns` (Mac), `.ico` (Windows) and `-linux.png`, and used by the workflow.
+- **Name:** the app, its folder and the program are renamed to **Couch TV Setup** (0.13.15). Proved on this Mac, 25 Nov 2026, with two tiny ad hoc signed test apps: a bundle still called `couch-tv Setup.app` with `CFBundleName`, `CFBundleDisplayName`, `CFBundleLocalizations` and `en.lproj/InfoPlist.strings` all saying "Couch TV Setup" is still named "couch-tv Setup" by `NSFileManager displayNameAtPath` (what Finder shows) and by Spotlight (`kMDItemDisplayName`); the same bundle named `Couch TV Setup.app` is named "Couch TV Setup" by both. So the file name had to change. Release zip and tar.gz names (`couch-tv-Setup-*`), `SHA256SUMS-setup.txt` and the site's download links are unchanged. The Helper's updater (`helper/update.py`) now puts the new copy under its own name next to the old one (never over something already there) and starts it by that name; the Helper's start with the computer entry is rewritten when it points at another path (`autostart.refresh`), and the Windows link is registered again at helper start. The data folder name (`paths.APP`) is unchanged so saved keys and settings are found.
+- **Tests:** `tests/test_ui.py` drives the real page in Chromium (Playwright) against `tests/ui_harness.py` fakes; `tests/ui_shots.py` makes the screenshots. They skip when Playwright is not installed.
+- **Old Helpers still update (0.13.15).** A Helper from 0.13.14 or older runs the updater it shipped with (`tests/fixtures/helper_update_v0_13_14.py`, byte for byte from tag v0.13.14). It moves the one folder or .app in the archive to where the old copy was, then starts `<that folder>/couch-tv Setup` (Windows `couch-tv Setup.exe`, Mac `open -a` on the .app). So the archives also hold the old program name: `compat_names.py` (run by the workflow right after PyInstaller) copies `Couch TV Setup.exe` to `couch-tv Setup.exe` on Windows and writes a one-line launcher called `couch-tv Setup` on Linux. A Mac needs nothing in the folder. `tests/test_old_updater.py` runs the real old `apply()` and its swap script in temp folders, including a failed second move (the old version comes back and starts again), and the build smoke-tests the old name too. When a release changes the program name, the archive layout or the updater, add the previous release's `update.py` as another fixture and run the same tests. Known cost: after an old updater, the folder is still called `couch-tv Setup` (Windows, Linux) or `couch-tv Setup.app` (Mac, where Finder shows the file name, so it still reads "couch-tv Setup" there) until the next update, which the new updater puts under the new name.
+

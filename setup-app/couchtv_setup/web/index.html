@@ -1,6 +1,7 @@
 <!doctype html>
 <!-- The Fire TV steps, the "Look at your TV" Allow card and the Local Network hints are adapted
-     from couch-tv-setup by killy10o10 (MIT, Copyright (c) 2026 killy10o10). See THIRD-PARTY.md. -->
+     from couch-tv-setup by killy10o10 (MIT, Copyright (c) 2026 killy10o10). See THIRD-PARTY.md.
+     The fonts (Nunito, Inter) are bundled in fonts/ (SIL Open Font License). Nothing loads from the network. -->
 <html lang="en-AU">
 <head>
 <meta charset="utf-8">
@@ -8,129 +9,168 @@
 <title>Couch TV Setup</title>
 <meta name="setup-key" content="__SETUP_KEY__">
 <meta name="setup-os" content="__SETUP_OS__">
+<link rel="icon" type="image/png" href="img/icon-128.png">
 <link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="tidy.css">
 </head>
 <body>
-<main>
-  <header>
-    <div class="logo">Couch TV <span>Setup</span></div>
-    <span class="acct" id="acct-top" hidden></span>
-    <button id="close-top" class="link">Close setup</button>
-  </header>
+<svg width="0" height="0" aria-hidden="true" focusable="false" class="defs"><defs>
+  <symbol id="glyph" viewBox="0 0 112 76"><rect x="24" y="29" width="64" height="22" rx="6" fill="#FBFAF7"/><rect x="16" y="21" width="18" height="34" rx="9" fill="#FFC81E"/><rect x="78" y="21" width="18" height="34" rx="9" fill="#FFC81E"/><rect x="34" y="19" width="44" height="18" rx="8" fill="#9CCBF0"/></symbol>
+  <symbol id="logo" viewBox="0 0 112 92"><rect width="112" height="76" rx="18" fill="#F2441B"/><use href="#glyph"/><rect x="34" y="84" width="44" height="8" rx="4" fill="#14131A"/></symbol>
+  <symbol id="check" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5" fill="none" stroke="#fff" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="arrow" viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></symbol>
+  <symbol id="chev" viewBox="0 0 12 12"><path d="M2 4l4 4 4-4"/></symbol>
+</defs></svg>
 
+<header class="top">
+  <div class="brand"><svg width="46" height="38" aria-hidden="true"><use href="#logo"/></svg><div>Couch TV <span>Setup</span></div></div>
+  <button id="back" class="back" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19 12H5M11 6l-6 6 6 6"/></svg>Back<svg class="lock" viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2" fill="currentColor" stroke="none"/><path d="M8 11V8a4 4 0 018 0v3" stroke-width="2.4"/></svg></button>
+  <nav class="steps" id="steps" aria-label="Where you are" hidden>
+    <div class="s" id="st-0"><span class="n">1</span><span class="t">Account</span></div><i></i>
+    <div class="s" id="st-1"><span class="n">2</span><span class="t">Set up your TV</span></div><i></i>
+    <div class="s" id="st-2"><span class="n">3</span><span class="t">Design</span></div>
+  </nav>
+  <div class="who">
+    <span class="chip" id="acct-top" hidden><span class="av" id="acct-av"></span><span id="acct-name"></span></span>
+    <a class="q" id="studio-top" target="_blank" rel="noopener" hidden>Open Couch TV Studio</a>
+  </div>
+</header>
+<p class="backnote" id="back-note" hidden></p>
+
+<main>
   <!-- welcome -->
-  <section data-step="welcome">
-    <h1>Put Couch TV on your TV</h1>
-    <p class="lead">A clean home screen with no adverts: your apps up front, the time, the weather and a
-      changing scene behind them. About ten minutes, most of it with the TV remote. You can undo all of it.</p>
-    <ul class="need">
-      <li><b>Your TV</b>, switched on, and its remote.</li>
-      <li><b>This computer on the same Wi-Fi</b> as the TV.</li>
-    </ul>
-    <div class="card" id="acct-box" hidden>
-      <p id="acct-line"><b>Have a Couch TV account?</b> Link it, and your design and home details go on the TV too.</p>
-      <div id="acct-ask">
-        <label>The code from the Couch TV website<span class="row"><input id="acct-code" autocomplete="off" placeholder="for example ABCD-EFGH" maxlength="12"><button id="acct-go">Link</button></span></label>
-        <p class="small">No code? <button class="link" id="acct-device">Sign in on the website instead</button></p>
-        <p class="lead" id="acct-device-code" hidden></p>
+  <section data-step="welcome" class="hero">
+    <div>
+      <h1>Put Couch TV<br>on your TV</h1>
+      <button class="btn go huge" id="setup-start" type="button">Start <svg class="arr" viewBox="0 0 24 24" aria-hidden="true"><use href="#arrow"/></svg></button>
+      <div class="pills">
+        <span class="pill dim"><span class="tick-icon sm"><svg aria-hidden="true"><use href="#check"/></svg></span>TV switched on</span>
+        <span class="pill dim"><span class="tick-icon sm"><svg aria-hidden="true"><use href="#check"/></svg></span>Same Wi-Fi as this computer</span>
       </div>
+      <div class="card flat" id="acct-box" hidden>
+        <p id="acct-line"><b>Have a Couch TV account?</b> Link it, and your design and home details go on the TV too.</p>
+        <div id="acct-ask">
+          <label>The code from the Couch TV website<span class="row"><input id="acct-code" autocomplete="off" placeholder="for example ABCD-EFGH" maxlength="12"><button id="acct-go" type="button">Link</button></span></label>
+          <p class="small">No code? <button class="link" id="acct-device" type="button">Sign in on the website instead</button></p>
+          <p class="lead" id="acct-device-code" hidden></p>
+        </div>
+      </div>
+      <details class="more" id="more">
+        <summary>More</summary>
+        <div class="morelist">
+          <button class="q soft" id="undo-start" type="button">Take Couch TV off a TV</button>
+          <p class="small later" id="helper-later" hidden><button class="q soft" id="helper-later-go" type="button">Turn on extra features</button></p>
+          <details class="which">
+            <summary>Which TVs work with this app</summary>
+            <ul class="tvs">
+              <li class="yes"><b>Google TV</b>. Android 12 or newer uses Wireless debugging and a code. Android 11 uses USB debugging over Wi-Fi, no cable.</li>
+              <li class="yes"><b>Android TV</b> 7.1 or newer, with Wireless debugging, or a TV that asks "Allow USB debugging?" over Wi-Fi.</li>
+              <li class="partly"><b>Fire TV</b> on Fire OS. Amazon's home flashes up for a moment before Couch TV comes back.</li>
+              <li class="no">TVs that need the Couch TV Helper, a small app on this computer. Setup finds them and offers it.</li>
+              <li class="no">Some TVs cannot install apps this way. Setup tells you, and nothing on the TV is changed.</li>
+            </ul>
+            <p class="small">Plug a Google TV box into any TV to get everything. This computer is only needed today. Nothing is deleted from the TV. Nothing about you is sent anywhere.</p>
+          </details>
+        </div>
+      </details>
     </div>
-    <div class="card" id="helper-later" hidden>
-      <p><b>Extra features from this computer</b> are off.</p>
-      <p class="small">Turn the TV on from your phone, Ask AI at home, picks. The TV works without them.</p>
-      <div class="actions"><button id="helper-later-go">Turn on extra features</button></div>
-    </div>
-    <p>Works with Google TV and Android TV 7.1 or newer. Setup finds the TV on your Wi-Fi by itself.</p>
-    <details class="small"><summary>Which TVs work with this app</summary>
-    <h2>Works with</h2>
-    <ul class="tvs">
-      <li class="yes"><b>Google TV</b> (Sony, TCL, Hisense, Toshiba, Philips, Panasonic Google TVs, Chromecast with Google TV, Google TV Streamer and others). Android 12 or newer uses Wireless debugging and a code; Android 11 uses USB debugging over Wi-Fi, no cable.</li>
-      <li class="yes"><b>Android TV</b> 7.1 and newer, if Developer options has Wireless debugging, or the TV asks "Allow USB debugging?" over Wi-Fi.</li>
-      <li class="partly"><b>Fire TV on Fire OS</b> (sticks, Cubes, and Fire TV TVs such as Panasonic's). Amazon's home flashes up for a moment before couch-tv comes back.</li>
-    </ul>
-    <h2>Does not work with this app</h2>
-    <ul class="tvs">
-      <li class="no"><b>Samsung (Tizen)</b>, <b>LG (webOS)</b> and <b>Roku OS</b>. they need the Couch TV Helper, a small app on this computer. Setup finds them and offers it. The guides are on GitHub: docs/SAMSUNG.md, docs/LG.md and docs/ROKU.md.</li>
-      <li class="no"><b>VIDAA</b> (Hisense's own system).</li>
-      <li class="no"><b>Apple TV (tvOS)</b>.</li>
-      <li class="no"><b>Fire TV sticks on Vega OS</b> (Fire TV Stick 4K Select, Fire TV Stick HD 2026, Fire TV Stick 4K 3rd gen). They cannot install apps.</li>
-      <li class="no"><b>Panasonic with My Home Screen or TiVo OS</b>, and <b>TiVo OS</b> on any brand.</li>
-      <li class="no"><b>Philips with Saphi or Titan OS</b> (most 2025 and all 2026 Philips TVs).</li>
-      <li class="no"><b>Android 6 and 7.0 TVs</b> (for example the Xiaomi Mi TV 4A with PatchWall): set up from a computer with the guide on GitHub.</li>
-      <li class="no"><b>Android TVs that never ask</b> "Allow USB debugging?" over Wi-Fi: the app walks through what usually fixes that, and if the TV still says no, shows how to put couch-tv on with just your phone.</li>
-    </ul>
-    <p class="small">Any of these can get everything by plugging a Google TV box (for example the Google TV Streamer) into the TV.</p>
-    </details>
-    <p class="small">This computer is only needed today. Once it is set up, Couch TV runs on the TV by itself.
-      Nothing is deleted from the TV. Nothing about you is sent anywhere, unless you link your Couch TV account.</p>
-    <div class="actions">
-      <button id="undo-start">Take couch-tv off a TV</button>
-      <button class="primary" id="setup-start">Start</button>
+    <div class="hero-art">
+      <div class="tv stand"><img src="img/tv-home.webp" width="1200" height="675" alt="A Couch TV home screen: the time, the weather, shows to keep watching and a row of apps over a changing scene."></div>
     </div>
   </section>
 
   <!-- find -->
   <section data-step="find">
-    <h1>Find your TV</h1>
-    <p class="lead" id="find-status">Looking on your Wi-Fi…</p>
-    <div id="found" class="list"></div>
-    <p class="small" id="find-watch" hidden>This list keeps looking. A TV turns Ready by itself once its switch is on.</p>
-    <div id="guide" class="guide" hidden>
+    <h1>Which TV is yours?</h1>
+    <p class="lede" id="find-status">Looking on your Wi-Fi…</p>
+    <div id="found" class="grid"></div>
+    <div id="find-help" class="card empty" hidden>
+      <div class="tvmini"><div class="tv stand"><div class="scr"><span>?</span></div></div></div>
+      <div>
+        <h2>We cannot see a TV yet</h2>
+        <ul class="checks">
+          <li>Check the TV is switched on.</li>
+          <li>Check it is on the same Wi-Fi as this computer.</li>
+          <li>Wait a minute, then press Look again.</li>
+        </ul>
+      </div>
+    </div>
+    <div id="guide" class="card guide" hidden>
       <h2 id="guide-title"></h2>
       <div id="guide-steps"></div>
       <div class="choices" id="guide-which" hidden>
-        <button data-which="wireless"><b>Wireless debugging</b><small>You will type a 6 number code from the TV.</small></button>
-        <button data-which="usb"><b>Only USB debugging</b><small>No cable. The TV asks to allow this computer.</small></button>
+        <button data-which="wireless" type="button"><b>Wireless debugging</b><small>You will type a 6 number code from the TV.</small></button>
+        <button data-which="usb" type="button"><b>Only USB debugging</b><small>No cable. The TV asks to allow this computer.</small></button>
       </div>
       <div class="actions">
-        <button id="guide-fire" class="link">Is it a Fire OS stick or TV?</button>
-        <button class="primary" id="guide-next" hidden>Done</button>
+        <button id="guide-fire" class="link" type="button">Is it a Fire OS stick or TV?</button>
+        <button class="primary" id="guide-next" type="button" hidden>Done</button>
       </div>
     </div>
-    <details id="manual">
-      <summary>Type the TV's address instead</summary>
-      <p class="small">Google TV: <b>Settings, Network and Internet</b>, then your Wi-Fi network.
-        Android TV: <b>Settings, Network</b>. Fire TV: <b>Settings, My Fire TV, About, Network</b>.
-        Type the <b>IP address</b> it shows.</p>
-      <div class="row"><input id="ip" placeholder="for example 192.0.2.10" inputmode="decimal" autocomplete="off"><button class="primary" id="ip-go">Use this</button></div>
-    </details>
-    <p class="hint" id="find-help" hidden>Nothing yet? Check the TV is on and on the same Wi-Fi as this computer.
-      <span data-os="mac">If the Mac asked to "find devices on your local network", it needs <b>Allow</b> (System Settings, Privacy and Security, Local Network).</span>
-      <span data-os="windows">If Windows asked whether to allow couch-tv Setup on networks, it needs <b>Allow</b>. A guest or "Public" Wi-Fi can keep devices apart: use your home Wi-Fi.</span>
-      <span data-os="linux">If a firewall is on (ufw or firewalld), allow this app on your home network, or it cannot hear the TV. With ufw: <b>sudo ufw allow 5353/udp</b>.</span>
-      A Fire TV only shows up once ADB debugging is on: pick <b>Type the TV's address</b>.</p>
-    <div class="actions">
-      <button data-go="welcome">Back</button>
-      <button id="rescan">Look again</button>
+    <div class="findbar">
+      <div class="watching" id="find-watch" hidden><span class="pulse"></span>Still looking. New TVs appear here by themselves.</div>
+      <div class="findbtns">
+        <button id="rescan" type="button" class="btn ghost">Look again</button>
+        <button id="nohere-go" type="button" class="btn ghost">My TV isn't here</button>
+      </div>
     </div>
   </section>
 
+  <!-- the help page: My TV isn't here, with the address box -->
+  <section data-step="nohere" class="sheet">
+    <h1>My TV isn't here</h1>
+    <p class="lede">Try these, then look again.</p>
+    <ol class="howto">
+      <li>Switch the TV on and wait a minute.</li>
+      <li>Put this computer on the same Wi-Fi as the TV.</li>
+      <li>Avoid guest Wi-Fi. It keeps devices apart.</li>
+    </ol>
+    <p class="hint" data-os="mac">If the Mac asked to find devices on your local network, press <b>Allow</b>.</p>
+    <p class="hint" data-os="mac">You can switch it on in System Settings, Privacy and Security, Local Network.</p>
+    <p class="hint" data-os="windows">If Windows asked about networks, press <b>Allow</b>.</p>
+    <p class="hint" data-os="linux">If a firewall is on, allow this app on your home network.</p>
+    <p class="hint" data-os="linux">With ufw, run <b>sudo ufw allow 5353/udp</b>.</p>
+    <div class="actions"><button id="nohere-look" type="button" class="primary">Look again</button></div>
+    <h2>Type the TV's address</h2>
+    <p class="hint">Find the address in the TV's network settings.</p>
+    <div class="row"><input id="ip" placeholder="for example 192.0.2.10" inputmode="decimal" autocomplete="off" aria-label="The TV's address"><button class="primary" id="ip-go" type="button">Use this</button></div>
+    <details id="manual" class="sub">
+      <summary>Where is the address?</summary>
+      <ul>
+        <li>Google TV: <b>Settings, Network and Internet</b>, then your Wi-Fi.</li>
+        <li>Android TV: <b>Settings, Network</b>.</li>
+        <li>Fire TV: <b>Settings, My Fire TV, About, Network</b>.</li>
+        <li>Look for the <b>IP address</b>.</li>
+      </ul>
+      <p class="small">A Fire TV shows up only after ADB debugging is on. Type its address here.</p>
+    </details>
+  </section>
+
   <!-- not this app -->
-  <section data-step="stop">
+  <section data-step="stop" class="sheet">
     <h1 id="stop-title">This TV needs another way</h1>
     <p class="lead" id="stop-text"></p>
     <p id="stop-more" class="small"></p>
     <div class="actions">
-      <button data-go="find">Pick another TV</button>
+      <button data-go="find" type="button">Pick another TV</button>
       <a class="button" href="https://github.com/Seagey/couch-tv#will-it-work-on-my-tv" target="_blank" rel="noopener">The guide on GitHub</a>
     </div>
   </section>
 
   <!-- what kind -->
-  <section data-step="kind">
+  <section data-step="kind" class="sheet">
     <h1>What kind of TV is it?</h1>
     <p class="lead" id="kind-line"></p>
     <div class="choices">
-      <button data-kind="google"><b>Google TV</b><small>The home says Google TV, or Settings, System, About shows "Google TV".</small></button>
-      <button data-kind="android"><b>Android TV</b><small>An older Android TV: Settings has Device Preferences.</small></button>
-      <button data-kind="fire"><b>Fire TV</b><small>An Amazon Fire TV stick, Cube or Fire TV Edition TV.</small></button>
+      <button data-kind="google" type="button"><b>Google TV</b><small>The home says Google TV, or Settings, System, About shows "Google TV".</small></button>
+      <button data-kind="android" type="button"><b>Android TV</b><small>An older Android TV: Settings has Device Preferences.</small></button>
+      <button data-kind="fire" type="button"><b>Fire TV</b><small>An Amazon Fire TV stick, Cube or Fire TV Edition TV.</small></button>
     </div>
     <p class="small">Not sure? On the TV open <b>Settings</b>, then <b>System, About</b> (or <b>Device Preferences, About</b>) and look for "Android TV OS" or "Google TV". Fire TV says Fire OS under <b>Settings, My Fire TV, About</b>.</p>
-    <div class="actions"><button data-go="find">Back</button></div>
   </section>
 
   <!-- Google TV: Developer options first, then whichever switch this TV has -->
-  <section data-step="dev-google">
+  <section data-step="dev-google" class="sheet">
     <h1>Switch on Developer options</h1>
     <p class="lead" id="route-line"></p>
     <p>This lets this computer make the changes on the TV. With the TV remote:</p>
@@ -140,15 +180,14 @@
       <li>Look down the list. Which of these does it have?</li>
     </ol>
     <div class="choices">
-      <button data-dev="wireless"><b>Wireless debugging</b><small>Google TVs on Android 12 or newer. You type a 6 number code from the TV.</small></button>
-      <button data-dev="usb"><b>Only USB debugging</b><small>Google TVs on Android 11 (many 2021 and 2022 Hisense, Toshiba and TCL TVs). No cable needed: the TV asks to allow this computer over Wi-Fi.</small></button>
+      <button data-dev="wireless" type="button"><b>Wireless debugging</b><small>Google TVs on Android 12 or newer. You type a 6 number code from the TV.</small></button>
+      <button data-dev="usb" type="button"><b>Only USB debugging</b><small>Google TVs on Android 11. No cable needed: the TV asks to allow this computer over Wi-Fi.</small></button>
     </div>
     <p class="warn"><b>Careful:</b> in that list, <b>Revoke USB debugging authorisations</b> sits near these switches. Do not press OK on it unless this app asks you to. Check what is highlighted before each OK.</p>
-    <div class="actions"><button data-go="kind">Back</button></div>
   </section>
 
   <!-- Google TV: Wireless debugging and the code -->
-  <section data-step="dev-google-pair">
+  <section data-step="dev-google-pair" class="sheet">
     <h1>Switch on Wireless debugging</h1>
     <ol class="howto">
       <li>In <b>Developer options</b>, go down to <b>Wireless debugging</b>, open it and switch it on. If it asks "Allow wireless debugging on this network?", tick <b>Always allow</b> and choose <b>Allow</b>.</li>
@@ -160,23 +199,20 @@
       <label>The port: the numbers after the colon under <b>IP address &amp; Port</b><input id="pair-port" inputmode="numeric" maxlength="5" autocomplete="off" placeholder="looking…"></label>
     </div>
     <p class="hint" id="pair-status"></p>
-    <div class="actions">
-      <button data-go="dev-google">Back</button>
-      <button class="primary" id="pair-go">Pair</button>
-    </div>
+    <div class="actions"><button class="primary" id="pair-go" type="button">Pair</button></div>
   </section>
 
   <!-- the connect port, when the TV does not announce it -->
-  <section data-step="tls-port">
+  <section data-step="tls-port" class="sheet">
     <h1>One more number</h1>
     <p class="lead">Paired. Now go back one screen on the TV, to <b>Wireless debugging</b>, and type the port shown under
       <b>IP address &amp; Port</b> (the numbers after the colon). It is a different port from the pairing one.</p>
-    <div class="row"><input id="tls-port" inputmode="numeric" maxlength="5" autocomplete="off" placeholder="for example 41234"><button class="primary" id="tls-go">Connect</button></div>
+    <div class="row"><input id="tls-port" inputmode="numeric" maxlength="5" autocomplete="off" placeholder="for example 41234" aria-label="The port"><button class="primary" id="tls-go" type="button">Connect</button></div>
     <p class="hint" id="tls-status"></p>
   </section>
 
   <!-- Android TV and Fire TV: debugging on port 5555 and the Allow prompt -->
-  <section data-step="dev-classic">
+  <section data-step="dev-classic" class="sheet">
     <h1 id="classic-title">Switch on debugging</h1>
     <p class="lead">This lets this computer make the changes on the TV. With the TV remote:</p>
     <ol class="howto" id="howto-android">
@@ -195,31 +231,28 @@
       <li>Open <b>About</b> and press select on your stick's name <b>seven times</b>. "You are now a developer" shows. Press Back.</li>
       <li>Open <b>Developer options</b> and switch <b>ADB debugging</b> on. Say OK to the warning.</li>
     </ol>
-    <p class="small" id="fire-note">On a Fire TV, Amazon's home still flashes up for a moment before couch-tv comes back. That is as good as Fire OS allows.</p>
-    <div class="actions">
-      <button id="classic-back">Back</button>
-      <button class="primary" id="connect-go">Done, connect</button>
-    </div>
+    <p class="small" id="fire-note">On a Fire TV, Amazon's home still flashes up for a moment before Couch TV comes back. That is as good as Fire OS allows.</p>
+    <div class="actions"><button class="primary" id="connect-go" type="button">Done, connect</button></div>
   </section>
 
   <!-- the Allow prompt -->
-  <section data-step="allow">
+  <section data-step="allow" class="sheet">
     <h1>Look at your TV</h1>
     <div class="tvcard"><div class="tvprompt">Allow USB debugging?<small>☑ Always allow from this computer</small><span>Allow</span></div></div>
     <p class="lead" id="allow-status">Tick <b>Always allow from this computer</b>, then press <b>Allow</b>.</p>
-    <div class="actions"><button id="allow-back">Back</button><button id="allow-retry" class="primary" hidden>Try again</button></div>
+    <div class="actions"><button id="allow-retry" class="primary" type="button" hidden>Try again</button></div>
   </section>
 
   <!-- no Allow prompt: the real fixes, one screen each, then the phone route. Never a dead end. -->
-  <section data-step="fix-home">
+  <section data-step="fix-home" class="sheet">
     <h1>The TV did not ask yet</h1>
     <p class="lead">"Allow USB debugging?" can hide behind an app. Press <b>Home</b> on the TV remote so the TV shows its
       home screen, and wait 10 seconds.</p>
     <p>Then press <b>Try again</b> here and watch the TV.</p>
-    <div class="actions"><button class="fix-back">Back</button><button class="primary fix-try">Try again</button></div>
+    <div class="actions"><button class="primary fix-try" type="button">Try again</button></div>
   </section>
 
-  <section data-step="fix-toggle">
+  <section data-step="fix-toggle" class="sheet">
     <h1>Switch it off and on again</h1>
     <p class="lead" data-tvkind="tv">On the TV, open <b>Settings, System, Developer options</b> (on some TVs <b>Settings,
       Device Preferences, Developer options</b>). Switch <b>USB debugging</b> off, then on again. If there is a
@@ -227,21 +260,21 @@
     <p class="lead" data-tvkind="fire">On the Fire TV, open <b>Settings, My Fire TV, Developer options</b>. Switch
       <b>ADB debugging</b> off, then on again.</p>
     <p>Go back to the TV's home screen, then press <b>Try again</b> here and watch the TV.</p>
-    <div class="actions"><button class="fix-back">Back</button><button class="primary fix-try">Try again</button></div>
+    <div class="actions"><button class="primary fix-try" type="button">Try again</button></div>
   </section>
 
-  <section data-step="fix-revoke">
+  <section data-step="fix-revoke" class="sheet">
     <h1>Clear the computers the TV remembers</h1>
     <p class="lead">In the same menu, <b>Developer options</b>, choose <b>Revoke USB debugging authorisations</b> and
       press OK.</p>
     <p>This only helps because this computer has never been allowed on this TV. It makes every other computer that was
-      allowed before ask again the next time it connects (for example a computer that runs couch-tv for you): someone
+      allowed before ask again the next time it connects (for example a computer that runs Couch TV for you): someone
       presses Allow once more for it.</p>
     <p>Go back to the TV's home screen, then press <b>Try again</b> here and watch the TV.</p>
-    <div class="actions"><button class="fix-back">Back</button><button class="primary fix-try">Try again</button></div>
+    <div class="actions"><button class="primary fix-try" type="button">Try again</button></div>
   </section>
 
-  <section data-step="fix-restart">
+  <section data-step="fix-restart" class="sheet">
     <h1>Restart the TV</h1>
     <p class="lead" data-tvkind="tv">Hold the <b>Power</b> button on the remote until the TV restarts. If it only goes
       to sleep, unplug the TV at the wall for 10 seconds and plug it back in.</p>
@@ -251,12 +284,12 @@
     <p data-tvkind="fire">When it is back, open <b>Settings, My Fire TV, Developer options</b> and check <b>ADB
       debugging</b> is still on.</p>
     <p>Then press <b>Try again</b> here and watch the TV.</p>
-    <div class="actions"><button class="fix-back">Back</button><button class="primary fix-try">Try again</button></div>
+    <div class="actions"><button class="primary fix-try" type="button">Try again</button></div>
   </section>
 
-  <section data-step="phone-route">
+  <section data-step="phone-route" class="sheet">
     <h1>Use your phone instead</h1>
-    <p class="lead">This TV will not let a computer in over Wi-Fi. You can still put couch-tv on it with just your
+    <p class="lead">This TV will not let a computer in over Wi-Fi. You can still put Couch TV on it with just your
       phone. Nothing was changed on the TV.</p>
     <ol class="howto">
       <li data-tvkind="tv">On the TV, open <b>Apps</b>, then <b>Search for apps</b>. Type <b>Downloader</b>, pick
@@ -270,12 +303,12 @@
         <b>SETTINGS</b>. Go right to <b>SETTINGS</b> (not CANCEL) and press OK. A list of apps opens with a warning
         that you are responsible for what you install: that is normal. Find <b>Downloader</b>, switch it on and
         press Back. If Downloader closes, open it and type the code again.</li>
-      <li>Press <b>Install</b>. When it is done, press <b>Open</b>. That is the couch-tv app, <b>Couch TV</b>.</li>
+      <li>Press <b>Install</b>. When it is done, press <b>Open</b>. That is the Couch TV app, <b>Couch TV</b>.</li>
       <li data-tvkind="tv">If Google Play Protect says <b>App blocked to protect your device</b>: Play Protect checks
-        apps that do not come from the Play Store, and it blocks couch-tv because couch-tv asks for strong
+        apps that do not come from the Play Store, and it blocks Couch TV because Couch TV asks for strong
         permissions (it becomes your home screen and lets your phone work the TV). If the box has <b>More
         details</b>, open it and choose <b>Install anyway</b>. If it only has <b>OK</b>, this TV will not install
-        couch-tv until Play Protect's app scan is paused: in the <b>Play Store</b> app on the TV, open your profile
+        Couch TV until Play Protect's app scan is paused: in the <b>Play Store</b> app on the TV, open your profile
         picture (or <b>Settings</b>), then <b>Play Protect</b>, and switch off <b>Scan apps with Play Protect</b>.
         Install again, then switch the scan back on. If you would rather not, press <b>Try the computer once
         more</b> below.</li>
@@ -283,100 +316,154 @@
         type the code. Your phone is now the remote, and it sets up the rest from there.</li>
     </ol>
     <div class="actions">
-      <button id="fix-again">Try the computer once more</button>
-      <button class="primary" id="close-go3">Close setup</button>
+      <button id="fix-again" type="button">Try the computer once more</button>
+      <button class="primary" id="close-go3" type="button">Close setup</button>
     </div>
   </section>
 
   <!-- the computer stopped this app from reaching the home network -->
-  <section data-step="blocked">
+  <section data-step="blocked" class="sheet">
     <h1>Let this app find the TV</h1>
     <p class="lead" id="blocked-text"></p>
-    <p class="small" data-os="mac">If couch-tv Setup is not in that list, close setup, open the app again and press
+    <p class="small" data-os="mac">If Couch TV Setup is not in that list, close setup, open the app again and press
       <b>Allow</b> when the Mac asks to find devices on your local network.</p>
-    <div class="actions">
-      <button data-go="welcome">Back</button>
-      <button class="primary" id="blocked-again">Look again</button>
-    </div>
+    <div class="actions"><button class="primary" id="blocked-again" type="button">Look again</button></div>
   </section>
 
   <!-- the plan, and the yes -->
-  <section data-step="plan">
-    <h1>Here is the plan</h1>
-    <p class="lead" id="device-line"></p>
-    <ul id="plan-list" class="plan"></ul>
-    <label class="tick" id="ontv-row" hidden><input type="checkbox" id="ontv-off" checked> Switch off the on-TV app's home and watch (it stays installed). Untick to keep it as the home: nothing is installed then.</label>
-    <label class="tick"><input type="checkbox" id="ambient" checked> Switch off ambient mode (the adverts and photos when the TV is idle)</label>
-    <p class="card small" id="plan-account" hidden></p>
-    <label>What do you call this TV?<input id="tv-room" autocomplete="off" maxlength="30" placeholder="for example Living room TV"></label>
-    <h2>Make it yours (you can skip this)</h2>
-    <label>Who watches? Names, with commas between<input id="people" autocomplete="off" placeholder="for example Sam, Alex"></label>
-    <label>Suburb or city, for the weather<span class="row"><input id="place-q" autocomplete="off" placeholder="for example Lismore"><button id="place-go">Look up</button></span></label>
-    <div id="places" class="list small"></div>
-    <p class="small">You can change all of this any time on the TV, in couch-tv's Home settings (the gear tile).</p>
-    <p class="small" id="tcl-note" hidden><b>TCL:</b> after setting up, open the TV's <b>Settings, Accessibility</b> and check both couch-tv services are switched on. On TCL TVs that is what keeps couch-tv as the home after a restart.</p>
-    <div class="actions">
-      <button data-go="welcome">Not now</button>
-      <button class="primary" id="setup-go">Yes, set it up</button>
+  <section data-step="plan" class="sheet wide">
+    <div class="planhead">
+      <div class="tv stand"><div class="scr sky"><svg width="112" height="92" aria-hidden="true"><use href="#logo"/></svg></div></div>
+      <div>
+        <h1>Ready to set up your TV</h1>
+        <p class="lede" id="device-line">We will put Couch TV on it and make it the home screen.</p>
+      </div>
+    </div>
+    <label class="lab" for="tv-room">What do you call this TV?</label>
+    <input id="tv-room" autocomplete="off" maxlength="30" placeholder="for example Living room TV">
+    <details class="what" id="plan-details">
+      <summary><svg viewBox="0 0 12 12" aria-hidden="true"><use href="#chev"/></svg>What will change</summary>
+      <ul class="checks">
+        <li><span class="tick-icon"><svg aria-hidden="true"><use href="#check"/></svg></span>Installs Couch TV and makes it your home screen.</li>
+        <li><span class="tick-icon"><svg aria-hidden="true"><use href="#check"/></svg></span>Keeps Couch TV in front when the TV home appears.</li>
+        <li><span class="tick-icon"><svg aria-hidden="true"><use href="#check"/></svg></span>Keeps your apps, logins and settings. Nothing is deleted.</li>
+        <li><span class="tick-icon"><svg aria-hidden="true"><use href="#check"/></svg></span>You can take it off again any time.</li>
+      </ul>
+      <details class="sub"><summary>Every step, in detail</summary><ul id="plan-list" class="plan"></ul></details>
+    </details>
+    <label class="tick" id="ontv-row" hidden><input type="checkbox" id="ontv-off" checked> Switch off the phone remote app's home and watch (it stays installed). Untick to keep it as the home: nothing is installed then.</label>
+    <label class="tick" hidden><input type="checkbox" id="ambient"> Switch off ambient mode</label>
+    <p class="notice" id="plan-account" hidden></p>
+    <p class="small" id="tcl-note" hidden><b>TCL:</b> after setting up, open the TV's <b>Settings, Accessibility</b> and check both Couch TV services are switched on. On TCL TVs that keeps Couch TV as the home after a restart.</p>
+    <div class="planact">
+      <button class="btn go" id="setup-go" type="button"><span>Set up <span id="plan-name">this TV</span></span> <svg class="arr" viewBox="0 0 24 24" aria-hidden="true"><use href="#arrow"/></svg></button>
+      <button class="q soft" id="plan-back" type="button">Back</button>
     </div>
   </section>
 
   <!-- working -->
-  <section data-step="work">
-    <h1 id="work-title">Setting it up</h1>
-    <div class="bar"><i id="work-bar"></i></div>
-    <p class="lead" id="work-status">Starting…</p>
-    <p class="small">Keep the TV on. This takes a minute or two.</p>
+  <section data-step="work" class="work">
+    <div class="workgrid">
+      <div>
+        <h1 id="work-title">Setting it up</h1>
+        <p class="lede" id="work-sub">Keep the TV on. We will tell you when it is done.</p>
+        <div class="tv stand"><div class="scr sky"><div><svg width="112" height="92" aria-hidden="true"><use href="#logo"/></svg><div class="minibar"><i id="work-mini"></i></div><span id="work-label">Installing Couch TV</span></div></div></div>
+      </div>
+      <div class="card worklist">
+        <div class="bar"><i id="work-bar"></i></div>
+        <ul class="msteps" id="work-steps"></ul>
+        <p class="single" id="work-status" aria-live="polite">Starting…</p>
+      </div>
+    </div>
   </section>
 
   <!-- done, check -->
-  <section data-step="done">
-    <h1 id="done-title">Couch TV is your home screen</h1>
-    <p class="lead" id="done-line"></p>
-    <ul class="ticks" id="done-account" hidden></ul>
-    <p>Press <b>Home</b> on your TV remote. You should see couch-tv. On Google TV and Fire TV the TV's own home may flash up first: that is normal.</p>
-    <div class="actions"><button id="check-go">Check it again</button></div>
-    <h2>Phone remote (optional)</h2>
-    <p>Use your phone as the remote, and search for a show by name. It adds a second small app to the TV. No computer is needed afterwards.</p>
-    <div class="actions"><button class="primary" id="remote-go">Add the phone remote</button></div>
-    <div id="remote-done" hidden>
-      <p>On your phone (on the same Wi-Fi), open <b id="remote-addr"></b> and type the 6 numbers the TV shows.
-        Then add the page to the phone's home screen.</p>
-      <div class="actions"><button id="remote-code">Show a code on the TV</button></div>
+  <section data-step="done" class="finish">
+    <div class="fin">
+      <div>
+        <span class="pill ok" id="fin-badge"><span class="tick-icon sm" id="fin-badge-tick"><svg aria-hidden="true"><use href="#check"/></svg></span><span id="fin-badge-dot" class="dot" hidden></span><span id="fin-badge-text">Your TV is ready</span></span>
+        <h1 id="done-title">Couch TV is on your TV</h1>
+        <p class="lede" id="fin-lede"></p>
+        <p class="notice" id="done-line" aria-live="polite" hidden></p>
+        <details class="sub more"><summary>What was done</summary><ul class="ticks small" id="done-account" hidden></ul></details>
+        <a class="btn go big" id="studio-cta" target="_blank" rel="noopener" hidden><span id="studio-cta-text">Design your own screen</span> <svg class="arr" viewBox="0 0 24 24" aria-hidden="true"><use href="#arrow"/></svg></a>
+        <button class="btn go big" id="link-cta" type="button" hidden><span>Link it to your account</span> <svg class="arr" viewBox="0 0 24 24" aria-hidden="true"><use href="#arrow"/></svg></button>
+        <p class="cap" id="fin-cap" hidden></p>
+        <div class="card flat linkpanel" id="fl-panel" hidden>
+          <h2>Sign in to link this TV</h2>
+          <div id="fl-ask">
+            <label>The code from the Couch TV website<span class="row"><input id="fl-code" autocomplete="off" placeholder="for example ABCD-EFGH" maxlength="12"><button class="primary" id="fl-go" type="button">Link this TV</button></span></label>
+            <p class="small">No code? <button class="link" id="fl-device" type="button">Sign in on the website instead</button></p>
+            <p class="lead" id="fl-device-code" hidden></p>
+          </div>
+          <p class="hint" id="fl-status" aria-live="polite"></p>
+        </div>
+        <p class="hint" id="link-status" aria-live="polite" hidden></p>
+        <div class="row2">
+          <button class="btn ghost" id="another-go" type="button">Set up another TV</button>
+          <button class="q" id="finish-go" type="button"><span id="finish-text">Keep this one</span></button>
+        </div>
+        <p><button class="link" id="check-go" type="button">Check it again</button></p>
+      </div>
+      <div class="fin-art">
+        <div class="tv stand"><span class="designtag" id="design-tag" hidden></span><img src="img/tv-home.webp" width="1200" height="675" alt="Your Couch TV home screen"></div>
+        <div class="card session" id="session-box" hidden>
+          <h3>TVs set up in this session</h3>
+          <ul id="session-list"></ul>
+        </div>
+      </div>
+    </div>
+
+    <div class="tools">
+      <button class="tool" id="remote-go" type="button"><span><small>Use your phone as the remote</small><b>Add the phone remote</b></span><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#arrow"/></svg></button>
+      <button class="tool" id="health-look" type="button"><span><small>Something not right?</small><b>Show the health report</b></span><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#arrow"/></svg></button>
+      <button class="tool" id="debug-off" type="button"><span><small>Done with the computer?</small><b>Switch debugging off</b></span><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#arrow"/></svg></button>
+      <button class="tool" id="tidy-go" type="button" hidden><span><small>Clear out what you do not use</small><b>Tidy up your TV</b></span><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#arrow"/></svg></button>
+    </div>
+  </section>
+
+  <!-- what each card on the finish screen opens -->
+  <section data-step="remote" class="sheet">
+    <h1>Phone remote</h1>
+    <div id="remote-done">
+      <p class="lead">On your phone, on the same Wi-Fi, open <b id="remote-addr"></b> and type the 6 numbers the TV shows.</p>
+      <p>Then add the page to the phone's home screen.</p>
+      <div class="actions"><button class="primary" id="remote-code" type="button">Show a code on the TV</button></div>
+      <p class="hint" id="remote-status" aria-live="polite"></p>
       <p class="small" id="remote-adb-google">To let the phone press keys and type, open <b id="remote-setup"></b> on the phone and follow the steps there.</p>
       <p class="small" id="remote-adb-fire">On an up to date Fire TV, Amazon blocks the phone remote from pressing keys and typing. Opening apps and finding shows still work.</p>
     </div>
-    <div id="health-box" hidden>
-      <h2>Something not right?</h2>
-      <p class="small">A health report helps us fix it. You see all of it before anything is sent.</p>
-      <div class="actions"><button id="health-look">Show the health report</button></div>
-      <div id="health-show" hidden>
-        <p class="small">Couch TV's own details only: versions, free space, memory, its last crash and its own log lines. Addresses and e-mails are blanked out.</p>
-        <pre class="report" id="health-text"></pre>
-        <div class="actions"><button class="primary" id="health-send">Send it to my Couch TV account</button></div>
-        <p class="hint" id="health-status"></p>
-      </div>
+  </section>
+
+  <section data-step="health" class="sheet">
+    <h1>Health report</h1>
+    <div id="health-show">
+      <p class="lead">You see all of it before anything is sent.</p>
+      <p class="small">Couch TV's own details only: versions, free space, memory, its last crash and its own log lines. Addresses and e-mails are blanked out.</p>
+      <pre class="report" id="health-text"></pre>
+      <div class="actions"><button class="primary" id="health-send" type="button">Send it to my Couch TV account</button></div>
+      <p class="hint" id="health-status" aria-live="polite"></p>
     </div>
-    <h2>Finish</h2>
-    <p id="debug-line">couch-tv does not need debugging any more. Switching it off is safest: <span id="debug-why"></span></p>
-    <div class="actions">
-      <button id="debug-off">Switch debugging off</button>
-      <button class="primary" id="finish-go">Finish</button>
-    </div>
-    <p class="small">To take couch-tv off again, open this app and choose <b>Take couch-tv off a TV</b>. Or by hand, with the remote: Settings, Apps, the couch-tv <b>Home</b> app, Uninstall.</p>
+  </section>
+
+  <section data-step="debug" class="sheet">
+    <h1>Switch debugging off</h1>
+    <p class="lead" id="debug-line">Couch TV does not need debugging any more. Switching it off is safest: <span id="debug-why"></span></p>
+    <div class="actions"><button class="primary" id="debug-go" type="button">Switch it off</button></div>
+    <p class="hint" id="debug-status" aria-live="polite"></p>
   </section>
 
   <!-- the last screen: Done, or add the helper -->
-  <section data-step="extras">
+  <section data-step="extras" class="sheet">
     <h1>Couch TV is on your TV.</h1>
     <p class="lead">It works on its own. You can stop here.</p>
-    <div class="card">
+    <div class="card flat">
       <h2>Done</h2>
       <p>Close this app. Delete it if you like.</p>
       <p class="small">The TV needs no computer.</p>
-      <div class="actions"><button class="primary" id="extras-done">Done</button></div>
+      <div class="actions"><button class="primary" id="extras-done" type="button">Done</button></div>
     </div>
-    <div class="card" id="extras-add">
+    <div class="card flat" id="extras-add">
       <h2>Add extra features</h2>
       <p>Keep the Couch TV Helper in your <span data-os="mac">menu bar</span><span data-os="windows">tray</span><span data-os="linux">tray</span>.</p>
       <ul class="ticks">
@@ -384,23 +471,24 @@
         <li>Ask AI on your home computer</li>
         <li>Picks made for you</li>
       </ul>
-      <label class="small"><input type="checkbox" id="extras-autostart"> Start with this computer</label>
+      <label class="tick"><input type="checkbox" id="extras-autostart"> Start with this computer</label>
       <p class="small"><b>Computer off?</b> Your home keeps working. Only these extras pause.</p>
-      <div class="actions"><button id="extras-on">Add extra features</button></div>
+      <div class="actions"><button id="extras-on" type="button">Add extra features</button></div>
     </div>
     <p class="small">You can add them any time, from Couch TV Setup or your account.</p>
+    <p class="small">To take Couch TV off again, open this app and choose <b>Take Couch TV off a TV</b>.</p>
   </section>
 
   <!-- the helper is on -->
-  <section data-step="helper-on">
+  <section data-step="helper-on" class="sheet">
     <h1>Couch TV Helper is on.</h1>
     <p class="lead" id="helper-on-line">Look for it in your menu bar.</p>
     <p class="small">Open Couch TV Studio, pause it or turn it off from there. The TV stays as it is.</p>
-    <div class="actions"><button class="primary" id="helper-on-done">Close setup</button></div>
+    <div class="actions"><button class="primary" id="helper-on-done" type="button">Close setup</button></div>
   </section>
 
   <!-- Samsung, LG or Roku found -->
-  <section data-step="helper-tv">
+  <section data-step="helper-tv" class="sheet">
     <h1 id="helper-tv-title">Your TV needs the helper.</h1>
     <p class="lead">It opens Couch TV and runs your phone remote.</p>
     <h2>What the helper does</h2>
@@ -412,45 +500,43 @@
     <h2>Computer off?</h2>
     <p>Couch TV stays on the TV. Open it from the app row.</p>
     <p>It will not open itself, and the phone remote stops.</p>
-    <label class="small"><input type="checkbox" id="helper-tv-autostart" checked> Start with this computer</label>
-    <div class="actions">
-      <button data-go="find">Not now</button>
-      <button class="primary" id="helper-tv-go">Set up the helper</button>
-    </div>
+    <label class="tick"><input type="checkbox" id="helper-tv-autostart" checked> Start with this computer</label>
+    <div class="actions"><button class="primary" id="helper-tv-go" type="button">Set up the helper</button></div>
   </section>
 
   <!-- undo -->
-  <section data-step="undo">
-    <h1>Take couch-tv off this TV</h1>
-    <p class="lead">This puts the TV's own home back and removes the couch-tv apps. Your other apps, logins and settings stay as they are.</p>
-    <p class="small">If a computer at home runs couch-tv for you (the bridge), stop it first, or it switches things back: see docs/UNINSTALL.md on GitHub.</p>
+  <section data-step="undo" class="sheet">
+    <h1>Take Couch TV off this TV</h1>
+    <p class="lead">This puts the TV's own home back and removes the Couch TV apps. Your other apps, logins and settings stay as they are.</p>
+    <p class="small">If a computer at home runs Couch TV for you (the bridge), stop it first, or it switches things back: see docs/UNINSTALL.md on GitHub.</p>
     <ul id="undo-list" class="plan"></ul>
     <p class="small" id="undo-details"></p>
     <label class="tick"><input type="checkbox" id="undo-debug"> Also switch debugging off afterwards</label>
-    <div class="actions">
-      <button data-go="welcome">Not now</button>
-      <button class="primary" id="undo-go">Take it off</button>
-    </div>
+    <div class="actions"><button class="primary" id="undo-go" type="button">Take it off</button></div>
   </section>
 
-  <section data-step="undone">
+  <section data-step="undone" class="sheet">
     <h1>Done</h1>
-    <p class="lead" id="undone-line">couch-tv is off this TV. Press Home on the remote: you should see the TV's own home.</p>
+    <p class="lead" id="undone-line">Couch TV is off this TV. Press Home on the remote: you should see the TV's own home.</p>
     <p class="small">Want Developer options gone too? On the TV: Developer options, switch the switch at the top off.</p>
-    <div class="actions"><button class="primary" id="close-go2">Close setup</button></div>
+    <div class="actions"><button class="primary" id="close-go2" type="button">Close setup</button></div>
   </section>
 
-  <section data-step="closed">
+  <section data-step="closed" class="sheet">
     <h1>Setup has stopped</h1>
     <p class="lead">You can close this tab.</p>
   </section>
 
-  <div class="error" id="error" hidden>
+  <div class="error" id="error" role="alert" hidden>
     <p id="error-text"></p>
     <details id="error-more" hidden><summary>Details</summary><p class="small" id="error-detail"></p></details>
   </div>
-  <footer>Free and open source. <a href="https://github.com/Seagey/couch-tv" target="_blank" rel="noopener">couch-tv on GitHub</a></footer>
 </main>
+<footer>
+  <span>Free and open source. <a href="https://github.com/Seagey/couch-tv" target="_blank" rel="noopener">Couch TV on GitHub</a></span>
+  <button class="link" id="close-top" type="button">Close setup</button>
+</footer>
 <script src="app.js"></script>
+<script src="tidy.js"></script>
 </body>
 </html>
