@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- Android 11 and older. The smart home settings hold a Home Assistant token, and athome.xml the
-     things typed at home (guest Wi-Fi password, calendar link, notes), and phonepage.xml the paired phones (PhoneAuth.kt): never in a backup. The Matter
+     things typed at home (guest Wi-Fi password, calendar link, notes), and phonepage.xml the paired phones (PhoneAuth.kt), and account.xml this TV's link to a Couch TV Studio account (AccountLink.kt): never in a backup. The Matter
      controller's keys (the two chip.platform files and files/matter/) let whoever holds them control
      every Matter device added on this TV: never in a backup either. -->
 <full-backup-content>
@@ -10,4 +10,5 @@
     <exclude domain="sharedpref" path="chip.platform.ConfigurationManager.xml" />
     <exclude domain="file" path="matter/" />
     <exclude domain="sharedpref" path="phonepage.xml" />
+    <exclude domain="sharedpref" path="account.xml" />
 </full-backup-content>

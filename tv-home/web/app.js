@@ -6261,6 +6261,95 @@
       if (zone === "settings") renderSettings();
     });
   }
+  // Couch TV Setup brought the account's design code with it (AccountLink.kt, design-code.js fromSetup):
+  // got at once, with no typing, the same way as a typed code. Setup is the person asking for their
+  // account's design, so designs go on; the home starts again and "Use this design?" comes first, and
+  // the home pack that came with it is applied as the home starts (takeAccountHome). Offline: tried
+  // again when the home comes back to the front.
+  function setupDesign() {
+    if (typeof CouchDesignCode === "undefined" || !CouchDesignCode.fromSetup || MOCK || PREVIEW || /[?&]designer=1\b/.test(Q)) return;
+    CouchDesignCode.fromSetup().then(function (d) {
+      if (!d) return;
+      if (typeof CouchDesigner !== "undefined") keep(CouchDesigner.KEY, "on");
+      try { localStorage.removeItem("couchtv.design.off"); } catch (e) {}
+      if (LOOP) { ST.look = "night"; keep("tvhome.look", "night"); saveSettings(); }
+      setTimeout(restart, 300);
+    }, function () {});
+  }
+  // The account's TV inbox (Send to Living room TV in Couch TV Studio, no code): asked by the app with the
+  // link Setup wrote (AccountLink.kt), at start, when the home comes back to the front, and every "poll"
+  // seconds (Studio says 60; never under 30) only while the home is in front. Nothing while another app or
+  // the screensaver is in front; after an error it waits 1, 2, 4 ... up to 30 minutes. A design that comes
+  // is got like a typed code (its home pack too) and goes on at once, as the account owner asked for it on
+  // their own TV: "New design from your account", with Undo in Home settings, Designs for a day.
+  var INBOX = { timer: 0, fails: 0, stopped: false };
+  function inboxCan() {
+    return !(MOCK || PREVIEW || /[?&]designer=1\b/.test(Q)) && TV && typeof TV.accountInbox === "function" &&
+      typeof CouchDesignCode !== "undefined" && CouchDesignCode.readInboxAnswer && CouchDesignCode.linked();
+  }
+  function inboxLater(secs) { clearTimeout(INBOX.timer); INBOX.timer = secs > 0 ? setTimeout(inboxAsk, secs * 1000) : 0; }
+  function inboxAsk() {
+    clearTimeout(INBOX.timer); INBOX.timer = 0;
+    if (INBOX.stopped || PAGE_PAUSED || !inboxCan()) return;
+    try { TV.accountInbox(); } catch (e) { inboxLater(CouchDesignCode.inboxDelay({ state: "error" }, INBOX.fails++)); }
+  }
+  function inboxStop() { INBOX.stopped = true; inboxLater(0); }
+  function accountInbox(raw) {
+    if (typeof CouchDesignCode === "undefined" || !CouchDesignCode.readInboxAnswer) return;
+    var a = CouchDesignCode.readInboxAnswer(raw);
+    var wait = CouchDesignCode.inboxDelay(a, INBOX.fails);
+    INBOX.fails = a.state === "error" ? INBOX.fails + 1 : 0;
+    if (a.state === "unlinked") { inboxStop(); return; }   // the app forgot the link; a typed code still works
+    if (a.state === "item") takeAccountDesign(a);
+    if (!PAGE_PAUSED && !INBOX.stopped) inboxLater(wait);
+  }
+  function takeAccountDesign(a) {
+    var snap = CouchDesignCode.snapshot(typeof CouchDesigner !== "undefined" ? kept(CouchDesigner.KEY) : null);
+    CouchDesignCode.get(a.code).then(function (d) {
+      CouchDesignCode.holdUndo(snap, a.title);
+      if (typeof CouchDesigner !== "undefined") keep(CouchDesigner.KEY, "on");
+      try { localStorage.removeItem("couchtv.design.off"); } catch (e) {}
+      // sent by the account to its own linked TV: on without a second question here (Undo is the way back)
+      try { if (typeof CouchDesign !== "undefined" && CouchDesign.hashOf) localStorage.setItem("couchtv.design.ok", CouchDesign.hashOf(d)); } catch (e) {}
+      if (LOOP) { ST.look = "night"; keep("tvhome.look", "night"); saveSettings(); }
+      setTimeout(restart, 300);
+    }, function () {});
+  }
+  // once, as the home starts again with it
+  function accountNewNotice() {
+    if (typeof CouchDesignCode === "undefined" || !CouchDesignCode.undoFresh || MOCK || PREVIEW) return;
+    var u = CouchDesignCode.undoFresh();
+    if (u) toast("New design from your account" + (u.title ? ": " + u.title : "") + ". To undo it, open Home settings, Designs.");
+  }
+  function undoAccountDesign() {
+    var choice = CouchDesignCode.undoNew();
+    if (choice === undefined) return;
+    if (typeof CouchDesigner !== "undefined") { if (choice == null) keep(CouchDesigner.KEY, null); else keep(CouchDesigner.KEY, choice); }
+    SET.msg = "Your earlier home is back.";
+    setTimeout(restart, 600);
+  }
+  // Designs, Linked to your account: shown only while this TV holds a link (Couch TV Setup made it). One
+  // press asks, a second press unlinks: the TV stops getting what the account sends; the design and the
+  // names already here stay (Home settings, People takes the account's names off).
+  var UNLINK_ASK = 0;
+  function accountRows(rows) {
+    if (typeof CouchDesignCode === "undefined" || !CouchDesignCode.linked) return;
+    var u = CouchDesignCode.undoHeld && CouchDesignCode.undoHeld();
+    if (u) rows.push({ kind: "action", key: "dz-undo", label: "Undo the new design", sub: "Puts back what this TV had before " +
+      (u.title ? "“" + u.title + "”" : "the design") + " came from your account", act: undoAccountDesign });
+    if (!CouchDesignCode.linked()) return;
+    var asking = UNLINK_ASK && Date.now() - UNLINK_ASK < 15000;
+    rows.push({ kind: "action", key: "dz-unlink", label: asking ? "Press OK again to unlink" : "Unlink this TV from your account",
+      sub: asking ? "This TV stops getting designs your Couch TV Studio account sends. What is on it now stays." :
+        "Linked to your Couch TV Studio account. New designs you send come straight here.",
+      act: function () {
+        if (!(UNLINK_ASK && Date.now() - UNLINK_ASK < 15000)) { UNLINK_ASK = Date.now(); return; }
+        UNLINK_ASK = 0;
+        CouchDesignCode.unlink();
+        inboxStop();
+        SET.msg = "This TV is no longer linked to your account."; SET.keyFocus = "dz-share";
+      } });
+  }
   // ---- Designs (designer-gate.js, Couch TV Studio designs): opt in, and one step back to the standard home ----
   // English only for now, like the rows above (needs i18n). The section's name is the product's.
   function setDesigner(on) {
@@ -6334,6 +6423,7 @@
       act: function () { ST.look = "night"; keep("tvhome.look", "night"); saveSettings(); restart(); } });
     designCodeRows(rows);
     rows.push({ kind: "action", key: "dz-share", label: "Open this home in Couch TV Studio", sub: "Change it on your phone or computer. Names, photos, places, keys and calendar links stay on this TV.", act: shareHome });
+    accountRows(rows);
     // (the Commute's Where to is its own page now, Widgets on this home; tvhome.commute stays the 0.13.8 fallback)
     if (on && CFG.design) widgetRows(rows);   // each widget on the design with settings of its own
     if ((window.smartHome && window.smartHome.setup && window.smartHome.setup.can()) || (on && AH)) rows.push(head("Smart home and At home"));
@@ -9150,10 +9240,10 @@
     phoneLink: function () { PHONE_QR.url = ""; phoneQr(); if (typeof CouchDesign !== "undefined" && CouchDesign.nav && CouchDesign.nav.phoneAgain) CouchDesign.nav.phoneAgain(); },
     // also the on-TV app's HomeActivity.refresh() after a phone or setup save, with the home already in front
     // and never paused: that redraws, but only a resume after tv.pause() is the home coming to the front
-    resume: function () { var front = PAGE_PAUSED; PAGE_PAUSED = false; clock(); designVideo("away", false); toggleScreenOff(false); setIdleAmbient(false); resetSmartIdle(); okReset(); refresh(); if (!OFFLINE) refreshQuick(); refreshWeather(); startVideo(); clipWake(); sceneVideos(true); refreshMusic(); refreshCards(true); if (window.AmbientWeather) window.AmbientWeather.resume(); resetIdlePhoto(); kwArtAgain(); if (front) updFront(); },
+    resume: function () { var front = PAGE_PAUSED; PAGE_PAUSED = false; clock(); designVideo("away", false); toggleScreenOff(false); setIdleAmbient(false); resetSmartIdle(); okReset(); refresh(); if (!OFFLINE) refreshQuick(); refreshWeather(); startVideo(); clipWake(); sceneVideos(true); refreshMusic(); refreshCards(true); if (window.AmbientWeather) window.AmbientWeather.resume(); resetIdlePhoto(); kwArtAgain(); if (front) updFront(); setupDesign(); if (front) inboxAsk(); },
     // an app is in front: the video background stops until the home is back
     // (and a design's video background lets go of the TV's decoder, which the app may need)
-    pause: function () { saveFocusNow(); PAGE_PAUSED = true; pauseVideo(); designVideo("away", true); },
+    pause: function () { saveFocusNow(); PAGE_PAUSED = true; pauseVideo(); designVideo("away", true); inboxLater(0); },
     scene: function (pick) { return phoneScene(pick); },
     // the launcher's file picker has copied the chosen photos into its own storage (Home settings)
     photosAdded: function (names) { photosAdded(names); },
@@ -9167,6 +9257,8 @@
     homeAnswered: function (held) { homeAnswered(held); },
     // a calendar the launcher read for the Agenda widget (MainActivity.calendar)
     calendarText: function (id, ok, text) { calendarText(id, ok, text); },
+    setupDesign: function () { setupDesign(); INBOX.stopped = false; inboxAsk(); },
+    accountInbox: function (raw) { accountInbox(raw); },
     // words typed on the phone remote (Type on the TV) when the TV app cannot press keys (the on-TV app
     // with no ADB): they go into the typing box Home settings has open, at the cursor. False: no box open.
     typeText: function (s) { return typeIn(s); },
@@ -10057,6 +10149,9 @@
     initSettings();
     remindersInit();
     welcomeStart(freshTv);   // a TV never set up: the first-run welcome, over everything else
+    setupDesign();           // Couch TV Setup's design code, if it brought one: no typing
+    accountNewNotice();      // a design the account just sent: say so once, with where Undo is
+    inboxAsk();              // the account's TV inbox, when this TV is linked
     // Home settings gets an Updates section, before About, where the launcher can update itself
     if (updRead() && UPD.supported) SECS.splice(SECS.length - 1, 0, ["updates", "download"]);
     // back from Update to ... on the on-TV app: say so once

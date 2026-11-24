@@ -319,9 +319,97 @@
       return d;
     });
   }
+  // ---- Couch TV Setup: the design code it brought (setup-app make_home, --es design_code) ----
+  // The app holds it (AccountLink.kt) until the page has fetched it here, through get() like a typed code:
+  // "Use this design?" first, the home pack with it. Only a whole CTV1 code is taken (no short code ever
+  // comes this way). Done (the app forgets it) once it arrived, or when the store says it is used, gone
+  // or not a design; kept for the next start when the TV was offline or the store was busy.
+  var SETUP_CODE = /^CTV1-[A-Za-z0-9_-]{43}$/;
+  function setupCode() {
+    var T = window.TVOS, c = "";
+    if (!T || typeof T.setupDesignCode !== "function") return "";
+    try { c = String(T.setupDesignCode() || ""); } catch (e) { return ""; }
+    return c.length === 48 && SETUP_CODE.test(c) ? c : "";
+  }
+  function setupDone() { var T = window.TVOS; try { if (T && T.setupDesignDone) T.setupDesignDone(); } catch (e) {} }
+  var setupBusy = false;
+  function fromSetup() {
+    var code = setupCode();
+    if (!code || setupBusy || DESIGNER) return Promise.resolve(null);
+    setupBusy = true;
+    return get(code).then(function (d) { setupBusy = false; setupDone(); return d; }, function (e) {
+      setupBusy = false;
+      if (!e || ["offline", "slow", "paused", "full"].indexOf(e.kind) < 0) setupDone();
+      throw e;
+    });
+  }
+  // whether this TV holds a link to a Couch TV Studio account (the link itself never reaches the page)
+  function linked() { var T = window.TVOS; try { return !!(T && T.accountLinked && T.accountLinked()); } catch (e) { return false; } }
+  function unlink() { var T = window.TVOS; try { return !!(T && T.unlinkAccount && T.unlinkAccount()); } catch (e) { return false; } }
+  // ---- The account's TV inbox (DREAM-SETUP-BUILD.md, "TV inbox"): Send to Living room TV, no code ----
+  // The app asks it (AccountLink.kt, the link stays in Kotlin) and hands the page only a state, one CTV1
+  // code and its title. Read again here as untrusted. inboxDelay: seconds to the next look (0: stop).
+  function readInboxAnswer(raw) {
+    var j = typeof raw === "string" ? parse(raw) : raw && typeof raw === "object" && !Array.isArray(raw) ? raw : null;
+    if (!j) return { state: "error" };
+    var poll = typeof j.poll === "number" && isFinite(j.poll) ? Math.max(30, Math.min(3600, Math.round(j.poll))) : 60;
+    if (j.state === "item" && typeof j.code === "string" && j.code.length === 48 && SETUP_CODE.test(j.code))
+      return { state: "item", code: j.code, title: cleanWords(j.title, 60), poll: poll };
+    if (j.state === "none") return { state: "none", poll: poll };
+    if (j.state === "unlinked") return { state: "unlinked" };
+    if (j.state === "wait") return { state: "wait", wait: typeof j.wait === "number" && isFinite(j.wait) ? Math.max(30, Math.min(3600, Math.round(j.wait))) : 300 };
+    return { state: "error" };
+  }
+  // after an error: 1, 2, 4 ... minutes, at most 30, so a TV with no internet does not keep asking
+  function inboxDelay(a, fails) {
+    if (!a || a.state === "unlinked") return 0;
+    if (a.state === "item" || a.state === "none") return a.poll;
+    if (a.state === "wait") return a.wait;
+    return Math.min(1800, 60 * Math.pow(2, Math.max(0, Math.min(5, fails | 0))));
+  }
+  // Undo for a design that came from the account: what was there before (the design got by code, the
+  // answer to "Use this design?", designs switched off, and the Designs choice app.js keeps), held a day.
+  var UNDO_KEY = "couchtv.design.undo", UNDO_MS = 24 * 3600 * 1000;
+  function snapshot(choice) {
+    return { fetched: store(KEY), ok: store("couchtv.design.ok"), no: store("couchtv.design.no"), off: store("couchtv.design.off"), choice: choice === undefined ? null : choice };
+  }
+  function holdUndo(snap, title, now) {
+    var rec = JSON.stringify({ at: typeof now === "number" ? now : Date.now(), title: cleanWords(title, 60), fresh: true, snap: snap });
+    store(UNDO_KEY, rec);
+    if (store(UNDO_KEY) === rec) return true;
+    store(UNDO_KEY, null);   // no room for the copy: no Undo rather than half of one
+    return false;
+  }
+  function undoHeld(now) {
+    var raw = store(UNDO_KEY), u = raw ? parse(raw) : null, t = typeof now === "number" ? now : Date.now();
+    if (!u || !u.snap || typeof u.at !== "number" || t - u.at > UNDO_MS || t < u.at) { if (raw) store(UNDO_KEY, null); return null; }
+    return u;
+  }
+  // the notice after the home started again with the new design: once
+  function undoFresh(now) {
+    var u = undoHeld(now);
+    if (!u || !u.fresh) return null;
+    u.fresh = false;
+    store(UNDO_KEY, JSON.stringify(u));
+    return u;
+  }
+  // puts it all back; answers the Designs choice that was kept before (for app.js), or undefined
+  function undoNew(now) {
+    var u = undoHeld(now);
+    if (!u) return undefined;
+    var s = u.snap;
+    ["fetched", "ok", "no", "off"].forEach(function (k) {
+      var key = k === "fetched" ? KEY : "couchtv.design." + k, v = s[k];
+      store(key, typeof v === "string" ? v : null);
+    });
+    store(UNDO_KEY, null);
+    return s.choice;
+  }
+  function dropUndo() { store(UNDO_KEY, null); }
   // keep it, and forget any yes this TV gave before: the question always comes first
   function arrived(d) {
     var rec = JSON.stringify({ design: d, at: Date.now() });
+    store(UNDO_KEY, null);   // a newer design: the Undo for an older one from the account goes
     store("couchtv.design.ok", null);
     store("couchtv.design.no", null);
     store("couchtv.design.off", null);   // asked for at the TV: designs on again (the question still guards it)
@@ -420,6 +508,7 @@
   }
 
   window.CouchDesignCode = { base: base, readCode: readCode, checkCode: checkCode, get: get, kept: kept, forget: forget, accept: accept, lockImages: lockImages, mediaSources: mediaSources,
-    openInbox: openInbox, takeInbox: takeInbox, tvReport: tvReport,
+    openInbox: openInbox, takeInbox: takeInbox, tvReport: tvReport, fromSetup: fromSetup, linked: linked, unlink: unlink,
+    readInboxAnswer: readInboxAnswer, inboxDelay: inboxDelay, snapshot: snapshot, holdUndo: holdUndo, undoHeld: undoHeld, undoFresh: undoFresh, undoNew: undoNew, dropUndo: dropUndo,
     readHome: readHome, takeHome: takeHome, mergeHome: mergeHome, fromAccount: fromAccount, photoOf: photoOf, wifiFromAccount: wifiFromAccount };
 })();

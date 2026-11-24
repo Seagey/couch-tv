@@ -65,6 +65,7 @@ class MainActivity : Activity() {
 
     private val main = Handler(Looper.getMainLooper())
     private val io = Executors.newSingleThreadExecutor()
+    private val inboxBusy = java.util.concurrent.atomic.AtomicBoolean(false)   // one look at the account's TV inbox at a time
     private val banners = ConcurrentHashMap<String, ByteArray>()
     private val icons = ConcurrentHashMap<String, ByteArray>()
 
@@ -206,6 +207,11 @@ class MainActivity : Activity() {
             pageReady = false
             offline = false
             connect()
+            return
+        }
+        // Couch TV Setup with only the account's link and design code: kept, and the page gets the design now
+        if (AccountLink.readExtras(this, intent)) {
+            js("window.tv && tv.setupDesign && tv.setupDesign()")
             return
         }
         // tv-home/tools/app-icons.sh after it copies your own app icons: the page afresh, so they
@@ -355,6 +361,7 @@ class MainActivity : Activity() {
         }
         e.apply()
         HomeAssistant.readExtras(this, i)   // smart home ("ha_b64"), kept apart from the page's settings
+        AccountLink.readExtras(this, i)     // Couch TV Setup: "account_link" and "design_code", kept apart too
     }
 
     // ---------------------------------------------------------------- finding the bridge
@@ -912,6 +919,33 @@ class MainActivity : Activity() {
         /** Total memory in MB (0 if unknown), sent with a design fetch only (design-code.js, TvReport.kt). */
         @JavascriptInterface
         fun memoryMb(): Int = TvReport.memoryMb(this@MainActivity)
+
+        // Couch TV Setup's link to the account (AccountLink.kt). The page only learns whether there is one,
+        // never the link itself; the design code Setup brought is handed over until the page says it is done.
+        @JavascriptInterface
+        fun accountLinked(): Boolean = AccountLink.linked(AccountLink.kv(this@MainActivity))
+
+        @JavascriptInterface
+        fun setupDesignCode(): String = AccountLink.pendingCode(AccountLink.kv(this@MainActivity), System.currentTimeMillis()) ?: ""
+
+        @JavascriptInterface
+        fun setupDesignDone() = AccountLink.codeDone(AccountLink.kv(this@MainActivity))
+
+        @JavascriptInterface
+        fun unlinkAccount(): Boolean { AccountLink.unlink(AccountLink.kv(this@MainActivity)); return true }
+
+        // The account's TV inbox, asked from here so the link never reaches the page: the answer (a checked
+        // code and title, or a state) comes back through tv.accountInbox. False: no link, or a look is running.
+        @JavascriptInterface
+        fun accountInbox(): Boolean {
+            val kv = AccountLink.kv(this@MainActivity)
+            if (!AccountLink.linked(kv) || !inboxBusy.compareAndSet(false, true)) return false
+            io.execute {
+                val r = try { AccountLink.inbox(kv) } finally { inboxBusy.set(false) }
+                main.post { js("window.tv && tv.accountInbox && tv.accountInbox(" + JSONObject.quote(r.toString()) + ")") }
+            }
+            return true
+        }
 
         /** Home settings, About, Restart home: what a force-stop and Home would do, from the remote. */
         @JavascriptInterface

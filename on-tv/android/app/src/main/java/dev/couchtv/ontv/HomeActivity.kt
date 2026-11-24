@@ -38,6 +38,7 @@ import java.util.concurrent.ConcurrentHashMap
  */
 class HomeActivity : Activity() {
     private val main = Handler(Looper.getMainLooper())
+    private val inboxBusy = java.util.concurrent.atomic.AtomicBoolean(false)   // one look at the account's TV inbox at a time
     private var web: WebView? = null
     private var ready = false
     private val banners = ConcurrentHashMap<String, ByteArray>()
@@ -51,6 +52,7 @@ class HomeActivity : Activity() {
     override fun onCreate(b: Bundle?) {
         super.onCreate(b)
         App.startService(this)
+        AccountLink.readExtras(this, intent)   // Couch TV Setup's link to the account and design code
         Auth.onPin(pinListener)
         WebView.setWebContentsDebuggingEnabled(BuildConfig.DEBUG)
         CookieManager.getInstance().setCookie(base, "couchtv_token=${Auth.internalToken}; path=/")
@@ -171,7 +173,12 @@ class HomeActivity : Activity() {
     // the video background stops while an app is in front
     override fun onPause() { super.onPause(); front = false; js("window.tv && tv.pause && tv.pause()") }
     @Volatile private var front = false
-    override fun onNewIntent(i: Intent) { super.onNewIntent(i); js("window.tv && tv.home()") }
+    override fun onNewIntent(i: Intent) {
+        super.onNewIntent(i)
+        // Couch TV Setup's link to the account and design code (AccountLink.kt): the page gets the design now
+        if (AccountLink.readExtras(this, i)) { js("window.tv && tv.setupDesign && tv.setupDesign()"); return }
+        js("window.tv && tv.home()")
+    }
 
     override fun dispatchKeyEvent(e: KeyEvent): Boolean {
         // The mic/search button: the TV's own assistant opens, the page never sees it (VoiceKeys)
@@ -261,6 +268,21 @@ class HomeActivity : Activity() {
         @JavascriptInterface fun version(): String = BuildConfig.VERSION_NAME
         /** Total memory in MB (0 if unknown), sent with a design fetch only (design-code.js, TvReport.kt). */
         @JavascriptInterface fun memoryMb(): Int = TvReport.memoryMb(this@HomeActivity)
+        // Couch TV Setup's link to the account (AccountLink.kt): only whether there is one reaches the page
+        @JavascriptInterface fun accountLinked(): Boolean = AccountLink.linked(AccountLink.kv(this@HomeActivity))
+        @JavascriptInterface fun setupDesignCode(): String = AccountLink.pendingCode(AccountLink.kv(this@HomeActivity), System.currentTimeMillis()) ?: ""
+        @JavascriptInterface fun setupDesignDone() = AccountLink.codeDone(AccountLink.kv(this@HomeActivity))
+        @JavascriptInterface fun unlinkAccount(): Boolean { AccountLink.unlink(AccountLink.kv(this@HomeActivity)); return true }
+        // the account's TV inbox, asked from Kotlin so the link never reaches the page (answer: tv.accountInbox)
+        @JavascriptInterface fun accountInbox(): Boolean {
+            val kv = AccountLink.kv(this@HomeActivity)
+            if (!AccountLink.linked(kv) || !inboxBusy.compareAndSet(false, true)) return false
+            Thread {
+                val r = try { AccountLink.inbox(kv) } finally { inboxBusy.set(false) }
+                main.post { js("window.tv && tv.accountInbox && tv.accountInbox(" + JSONObject.quote(r.toString()) + ")") }
+            }.start()
+            return true
+        }
         @JavascriptInterface fun keep(key: String, value: String) { getSharedPreferences("page", MODE_PRIVATE).edit().putString(key, value).apply() }
         @JavascriptInterface fun kept(key: String): String? = getSharedPreferences("page", MODE_PRIVATE).getString(key, null)
         @JavascriptInterface fun setScreenOff(off: Boolean): Boolean {

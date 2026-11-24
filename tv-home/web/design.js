@@ -3178,6 +3178,8 @@
 
   window.CouchDesign = {
     home: home,
+    // the key "Use this design?" keeps a yes under (app.js: a design the account sent to its own linked TV, with Undo)
+    hashOf: hashOf,
     on: function () { return ON; },
     // the video background: app.js holds it while the home is not on screen (name: "away", "idle",
     // "off"); state() says what it is doing and why ({ state, why, ref }); loops() the built in ones
