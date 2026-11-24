@@ -35,7 +35,7 @@ class PlayBuildTest {
         assertEquals("play", BuildConfig.FLAVOR)
         assertTrue(Variant.play)
         assertTrue(Variant.hasWatch)
-        assertEquals("0.13.13", BuildConfig.VERSION_NAME)
+        assertEquals("0.13.14", BuildConfig.VERSION_NAME)
         assertTrue("Play versionCode above every GitHub build", BuildConfig.VERSION_CODE >= 1_000_000)
         assertEquals("1,000,000 + 100 x GitHub + 0", 0, BuildConfig.VERSION_CODE % 100)
     }

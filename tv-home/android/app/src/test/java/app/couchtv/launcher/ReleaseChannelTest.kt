@@ -103,6 +103,11 @@ class ReleaseChannelTest {
         assertTrue(ReleaseChannel.newer("v0.13.13", "0.13.11"))
         assertFalse(ReleaseChannel.newer("v0.13.13", "0.13.13"))
         assertFalse(ReleaseChannel.newer("v0.13.12", "0.13.13"))
+        // 0.13.14 (Couch TV Helper, apps on your TV in Studio) reaches 0.13.13 and 0.13.12 TVs
+        assertTrue(ReleaseChannel.newer("v0.13.14", "0.13.13"))
+        assertTrue(ReleaseChannel.newer("v0.13.14", "0.13.12"))
+        assertFalse(ReleaseChannel.newer("v0.13.14", "0.13.14"))
+        assertFalse(ReleaseChannel.newer("v0.13.13", "0.13.14"))
         assertFalse(ReleaseChannel.newer("v0.13.10", "0.13.11"))
         assertFalse(ReleaseChannel.newer("v0.13.8", "0.13.9"))
     }

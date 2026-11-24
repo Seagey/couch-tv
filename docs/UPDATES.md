@@ -2,9 +2,19 @@
 
 Everything that changed in couch-tv, newest first.
 
-The newest release is **0.13.13**. The TV apps come from [the Releases page](https://github.com/Seagey/couch-tv/releases). The bridge, and with option B the home's own screen, run from your copy of this repo, so `git pull` brings their changes.
+The newest release is **0.13.14**. The TV apps come from [the Releases page](https://github.com/Seagey/couch-tv/releases). The bridge, and with option B the home's own screen, run from your copy of this repo, so `git pull` brings their changes.
 
 ## November 2026
+
+### 24 November 2026: release 0.13.14, Couch TV Helper, apps on your TV in Studio, and a fix for Home settings
+
+0.13.14 is on [the Releases page](https://github.com/Seagey/couch-tv/releases). Option C: Home settings, Updates, Update to; it carries the same key as 0.13.13, so a TV on 0.13.13, 0.13.12 or 0.13.11 updates as normal. Other Android TVs: Home settings, Updates. Option B: `git pull` and restart the bridge. Full notes: [RELEASE-NOTES-0.13.14.md](../RELEASE-NOTES-0.13.14.md).
+
+- **Couch TV Helper:** the last screen of Couch TV Setup asks Done, or Add extra features. The helper stays in your menu bar or tray and adds turning the TV on from your phone, Ask AI at home, picks, and the phone remote for a Samsung, LG or Roku TV. Start with this computer is off until you pick it, and Turn off extra features removes it. The link `couchtv://helper/on` opens Setup on that screen.
+- **It updates itself, only when you say so:** a new version must carry Couch TV's signature and checksum, and is used only when you press Update ready, restart.
+- **It sleeps when it can:** it keeps the computer awake only for a Samsung, LG or Roku TV on power, and Let this computer sleep overrides that. Remove everything from this computer deletes what Setup keeps.
+- **Apps on your TV, in Couch TV Studio:** Setup and the Couch TV app send the package names of the apps on a linked TV, at most 300, for Studio to show first. Nothing about what is signed in inside them.
+- **Fix:** the settings save in Home settings no longer fails when nothing has been kept yet.
 
 ### 24 November 2026: release 0.13.13, your home from your Couch TV account, Setup finds the TV for you, and Glass text
 
