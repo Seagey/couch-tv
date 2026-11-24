@@ -311,6 +311,9 @@ footer a { color: var(--ink3); }
 .fin details:has(> ul[hidden]) { display: none; }
 .fin .more { margin-top: 14px; }
 .fin .go { margin-top: 36px; }
+/* the big button may wrap and never runs under the TV picture (1100 to 1440 wide) */
+.fin .btn.big { max-width: 100%; height: auto; min-height: 84px; padding: 14px 44px; white-space: normal; text-align: left; line-height: 1.15; }
+@media (max-width: 1440px) { .fin { grid-template-columns: minmax(0, 1fr) minmax(0, 480px); gap: 36px; } .fin .btn.big { font-size: 28px; padding: 14px 36px; } }
 .cap { font: 600 17px/1.4 var(--body); color: var(--ink2); margin: 14px 0 0 8px; }
 .fin .row2 + p { margin-top: 18px; }
 .fin .row2 { display: flex; align-items: center; gap: 28px; flex-wrap: wrap; margin-top: 26px; }
