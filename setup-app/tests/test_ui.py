@@ -273,7 +273,7 @@ class Page(unittest.TestCase):
 
     def test_link_it_hook_is_hidden_when_absent(self):
         stub = dict(uh.stub_account(), **{"/v1/setup/tv": {"error": "no"}})
-        pg = self.open(uh.Harness(stub=stub))          # no "link-tv" in features
+        pg = self.open(uh.Harness(stub=stub, features=["reset-tv"]))          # no "link-tv" in features
         self.sign_in(pg)
         self.to_plan(pg)
         self.install(pg)

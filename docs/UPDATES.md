@@ -2,9 +2,18 @@
 
 Everything that changed in couch-tv, newest first.
 
-The newest release is **0.13.14**. The TV apps come from [the Releases page](https://github.com/Seagey/couch-tv/releases). The bridge, and with option B the home's own screen, run from your copy of this repo, so `git pull` brings their changes.
+The newest release is **0.13.15**. The TV apps come from [the Releases page](https://github.com/Seagey/couch-tv/releases). The bridge, and with option B the home's own screen, run from your copy of this repo, so `git pull` brings their changes.
 
 ## November 2026
+
+### 25 November 2026: release 0.13.15, a redesigned Couch TV Setup that links your TV to your account, Tidy up your TV, and Make it yours
+
+0.13.15 is on [the Releases page](https://github.com/Seagey/couch-tv/releases). Option C: Home settings, Updates, Update to; it carries the same key as 0.13.14, so a TV on 0.13.14, 0.13.13 or 0.13.12 updates as normal. Other Android TVs: Home settings, Updates, check now.
+
+- **Couch TV Setup, new look and name:** it finds more TVs, shows the TVs set up in the session, and keeps working with a Helper that is older than 0.13.15.
+- **Links the TV to your account, after asking whose account it is:** nothing is used until you press Yes, and the TV is called linked only when it said it took the link.
+- **Tidy up your TV (optional):** fewer ads, shorter menu animations, a smoothness check, undo, and Stop idle screen adverts that reads back what the TV says and covers Android TV's Backdrop screen.
+- **Make it yours:** a new TV opens on a card that fetches your design; Get my new design is the first row of Home settings on a linked TV.
 
 ### 24 November 2026: release 0.13.14, Couch TV Helper, apps on your TV in Studio, and a fix for Home settings
 

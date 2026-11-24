@@ -10,8 +10,8 @@ android {
         applicationId = "dev.couchtv.ontv"
         minSdk = 23          // Android 6.0. Wireless debugging pairing needs Android 11+ on the TV.
         targetSdk = 34
-        versionCode = 27
-        versionName = "0.13.14"
+        versionCode = 28
+        versionName = "0.13.15"
     }
     buildFeatures { buildConfig = true }
     // Test builds: when COUCHTV_KEYSTORE names a keystore (a debug-style key, alias androiddebugkey,
@@ -138,7 +138,7 @@ tasks.withType<Test>().configureEach {
 // signing key, and a GitHub APK can never replace a Play install. PlayRules.versionCode is the same formula.
 // targetSdk 34 for both: Google Play's floor for Android TV apps (since 31 Aug 2025); the Play build is TV only.
 val PLAY_REBUILD = 0
-val PLAY_VERSION_NAME = "0.13.14"   // the GitHub versionName of the same source
+val PLAY_VERSION_NAME = "0.13.15"   // the GitHub versionName of the same source
 android.flavorDimensions += "store"
 android.productFlavors.create("github") { dimension = "store"; isDefault = true }
 android.productFlavors.create("play") {

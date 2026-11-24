@@ -33,5 +33,5 @@ assert.strictEqual(pickFocus({ t: now, zone: 'grid', g: 0 }, now, 3, []), null);
 
 // Home forgets the saved focus, and the app saves it when it is paused
 assert(/home: function \(\) \{ forgetFocus\(\);/.test(js), 'tv.home forgets the focus');
-assert(/pause: function \(\) \{ saveFocusNow\(\);/.test(js), 'tv.pause saves the focus');
+assert(/pause: function \(\) \{ (if \(zone === "makeit"\) makeitClose\(\); )?saveFocusNow\(\);/.test(js), 'tv.pause saves the focus');
 console.log('Focus restore tests passed.');

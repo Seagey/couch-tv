@@ -108,6 +108,11 @@ class ReleaseChannelTest {
         assertTrue(ReleaseChannel.newer("v0.13.14", "0.13.12"))
         assertFalse(ReleaseChannel.newer("v0.13.14", "0.13.14"))
         assertFalse(ReleaseChannel.newer("v0.13.13", "0.13.14"))
+        // 0.13.15 (redesigned Setup, account linking, Tidy up, Make it yours) reaches 0.13.14 and 0.13.13 TVs
+        assertTrue(ReleaseChannel.newer("v0.13.15", "0.13.14"))
+        assertTrue(ReleaseChannel.newer("v0.13.15", "0.13.13"))
+        assertFalse(ReleaseChannel.newer("v0.13.15", "0.13.15"))
+        assertFalse(ReleaseChannel.newer("v0.13.14", "0.13.15"))
         assertFalse(ReleaseChannel.newer("v0.13.10", "0.13.11"))
         assertFalse(ReleaseChannel.newer("v0.13.8", "0.13.9"))
     }

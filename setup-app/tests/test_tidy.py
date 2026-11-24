@@ -306,7 +306,7 @@ class Idle(unittest.TestCase):
         self.assertIn("com.android.dreams.basic", tv.disabled)              # not ours: never touched
         self.assertEqual(r["report"]["off"], [tidy.steps.BACKDROP])
         self.assertIn("backdrop/com.google.android.backdrop.DreamActivity", r["words"])   # what the TV says it uses
-        self.assertEqual(disables(tv), [tidy.steps.BACKDROP])
+        self.assertEqual([c.split()[-1] for c in disables(tv)], [tidy.steps.BACKDROP])
         self.assertEqual(tv.secure["screensaver_enabled"], "1")             # the setting is left alone when the app went off
         self.assertEqual(result(tv, idle=False)["idle"]["status"], "off")
         self.assertNotIn(tidy.steps.BACKDROP, tv.disabled)
@@ -341,6 +341,7 @@ class Idle(unittest.TestCase):
     def test_refused_idle(self):
         tv = FakeTv("google")
         tv.refuse_disable = {AMBIENT}
+        tv.refuse_secure = {"screensaver_enabled"}     # and the TV ignores the screen saver setting too
         r = result(tv, idle=True)["idle"]
         self.assertEqual(r["status"], "refused")
         self.assertFalse(tidy.has_record(tv))
@@ -499,7 +500,7 @@ class Injection(unittest.TestCase):
         result(tv, ads=True, anim=True, idle=True)
         result(tv, ads=False, anim=False, idle=False)
         shapes = re.compile(
-            r"^(pm list packages( -d)?|pm query-activities .*|settings (get|delete) global [a-z_]+|settings put global [a-z_]+ [0-9.]+|"
+            r"^(pm list packages( -d)?|pm query-activities .*|settings (get|delete) global [a-z_]+|settings (get|put|delete) secure screensaver_[a-z_]+( [0-9]+)?|dumpsys dreams|settings put global [a-z_]+ [0-9.]+|"
             r"pm (disable-user --user 0|enable) [A-Za-z0-9_.]+|dumpsys package [A-Za-z0-9_.]+|cat /data/local/tmp/couchtv-setup/\w+ 2>/dev/null|"
             r"mkdir -p /data/local/tmp/couchtv-setup; printf '%s\\n' [A-Za-z0-9_.:]+( [A-Za-z0-9_.:]+)* > /data/local/tmp/couchtv-setup/tidy|"
             r"rm -f /data/local/tmp/couchtv-setup/\w+|mkdir -p /data/local/tmp/couchtv-setup; echo .*|"

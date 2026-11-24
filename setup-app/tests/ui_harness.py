@@ -146,7 +146,7 @@ class Harness:
 def stub_account(name="Sam", design="Couch Original"):
     """Couch TV Studio's answers for a signed in account, a TV that registers, and a finished setup."""
     return {"/v1/setup/who": {"account": {"email": "s***@example.test", "name": name}},
-            "/v1/setup/handoff": {"token": "T" * 40, "account": {"name": name, "design": design}},
+            "/v1/setup/handoff": {"token": "T" * 40, "account": {"email": "s***@example.test", "name": name, "design": design}},
             "/v1/setup/tv": {"tv_id": "tv_abc123", "link": LINK, "code": "CTV1-ABCD", "design": design, "home": None},
             "/v1/setup/done": {"ok": True}}
 
