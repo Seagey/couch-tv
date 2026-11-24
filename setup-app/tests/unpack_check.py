@@ -27,8 +27,8 @@ def main(archive, program):
     if sys.platform == "darwin":
         app = next(p for p in exe.parents if p.suffix == ".app")
         subprocess.run(["codesign", "--verify", "--deep", "--strict", str(app)], check=True)
-    for smoke in ("smoke.py",) + (("smoke_helper.py",) if os.environ.get("HELPER_BUNDLED") == "yes" else ()):
-        subprocess.run([sys.executable, str(HERE / smoke), str(exe)], check=True)
+    for smoke in ("smoke.py", "smoke_link.py") + (("smoke_helper.py",) if os.environ.get("HELPER_BUNDLED") == "yes" else ()):
+        subprocess.run([sys.executable, str(HERE / smoke), str(exe)], check=True, timeout=600)
     print("unpacked update ok")
 
 
