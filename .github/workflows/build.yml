@@ -56,8 +56,38 @@ jobs:
       - name: Build the TV apps
         run: sh scripts/build-apk.sh
 
+      - name: Gradle cache
+        # keep what was downloaded for the next run
+        uses: actions/cache@v4
+        with:
+          path: ~/.gradle/caches
+          key: gradle-${{ runner.os }}-${{ hashFiles('on-tv/android/**/*.kts', 'on-tv/android/gradle/**', 'tv-home/android/**/*.kts') }}
+          restore-keys: gradle-${{ runner.os }}-
+
+      - name: Maven Central mirror for this runner
+        # repo.maven.apache.org answers 429 (too many requests) to GitHub's runners, and the Robolectric
+        # native runtime jar (nativeruntime-dist-compat) is the one it refused. Google's mirror of Maven
+        # Central serves the same files; Gradle checks it first. Only this CI job uses it (an init script
+        # in the runner's home), the project's own repositories are unchanged.
+        run: |
+          mkdir -p "$HOME/.gradle/init.d"
+          printf '%s\n' \
+            'settingsEvaluated { s ->' \
+            '  def repos = s.dependencyResolutionManagement.repositories' \
+            '  def m = repos.maven { url = "https://maven-central.storage-download.googleapis.com/maven2/" }' \
+            '  repos.remove(m); repos.add(0, m)' \
+            '}' | tee "$HOME/.gradle/init.d/central-mirror.gradle"
+
       - name: On-TV app unit tests
-        run: tv-home/android/gradlew -p on-tv/android --no-daemon -q testDebugUnitTest
+        run: tv-home/android/gradlew -p on-tv/android --no-daemon testDebugUnitTest
+
+      - name: Unit test failures (only when the tests fail)
+        if: failure()
+        run: |
+          for f in on-tv/android/app/build/test-results/testGithubDebugUnitTest/*.xml; do
+            [ -f "$f" ] && grep -q "<failure" "$f" && { echo "== $f"; grep -A12 "<failure" "$f" | head -60; }
+          done
+          true
 
       - name: Signing fingerprints
         run: for f in dist/*.apk; do echo "$f"; "$ANDROID_HOME/build-tools/34.0.0/apksigner" verify --print-certs "$f" | grep -i "SHA-256"; done
