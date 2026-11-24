@@ -13,6 +13,7 @@ instead (your own builds, or for tests). Nothing is checked against GitHub then.
 import hashlib
 import json
 import os
+import re
 import ssl
 import urllib.error
 import urllib.request
@@ -60,12 +61,45 @@ def _sums(release):
         return {}
     with _open(asset["browser_download_url"]) as r:
         text = r.read(65536).decode(errors="replace")
-    out = {}
-    for line in text.splitlines():
+    return parse_sums(text)
+
+
+def parse_sums(text):
+    """SHA256SUMS.txt (sha256sum's own format, "<64 hex>  <name>", a "*" before the name in binary
+    mode) as {name: sha}. Lines that are not exactly that are skipped; a name listed twice with two
+    different sums is dropped, so it can never be checked against the wrong one."""
+    out, clash = {}, set()
+    for line in (text or "").splitlines():
         parts = line.split()
-        if len(parts) == 2 and len(parts[0]) == 64:
-            out[parts[1].lstrip("*")] = parts[0].lower()
+        if len(parts) != 2 or not re.fullmatch(r"[0-9a-fA-F]{64}", parts[0]):
+            continue
+        name, sha = parts[1].lstrip("*"), parts[0].lower()
+        if name in out and out[name] != sha:
+            clash.add(name)
+        out[name] = sha
+    for name in clash:
+        out.pop(name, None)
     return out
+
+
+def expected(digest, sums_sha):
+    """The SHA-256 a release file must have, from GitHub's own digest ("sha256:<hex>") and its line in
+    SHA256SUMS.txt. The SHA256SUMS.txt line is required (the release script always makes one); when
+    GitHub's digest is there too, both must agree. Returns (sha, how it was checked) or raises."""
+    digest = (digest or "").lower()
+    gh = digest.split(":", 1)[1] if digest.startswith("sha256:") else None
+    if gh and not re.fullmatch(r"[0-9a-f]{64}", gh):
+        gh = None
+    if not sums_sha:
+        raise TvError("The release has no SHA256SUMS.txt line for this file, so it was not installed.", "no_checksum")
+    if gh and gh != sums_sha:
+        raise TvError("The release's two checksums disagree, so nothing was installed. Please tell us on GitHub.", "checksum")
+    return sums_sha, "SHA256SUMS.txt" + (" and GitHub checksum" if gh else "")
+
+
+def verify(path, want):
+    """True when the file at path has exactly this SHA-256."""
+    return sha256(path) == (want or "").lower()
 
 
 def sha256(path):
@@ -88,20 +122,12 @@ def get(name, progress=lambda f, msg=None: None, release=None):
     asset = next((a for a in rel.get("assets", []) if a.get("name") == name), None)
     if not asset:
         raise TvError(f"The newest couch-tv release has no {name}.", "no_asset")
-    digest = (asset.get("digest") or "").lower()
-    want = digest.split(":", 1)[1] if digest.startswith("sha256:") else None
-    sums = _sums(rel).get(name)
-    if want and sums and want != sums:
-        raise TvError("The release's two checksums disagree, so nothing was installed. Please tell us on GitHub.", "checksum")
-    want = want or sums
-    if not want:
-        raise TvError("The release does not say what the file should look like (no checksum), so it was not installed.",
-                      "no_checksum")
+    want, how = expected(asset.get("digest"), _sums(rel).get(name))
     tag = rel.get("tag_name", "latest")
     safe_tag = "".join(c for c in tag if c.isalnum() or c in ".-_") or "latest"
     dest = paths.cache() / f"{safe_tag}-{name}"
-    if dest.is_file() and dest.stat().st_size == asset.get("size") and sha256(dest) == want:
-        return {"path": str(dest), "version": tag, "sha256": want, "checked": "GitHub checksum"}
+    if dest.is_file() and dest.stat().st_size == asset.get("size") and verify(dest, want):
+        return {"path": str(dest), "version": tag, "sha256": want, "checked": how}
     part = dest.with_name(dest.name + ".part")
     try:
         with _open(asset["browser_download_url"], timeout=60) as r, open(part, "wb") as f:
@@ -113,16 +139,16 @@ def get(name, progress=lambda f, msg=None: None, release=None):
                 f.write(chunk)
                 got += len(chunk)
                 if total:
-                    progress(min(1.0, got / total), "Downloading the " + ("couch-tv home" if "home" in name else "phone remote app") + f" ({tag})")
+                    progress(min(1.0, got / total), "Downloading " + ("Couch TV" if "home" in name else "the phone remote app") + f" ({tag})")
     except (urllib.error.URLError, OSError) as e:
         part.unlink(missing_ok=True)
         raise TvError("The download stopped part way. Check the internet and try again.", "offline") from e
     if asset.get("size") and part.stat().st_size != asset["size"]:
         part.unlink()
         raise TvError("The download was cut short. Try again.", "short")
-    if sha256(part) != want:
+    if not verify(part, want):
         part.unlink()
         raise TvError("The downloaded file did not match the release's checksum, so it was deleted and nothing "
                       "was installed. Try again; if it happens twice, tell us on GitHub.", "checksum")
     part.replace(dest)
-    return {"path": str(dest), "version": tag, "sha256": want, "checked": "GitHub checksum" + (" and SHA256SUMS.txt" if sums else "")}
+    return {"path": str(dest), "version": tag, "sha256": want, "checked": how}

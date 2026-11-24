@@ -12,6 +12,8 @@
 // design.js's own gate (CouchDesign.sanitize) rebuilds it from the allow list as for any design.
 // A design got this way ALWAYS shows the "Use this design?" question first: arriving clears this
 // TV's record of any design it said yes to, so nothing in the answer can skip the question.
+// A send to the account's own TV may also carry "home" (Your home: people, the town, the guest Wi-Fi). It is read
+// below (readHome) into a checked copy, never into the design, and app.js puts it in Home settings.
 (function () {
   "use strict";
   var KEY = "couchtv.design.fetched", MAX = 4000000, TIMEOUT = 15000;
@@ -95,12 +97,16 @@
   }
   // keep only what a design may be: an object, with at most a JPEG background from the store (and its
   // PNG or WebP cut out)
-  function accept(text) {
+  // the answer as an object, or null; keys that reach an object's prototype are dropped as it is read
+  function parse(text) {
     if (typeof text !== "string" || text.length > MAX) return null;
     var j;
-    // keys that reach an object's prototype are dropped as the answer is read
     try { j = JSON.parse(text, function (k, v) { return k === "__proto__" || k === "constructor" || k === "prototype" ? undefined : v; }); } catch (e) { return null; }
-    if (!j || typeof j !== "object" || Array.isArray(j)) return null;
+    return j && typeof j === "object" && !Array.isArray(j) ? j : null;
+  }
+  function accept(text) {
+    var j = parse(text);
+    if (!j) return null;
     var d = j.design;
     if (!d || typeof d !== "object" || Array.isArray(d)) return null;
     d = JSON.parse(JSON.stringify(d));   // a plain copy: nothing of the answer but data
@@ -117,6 +123,139 @@
     }
     return d;
   }
+  // ---- Your home: the household's own details from a Couch TV Studio account (HOME-DETAILS-PAYLOAD.md) ----
+  // A send to one of the account's own TVs may carry "home" next to "design": people (names, order, the
+  // kids flag, a colour, a small photo), the town and the guest Wi-Fi. It is untrusted like the rest of the answer: read
+  // here into a plain, checked copy or dropped. It is never part of the design, so no export or share of
+  // the design can carry it. The store hands it over once (the first fetch of the code), so the TV keeps
+  // it: held here (HOME_KEY) until app.js applies it to Home settings, People and Location.
+  var HOME_KEY = "couchtv.home.pack", PHOTO_MAX = 56000;   // 40 KB of JPEG as base64, plus a little
+  function num(v, lo, hi) { return typeof v === "number" && isFinite(v) && v >= lo && v <= hi; }
+  function round2(v) { return Math.round(v * 100) / 100; }
+  function cleanWords(v, max) {
+    if (typeof v !== "string") return "";
+    v = v.replace(/[\u0000-\u001f\u007f<>]/g, "").replace(/\s+/g, " ").trim();
+    return v.length >= 1 && v.length <= max ? v : "";
+  }
+  function readHome(h) {
+    if (!h || typeof h !== "object" || Array.isArray(h)) return null;
+    if (!(typeof h.v === "number" && h.v % 1 === 0 && h.v >= 1) || !(typeof h.rev === "number" && h.rev % 1 === 0 && h.rev >= 0)) return null;
+    var out = { v: h.v, rev: h.rev, at: typeof h.at === "string" ? h.at.slice(0, 40) : "" };
+    // a newer pack format: only people and town, if they read; wipe is a v1 word
+    if (h.v === 1 && h.wipe === true) { out.wipe = true; return out; }
+    if (Array.isArray(h.people)) {
+      var seen = {};
+      out.people = [];
+      h.people.slice(0, 8).forEach(function (p) {
+        if (!p || typeof p !== "object") return;
+        var id = typeof p.id === "string" && /^p_[a-z0-9]{6,12}$/.test(p.id) ? p.id : "", name = cleanWords(p.name, 24);
+        if (!id || !name || seen[id]) return;
+        seen[id] = true;
+        out.people.push({ id: id, name: name, kids: p.kids === true,
+          colour: typeof p.colour === "string" && /^#[0-9a-fA-F]{6}$/.test(p.colour) ? p.colour.toLowerCase() : null,
+          photo: typeof p.photo === "string" && p.photo.length <= PHOTO_MAX && jpegOk(p.photo) ? p.photo : null });
+      });
+    }
+    var t = h.town;
+    if (t && typeof t === "object" && !Array.isArray(t) && cleanWords(t.name, 40) && num(t.lat, -90, 90) && num(t.lon, -180, 180))
+      out.town = { name: cleanWords(t.name, 40), lat: round2(t.lat), lon: round2(t.lon) };
+    // the guest Wi-Fi (v1): null when the account cleared it; a network name of 1 to 32 characters and
+    // a password of 0 to 63 ("" for an open network), as the Guest Wi-Fi widget keeps them (athome.js)
+    if (h.v === 1 && h.wifi === null) out.wifi = null;
+    else if (h.v === 1 && h.wifi && typeof h.wifi === "object" && !Array.isArray(h.wifi)) {
+      var ssid = typeof h.wifi.name === "string" ? h.wifi.name.replace(/[\u0000-\u001f\u007f]/g, "") : "", pw = h.wifi.password;
+      if (ssid.trim() && ssid.length <= 32 && typeof pw === "string" && pw.length <= 63 && !/[\u0000-\u001f\u007f]/.test(pw)) out.wifi = { name: ssid, password: pw };
+    }
+    return out;
+  }
+  // held until app.js takes it (takeHome), as one record; a pack older than one already held is dropped
+  function holdHome(h) {
+    if (!h) return false;
+    var old = takeHome(true);
+    if (old && old.rev > h.rev) return false;
+    var rec = JSON.stringify(h);
+    store(HOME_KEY, rec);
+    return store(HOME_KEY) === rec;
+  }
+  function takeHome(peek) {
+    var raw = store(HOME_KEY), h = null;
+    try { h = raw ? readHome(JSON.parse(raw)) : null; } catch (e) {}
+    if (!peek || (raw && !h)) store(HOME_KEY, null);
+    return h;
+  }
+  // An account person is marked src "account"; ids from an account start "p_" and a TV made id never
+  // does (app.js newPersonId), so a person who lost the mark on the way through a bridge is still known.
+  function fromAccount(p) { return !!p && (p.src === "account" || (typeof p.id === "string" && p.id.indexOf("p_") === 0)); }
+  // What the TV keeps after a pack, worked out without touching anything (app.js stores the answer).
+  // now: { people: the TV's list [{id, name, kid?, colour?, guest?, src?}], place: Home settings' Location
+  // (or null), account: what the last pack left ({ rev, people: [{id, name, kids, colour, photo}], town })
+  // or null }. Answers null when the pack is older than the one already applied, else { people, place,
+  // account }: the account's people first, in its order, then the ones added on this TV; the account wins
+  // on the same id even after a rename here, and an account person no longer in the account is gone.
+  function mergeHome(now, pack) {
+    now = now || {};
+    var acc = now.account && typeof now.account === "object" ? now.account : null;
+    if (!pack || (acc && typeof acc.rev === "number" && acc.rev > pack.rev)) return null;
+    var people = Array.isArray(now.people) ? now.people.slice() : [], place = now.place || null;
+    var next = { rev: pack.rev, at: pack.at || "", people: acc && Array.isArray(acc.people) ? acc.people : [], town: acc && acc.town ? acc.town : null,
+      wifi: acc && acc.wifi ? acc.wifi : null };
+    var placeFromAccount = !!(place && place.src === "account");
+    // the guest Wi-Fi on this TV (athome.js keeps it, with no room for a mark) is the account's while it is
+    // still exactly what the account sent; changed on the TV, it is the TV's own and a clear leaves it
+    var w = now.wifi && typeof now.wifi === "object" ? now.wifi : null;
+    var wifiFromAccount = !!(w && next.wifi && w.ssid === next.wifi.name && (w.pass || "") === next.wifi.password);
+    if (pack.wipe) {
+      people = people.filter(function (p) { return !fromAccount(p); });
+      if (placeFromAccount) place = null;
+      next.people = []; next.town = null; next.wifi = null;
+      var out = { people: people, place: place, account: next };
+      if (wifiFromAccount) out.wifi = null;
+      return out;
+    }
+    if (pack.people) {
+      var names = {};
+      pack.people.forEach(function (p) { names[p.name.toLowerCase()] = true; });
+      // someone added on this TV under the same name as an account person is that person: one row, not two
+      var mine = people.filter(function (p) { return p && !fromAccount(p) && !names[String(p.name || "").toLowerCase()]; });
+      people = pack.people.map(function (p) {
+        var o = { id: p.id, name: p.name, src: "account" };
+        if (p.kids) o.kid = true;
+        if (p.colour) o.colour = p.colour;
+        return o;
+      }).concat(mine).slice(0, 12);
+      next.people = pack.people;
+    }
+    if (pack.town) {
+      place = { name: pack.town.name, area: "", lat: pack.town.lat, lon: pack.town.lon, timezone: "auto", src: "account" };
+      next.town = pack.town;
+    }
+    var res = { people: people, place: place, account: next };
+    // wifi in the answer only when it changes: an object to keep, null to take away
+    if (pack.wifi === null) {
+      if (wifiFromAccount) res.wifi = null;
+      next.wifi = null;
+    } else if (pack.wifi) {
+      var same = w && w.ssid === pack.wifi.name;
+      res.wifi = { ssid: pack.wifi.name, sec: pack.wifi.password ? (same && w.sec === "WEP" ? "WEP" : "WPA") : "nopass", pass: pack.wifi.password, hidden: !!(same && w.hidden) };
+      next.wifi = pack.wifi;
+    }
+    return res;
+  }
+  // whether the guest Wi-Fi kept on this TV is still the one the account sent
+  function wifiFromAccount(account, w) {
+    var a = account && account.wifi;
+    return !!(a && w && w.ssid === a.name && (w.pass || "") === a.password);
+  }
+  // the account's photo for a person, or "" (checked again: what is kept on the TV is read as untrusted)
+  function photoOf(account, id) {
+    var list = account && Array.isArray(account.people) ? account.people : [];
+    for (var i = 0; i < list.length; i++) {
+      var p = list[i];
+      if (p && p.id === id) return typeof p.photo === "string" && p.photo.length <= PHOTO_MAX && jpegOk(p.photo) ? p.photo : "";
+    }
+    return "";
+  }
+
   var MSG = {
     nocode: "That is not a design code. It looks like ABCDE-FGHJK.",
     notfound: "That code did not work. A code works once, for 30 minutes. Make a new one in Couch TV Studio.",
@@ -174,12 +313,103 @@
       var d = accept(text);
       if (!d) throw fail("bad");
       arrived(d);
+      // Your home comes only with a design that was good and kept: a bad design leaves no half a home
+      var j = parse(text);
+      holdHome(j ? readHome(j.home) : null);
       return d;
     });
   }
+  // ---- Couch TV Setup: the design code it brought (setup-app make_home, --es design_code) ----
+  // The app holds it (AccountLink.kt) until the page has fetched it here, through get() like a typed code:
+  // "Use this design?" first, the home pack with it. Only a whole CTV1 code is taken (no short code ever
+  // comes this way). Done (the app forgets it) once it arrived, or when the store says it is used, gone
+  // or not a design; kept for the next start when the TV was offline or the store was busy.
+  var SETUP_CODE = /^CTV1-[A-Za-z0-9_-]{43}$/;
+  function setupCode() {
+    var T = window.TVOS, c = "";
+    if (!T || typeof T.setupDesignCode !== "function") return "";
+    try { c = String(T.setupDesignCode() || ""); } catch (e) { return ""; }
+    return c.length === 48 && SETUP_CODE.test(c) ? c : "";
+  }
+  function setupDone() { var T = window.TVOS; try { if (T && T.setupDesignDone) T.setupDesignDone(); } catch (e) {} }
+  var setupBusy = false;
+  function fromSetup() {
+    var code = setupCode();
+    if (!code || setupBusy || DESIGNER) return Promise.resolve(null);
+    setupBusy = true;
+    return get(code).then(function (d) { setupBusy = false; setupDone(); return d; }, function (e) {
+      setupBusy = false;
+      if (!e || ["offline", "slow", "paused", "full"].indexOf(e.kind) < 0) setupDone();
+      throw e;
+    });
+  }
+  // whether this TV holds a link to a Couch TV Studio account (the link itself never reaches the page)
+  function linked() { var T = window.TVOS; try { return !!(T && T.accountLinked && T.accountLinked()); } catch (e) { return false; } }
+  function unlink() { var T = window.TVOS; try { return !!(T && T.unlinkAccount && T.unlinkAccount()); } catch (e) { return false; } }
+  // ---- The account's TV inbox (DREAM-SETUP-BUILD.md, "TV inbox"): Send to Living room TV, no code ----
+  // The app asks it (AccountLink.kt, the link stays in Kotlin) and hands the page only a state, one CTV1
+  // code and its title. Read again here as untrusted. inboxDelay: seconds to the next look (0: stop).
+  function readInboxAnswer(raw) {
+    var j = typeof raw === "string" ? parse(raw) : raw && typeof raw === "object" && !Array.isArray(raw) ? raw : null;
+    if (!j) return { state: "error" };
+    var poll = typeof j.poll === "number" && isFinite(j.poll) ? Math.max(30, Math.min(3600, Math.round(j.poll))) : 60;
+    if (j.state === "item" && typeof j.code === "string" && j.code.length === 48 && SETUP_CODE.test(j.code))
+      return { state: "item", code: j.code, title: cleanWords(j.title, 60), poll: poll };
+    if (j.state === "none") return { state: "none", poll: poll };
+    if (j.state === "unlinked") return { state: "unlinked" };
+    if (j.state === "wait") return { state: "wait", wait: typeof j.wait === "number" && isFinite(j.wait) ? Math.max(30, Math.min(3600, Math.round(j.wait))) : 300 };
+    return { state: "error" };
+  }
+  // after an error: 1, 2, 4 ... minutes, at most 30, so a TV with no internet does not keep asking
+  function inboxDelay(a, fails) {
+    if (!a || a.state === "unlinked") return 0;
+    if (a.state === "item" || a.state === "none") return a.poll;
+    if (a.state === "wait") return a.wait;
+    return Math.min(1800, 60 * Math.pow(2, Math.max(0, Math.min(5, fails | 0))));
+  }
+  // Undo for a design that came from the account: what was there before (the design got by code, the
+  // answer to "Use this design?", designs switched off, and the Designs choice app.js keeps), held a day.
+  var UNDO_KEY = "couchtv.design.undo", UNDO_MS = 24 * 3600 * 1000;
+  function snapshot(choice) {
+    return { fetched: store(KEY), ok: store("couchtv.design.ok"), no: store("couchtv.design.no"), off: store("couchtv.design.off"), choice: choice === undefined ? null : choice };
+  }
+  function holdUndo(snap, title, now) {
+    var rec = JSON.stringify({ at: typeof now === "number" ? now : Date.now(), title: cleanWords(title, 60), fresh: true, snap: snap });
+    store(UNDO_KEY, rec);
+    if (store(UNDO_KEY) === rec) return true;
+    store(UNDO_KEY, null);   // no room for the copy: no Undo rather than half of one
+    return false;
+  }
+  function undoHeld(now) {
+    var raw = store(UNDO_KEY), u = raw ? parse(raw) : null, t = typeof now === "number" ? now : Date.now();
+    if (!u || !u.snap || typeof u.at !== "number" || t - u.at > UNDO_MS || t < u.at) { if (raw) store(UNDO_KEY, null); return null; }
+    return u;
+  }
+  // the notice after the home started again with the new design: once
+  function undoFresh(now) {
+    var u = undoHeld(now);
+    if (!u || !u.fresh) return null;
+    u.fresh = false;
+    store(UNDO_KEY, JSON.stringify(u));
+    return u;
+  }
+  // puts it all back; answers the Designs choice that was kept before (for app.js), or undefined
+  function undoNew(now) {
+    var u = undoHeld(now);
+    if (!u) return undefined;
+    var s = u.snap;
+    ["fetched", "ok", "no", "off"].forEach(function (k) {
+      var key = k === "fetched" ? KEY : "couchtv.design." + k, v = s[k];
+      store(key, typeof v === "string" ? v : null);
+    });
+    store(UNDO_KEY, null);
+    return s.choice;
+  }
+  function dropUndo() { store(UNDO_KEY, null); }
   // keep it, and forget any yes this TV gave before: the question always comes first
   function arrived(d) {
     var rec = JSON.stringify({ design: d, at: Date.now() });
+    store(UNDO_KEY, null);   // a newer design: the Undo for an older one from the account goes
     store("couchtv.design.ok", null);
     store("couchtv.design.no", null);
     store("couchtv.design.off", null);   // asked for at the TV: designs on again (the question still guards it)
@@ -278,5 +508,7 @@
   }
 
   window.CouchDesignCode = { base: base, readCode: readCode, checkCode: checkCode, get: get, kept: kept, forget: forget, accept: accept, lockImages: lockImages, mediaSources: mediaSources,
-    openInbox: openInbox, takeInbox: takeInbox, tvReport: tvReport };
+    openInbox: openInbox, takeInbox: takeInbox, tvReport: tvReport, fromSetup: fromSetup, linked: linked, unlink: unlink,
+    readInboxAnswer: readInboxAnswer, inboxDelay: inboxDelay, snapshot: snapshot, holdUndo: holdUndo, undoHeld: undoHeld, undoFresh: undoFresh, undoNew: undoNew, dropUndo: dropUndo,
+    readHome: readHome, takeHome: takeHome, mergeHome: mergeHome, fromAccount: fromAccount, photoOf: photoOf, wifiFromAccount: wifiFromAccount };
 })();

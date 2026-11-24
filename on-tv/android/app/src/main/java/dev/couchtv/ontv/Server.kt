@@ -549,13 +549,7 @@ class Server(private val ctx: Context, port: Int) : NanoWSD(port) {
             by.forEach { (id, p) -> if (id !in seen) out.put(p) }
             out
         }
-        val clean = JSONArray()
-        for (i in 0 until minOf(list.length(), 12)) {
-            val p = list.optJSONObject(i) ?: continue
-            val name = p.optString("name").trim().take(40)
-            if (name.isNotEmpty()) clean.put(JSONObject().put("id", p.optString("id").ifEmpty { "person${i + 1}" }.take(32)).put("name", name))
-        }
-        Store.putStr("people", clean.toString())
+        Store.putStr("people", PeopleClean.clean(list).toString())
         Now.push()
     }
 

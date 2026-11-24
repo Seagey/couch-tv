@@ -461,7 +461,21 @@
   function people(env) {
     if (env.demo) return [["character-curly", "Alex", 1, "a"], ["character-bun", "Sam", 0, "b"], ["character-pigtails", "Ruby", 0, "c"]];
     var d = dataOf(env), avs = ["character-curly", "character-bun", "character-pigtails", "character-short-hair", "character-cap", "character-long-hair", "character-beard", "character-grandparent"];
-    return (d.people || []).map(function (p, i) { return [p.avatar || avs[i % avs.length], String(p.name || ""), p.id === d.who ? 1 : 0, p.id]; });
+    return (d.people || []).map(function (p, i) { return [p.avatar || avs[i % avs.length], String(p.name || ""), p.id === d.who ? 1 : 0, p.id, personPhoto(p.photo)]; });
+  }
+  // a person's own photo, sent from their Couch TV Studio account (Your home): only a JPEG data URL,
+  // checked by its first bytes, never a link. "" draws the character as before.
+  function personPhoto(u) {
+    var m = typeof u === "string" && u.length <= 56000 && /^data:image\/jpeg;base64,([A-Za-z0-9+/]+={0,2})$/.exec(u);
+    if (!m) return "";
+    try { var h = atob(m[1].slice(0, 8)); return h.charCodeAt(0) === 0xff && h.charCodeAt(1) === 0xd8 && h.charCodeAt(2) === 0xff ? u : ""; } catch (e) { return ""; }
+  }
+  function personFace(x, size) {
+    if (!x[4]) return avatar(x[0], size);
+    var img = document.createElement("img");
+    img.src = x[4]; img.alt = "";
+    img.style.cssText = "display:block;width:" + px(size) + ";height:" + px(size) + ";border-radius:50%;object-fit:cover";
+    return img;
   }
 
   // ---------------- time ----------------
@@ -2366,7 +2380,7 @@
     var av = clamp(b.h - 20, 40, 62);
     root.style.padding = b.h < 100 ? "0 20px" : "14px 20px";
     add(root, E("div", "cw-row", "height:100%;max-width:100%", ps.slice(0, Math.max(1, Math.floor(b.w / (names ? 150 : av + 24)))).map(function (x, i) {
-      var p = E("div", "cw-row", "min-width:0;flex:0 1 auto;opacity:" + (x[2] ? 1 : 0.68) + ";" + (i ? "margin-left:20px" : "") + ";border-radius:40px;padding:4px", [E("div", "", "width:" + px(av) + ";height:" + px(av) + ";border-radius:50%;overflow:hidden;flex:none;" + (x[2] ? "box-shadow:0 0 0 4px #fff" : ""), [avatar(x[0], av)]),
+      var p = E("div", "cw-row", "min-width:0;flex:0 1 auto;opacity:" + (x[2] ? 1 : 0.68) + ";" + (i ? "margin-left:20px" : "") + ";border-radius:40px;padding:4px", [E("div", "", "width:" + px(av) + ";height:" + px(av) + ";border-radius:50%;overflow:hidden;flex:none;" + (x[2] ? "box-shadow:0 0 0 4px #fff" : ""), [personFace(x, av)]),
         names ? E("span", "cw-t25 cw-ell", "color:var(--ink);margin-left:12px;font-weight:" + (x[2] ? 700 : 560), [x[1]]) : null]);
       return stop(p, "person", x[3], x[1]);
     })));

@@ -5,7 +5,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>couch-tv Setup</title>
+<title>Couch TV Setup</title>
 <meta name="setup-key" content="__SETUP_KEY__">
 <meta name="setup-os" content="__SETUP_OS__">
 <link rel="stylesheet" href="style.css">
@@ -13,19 +13,30 @@
 <body>
 <main>
   <header>
-    <div class="logo">couch-tv <span>Setup</span></div>
+    <div class="logo">Couch TV <span>Setup</span></div>
+    <span class="acct" id="acct-top" hidden></span>
     <button id="close-top" class="link">Close setup</button>
   </header>
 
   <!-- welcome -->
   <section data-step="welcome">
-    <h1>Put couch-tv on your TV</h1>
+    <h1>Put Couch TV on your TV</h1>
     <p class="lead">A clean home screen with no adverts: your apps up front, the time, the weather and a
       changing scene behind them. About ten minutes, most of it with the TV remote. You can undo all of it.</p>
     <ul class="need">
       <li><b>Your TV</b>, switched on, and its remote.</li>
       <li><b>This computer on the same Wi-Fi</b> as the TV.</li>
     </ul>
+    <div class="card" id="acct-box" hidden>
+      <p id="acct-line"><b>Have a Couch TV account?</b> Link it, and your design and home details go on the TV too.</p>
+      <div id="acct-ask">
+        <label>The code from the Couch TV website<span class="row"><input id="acct-code" autocomplete="off" placeholder="for example ABCD-EFGH" maxlength="12"><button id="acct-go">Link</button></span></label>
+        <p class="small">No code? <button class="link" id="acct-device">Sign in on the website instead</button></p>
+        <p class="lead" id="acct-device-code" hidden></p>
+      </div>
+    </div>
+    <p>Works with Google TV and Android TV 7.1 or newer. Setup finds the TV on your Wi-Fi by itself.</p>
+    <details class="small"><summary>Which TVs work with this app</summary>
     <h2>Works with</h2>
     <ul class="tvs">
       <li class="yes"><b>Google TV</b> (Sony, TCL, Hisense, Toshiba, Philips, Panasonic Google TVs, Chromecast with Google TV, Google TV Streamer and others). Android 12 or newer uses Wireless debugging and a code; Android 11 uses USB debugging over Wi-Fi, no cable.</li>
@@ -44,8 +55,9 @@
       <li class="no"><b>Android TVs that never ask</b> "Allow USB debugging?" over Wi-Fi: the app walks through what usually fixes that, and if the TV still says no, shows how to put couch-tv on with just your phone.</li>
     </ul>
     <p class="small">Any of these can get everything by plugging a Google TV box (for example the Google TV Streamer) into the TV.</p>
-    <p class="small">This computer is only needed today. Once it is set up, couch-tv runs on the TV by itself.
-      Nothing is deleted from the TV, and nothing about you is sent anywhere.</p>
+    </details>
+    <p class="small">This computer is only needed today. Once it is set up, Couch TV runs on the TV by itself.
+      Nothing is deleted from the TV. Nothing about you is sent anywhere, unless you link your Couch TV account.</p>
     <div class="actions">
       <button id="undo-start">Take couch-tv off a TV</button>
       <button class="primary" id="setup-start">Start</button>
@@ -57,6 +69,19 @@
     <h1>Find your TV</h1>
     <p class="lead" id="find-status">Looking on your Wi-Fi…</p>
     <div id="found" class="list"></div>
+    <p class="small" id="find-watch" hidden>This list keeps looking. A TV turns Ready by itself once its switch is on.</p>
+    <div id="guide" class="guide" hidden>
+      <h2 id="guide-title"></h2>
+      <div id="guide-steps"></div>
+      <div class="choices" id="guide-which" hidden>
+        <button data-which="wireless"><b>Wireless debugging</b><small>You will type a 6 number code from the TV.</small></button>
+        <button data-which="usb"><b>Only USB debugging</b><small>No cable. The TV asks to allow this computer.</small></button>
+      </div>
+      <div class="actions">
+        <button id="guide-fire" class="link">Is it a Fire OS stick or TV?</button>
+        <button class="primary" id="guide-next" hidden>Done</button>
+      </div>
+    </div>
     <details id="manual">
       <summary>Type the TV's address instead</summary>
       <p class="small">Google TV: <b>Settings, Network and Internet</b>, then your Wi-Fi network.
@@ -276,6 +301,8 @@
     <ul id="plan-list" class="plan"></ul>
     <label class="tick" id="ontv-row" hidden><input type="checkbox" id="ontv-off" checked> Switch off the on-TV app's home and watch (it stays installed). Untick to keep it as the home: nothing is installed then.</label>
     <label class="tick"><input type="checkbox" id="ambient" checked> Switch off ambient mode (the adverts and photos when the TV is idle)</label>
+    <p class="card small" id="plan-account" hidden></p>
+    <label>What do you call this TV?<input id="tv-room" autocomplete="off" maxlength="30" placeholder="for example Living room TV"></label>
     <h2>Make it yours (you can skip this)</h2>
     <label>Who watches? Names, with commas between<input id="people" autocomplete="off" placeholder="for example Sam, Alex"></label>
     <label>Suburb or city, for the weather<span class="row"><input id="place-q" autocomplete="off" placeholder="for example Lismore"><button id="place-go">Look up</button></span></label>
@@ -298,8 +325,9 @@
 
   <!-- done, check -->
   <section data-step="done">
-    <h1 id="done-title">couch-tv is your home screen</h1>
+    <h1 id="done-title">Couch TV is your home screen</h1>
     <p class="lead" id="done-line"></p>
+    <ul class="ticks" id="done-account" hidden></ul>
     <p>Press <b>Home</b> on your TV remote. You should see couch-tv. On Google TV and Fire TV the TV's own home may flash up first: that is normal.</p>
     <div class="actions"><button id="check-go">Check it again</button></div>
     <h2>Phone remote (optional)</h2>
@@ -311,6 +339,17 @@
       <div class="actions"><button id="remote-code">Show a code on the TV</button></div>
       <p class="small" id="remote-adb-google">To let the phone press keys and type, open <b id="remote-setup"></b> on the phone and follow the steps there.</p>
       <p class="small" id="remote-adb-fire">On an up to date Fire TV, Amazon blocks the phone remote from pressing keys and typing. Opening apps and finding shows still work.</p>
+    </div>
+    <div id="health-box" hidden>
+      <h2>Something not right?</h2>
+      <p class="small">A health report helps us fix it. You see all of it before anything is sent.</p>
+      <div class="actions"><button id="health-look">Show the health report</button></div>
+      <div id="health-show" hidden>
+        <p class="small">Couch TV's own details only: versions, free space, memory, its last crash and its own log lines. Addresses and e-mails are blanked out.</p>
+        <pre class="report" id="health-text"></pre>
+        <div class="actions"><button class="primary" id="health-send">Send it to my Couch TV account</button></div>
+        <p class="hint" id="health-status"></p>
+      </div>
     </div>
     <h2>Finish</h2>
     <p id="debug-line">couch-tv does not need debugging any more. Switching it off is safest: <span id="debug-why"></span></p>

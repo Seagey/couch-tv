@@ -59,7 +59,9 @@ jobs:
           SEP=$(python -c "import os; print(os.pathsep)")
           # the release's version in the program's file details (Windows), not PyInstaller's 0.0.0
           python stamp_version.py windows-file version.txt
-          pyinstaller --noconfirm --windowed --name "couch-tv Setup" \
+          # Mac: the website's "Set up my TV" link (couchtv://) reaches the app as an argument at start
+          ARGV=""; [ "$RUNNER_OS" = "macOS" ] && ARGV="--argv-emulation"
+          pyinstaller --noconfirm --windowed --name "couch-tv Setup" $ARGV \
             --version-file version.txt \
             --osx-bundle-identifier app.couchtv.setup \
             --add-data "couchtv_setup/web${SEP}couchtv_setup/web" \
@@ -78,6 +80,11 @@ jobs:
           # No Dock icon or window of its own: the setup is the browser page, and the app stops by
           # itself on Close setup or a few minutes after the page is closed.
           plutil -insert LSUIElement -bool true "$APP/Contents/Info.plist"
+          # Opened by the website's "Set up my TV" button (couchtv://setup?handoff=..., linkin.py)
+          plutil -insert CFBundleURLTypes -json '[{"CFBundleURLName":"app.couchtv.setup","CFBundleURLSchemes":["couchtv","couchtv-setup"]}]' "$APP/Contents/Info.plist"
+          # macOS 15 asks once before the app may look for TVs; these say why, and which announcements it listens for
+          plutil -insert NSLocalNetworkUsageDescription -string "Couch TV Setup looks for your TV on your Wi-Fi so it can put Couch TV on it." "$APP/Contents/Info.plist"
+          plutil -insert NSBonjourServices -json '["_adb-tls-connect._tcp","_adb-tls-pairing._tcp","_adb._tcp","_androidtvremote2._tcp","_googlecast._tcp"]' "$APP/Contents/Info.plist"
           # the release's version (Finder, Get Info), not PyInstaller's 0.0.0; before codesign
           python stamp_version.py mac-plist "$APP/Contents/Info.plist"
           # Ad hoc signature only (no paid Apple account): macOS asks once, see setup-app/README.md.

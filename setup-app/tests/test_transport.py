@@ -129,7 +129,7 @@ class Mdns(unittest.TestCase):
         pkt += rr(inst, mdns.SRV, struct.pack(">HHH", 0, 0, 37123) + name("android-3.example.local"))
         pkt += rr("android-3.example.local", mdns.A, socket.inet_aton("192.0.2.10"))
         found = mdns.resolve([r + ("192.0.2.10",) for r in mdns.parse(pkt)], [svc.rstrip(".")])
-        self.assertEqual(found, [{"service": svc.rstrip("."), "instance": inst.lower(), "ip": "192.0.2.10", "port": 37123, "name": "adb-ABC-xyz"}])
+        self.assertEqual(found, [{"service": svc.rstrip("."), "instance": inst.lower(), "ip": "192.0.2.10", "port": 37123, "name": "adb-ABC-xyz", "txt": {}}])
 
     def test_garbage_is_ignored(self):
         self.assertEqual(mdns.parse(b"\x00\x01garbage"), [])
@@ -160,7 +160,7 @@ class Release(unittest.TestCase):
         self.assertIn("SHA256SUMS", r["checked"])
 
     def test_tampered_download_is_deleted(self):
-        rel = self._release("sha256:" + "0" * 64)
+        rel = self._release("sha256:" + "0" * 64, "0" * 64 + "  couch-tv-home.apk\n")
         with mock.patch.object(release, "_open", self._fake_open):
             with self.assertRaises(TvError) as e:
                 release.get("couch-tv-home.apk", release=rel)
