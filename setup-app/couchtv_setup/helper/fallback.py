@@ -66,11 +66,15 @@ def make_server(ctl):
             self._send(404, b"not found", "text/plain")
 
         def do_POST(self):
+            try:
+                n = min(max(int(self.headers.get("Content-Length") or 0), 0), 4096)
+            except ValueError:
+                n = 0
+            raw = self.rfile.read(n)   # read before any answer: Windows resets the connection over an unread body
             if not self._host_ok() or not secrets.compare_digest(self.headers.get("X-Helper-Key") or "", secret):
                 return self._send(403, {"error": "not this page"}, "application/json")
-            n = min(int(self.headers.get("Content-Length") or 0), 4096)
             try:
-                body = json.loads(self.rfile.read(n) or b"{}")
+                body = json.loads(raw or b"{}")
             except ValueError:
                 body = {}
             if self.path == "/api/act":
@@ -90,5 +94,6 @@ def serve(ctl):
     """Starts the page in the background. Returns its address."""
     httpd, _ = make_server(ctl)
     threading.Thread(target=httpd.serve_forever, daemon=True).start()
-    ctl.on_quit = httpd.shutdown
+    # stop a moment later, so the page's own Quit request still gets its answer (Windows aborted it, a flaky CI test)
+    ctl.on_quit = lambda: threading.Timer(0.5, httpd.shutdown).start()
     return "http://127.0.0.1:%d/" % httpd.server_address[1]
