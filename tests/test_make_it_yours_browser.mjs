@@ -1,7 +1,8 @@
 // The first-run "Make it yours" card (owner approved 25 Nov 2026): a new TV that stayed on Couch Original is shown
 // one card, once, on a calm moment: a QR code and an address to design its own screen on a phone.
-//  1. Fresh install: the welcome comes first; answered with Use Couch Original (or Back) the card comes after the calm
-//     wait, never over the welcome, shows the words, the address and a QR that decodes to the one constant.
+//  1. Fresh install linked by Setup: no welcome, the card after the calm wait; words, address and a QR that decodes to the one
+//     constant. Fresh and not linked: the welcome with its own QR and no card, even after Use Couch Original.
+//     The link arriving before, during or after the welcome, and across a restart, a design code of Setup's, an update.
 //  2. Back closes it for good: out of the page, the home is back with focus, kept across a restart (reload).
 //  3. Never: on an update (welcome "set", or answered Couch Original by an older version), once a design or home
 //     pack is here, in a guest's profile, while the TV is away at an app or the screen is off, if dismissed.
@@ -47,8 +48,10 @@ await new Promise((r) => server.listen(0, "127.0.0.1", r));
 const STORE = "https://designs.example";
 const ORIGIN = "http://127.0.0.1:" + server.address().port;
 const HOME = ORIGIN + "/tv-home/web/index.html?mock=1&place=Your+town&designstore=" + encodeURIComponent(STORE);
-const CALM = 600;   // the calm wait, shortened for the test (the real one is 25 s)
-const FRESH = HOME + "&ontv=1&firstrun=1&makeitcalm=" + CALM;
+const CALM = 600;    // the calm wait, shortened for the test (the real one is about 3 s)
+const SLOW = 3000;   // the real one, for the tests that act before the card comes
+const FRESH = HOME + "&ontv=1&firstrun=1&makeitcalm=" + CALM;               // a fresh TV Setup never linked: the welcome
+const LINKED = HOME + "&ontv=1&firstrun=1&linked=1&makeitcalm=" + SLOW;      // a fresh TV Setup linked: the card, no welcome
 let n = 0;
 const ok = (c, m) => { assert.ok(c, m); n++; };
 
@@ -79,16 +82,63 @@ try {
     const r = jsQR(Uint8ClampedArray.from(px.d), px.w, px.h);
     return r ? r.data : null;
   };
-  // a fresh TV that answers the welcome with Use Couch Original (Right then OK), and waits for the calm moment
-  const original = async () => { await press("ArrowRight"); await press("Enter", 100); };
+  const original = async () => {};   // a linked fresh TV has no welcome to answer
+  const linkNow = (extra) => page.evaluate(() => { localStorage.setItem("mock:linked", "1"); window.tv.setupDesign(); });
+  const welcomeKey = () => page.evaluate(() => JSON.parse(localStorage.getItem("mock:tvhome.welcome") || "null"));
 
-  // 1. a fresh install: welcome first, the card after it
+  // 1a. a fresh TV Setup never linked: the welcome as today, no card
   await freshTv();
-  ok(await welcomeUp() && !(await cardUp()), "a fresh TV opens on the welcome, with no card");
-  await wait(CALM + 1500);
-  ok(await welcomeUp() && !(await cardUp()) && await kept() === null, "the card never comes over the welcome, however long it waits");
-  await original();
-  ok(!(await cardUp()) && await kept() === "due", "Use Couch Original: the card is due, but not at once (a calm moment first)");
+  ok(await welcomeUp() && !(await cardUp()), "fresh and not linked: the welcome, no card");
+  ok(await page.evaluate(() => !!document.querySelector("#welcome-qr svg")), "with its own QR");
+  await wait(SLOW + 1500);
+  ok(await welcomeUp() && !(await cardUp()) && await kept() === null, "the card never comes over the welcome");
+  await press("ArrowRight"); await press("Enter", 300);
+  await wait(SLOW + 1500);
+  ok(!(await welcomeUp()) && !(await cardUp()) && await kept() === null && await welcomeKey() === "original", "Use Couch Original while not linked: no card, ever");
+  // linked later by Setup, still on Couch Original with no design: the card, once
+  await linkNow();
+  ok(await kept() === "due", "linked later while on Couch Original: the card is due");
+  await page.waitForFunction(() => !!document.getElementById("makeit"), null, { timeout: 8000 });
+  ok(await kept() === "done", "and it comes, once");
+  await press("Escape", 300);
+  await linkNow(); await wait(SLOW + 1500);
+  ok(!(await cardUp()) && await kept() === "done", "linked again: not shown twice");
+  // the link arrives with the welcome on screen: the card replaces it
+  await freshTv();
+  ok(await welcomeUp(), "the welcome is up");
+  await linkNow(); await wait(300);
+  ok(!(await welcomeUp()) && await welcomeKey() === "linked" && await kept() === "due", "the link arrives during the welcome: the welcome goes, the card is due");
+  await page.waitForFunction(() => !!document.getElementById("makeit"), null, { timeout: 8000 });
+  ok(!(await welcomeUp()), "and the card replaces it");
+  await press("Escape", 300);
+  // the link arrives with the welcome on screen and a design code of Setup's on its way: no card at all
+  await freshTv(FRESH + "&setupcode=1");
+  await linkNow(); await wait(SLOW + 1500);
+  ok(!(await welcomeUp()) && !(await cardUp()) && await kept() === null, "link and a design code together, welcome up: neither card");
+  // the link before the welcome (already linked at the first start): no welcome at all
+  await freshTv(LINKED);
+  ok(!(await welcomeUp()) && await welcomeKey() === "linked", "linked before the first start: the welcome is skipped");
+  // a restart in between: unlinked, welcome up, restart, then linked
+  await freshTv();
+  await page.reload(); await ready();
+  ok(await welcomeUp() && await welcomeKey() === "ask", "restart with the welcome unanswered: still the welcome");
+  await page.evaluate(() => localStorage.setItem("mock:linked", "1"));
+  await page.reload(); await ready();
+  ok(!(await welcomeUp()) && await welcomeKey() === "linked" && ["due", "done"].includes(await kept()), "linked while it was away: the restart skips the welcome and the card is due");
+  await page.waitForFunction(() => !!document.getElementById("makeit"), null, { timeout: 8000 });
+  await press("Escape", 300);
+  // a design code of Setup's in the same start: no card
+  await freshTv(LINKED + "&setupcode=1");
+  await wait(SLOW + 1500);
+  ok(!(await cardUp()) && await kept() === null && !(await welcomeUp()) && await welcomeKey() === "linked", "linked with a design code: no welcome and no card");
+  // an update: the welcome never was, and a link later changes nothing
+  await freshTv(LINKED, { "mock:tvhome.apps.seen": JSON.stringify(["com.netflix.ninja"]) });
+  await linkNow(); await wait(SLOW + 1500);
+  ok(!(await cardUp()) && await kept() === null && await welcomeKey() === "set", "an update, linked: no card");
+
+  // 1b. a fresh TV Setup linked: the card
+  await freshTv(LINKED);
+  ok(!(await welcomeUp()) && !(await cardUp()) && await kept() === "due", "fresh and linked: no welcome, the card is due but not at once");
   await page.waitForFunction(() => !!document.getElementById("makeit"), null, { timeout: 8000 });
   ok(await cardUp() && await kept() === "done", "the card comes on a calm moment, and counts as shown");
   const words = await page.evaluate(() => document.getElementById("makeit").textContent);
@@ -107,12 +157,12 @@ try {
   ok(await page.evaluate(() => !!document.querySelector("#grid .app.focus, .focus")), "the home has its focus back");
   await press("ArrowRight", 300);
   ok(await page.evaluate(() => !!document.querySelector(".focus")), "and the remote moves on the home");
-  await page.reload(); await ready(); await wait(CALM + 1500);
+  await page.reload(); await ready(); await wait(SLOW + 1500);
   ok(!(await cardUp()) && !(await welcomeUp()) && await kept() === "done", "a restart: dismissed stays dismissed");
-  await page.reload(); await ready(); await wait(CALM + 1500);
+  await page.reload(); await ready(); await wait(SLOW + 1500);
   ok(!(await cardUp()), "and again");
   // a restart before it was shown: still due, still shown once
-  await freshTv(); await original();
+  await freshTv(LINKED);
   await page.reload(); await ready();
   ok(await kept() === "due", "restarted before it showed: still due");
   await page.waitForFunction(() => !!document.getElementById("makeit"), null, { timeout: 8000 });
@@ -120,68 +170,68 @@ try {
 
   // 3. never
   await freshTv(FRESH, { "mock:tvhome.apps.seen": JSON.stringify(["com.netflix.ninja"]) });
-  await wait(CALM + 1500);
+  await wait(SLOW + 1500);
   ok(!(await welcomeUp()) && !(await cardUp()) && await kept() === null, "an update (apps already seen): no welcome, no card, never later");
   await freshTv(FRESH, { "mock:tvhome.welcome": JSON.stringify("original") });
-  await wait(CALM + 1500);
+  await wait(SLOW + 1500);
   ok(!(await cardUp()) && await kept() === null, "an update from a version that already had the welcome (answered Couch Original): no card");
   // a design or home pack arrives while it waits
-  await freshTv(); await original();
+  await freshTv(LINKED);
   await page.evaluate(() => localStorage.setItem("couchtv.design.fetched", JSON.stringify({ design: { v: 1, background: { colour: "#203040" }, elements: { clock: { colour: "#ffcc00" } } }, at: Date.now() })));
-  await wait(CALM + 1500);
+  await wait(SLOW + 1500);
   ok(!(await cardUp()) && await kept() === "done", "a design was sent before it came: no card, and never later");
-  await freshTv(); await original();
+  await freshTv(LINKED);
   await page.evaluate(() => localStorage.setItem("couchtv.design.ok", "1"));
-  await wait(CALM + 1500);
+  await wait(SLOW + 1500);
   ok(!(await cardUp()), "a design already accepted: no card");
-  await freshTv(); await original();
+  await freshTv(LINKED);
   await page.evaluate(() => localStorage.setItem("mock:tvhome.home.account", JSON.stringify({ rev: 1, people: [{ id: "p_1", name: "Alex" }] })));
-  await wait(CALM + 1500);
+  await wait(SLOW + 1500);
   ok(!(await cardUp()), "a home pack already applied: no card");
   // the welcome answered with a code is no longer Couch Original
   await freshTv(); await press("Enter", 500);
-  await wait(CALM + 1500);
+  await wait(SLOW + 1500);
   ok(!(await cardUp()) && await kept() === null, "I have a design code: no card");
   // a guest's profile
   const people = JSON.stringify([{ id: "visitor", name: "Visitor", guest: true }, { id: "alex", name: "Alex" }]);
   const people2 = JSON.stringify([{ id: "alex", name: "Alex" }, { id: "visitor", name: "Visitor", guest: true }]);   // Alex is first, so Alex is watching
-  await freshTv(HOME + "&ontv=1&makeitcalm=" + CALM, { "mock:tvhome.makeit": JSON.stringify("due"), "mock:tvhome.welcome": JSON.stringify("original"), "mock:api.people": people });
-  await wait(CALM + 1500);
+  await freshTv(HOME + "&ontv=1&makeitcalm=" + SLOW, { "mock:tvhome.makeit": JSON.stringify("due"), "mock:tvhome.welcome": JSON.stringify("original"), "mock:api.people": people });
+  await wait(SLOW + 1500);
   ok(!(await cardUp()) && await kept() === "due", "a guest's profile: no card (still due for someone else)");
-  await freshTv(HOME + "&ontv=1&makeitcalm=" + CALM, { "mock:tvhome.makeit": JSON.stringify("due"), "mock:tvhome.welcome": JSON.stringify("original"), "mock:api.people": people2 });
+  await freshTv(HOME + "&ontv=1&makeitcalm=" + SLOW, { "mock:tvhome.makeit": JSON.stringify("due"), "mock:tvhome.welcome": JSON.stringify("original"), "mock:api.people": people2 });
   await page.waitForFunction(() => !!document.getElementById("makeit"), null, { timeout: 8000 });
   ok(true, "the same TV with a non guest watching: the card comes (so the guest test above is the guest, not the setup)");
   // away at an app, or the screen off
-  await freshTv(); await original();
+  await freshTv(LINKED);
   await page.evaluate(() => window.tv.pause());
-  await wait(CALM + 1500);
+  await wait(SLOW + 1500);
   ok(!(await cardUp()) && await kept() === "due", "the TV is at an app: no card over it");
   await page.evaluate(() => window.tv.resume());
   await page.waitForFunction(() => !!document.getElementById("makeit"), null, { timeout: 8000 });
   ok(true, "back from the app: the card comes on the next calm moment");
   await press("Escape", 300);
-  await freshTv(); await original();
+  await freshTv(LINKED);
   await page.evaluate(() => window.tv.screenOff());
-  await wait(CALM + 1500);
+  await wait(SLOW + 1500);
   ok(!(await cardUp()), "screen off (the screensaver): no card");
   await page.evaluate(() => window.tv.wakeScreen());
   // a question or Home settings on top: it waits, never stacks
-  await freshTv(); await original();
+  await freshTv(LINKED);
   await page.evaluate(() => window.tv.settingsKey()); await wait(300);
-  await wait(CALM + 1500);
+  await wait(SLOW + 1500);
   ok(!(await cardUp()) && await page.evaluate(() => document.getElementById("gear-pop").classList.contains("on")), "the gear menu is open: no card over it");
   await press("Escape", 300);
   await page.waitForFunction(() => !!document.getElementById("makeit"), null, { timeout: 15000 });
   ok(true, "the menu closed: the card comes after");
   await press("Escape", 300);
   // a kids profile
-  await freshTv(HOME + "&ontv=1&makeitcalm=" + CALM, { "mock:tvhome.makeit": JSON.stringify("due"), "mock:tvhome.welcome": JSON.stringify("original") });
+  await freshTv(HOME + "&ontv=1&makeitcalm=" + SLOW, { "mock:tvhome.makeit": JSON.stringify("due"), "mock:tvhome.welcome": JSON.stringify("original") });
   await page.evaluate(() => { window.KidsMode = Object.assign({}, window.KidsMode, { active: () => true }); });
-  await wait(CALM + 1500);
+  await wait(SLOW + 1500);
   ok(!(await cardUp()), "a kids profile: no card");
 
   // 4. the remote is never held
-  const show = async () => { await freshTv(); await original(); await page.waitForFunction(() => !!document.getElementById("makeit"), null, { timeout: 8000 }); };
+  const show = async () => { await freshTv(LINKED); await page.waitForFunction(() => !!document.getElementById("makeit"), null, { timeout: 8000 }); };
   await show(); await press("ArrowRight"); await press("ArrowDown"); await press("ArrowLeft");
   ok(await cardUp(), "the arrows do nothing to it");
   await press("Enter", 400);
@@ -213,9 +263,9 @@ try {
   ok(!(await cardUp()), "Back closes it again");
 
   // 6. light on a weak TV
-  await freshTv();
+  await freshTv(LINKED);
   ok(!(await cardUp()) && await page.evaluate(() => document.querySelectorAll(".makeit, .mk-card, #makeit-qr").length === 0), "a TV that never shows it has none of it in the page");
-  await original(); await page.waitForFunction(() => !!document.getElementById("makeit"), null, { timeout: 8000 });
+  await page.waitForFunction(() => !!document.getElementById("makeit"), null, { timeout: 8000 });
   const cost = await page.evaluate(() => { const c = getComputedStyle(document.getElementById("makeit")), k = getComputedStyle(document.querySelector(".mk-card"));
     return { blur: c.backdropFilter, blur2: k.backdropFilter, anim: c.animationName, anim2: k.animationName, tr: c.transitionProperty, nodes: document.getElementById("makeit").querySelectorAll("*").length }; });
   ok((!cost.blur || cost.blur === "none") && (!cost.blur2 || cost.blur2 === "none") && cost.anim === "none" && cost.anim2 === "none" && cost.nodes < 400, "no blur, no animation, few nodes (" + JSON.stringify(cost) + ")");
@@ -231,7 +281,7 @@ try {
   const shapes = [];
   for (const [w, h] of sizes) {
     await page.setViewportSize({ width: w, height: h });
-    await freshTv(); await original(); await page.waitForFunction(() => !!document.getElementById("makeit"), null, { timeout: 8000 });
+    await freshTv(LINKED); await page.waitForFunction(() => !!document.getElementById("makeit"), null, { timeout: 8000 });
     const f = await fit(); shapes.push(f);
     ok(f.inside && f.apart && f.cy < 2 && f.hint >= 0.0325, w + "x" + h + ": the card, QR, title and address fit, side by side, centred, small text 36px at 1080p or bigger (" + JSON.stringify(f) + ")");
     ok(await decode() === URL_CONST, w + "x" + h + ": the QR still decodes");

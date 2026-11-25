@@ -8,7 +8,8 @@
 //     Hidden and offline come back on their own while the card is still open; the rest close the card.
 //  4. A design arriving closes the card and stops it. A 429 (wait) ends it for good. A failure waits twice as long each
 //     time (40, 80, 160, 160 s) and still counts.
-//  5. A TV that is not linked asks nothing. Linked while the card is open (Setup's start), it begins then.
+//  5. A TV that is not linked asks nothing and has the welcome, no card. The link arriving with the welcome up replaces it with the
+//     card; linked while the card (from Home settings) is open, the window begins then.
 //  6. The Home key causes no look at all, with the card up or not.
 //  7. Home settings: Get my new design is the first row on a linked TV, one press is one look, the next waits 30 s, and
 //     it says a plain result: new design arrived, nothing new yet, no internet, TV not linked.
@@ -72,21 +73,21 @@ try {
     await page.goto(BASE);
     for (let i = 0; i < 40 && !(await page.evaluate(() => !!(window.tv && window.CouchDesignCode && window.I18N))); i++) await page.waitForTimeout(150);
     await page.waitForTimeout(1500);
-    await page.clock.pauseAt(new Date("2026-11-25T10:00:10Z"));
-    await run(1000);
+    const now = await page.evaluate(() => Date.now());
+    await page.clock.pauseAt(new Date(now + 200));
+    await run(300);
   };
   const run = async (ms) => { await page.clock.runFor(ms); await page.waitForTimeout(30); };
   const press = async (k, ms) => { await page.keyboard.press(k); await run(ms || 300); };
   const asks = () => page.evaluate(() => window.__asks.length);
   const cardUp = () => page.evaluate(() => !!document.getElementById("makeit"));
   const looks = () => page.evaluate(() => JSON.parse(localStorage.getItem("tvos:tvhome.makeit.looks") || localStorage.getItem("tvhome.makeit.looks") || "0"));
-  // a TV straight from the box: the welcome answered with Use Couch Original, then the calm 25 s, then the card
+  // a TV Setup linked, straight from the box: no welcome, the calm 3 s, then the card
   const cardOpen = async (opts) => {
     await start(opts);
-    await press("ArrowRight"); await press("Enter", 200);
-    // in small steps until the card shows (the calm 25 s), so the time it opened is known to 100 ms
+    // in small steps until the card shows (the calm 3 s), so the time it opened is known to 100 ms
     for (let i = 0; i < 400 && !(await cardUp()); i++) await run(100);
-    ok(await cardUp(), "the card is up after the welcome and a calm moment");
+    ok(await cardUp(), "the card is up after a calm moment, with no welcome");
     lastOpen = await page.evaluate(() => Date.now());
     return await asks();
   };
@@ -197,27 +198,52 @@ try {
   ok(await looks() === (await asks() - base), "and every failed look counts (" + await looks() + ")");
   await press("Escape", 300);
 
-  // 5. not linked, then linked while the card is open (an unlinked card goes by itself after 3 minutes)
-  base = await cardOpen({ linked: false });
+  // 5. not linked: the welcome and no card, no look. The link arrives with the welcome on screen: the card replaces it
+  //    and the window begins with it (the card's own 20 s, not at once). Or: the card from Home settings, then linked.
+  await start({ linked: false });
+  const welcomeOn = () => page.evaluate(() => { const w = document.getElementById("welcome"); return !!w && w.classList.contains("on"); });
+  ok(await welcomeOn() && !(await cardUp()), "not linked: the welcome, no card");
+  base = await asks();
+  await run(S20 * 7);
+  ok(await asks() === base && await welcomeOn() && !(await cardUp()), "not linked: no look in 2 minutes 20 s, the welcome still there, no card");
+  await page.evaluate(() => { window.__linked = true; window.tv.setupDesign(); });
+  await run(300);
+  ok(!(await welcomeOn()), "Setup links the TV: the welcome goes");
+  for (let i = 0; i < 100 && !(await cardUp()); i++) await run(100);
+  ok(await cardUp(), "and the card takes its place");
+  const b5 = await asks();
+  await run(S20 - 1000);
+  ok(await asks() === b5, "the first look is 20 s after the card, not at once");
+  await run(S20 + 1000);
+  ok(await asks() >= b5 + 1, "and then it looks");
+  await press("Escape", 300);
+  // not linked, welcome answered Use Couch Original, the card shown from Home settings: no looks. Then linked: it begins.
+  await start({ linked: false });
+  await press("ArrowRight"); await press("Enter", 300);
+  await run(S20 * 4);
+  ok(!(await cardUp()), "not linked, Use Couch Original: no card by itself");
+  await page.evaluate(() => window.tv.settingsKey()); await run(300); await press("Enter", 500);
+  for (let i = 0; i < 16 && !(await page.evaluate(() => /Designs/.test((document.querySelector(".ssec.focus") || {}).textContent || ""))); i++) await press("ArrowDown", 150);
+  await press("ArrowRight", 500);
+  for (let i = 0; i < 60 && !(await page.evaluate(() => /Make it yours/.test((document.querySelector(".srow.focus") || {}).textContent || ""))); i++) await press("ArrowDown", 150);
+  base = await asks();
+  await press("Enter", 600);
+  ok(await cardUp(), "the card from Home settings on a TV that is not linked");
   await run(S20 * 7);
   ok(await asks() === base && await looks() === 0 && await cardUp(), "not linked: no look at all in 2 minutes 20 s, the card still up");
   await page.evaluate(() => { window.__linked = true; window.tv.setupDesign(); });
   await run(S20 - 1000);
-  ok(await asks() === base, "Setup links the TV: the first look is 20 s later, not at once");
+  ok(await asks() === base, "linked with the card open: the first look is 20 s later, not at once");
   await run(S20 + 1000);
   ok(await asks() >= base + 1, "and then it looks");
   await press("Escape", 300);
 
   // 6. the Home key causes no look
-  await start();
-  await press("ArrowRight"); await press("Enter", 200);
-  await run(500);
-  let h0 = await asks();   // the first open of a linked TV looks once, as it always did
-  for (let i = 0; i < 6; i++) { await page.evaluate(() => window.tv.home()); await run(3000); }   // 18 s: before the card's calm 25 s
-  ok(await asks() === h0 && !(await cardUp()), "six Home presses before the card: no look (" + (await asks() - h0) + ")");
-  for (let i = 0; i < 400 && !(await cardUp()); i++) await run(100);
-  ok(await cardUp(), "the card comes");
-  h0 = await asks();
+  await start({ linked: false });
+  let h0 = await asks();
+  for (let i = 0; i < 12; i++) { await page.evaluate(() => window.tv.home()); await run(3000); }
+  ok(await asks() === h0, "twelve Home presses with the welcome up: no look (" + (await asks() - h0) + ")");
+  h0 = await cardOpen();
   await page.evaluate(() => window.tv.home()); await run(S20 * 3);
   ok(await asks() === h0 && !(await cardUp()), "Home with the card up closes it and asks nothing");
   for (let i = 0; i < 12; i++) { await page.evaluate(() => window.tv.home()); await run(3000); }
@@ -227,10 +253,9 @@ try {
   ok(await asks() === h0, "an app and back after a moment: no look (the 30 minute rule is as it was)");
 
   // 7. Home settings, Get my new design
-  await start();
-  await press("ArrowRight"); await press("Enter", 200);
-  await press("Escape", 300);   // dismiss nothing yet; make sure we are on the home
-  await run(31000); if (await cardUp()) await press("Escape", 300);
+  await cardOpen();
+  await press("Escape", 300);
+  await run(31000);
   await page.evaluate(() => window.tv.settingsKey()); await run(300); await press("Enter", 500);
   const first = await page.evaluate(() => { const r = document.querySelector("#set-rows .srow"); return r ? r.textContent : ""; });
   ok(/Get my new design/.test(first), "it is the first row of Home settings on a linked TV (" + first.slice(0, 50) + ")");
