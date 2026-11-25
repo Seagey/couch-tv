@@ -79,7 +79,7 @@ def enable(cmd=None, platform=None, home=None, registry=None):
     if plat == "mac":
         p.write_bytes(mac_plist(cmd))
     else:
-        p.write_text(linux_desktop(cmd), encoding="utf-8")
+        p.write_bytes(linux_desktop(cmd).encode("utf-8"))
     return str(p)
 
 

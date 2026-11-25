@@ -61,6 +61,8 @@ class System:
         self.patches = [mock.patch("subprocess.run", run), mock.patch.object(finder, "_primary_ip", lambda: self.primary)]
         if netinfo:
             self.patches.append(mock.patch.object(netinfo, "primary_ip", lambda: self.primary))
+            if sys.platform == "win32":   # the text here is an ifconfig listing, on every computer
+                self.patches.append(mock.patch.object(netinfo, "listing", lambda: netinfo.parse_ifconfig(self.text)))
         for p in self.patches:
             p.start()
         return self

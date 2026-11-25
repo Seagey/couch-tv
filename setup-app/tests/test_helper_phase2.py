@@ -360,7 +360,7 @@ class RenameMigration(unittest.TestCase):
             ok, folder, apps, spawned = self.stage(system, "couch-tv Setup", "Couch TV Setup")
             self.assertTrue(ok, system)
             script = (folder / ("swap.cmd" if system == "win32" else "swap.sh")).read_text(encoding="utf-8")
-            sep = "/"   # the staged paths are made on this computer
+            sep = os.sep   # the staged paths are made on this computer
             self.assertIn("Couch TV Setup" + sep + "Couch TV Setup" + (".exe" if system == "win32" else ""), script, system)
             self.assertIn("couch-tv Setup" + sep + "couch-tv Setup" + (".exe" if system == "win32" else ""), script, "the old one is what a failed swap starts")
 
