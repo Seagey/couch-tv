@@ -21,6 +21,7 @@ Couch TV Setup has a new look and a new name, finds more TVs, and links the TV i
 ### On the TV
 
 - **Make it yours.** A new TV opens on a Make it yours card. If the TV is linked, it looks for your design every 20 seconds while the card is open, at most 45 times in the TV's life, and stops when you leave the card. A TV that is not linked asks nothing.
+- **Fire TV (the on-TV app).** The home comes to the front when the watch connects just after a restart.
 - **Get my new design** is the first row of Home settings on a linked TV. One press is one look.
 
 ### Not in this release
