@@ -8062,6 +8062,8 @@
     return fresh && !kidsOn();
   }
   function welcomeStart(fresh) {
+    var wk = kept(WELCOME_KEY);
+    if (makeitLinked() && !kidsOn() && ((wk == null && fresh) || wk === "ask")) { welcomeLinked(); return; }   // linked: the card, not the welcome
     if (!welcomeDue(fresh)) return;
     zone = "welcome"; wi = 0; welcomeSeen = true;
     clearFocus();
@@ -8133,13 +8135,16 @@
     welcomeClose("original");
     startFocus();
     paintFocus();
-    makeitDue();   // a new TV that stays on Couch Original gets the Make it yours card, once, on a calm moment
+    if (makeitLinked()) makeitDue();   // linked and staying on Couch Original: the Make it yours card (an unlinked TV has the welcome's QR)
     // the one other first-run question (make Couch TV the home), now the welcome is answered
     setTimeout(homeAsk, 800);
   }
   // ---- the first-run "Make it yours" card (owner approved, 25 Nov 2026) ----
-  // A new TV that stayed on Couch Original (answered the welcome with Use Couch Original or Back) is shown one
-  // card, once, on a calm moment: a QR code and an address to design its own screen on a phone. Never on an
+  // A new TV that Couch TV Setup linked to an account, and that is still on Couch Original, is shown one
+  // card, once, on a calm moment (about 3 s after the home is clear): it takes the place of the welcome, so nobody
+  // sees two similar cards. A TV that is not linked keeps the welcome (with its own QR) and no card; linked later
+  // while still on Couch Original with no design, it gets the card then, once. The welcome on screen when the link
+  // arrives is replaced by it. The card is: a QR code and an address to design its own screen on a phone. Never on an
   // update (only the welcome's answer in this version makes it due), never once a design or home pack is here,
   // in a guest's or kids profile, in setup or while a question or sheet is up, over an app or the screensaver.
   // Back (or OK) closes it for good; Home settings, Designs, Make it yours shows the same card again.
@@ -8150,12 +8155,37 @@
   // the editor (/design/) and everyone else to /get/ before a release that shows this card (coord notes).
   var MAKEIT_URL = "https://couchtv.joshuaseage.com/go";
   var MAKEIT_KEY = "tvhome.makeit";   // "due" until it is shown, then "done"
-  var MAKEIT_CALM = (MOCK || PREVIEW) && /[?&]makeitcalm=(\d+)/.test(Q) ? +RegExp.$1 : 25000;   // the wait for a calm home
+  var MAKEIT_CALM = (MOCK || PREVIEW) && /[?&]makeitcalm=(\d+)/.test(Q) ? +RegExp.$1 : 3000;   // the wait for a calm home
   var MAKEIT_AWAY = 180000;   // nobody pressed anything: it goes by itself, so the remote is never held
   var makeitWait = 0, makeitAway = 0, makeitPrev = null;
   function makeitDue() {
     keep(MAKEIT_KEY, "due");
     makeitSchedule(MAKEIT_CALM);
+  }
+  // this TV is linked to an account by Couch TV Setup (a ?mock preview says so with ?linked=1 or mock:linked)
+  function makeitLinked() {
+    if (MOCK || PREVIEW) { try { return /[?&]linked=1\b/.test(Q) || localStorage.getItem("mock:linked") === "1"; } catch (e) { return false; } }
+    return typeof CouchDesignCode !== "undefined" && !!CouchDesignCode.linked && CouchDesignCode.linked();
+  }
+  // a fresh linked TV: the welcome question is skipped and the card comes in its place. The update question waits
+  // for a calm moment after it, as it does after the welcome.
+  function welcomeLinked() {
+    keep(WELCOME_KEY, "linked");
+    keep(WELCOME_AT_KEY, Date.now());
+    welcomeSeen = true;
+    if (kept(MAKEIT_KEY) == null && !makeitDesigned()) makeitDue();   // never again once it has been shown
+  }
+  // Setup's link (or its design code) arrived while the home was open
+  function makeitLinkArrived() {
+    if (!makeitLinked()) return;
+    var designed = makeitDesigned();
+    if (zone === "welcome") {   // the welcome is on screen: the card replaces it (or, with a design code on its way, nothing does)
+      welcomeClose(designed ? "code" : "linked");
+      startFocus(); paintFocus();
+      if (!designed) makeitDue();
+      return;
+    }
+    if (kept(WELCOME_KEY) === "original" && kept(MAKEIT_KEY) == null && !designed && !kidsOn()) makeitDue();
   }
   function makeitSchedule(ms) {
     if (makeitWait) clearTimeout(makeitWait);
@@ -8167,6 +8197,8 @@
     if (cfg.design && typeof cfg.design === "object") return true;
     try { if (localStorage.getItem("couchtv.design.ok") || localStorage.getItem("couchtv.design.no")) return true; } catch (e) {}
     if (typeof CouchDesigner !== "undefined" && kept(CouchDesigner.KEY)) return true;
+    // a design code Setup brought is waiting to be got: the design is on its way
+    try { if (MOCK || PREVIEW ? /[?&]setupcode=1\b/.test(Q) : TV && TV.setupDesignCode && TV.setupDesignCode()) return true; } catch (e) {}
     if (typeof CouchDesignCode !== "undefined") {
       try { if (CouchDesignCode.kept() || (CouchDesignCode.takeHome && CouchDesignCode.takeHome(true))) return true; } catch (e) {}
     }
@@ -10020,7 +10052,7 @@
     homeAnswered: function (held) { homeAnswered(held); },
     // a calendar the launcher read for the Agenda widget (MainActivity.calendar)
     calendarText: function (id, ok, text) { calendarText(id, ok, text); },
-    setupDesign: function () { setupDesign(); ACCT_INBOX.stopped = false; inboxArm(); makeitWindowStart(); },   // Setup brings its own design; the inbox keeps its times
+    setupDesign: function () { setupDesign(); ACCT_INBOX.stopped = false; inboxArm(); makeitLinkArrived(); makeitWindowStart(); },   // Setup brings its own design; the inbox keeps its times
     accountInbox: function (raw) { accountInbox(raw); },
     // words typed on the phone remote (Type on the TV) when the TV app cannot press keys (the on-TV app
     // with no ADB): they go into the typing box Home settings has open, at the cursor. False: no box open.
@@ -10912,7 +10944,7 @@
     initSettings();
     remindersInit();
     welcomeStart(freshTv);   // a TV never set up: the first-run welcome, over everything else
-    makeitSchedule(MAKEIT_CALM + 5000);   // the Make it yours card, if the welcome was answered with Couch Original and it never showed
+    makeitSchedule(MAKEIT_CALM);   // the Make it yours card, if it was due and never showed
     setupDesign();           // Couch TV Setup's design code, if it brought one: no typing
     accountNewNotice();      // a design the account just sent: say so once, with where Undo is
     inboxAsk("open");        // the account's TV inbox, when this TV is linked (after 30 minutes away, or due)

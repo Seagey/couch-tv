@@ -251,7 +251,7 @@ try {
     window.TVOS = { version: () => "0.13.13", apps: () => "[]", watchNext: () => "[]", homeState: () => "held", accountLinked: () => true, setupDesignCode: () => "",
       accountInbox: () => { window.__inbox().then((raw) => setTimeout(() => window.tv && window.tv.accountInbox(raw), 30)); return true; } };
   });
-  await p2.goto(BASE + "&reset=1"); await p2.evaluate(() => localStorage.clear());
+  await p2.goto(BASE + "&reset=1"); await p2.evaluate(() => { localStorage.clear(); localStorage.setItem("tvhome.makeit", JSON.stringify("done")); });   // a first-run card on screen would look every 20 s: this is a TV that has had it
   await p2.clock.install();
   await p2.goto(BASE);
   await p2.waitForFunction(() => window.tv && window.CouchDesignCode, null, { timeout: 20000 });
