@@ -40,4 +40,18 @@ class FireHomeWindowTest {
         assertEquals("$other:$me", FireHomeWindow.watchServices(other, me, declared = true))
         assertNull(FireHomeWindow.watchServices("$other:$me", me, declared = true))
     }
+
+    @Test fun aWatchConnectedAtPowerOnPutsTheHomeInFront() {
+        // Fire TV Stick 4K Max powered from the TV's USB port: the watch connected about 15 s after power
+        // on, Amazon's home already up and its window event missed
+        assertTrue(FireHomeWindow.justRestarted(15_000))
+        assertTrue(FireHomeWindow.justRestarted(FireHomeWindow.BOOT_WINDOW_MS - 1))
+    }
+
+    @Test fun aWatchConnectedLaterLeavesTheScreenAlone() {
+        // switched on in Settings, or bound again long after a restart: whatever is on screen stays
+        assertFalse(FireHomeWindow.justRestarted(FireHomeWindow.BOOT_WINDOW_MS))
+        assertFalse(FireHomeWindow.justRestarted(3 * 60 * 60_000L))
+        assertFalse(FireHomeWindow.justRestarted(-1))
+    }
 }

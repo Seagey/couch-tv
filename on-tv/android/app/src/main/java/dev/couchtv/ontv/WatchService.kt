@@ -22,7 +22,7 @@ class WatchService : AccessibilityService() {
         if (!mayAct()) { DisclosureActivity.show(this); return }
         start()
     }
-    private fun start() { connected = true; FireHome.readHomes(); applyKeyFilter(); FireHome.checkFrontAtConnect() }
+    private fun start() { connected = true; FireHome.readHomes(); applyKeyFilter(); FireHome.onWatchConnected() }
     override fun onDestroy() { connected = false; if (instance === this) instance = null; super.onDestroy() }
     override fun onInterrupt() {}
     private fun mayAct() = PlayRules.watchMayAct(BuildConfig.FLAVOR, Variant.agreed())

@@ -40,7 +40,7 @@ object FireHome {
     private const val WATCH = "shell:logcat -T1 -v brief ActivityTaskManager:I '*:S'"
     private val lock = Any()
     @Volatile private var running = false
-    @Volatile private var lastJump = 0L
+    @Volatile private var lastJump = -JUMP_GAP_MS   // SystemClock.elapsedRealtime of the last jump
 
     val isFireTv: Boolean get() = Tv.hasPackage(AMAZON_HOME)
 
@@ -145,6 +145,31 @@ object FireHome {
             if (lastPkg == TV_APP) Log.i(TAG, "screen on: the TV is going back to an input, Couch TV stays back")
             else App.openHome()
         }, 2_000)
+    }
+
+    /**
+     * The watch has just connected (WatchService.start).
+     *
+     * Fire TV at power on: Fire OS starts Amazon's home a few milliseconds after this app's process comes
+     * up for the watch (31 ms on a Fire TV Stick 4K Max, Fire OS 7.7.1.3; 54 ms on the sticks in issue
+     * #44), so Amazon's window event can arrive before the watch is connected and is never seen (a race:
+     * on that stick one power on of two). A Home press then changes nothing either: Amazon's home is
+     * already in front, so no window comes forward, and the home stayed on Amazon's until couch-tv was
+     * opened by hand. A stick powered from the TV's USB port restarts every time the TV is switched on,
+     * so it can happen at any power on. The watch reads no windows, so it goes by the clock, as the TV
+     * home app does since issue #44
+     * (FireWatch.onServiceConnected): connected in the first minutes after a restart on a Fire TV with
+     * "Use as home screen" on, nothing but Amazon's home can be in front, so the home goes on top once.
+     * Any later Amazon home is seen as usual.
+     *
+     * Then the usage-events look for other TVs (Hisense), as before.
+     */
+    fun onWatchConnected() {
+        if (wanted && FireHomeWindow.justRestarted(android.os.SystemClock.elapsedRealtime())) {
+            Log.i(TAG, "watch connected just after a restart: putting the home in front")
+            jump()
+        }
+        checkFrontAtConnect()
     }
 
     fun onOtherHome(pkg: String?, cls: String?) {
@@ -289,7 +314,10 @@ object FireHome {
 
     private fun jump(force: Boolean = false) {
         if (!force && !wanted) return
-        val now = System.currentTimeMillis()
+        // Not the wall clock: Fire OS starts with a stale clock (20 to 90 minutes behind on a Stick 4K Max,
+        // 12 days in issue #44) and corrects it a few seconds after the jump at power on. A correction
+        // backwards would hold every later jump for as long as the clock went back.
+        val now = android.os.SystemClock.elapsedRealtime()
         if (now - lastJump < JUMP_GAP_MS) {
             // One jump per press, not one per event. A second press inside the gap brings Amazon's home
             // back with no later window event to react to, so look again once the gap is over.

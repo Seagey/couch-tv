@@ -2,6 +2,14 @@ package dev.couchtv.ontv
 
 /** Amazon hosts search and Settings in its launcher package as well as the actual home. */
 internal object FireHomeWindow {
+    /**
+     * How long after a restart (SystemClock.elapsedRealtime) a newly connected watch counts as connected
+     * at power on, when Amazon's home has already come up unseen. The TV home app uses the same two
+     * minutes (FireWatch, issue #44).
+     */
+    const val BOOT_WINDOW_MS = 2 * 60_000L
+    fun justRestarted(sinceBootMs: Long): Boolean = sinceBootMs in 0 until BOOT_WINDOW_MS
+
     fun isHome(pkg: String?, cls: String?, resolvedHomes: Set<String> = emptySet()): Boolean =
         pkg == "com.amazon.tv.launcher" && cls != null &&
             (cls == "com.amazon.tv.launcher.ui.HomeActivity_vNext" ||
