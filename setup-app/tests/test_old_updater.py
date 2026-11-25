@@ -117,7 +117,7 @@ class Sandbox:
 
     def __init__(self, test, system, compat=True):
         self.system = system
-        self.root = Path(tempfile.mkdtemp())
+        self.root = Path(tempfile.mkdtemp()).resolve()   # Windows gives a short name (RUNNER~1) that the updater resolves
         self.marks = self.root / "marks"
         self.marks.mkdir()
         self.apps = self.root / "apps"

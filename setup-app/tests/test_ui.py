@@ -319,6 +319,130 @@ class Page(unittest.TestCase):
         self.assertTrue(pg.is_hidden("#steps"))
         self.assertTrue(pg.is_hidden("#link-cta"))
 
+    def calls(self):
+        return list(self.h.log)
+
+    def not_linked_finish(self, harness):
+        """Installed with no account, on Finish, with the sign in panel open and a code typed: the question is up."""
+        pg = self.open(harness)
+        self.to_plan(pg)
+        self.install(pg)
+        pg.click("#link-cta")
+        pg.fill("#fl-code", "ABCD-EFGH")
+        pg.click("#fl-go")
+        pg.wait_for_selector("#link-ask:not([hidden])")
+        return pg
+
+    def test_yes_on_finish_links_that_tv_and_only_after_yes(self):
+        pg = self.not_linked_finish(uh.Harness(stub=uh.stub_account()))
+        self.assertNotIn("/api/link-tv", self.calls())
+        pg.click("#link-ask-yes")
+        pg.wait_for_selector("#studio-cta:not([hidden])", timeout=20000)
+        self.assertEqual(self.calls().count("/api/link-tv"), 1)
+        self.assertIn("already linked", pg.inner_text("#fin-cap"))
+
+    def test_the_five_second_look_seeing_the_question_first_does_not_lose_the_link(self):
+        from couchtv_setup import server
+        from unittest import mock
+        pg = self.open(uh.Harness(stub=uh.stub_account()))
+        self.to_plan(pg)
+        self.install(pg)
+        orig = server.api
+
+        def slow(method, path, body):
+            r = orig(method, path, body)
+            if path == "/api/handoff":
+                uh.real_sleep(7)                 # the answer is slow: the 5 s look shows the question before it
+            return r
+        with mock.patch.object(server, "api", slow):
+            pg.click("#link-cta")
+            pg.fill("#fl-code", "ABCD-EFGH")
+            pg.click("#fl-go")
+            pg.wait_for_selector("#link-ask:not([hidden])", timeout=6500)
+            pg.wait_for_selector("#fl-status:empty", state="attached", timeout=10000)
+        pg.click("#link-ask-yes")
+        pg.wait_for_selector("#studio-cta:not([hidden])", timeout=20000)
+
+    def test_a_question_left_open_never_links_the_next_tv(self):
+        pg = self.not_linked_finish(uh.Harness(stub=uh.stub_account()))
+        pg.click("#another-go")
+        pg.wait_for_selector("#found .tvc")
+        pg.locator("#found .tvc").nth(1).get_by_role("button", name="Set up this TV").click()
+        pg.wait_for_selector('section[data-step="plan"]:not([hidden])', timeout=20000)
+        pg.click("#link-ask-yes")                # signs Setup in, which is what it asks
+        pg.wait_for_selector("#acct-top:not([hidden])")
+        pg.wait_for_timeout(1500)
+        self.assertNotIn("/api/link-tv", self.calls())
+
+    def test_yes_after_back_signs_in_and_links_nothing(self):
+        pg = self.not_linked_finish(uh.Harness(stub=uh.stub_account()))
+        pg.click("#back")
+        self.assertEqual(step(pg), "plan")
+        pg.click("#link-ask-yes")
+        pg.wait_for_selector("#acct-top:not([hidden])")
+        pg.wait_for_timeout(1000)
+        self.assertNotIn("/api/link-tv", self.calls())
+
+    def test_tidy_never_shows_the_last_tvs_switches_and_never_gets_stuck(self):
+        from couchtv_setup import server, tidy
+        from unittest import mock
+        pg = self.open(uh.Harness())
+        self.to_plan(pg)
+        pg.click("#setup-go")
+        pg.wait_for_selector("#tidy-idle", state="attached", timeout=30000)
+        pg.click("#tidy-skip")
+        pg.wait_for_selector('section[data-step="done"]:not([hidden])')
+        with mock.patch.object(tidy, "state", side_effect=server.TvError("The TV did not answer.", "lost")):
+            pg.click("#tidy-go")
+            pg.wait_for_selector(".tidy-note:has-text('did not answer')")
+            self.assertEqual(pg.locator("#tidy-idle").count(), 0)
+            pg.click("#tidy-save")               # nothing was read, so nothing to change: on to Finish
+            pg.wait_for_selector('section[data-step="done"]:not([hidden])')
+
+    def test_tidy_shows_the_truth_after_save_and_continue_always_leaves(self):
+        from couchtv_setup import server
+        pg = self.open(uh.Harness())
+        self.to_plan(pg)
+        pg.click("#setup-go")
+        pg.wait_for_selector("#tidy-idle", state="attached", timeout=30000)
+        self.assertTrue(pg.is_hidden("#tidy-undo"))
+        server.S.tv.refuse_disable = {"com.google.android.apps.tv.dreamx"}
+        server.S.tv.refuse_secure = {"screensaver_enabled"}
+        pg.check("#tidy-idle", force=True)
+        pg.check("#tidy-anim", force=True)
+        pg.click("#tidy-save")
+        pg.wait_for_selector("#tidy-res-idle:not([hidden])", timeout=15000)
+        self.assertIn("refused", pg.inner_text("#tidy-res-idle"))
+        self.assertFalse(pg.is_checked("#tidy-idle"), "a refused switch is not shown as on")
+        self.assertTrue(pg.is_checked("#tidy-anim"))
+        self.assertTrue(pg.is_visible("#tidy-undo"))
+        pg.click("#tidy-save")
+        pg.wait_for_selector('section[data-step="done"]:not([hidden])')
+
+    def test_find_the_tv_after_a_lost_link_can_set_up_again(self):
+        from couchtv_setup import server
+        from unittest import mock
+        pg = self.open(uh.Harness(stub=uh.stub_account()))
+        self.to_plan(pg)
+        self.install(pg)
+        orig = server.api
+
+        def api(method, path, body):
+            if path == "/api/link-tv":
+                raise server.TvError("Gone.", "no_tv")
+            return orig(method, path, body)
+        with mock.patch.object(server, "api", api):
+            pg.click("#link-cta")
+            pg.fill("#fl-code", "ABCD-EFGH")
+            pg.click("#fl-go")
+            pg.click("#link-ask-yes")
+            pg.wait_for_selector("#link-fix:not([hidden])")
+        pg.click("#link-fix-go")
+        pg.wait_for_selector("#found .tvc")
+        self.to_plan_from_find(pg)
+        self.install(pg)                         # Finish must come up again
+        self.assertIn("already linked", pg.inner_text("#fin-cap"))
+
     # ---- the list ----
 
     def test_no_tvs_found(self):

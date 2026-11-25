@@ -69,7 +69,7 @@
     note.setAttribute("aria-live", "polite");
     sec.appendChild(note);
     var actions = el("div", "actions");
-    var save = el("button", "primary", "Save and finish");
+    var save = el("button", "primary", "Save");
     save.id = "tidy-save";
     var skip = el("button", null, "Skip");
     skip.id = "tidy-skip";
@@ -132,6 +132,7 @@
 
   function saveAll() {
     if (busy) return;
+    if (!state) return close();             // this TV was never read: nothing to change
     var want = {}, changed = false;
     state.switches.forEach(function (s) {
       var on = sec.querySelector("#tidy-" + s.id).checked;
@@ -142,11 +143,11 @@
     say("Making the changes and checking each one.");
     job("/api/tidy/apply", want).then(function (r) {
       state = r.state;
+      draw();                               // the switches show what the TV says, and Undo all appears
       showResults(r.results);
-      say("Done. The TV was asked and each change was read back.");
+      say("Done.");
       lock(false);
       sec.querySelector("#tidy-save").textContent = "Continue";
-      sec.querySelector("#tidy-save").onclick = close;
       sec.querySelector("#tidy-skip").hidden = true;
     }, function (e) { say(e.message); lock(false); });
   }
@@ -183,9 +184,11 @@
   function open(from) {
     if (!sec) build();
     back = from || "plan";
+    state = null;                           // never the last TV's switches
+    rows.textContent = "";
+    sec.querySelector("#tidy-speed").hidden = sec.querySelector("#tidy-undo").hidden = true;
     var save = sec.querySelector("#tidy-save");
-    save.textContent = "Save and finish";
-    save.onclick = null;
+    save.textContent = "Save";
     sec.querySelector("#tidy-skip").hidden = false;
     document.querySelectorAll("section").forEach(function (s) { s.hidden = s !== sec; });
     window.scrollTo(0, 0);

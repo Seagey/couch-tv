@@ -7,6 +7,7 @@ import re
 import sys
 import tempfile
 import unittest
+from unittest import mock
 from pathlib import Path
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -19,7 +20,10 @@ from couchtv_setup.privacylist import PRIVACY  # noqa: E402
 from couchtv_setup.tv import TvError  # noqa: E402
 from faketv import AMBIENT, GOOGLE_HOME, WIZARD, FakeTv  # noqa: E402
 
-steps.time.sleep = lambda s: None
+# Only while this file's tests run: this is the one time.sleep every module shares, and left patched it made the
+# other files' fakes answer at once (test_ui's "partial first look" failed in a full run and passed alone).
+_SLEEP = mock.patch.object(steps.time, "sleep", lambda s: None)
+setUpModule, tearDownModule = _SLEEP.start, _SLEEP.stop
 APK = "/x/couch-tv-home.apk"
 ANIM = list(tidy.SETTINGS)
 ROOT = Path(HERE).parents[1]
@@ -291,7 +295,8 @@ class Idle(unittest.TestCase):
         self.assertEqual(disables(tv2), [])
 
     def tcl_android_11(self, **kw):
-        """The owner's TCL: Android TV 11, no dreamx, Backdrop is the idle screen, com.android.dreams.basic disabled."""
+        """The owner's TCL: Android TV 11, no dreamx, Backdrop is the idle screen. (The basic screen saver off here
+        stands for an app somebody else switched off; nothing was off on the real TCL.)"""
         tv = FakeTv("android", disabled={"com.android.dreams.basic"}, **kw)
         tv.packages |= {tidy.steps.BACKDROP, "com.android.dreams.basic"}
         tv.secure = {"screensaver_enabled": "1", "screensaver_components": "com.google.android.backdrop/com.google.android.backdrop.DreamActivity"}
@@ -305,7 +310,11 @@ class Idle(unittest.TestCase):
         self.assertIn(tidy.steps.BACKDROP, tv.disabled)
         self.assertIn("com.android.dreams.basic", tv.disabled)              # not ours: never touched
         self.assertEqual(r["report"]["off"], [tidy.steps.BACKDROP])
-        self.assertIn("backdrop/com.google.android.backdrop.DreamActivity", r["words"])   # what the TV says it uses
+        # the real TCL (25 Nov 2026): pm disable-user is taken and listed, but the component setting still names Backdrop
+        # and the screen saver setting stays on. That is done, and the words are for a person (the names are in report).
+        self.assertIn("backdrop/com.google.android.backdrop.DreamActivity", r["report"]["components"])
+        self.assertNotIn("com.", r["words"])
+        self.assertTrue(next(x for x in tidy.state(tv)["switches"] if x["id"] == "idle")["on"])
         self.assertEqual([c.split()[-1] for c in disables(tv)], [tidy.steps.BACKDROP])
         self.assertEqual(tv.secure["screensaver_enabled"], "1")             # the setting is left alone when the app went off
         self.assertEqual(result(tv, idle=False)["idle"]["status"], "off")

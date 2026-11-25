@@ -257,7 +257,7 @@
       var note = document.createElement("p"); note.className = "small note";
       card.appendChild(note);
       if (t.status === "other") {
-        note.textContent = kind ? "Needs the helper." : "Couch TV goes on this TV another way. See the guide on GitHub.";
+        note.textContent = kind ? "" : "Couch TV goes on this TV another way. See the guide on GitHub.";
         if (kind) {
           var hb = document.createElement("button"); hb.type = "button"; hb.className = "btn ghost";
           hb.textContent = "Set up the helper";
@@ -659,7 +659,7 @@
   var MILES = [
     { id: "found", t: "Found your TV" },
     { id: "allowed", t: "Allowed on the TV" },
-    { id: "download", t: "Downloaded and checked" },
+    { id: "download", t: "Downloading and checking" },
     { id: "link", t: "Linking it to your account" },
     { id: "install", t: "Installing Couch TV" },
     { id: "home", t: "Making it your home screen" },
@@ -768,8 +768,8 @@
     $("remote-adb-google").hidden = state.facts.fire;
     $("remote-adb-fire").hidden = !state.facts.fire;
     text("debug-why", state.route === "tls" ?
-      "this switches Wireless debugging off. Skip it if you add the phone remote: that needs it on." :
-      "this switches debugging off. Skip it if you add the phone remote and want it to press keys.");
+      "Skip this if you use the phone remote. It needs Wireless debugging on." :
+      "Skip this if the phone remote should press keys.");
     renderFinish();
     show("done");
     if (tidyOn() && !state.kept) openTidy("done");   // the optional step between progress and Finish
@@ -952,6 +952,7 @@
 
   function resetTv() {
     flow += 1;
+    askThen = null;                  // a question still open signs Setup in; it never links the next TV by itself
     clearInterval(countdown); clearInterval(portTimer); clearInterval(linkTimer);
     clearTimeout(poll); poll = null;
     state.ip = null; state.kind = null; state.facts = null; state.route = null; state.weather = null; state.remote = false;
@@ -1005,7 +1006,7 @@
   $("debug-off").addEventListener("click", function () { text("debug-status", ""); show("debug"); });
   $("debug-go").addEventListener("click", function () {
     api("/api/debug-off").then(function () {
-      ["debug-off", "remote-go", "health-look"].forEach(function (id) { $(id).hidden = true; });
+      ["debug-off", "remote-go", "health-look", "tidy-go"].forEach(function (id) { $(id).hidden = true; });
       show("done");
       text("done-line", "Debugging is off. Couch TV keeps working."); $("done-line").hidden = false;
     }, fail);
@@ -1067,7 +1068,8 @@
   // "Link as X?": the code is not used, and nothing about the TV is sent, until Yes. The server keeps to that too.
   var askId = null, askThen = null;
   function ask(q, then) {
-    if (!q || q.id === askId) return;
+    if (!q) return;
+    if (q.id === askId) { if (then) askThen = then; return; }   // the 5 s look may have shown it first
     askId = q.id; askThen = then || null;
     var x = q.account.email + (q.account.name ? ", " + q.account.name : "");   // the name is only what its account says
     text("link-ask-who", "Link as " + x + "?");
@@ -1084,7 +1086,8 @@
     api("/api/link-yes", { id: id }).then(function (r) {
       askDone(); signedIn(r.account);
       $("fl-panel").hidden = true;
-      if (then) then();
+      // the question can outlive the screen that asked it: only Finish of that same TV goes on to link it
+      if (then && current === "done") then(); else if (current === "done") renderFinish();
     }, function (e) { askDone(); fail(e); }).then(function () { $("link-ask-yes").disabled = false; });
   });
   $("link-ask-no").addEventListener("click", function () {

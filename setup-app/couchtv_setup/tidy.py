@@ -331,8 +331,7 @@ def _on_idle(tv, rec):
     if not bad:
         rep = idle_report(tv)
         return {"status": "done", "report": rep,
-                "words": "The idle screen app is switched off (" + ", ".join(ok) + "). Checked on the TV. "
-                         "Its screen saver setting reads: " + rep["components"] + "."}
+                "words": "The idle screen app is switched off. Checked on the TV."}
     # The TV kept the app on. Try the screen saver setting itself, note it first, and read both back.
     cur = _get(tv, "secure.screensaver_enabled")
     took = False
@@ -348,12 +347,10 @@ def _on_idle(tv, rec):
     rep = idle_report(tv)
     if took or ok:
         return {"status": "partial", "report": rep,
-                "words": "The TV would not switch the idle screen app off (" + ", ".join(bad) + "). "
-                         + ("Its screen saver setting is off now, but a TV can ignore that. "
-                            if took else "") +
-                         "Its screen saver is set to " + rep["components"] + ". If adverts still show when it is idle, tell us."}
-    return {"status": "refused", "report": rep,
-            "words": "The TV refused this change. Nothing was changed. Its screen saver is set to " + rep["components"] + "."}
+                "words": "The TV would not switch the idle screen app off. "
+                         + ("Its screen saver setting is off now, but a TV can ignore that. " if took else "")
+                         + "If adverts still show, tell us."}
+    return {"status": "refused", "report": rep, "words": "The TV refused this change. Nothing was changed."}
 
 
 # ---- putting things back ----

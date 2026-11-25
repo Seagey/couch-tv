@@ -25,7 +25,10 @@ from couchtv_setup import finder, guide, health, linkin, mdns, release, steps, s
 from couchtv_setup.tv import TvError  # noqa: E402
 from faketv import FakeTv  # noqa: E402
 
-steps.time.sleep = lambda s: None
+# Only while this file's tests run: this is the one time.sleep every module shares, and left patched it made the
+# other files' fakes answer at once (test_ui's "partial first look" failed in a full run and passed alone).
+_SLEEP = mock.patch.object(steps.time, "sleep", lambda s: None)
+setUpModule, tearDownModule = _SLEEP.start, _SLEEP.stop
 
 REMOTE, CAST = finder.ANDROID_REMOTE.rstrip("."), finder.GOOGLECAST.rstrip(".")
 CONNECT, PAIRING, PLAIN = finder.ADB_CONNECT.rstrip("."), finder.ADB_PAIRING.rstrip("."), finder.ADB_PLAIN.rstrip(".")

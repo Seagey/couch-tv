@@ -5,6 +5,7 @@ import os
 import sys
 import tempfile
 import unittest
+from unittest import mock
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.dirname(HERE))
@@ -15,7 +16,10 @@ from couchtv_setup import steps  # noqa: E402
 from couchtv_setup.tv import TvError  # noqa: E402
 from faketv import AMBIENT, GOOGLE_HOME, WIZARD, FakeTv  # noqa: E402
 
-steps.time.sleep = lambda s: None
+# Only while this file's tests run: this is the one time.sleep every module shares, and left patched it made the
+# other files' fakes answer at once (test_ui's "partial first look" failed in a full run and passed alone).
+_SLEEP = mock.patch.object(steps.time, "sleep", lambda s: None)
+setUpModule, tearDownModule = _SLEEP.start, _SLEEP.stop
 APK = "/x/couch-tv-home.apk"
 
 
