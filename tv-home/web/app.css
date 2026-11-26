@@ -583,6 +583,8 @@ html.who-gentle.scene-fog .mood:not(.dark) .mood-hi { text-shadow: 0 0 0.5rem rg
 
 /* Keep watching: three glass cards */
 .theme-night .shelf { top: 40rem; left: var(--safe-x); right: var(--safe-x); }
+/* a Now playing card taller than the shows lifts the row clear of the dock (npLiftFit in app.js) */
+.theme-night .shelf { margin-top: calc(-1 * var(--np-lift, 0px)); }
 html.spotify-align-dock-center .theme-night .shelf,
 html.spotify-align-dock-center.theme-night .shelf {
   left: 50%;
