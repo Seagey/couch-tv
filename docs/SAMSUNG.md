@@ -44,7 +44,11 @@ What each TV prompt means, in order:
 3. **Restart**: hold power about 5 seconds until the TV goes off and on (on a Frame a short press
    is only Art Mode).
 4. **The Samsung account page** in the computer's browser: sign in, and agree or allow if Samsung
-   asks. It makes a certificate for this TV only.
+   asks. It makes a certificate for this TV only. Samsung can put pages in between: a code sent by
+   email, new terms (the optional boxes can stay empty, then Agree) or a reminder to change the
+   password (Skip for now). The sign-in is done only when the browser shows "Signed in. You can
+   close this tab" (`localhost:4794/signin/callback`). Stopping on one of those pages looks like a
+   finished sign-in, but the installer waits 5 minutes and then stops with "No sign-in arrived".
 5. **"Allow Couch TV bridge to connect?"** only appears later, if a bridge is set up (step 5 below).
 
 **"No TV was found" or "The TV is not ready yet".** The first reason is the TV being off or asleep: switch

@@ -63,8 +63,12 @@ In the setup window press Return (Windows: Enter). The setup then:
 - finds your TV and checks Developer mode. If something is not right, it says what to fix:
   fix it on the TV, then press Return (Windows: Enter) again.
 - opens a browser for your Samsung account sign-in. This is Samsung's own page: couch-tv and
-  the setup never see your password. It makes a certificate for your TV only. If Samsung asks
-  you to agree or to allow access, say yes, then come back to the setup window.
+  the setup never see your password. It makes a certificate for your TV only. Samsung may show
+  more pages before it is done: a code sent to your email (type it in), new terms (the boxes
+  marked optional can stay empty: press Agree), or a reminder to change your password (Skip
+  for now is fine). Keep going until the browser says "Signed in. You can close this tab",
+  then come back to the setup window. If the window says no sign-in arrived, it waited 5
+  minutes: run the setup again and finish those pages.
   Apps2Samsung keeps that signing certificate on this computer, so the next update is signed
   the same way. Keep this computer for updates, and do not share the certificate.
 - puts couch-tv on the TV and opens it. Press Allow on the TV if it asks. (If it is not on
