@@ -5024,13 +5024,27 @@
     renderGrid();
   }
 
+  // Your own picture for an input tile, from tv-home/tools/app-icons.sh like an app's: the TV home app on
+  // Android TV serves custom/icons/input.<name>.png through its icon route (CustomArt.kt), where <name> is
+  // the tile's name in lower case with anything but letters and digits as "_" ("PS5" is input.ps5). Only
+  // the Android TV home has that route; elsewhere, and when there is no such picture, the drawn icon stays.
+  function inputArtKey(name) {
+    var s = String(name || "").toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "").slice(0, 40);
+    return s ? "input." + s : "";
+  }
+  function inputArtUrl(it) {
+    var key = inputArtKey(it.name);
+    return key && TV && !TV.iconUrl ? "http://tvos.invalid/icon/" + key : null;
+  }
+
   // An input tile: its own picture (home.inputs[].image, a file in the app such as
   // backgrounds/mine/console.svg), else the drawn icon for its kind. A picture that fails falls
   // back to the drawn icon.
   function inputFace(it) {
     var drawn = ICONS[it.icon] || ICONS.hdmi || ICONS.input;
-    if (it.image) {
-      return '<div class="face input-img"><img src="' + esc(it.image) + '" alt="" decoding="async" data-err="svg" data-svg="' + esc(drawn) + '"></div>';
+    var src = it.image || inputArtUrl(it);
+    if (src) {
+      return '<div class="face input-img"><img src="' + esc(src) + '" alt="" decoding="async" data-err="svg" data-svg="' + esc(drawn) + '"></div>';
     }
     return '<div class="face tool input-ic ic-' + esc(it.icon || "hdmi") + '">' + drawn + "</div>";
   }

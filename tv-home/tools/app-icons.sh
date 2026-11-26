@@ -8,6 +8,8 @@
 #   <folder>/banners/<package>.png   16:9, about 640 x 360: the Classic grid and More apps
 # PNG, JPEG (.jpg) or WebP. An app with no picture keeps its own. survey-tv.py lists the package
 # names, for example com.netflix.ninja for Netflix.
+# An input tile (home.inputs) takes icons/input.<name>.png, its name in lower case with anything but
+# letters and digits as _: icons/input.ps5.png for "PS5".
 #
 # Usage, from the repo root:
 #   TV_IP=<tv address> [ADB_PORT=5555] sh tv-home/tools/app-icons.sh <folder>    copy them (adds or replaces)
