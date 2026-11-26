@@ -3004,6 +3004,28 @@
   var npFitKey = "";
   function npFit(k) { if (LOOP && k !== npFitKey) { npFitKey = k; fitDate(); } }
 
+  // Night: the row sits at a fixed top, so a Now playing card taller than the shows (Spotify's
+  // extra row of shuffle, repeat, sleep, output and open) grew down behind the dock. Lift the row by
+  // what the card overflows, keeping the gap a plain card leaves above the dock (2.375rem). The mini
+  // card and the Spotify row layout place the card themselves and are left alone.
+  var npLift = 0;
+  function npLiftFit() {
+    var sec = $("shelf-section"), np = $("np"), grid = $("grid"), root = document.documentElement;
+    if (!sec) return;
+    var lift = 0;
+    if (NIGHT && !LOOP && np && grid && np.classList.contains("on") && !root.classList.contains("np-mini-mode") &&
+        !root.classList.contains("spotify-row")) {
+      if (root.classList.contains("expanded")) return;   // the dock is open as a grid: measure it again later
+      var rem = parseFloat(getComputedStyle(root).fontSize) || 16;
+      var bottom = np.getBoundingClientRect().bottom + (npLift || 0);   // where the card would end unlifted
+      lift = Math.max(0, Math.ceil(bottom - (grid.getBoundingClientRect().top - 2.375 * rem))) || 0;
+    }
+    if (lift === npLift) return;
+    npLift = lift;
+    if (lift) sec.style.setProperty("--np-lift", lift + "px");
+    else sec.style.removeProperty("--np-lift");
+  }
+
   function renderNp() {
     var el = $("np"), on = npVisible();
     el.classList.toggle("on", on);
@@ -3054,6 +3076,7 @@
       currentNpBtns = [];
       npSub = "btns";
       npFit("");
+      npLiftFit();
       return;
     }
 
@@ -3243,6 +3266,7 @@
     updateTitleMarquee();
     startProgressTimer();
     npFit([music.title, music.artist || music.album || "", btns.length].join("\n"));
+    npLiftFit();
   }
 
   function updateTitleMarquee() {
@@ -5172,6 +5196,7 @@
   function renderGrid() {
     document.documentElement.classList.toggle("expanded", expanded);
     document.documentElement.classList.toggle("lifting", !!lift);
+    if (!expanded) npLiftFit();
     gridItems = gridList();
     // before anyone has pressed a key, a design's dock starts on its first app (or More apps), not Settings
     if (!touched && !expanded && zone === "grid" && g === 0 && typeof CouchDesign !== "undefined" && CouchDesign.on() && CouchDesign.startIndex) g = CouchDesign.startIndex(gridItems);
