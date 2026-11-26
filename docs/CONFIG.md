@@ -804,7 +804,7 @@ The Spotify rows in Home settings show only where the card works: the Couch TV h
 | `title_mode` ["pingpong"] | Display mode for long song titles: `"dots"` (standard `...` truncation), `"pingpong"` (ping-pong marquee sliding), or `"continuous"` (continuous scrolling marquee). |
 | `show_app` [true] | `true` displays the "SPOTIFY" label above the song title; `false` hides it and proportionally centers and sizes the playback controls and track details. |
 | `align` ["classic"] | Shelf layout alignment for the Spotify card and Keep watching items: `"classic"` aligns left starting from the screen safe margin; `"center"` centers inline with the dock/app bar. |
-| `card_style` ["compact"] | Layout style for the Now Playing card: `"compact"` (wide horizontal bar) or `"mini"` (square artwork-first mini-player). |
+| `card_style` ["compact"] | Layout style for the Now Playing card: `"compact"` (wide horizontal bar) or `"mini"` (square artwork-first mini-player). In the Night look, the mini player can overlap a full dock (for example 10 apps); use `"compact"` there. |
 | `separate_row` [true] | `true` labels and presents the Now Playing card in its own dedicated "Now playing" environment rather than under "Keep watching". |
 | `adaptive_tint` [true] | `true` extracts the dominant color from album art to subtly tint the frosted-glass card and progress glow. |
 | `waveform` [true] | `true` renders a subtle animated equalizer / ambient waveform while playing. |
