@@ -272,6 +272,9 @@ def _signed_in(link, ans):
                       "studio_bad")
     link.token = tok
     link.account = clean_account(ans.get("account"))
+    # trusted: the Yes was said on this network (one tap) or the sign in came from the website button's own link. Only then
+    # does the account send people, photos and town at set up; a typed sign in gets the design alone.
+    link.account["trusted"] = isinstance(ans, dict) and ans.get("trusted") is True
     return link.account
 
 
