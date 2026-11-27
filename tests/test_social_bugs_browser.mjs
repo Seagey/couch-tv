@@ -314,7 +314,7 @@ try {
     current = "g31";
     const page = await fresh();
     await open(page, "&look=night");
-    await openSection(page, /^Quick/);
+    await openSection(page, /^Remote/);
     const checked = () => page.evaluate(() => [...document.querySelectorAll("#set-rows > .srow")].filter((r) => r.classList.contains("on") || r.getAttribute("aria-checked") === "true" || /✓/.test(r.textContent)).map((r) => r.textContent.trim().slice(0, 30)));
     ok(await toRow(page, /^Look switch|^Look/), "the Look button row");
     await keys(page).press("Enter", 250);

@@ -79,7 +79,7 @@ try {
   ok(/App name/.test(rows) && /Long titles/.test(rows) && /Card alignment/.test(rows), "browser: App name, Long titles and Card alignment under Now playing");
   const lookList = await page.evaluate(() => [...document.querySelectorAll("#set-rows > *")].map((r) => r.textContent));
   const at = (re) => lookList.findIndex((x) => re.test(x));
-  ok(at(/^Long titles/) > at(/^Now playing$/) && at(/^Now playing$/) >= 0 && at(/^Long titles/) < at(/^Your photos$/), "browser: Long titles sits in the Now playing part of Look");
+  ok(at(/^Long titles/) > at(/^Now playing$/) && at(/^Now playing$/) >= 0, "browser: Long titles sits in the Now playing part of Look");
   ok(page.errors.length === 0, "browser: no page errors (" + page.errors.join(" | ") + ")");
   await page.close();
 

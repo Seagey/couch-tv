@@ -6376,8 +6376,9 @@
   }
   // Set up from your phone: the scan card is on the right (phoneQr); a linked TV also asks for its new design here.
   function setupPhoneRows() {
-    var rows = [info("phone-note", t("set_phone2_head"), "", t("set_phone2_sub"))];
+    var rows = [];
     if (inboxCan()) rows.push(inboxRow("top-inbox-now"));
+    rows.push(info("phone-note", t("set_phone2_head"), "", t("set_phone2_sub")));
     return rows;
   }
   // This TV: its name from the account when it has one, the version, and how it is running.

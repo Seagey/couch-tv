@@ -100,7 +100,7 @@ async function about(kind) {
   await page.evaluate(() => { const p = document.getElementById("gear-pop"); if (p && p.classList.contains("ask")) window.MOCK_UPDATER.auto(true); });
   await page.keyboard.press("Escape"); await page.waitForTimeout(300);
   await page.evaluate(() => window.tv.settingsKey()); await page.waitForTimeout(300); await page.keyboard.press("Enter"); await page.waitForTimeout(400);
-  for (let i = 0; i < 25 && !(await page.evaluate(() => /^About/.test(((document.querySelector(".ssec.focus") || {}).textContent || "").trim()))); i++) { await page.keyboard.press("ArrowDown"); await page.waitForTimeout(120); }
+  for (let i = 0; i < 25 && !(await page.evaluate(() => /^Help and reset/.test(((document.querySelector(".ssec.focus") || {}).textContent || "").trim()))); i++) { await page.keyboard.press("ArrowDown"); await page.waitForTimeout(120); }
   await page.keyboard.press("ArrowRight"); await page.waitForTimeout(300);
   return page;
 }

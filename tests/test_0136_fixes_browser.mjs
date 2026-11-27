@@ -192,7 +192,7 @@ for (const id of ["welcome", "bento"]) {
 // 3 and 4. About on the on-TV app: the truth about the computer, and Update couch-tv
 async function about(page) {
   await page.evaluate(() => window.tv.settingsKey()); await page.waitForTimeout(300); await page.keyboard.press("Enter"); await page.waitForTimeout(400);
-  for (let i = 0; i < 20 && !(await page.evaluate(() => /About/.test((document.querySelector(".ssec.focus") || {}).textContent || ""))); i++) { await page.keyboard.press("ArrowDown"); await page.waitForTimeout(120); }
+  for (let i = 0; i < 20 && !(await page.evaluate(() => /Help and reset/.test((document.querySelector(".ssec.focus") || {}).textContent || ""))); i++) { await page.keyboard.press("ArrowDown"); await page.waitForTimeout(120); }
   return page.evaluate(() => document.getElementById("set-rows").textContent);
 }
 {
