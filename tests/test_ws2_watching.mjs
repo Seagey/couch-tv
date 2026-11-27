@@ -242,12 +242,7 @@ const WATCH = { who: "sam", shows: MINE, apps: INSTALLED, bridge: true,
   const steps = await page.evaluate(() => window.CouchWidgetCaps.steps("nowplaying", "android").join(" "));
   ok(/Couch TV Setup/.test(steps) && /Turn on Now playing/.test(steps), "nowplaying's steps name Couch TV Setup, Live from this TV: " + steps);
 }
-// queue: the Spotify queue widget was dropped (28 Nov 2026); a design that still has one draws Now playing in its place
-{
-  const g = await page.evaluate(() => window.CouchDesign && CouchDesign.check ? CouchDesign.check({ v: 1, objects: [{ id: "q", type: "widget", kind: "queue", x: 0, y: 0, w: 400, h: 400, opts: { count: 3, label: "Next" } }] }) : null);
-  const go = g && g.clean && g.clean.objects;
-  ok(go && go[0] && go[0].kind === "nowplaying" && !(go[0].opts && go[0].opts.count), "an old queue widget becomes Now playing, its own settings dropped: " + JSON.stringify(go));
-}
+// queue: dropped 28 Nov 2026; an old one becomes Now playing (checked in test_design_widgets.js)
 // the app widgets: their apps (the design's, then Hold OK's edits on this TV) and their own settings
 {
   const g = { id: "g", kind: "games", w: 1200, h: 460, opts: { apps: ["netflix"] } };

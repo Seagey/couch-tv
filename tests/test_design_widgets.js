@@ -27,6 +27,13 @@ const ok = (c, m) => { assert.ok(c, m); n++; };
 
 console.log("Running design widget tests...");
 
+// the Spotify queue widget was dropped (28 Nov 2026): an old design's one is Now playing, its own settings dropped
+{
+  const q = san({ id: "q", type: "widget", kind: "queue", x: 0, y: 0, w: 400, h: 400, opts: { count: 3, label: "Next" } });
+  ok(q.length === 1 && q[0].kind === "nowplaying" && !(q[0].opts && (q[0].opts.count || q[0].opts.label)), "an old queue widget becomes Now playing: " + JSON.stringify(q));
+  ok(CD.wkinds().indexOf("queue") < 0, "queue is not offered as a kind");
+}
+
 // 1. every kind sanitises, at a set size, with its own box
 CD.wkinds().filter((k) => k !== "stack").forEach((kind) => {
   const out = san({ id: "w1", type: "widget", kind, size: "small", x: 80, y: 60, w: 360, h: 360 });
