@@ -28,11 +28,12 @@ console.log("Running sharp icon tests...");
 const sizes = { "1080p": [1920, 1], "4K at ratio 2": [1920, 2], "4K full page": [3840, 1] };
 Object.keys(sizes).forEach((k) => {
   const W = tv(sizes[k][0], sizes[k][1]);
-  const big = pictures(W, 200), small = pictures(W, 90);
+  // the icon sits inside the panel's 24 px padding a side (lane G, the ABC iview fix), so a 110 tile draws a 62 icon
+  const big = pictures(W, 200), small = pictures(W, 110);
   ok(big.length === 1, k + ": a 200 wide tile has a picture (" + big + ")");
-  ok(small.length === 1, k + ": a 90 wide tile has a picture (" + small + ")");
-  if (k === "1080p") ok(/netflix-512\.png$/.test(big[0]) && /netflix\.png$/.test(small[0]), "1080p: the 200 tile gets the 512, the 90 tile the 160");
-  else ok(/netflix-512\.png$/.test(big[0]) && /netflix-512\.png$/.test(small[0]), k + ": both tiles get the 512 (90 wide becomes 180 real pixels)");
+  ok(small.length === 1, k + ": a 110 wide tile has a picture (" + small + ")");
+  if (k === "1080p") ok(/netflix-512\.png$/.test(big[0]) && /netflix\.png$/.test(small[0]), "1080p: the 200 tile gets the 512, the 110 tile the 160");
+  else ok(/netflix-512\.png$/.test(big[0]) && /netflix-512\.png$/.test(small[0]), k + ": both tiles get the 512 (a 62 icon becomes 124 real pixels)");
 });
 // the small screen of a phone preview never pays for the big file on a small tile
 const W = tv(960, 1);

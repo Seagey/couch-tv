@@ -562,16 +562,15 @@ struct Design: Equatable {
 
 enum DesignWidgets {
     /// Every kind couch-tv Studio has (design.js WKINDS). Anything else is dropped by the gate.
-    static let kinds = ["clock", "tallclock", "glassclock", "analog", "flipclock", "wordclock", "solar", "worldclock", "countdown", "date", "month", "timer",
-                        "weather", "bigtemp", "hourly", "week", "rain", "uv", "sun", "moon", "air", "surf",
-                        "photo", "slideshow", "mosaic", "artframe", "memory",
-                        "keep", "keeprow", "upnext", "picks",
-                        "app", "folder", "dock", "appgrid", "games",
-                        "nowplaying", "soundscape", "speakers",
-                        "aircon", "scenes", "controls", "camera", "doorbell", "energy", "sensor", "battery",
-                        "bins", "people", "agenda", "note", "list",
-                        "card", "quote", "word", "news", "sports", "stocks", "commute",
-                        "welcome", "quick", "wifi", "guide", "screentime", "ask", "agent", "stack"]
+    static let kinds = [
+                        "clock", "tallclock", "glassclock", "analog", "flipclock", "wordclock", "solar", "worldclock", "countdown", "date",
+                        "month", "timer", "weather", "bigtemp", "hourly", "week", "rain", "uv", "sun", "moon",
+                        "air", "surf", "photo", "slideshow", "mosaic", "artframe", "memory", "keep", "keeprow", "upnext",
+                        "picks", "app", "folder", "dock", "appgrid", "games", "nowplaying", "soundscape", "speakers", "aircon",
+                        "scenes", "controls", "camera", "doorbell", "energy", "sensor", "battery", "pool", "bins", "people",
+                        "agenda", "note", "list", "card", "quote", "word", "news", "sports", "stocks", "commute",
+                        "welcome", "quick", "wifi", "guide", "screentime", "ask", "agent", "stack", "tvsettings"
+    ]
 
     /// The options each kind takes (design.js WOPT).
     static let options: [String: String] = [

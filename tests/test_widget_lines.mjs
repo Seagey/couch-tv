@@ -40,7 +40,12 @@ const KEEP = {
   "Ask AI": "the feature's own name, kept in every language as i18n.js keeps it (the Play build's Ask AI layer, widget-detail.js)",
   "H:": "the day's high and low as H: and L:, written the way weather apps write them",
   "Whole House": "an AirPlay group's own name (bridge/airplay.py, config.json airplay.name) in Couch TV Studio's demo",
-  "Salt 4200 ppm": "a chlorinator reading in Couch TV Studio's demo"
+  "Salt 4200 ppm": "a chlorinator reading in Couch TV Studio's demo",
+  "Roboto Condensed": "a font family name in a CSS font stack (Phase 3 looks, P3c), never words",
+  "Noto Serif": "a font family name in a CSS font stack (Phase 3 looks, P3c), never words",
+  "Times New Roman": "a font family name in a CSS font stack (Phase 3 looks, P3c), never words",
+  "Roboto Mono": "a font family name in a CSS font stack (Phase 3 looks, P3c), never words",
+  "Droid Sans Mono": "a font family name in a CSS font stack (Phase 3 looks, P3c), never words"
 };
 // a literal that only starts a line made with tl() or the table (a fragment of one of its lines)
 const pieceOf = (s) => keys.some((k) => k.startsWith(s) || k.includes(" " + s.trim()) && s.trim().length > 3);

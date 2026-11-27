@@ -548,6 +548,11 @@
      "key": "cols",
      "label": "Apps across",
      "type": "choice"
+    },
+    {
+     "key": "names",
+     "label": "Names under icons",
+     "type": "toggle"
     }
    ]
   },
@@ -727,6 +732,46 @@
     {
      "key": "reading",
      "label": "Sensor",
+     "type": "device"
+    },
+    {
+     "key": "label",
+     "label": "Heading",
+     "type": "text"
+    }
+   ]
+  },
+  "pool": {
+   "name": "Pool",
+   "settings": [
+    {
+     "key": "via",
+     "label": "Your pool",
+     "type": "choice"
+    },
+    {
+     "key": "water",
+     "label": "Water temperature",
+     "type": "device"
+    },
+    {
+     "key": "pump",
+     "label": "Pump",
+     "type": "device"
+    },
+    {
+     "key": "heater",
+     "label": "Heater",
+     "type": "device"
+    },
+    {
+     "key": "light",
+     "label": "Lights",
+     "type": "device"
+    },
+    {
+     "key": "chlor",
+     "label": "Chlorinator",
      "type": "device"
     },
     {
@@ -1003,6 +1048,16 @@
      "key": "times",
      "label": "Check in and out times",
      "type": "toggle"
+    }
+   ]
+  },
+  "tvsettings": {
+   "name": "TV settings",
+   "settings": [
+    {
+     "key": "words",
+     "label": "Words",
+     "type": "choice"
     }
    ]
   },

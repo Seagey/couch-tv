@@ -111,7 +111,9 @@
       var cd = C.card ? C.card(kind, false) : { line: "", sub: "" };
       var plat = window.COUCH_STANDALONE ? "vidaa" : window.COUCH_WEBOS || window.COUCH_TIZEN ? "web" : window.TVOS ? "android" : "web";
       var st = C.steps ? C.steps(kind, plat) : [];
-      if (!st.length) {
+      // "Not possible on this TV: only ... share it" is the editor's and the phone's line, not a step: the TV itself names no other
+      // kind of TV (tests/test_widget_setup_tv_browser.mjs), so it shows its one line as before
+      if (!st.length || /^Not possible on this TV/.test(String(st[0]))) {
         S.body.appendChild(E("div", "cwd-col cwd-grow cwd-center", "", [E("div", "cwd-mid", "text-align:center;max-width:1300px", [cd.line]),
           cd.sub ? E("div", "cwd-small", "margin-top:16px;text-align:center;max-width:1300px", [cd.sub]) : null]));
         return;

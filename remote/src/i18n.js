@@ -26,7 +26,7 @@ S.en = {
   ds_askLater: "Not now",
   ds_askSend: "Send",
   ds_ask: "Send this design to the TV?",
-  ds_cannot: "This TV can't take a design from the phone: type the code on the TV, in Home settings, Designs, Get a design.",
+  ds_cannot: "This TV can't take a design from the phone: type the code on the TV, in Settings, More, Designs, Get a design.",
   ds_failed: "The TV did not take it. Check this phone is on the home Wi-Fi and try again.",
   ds_notListening: "Sent. Open the Couch TV home on the TV in the next 10 minutes.",
   ds_sent: "Sent. On the TV, pick Use this design, then press OK.",

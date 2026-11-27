@@ -504,7 +504,7 @@ enum DesignNotHere {
         "note": "Family note", "list": "List", "card": "Custom card", "quote": "Quote", "word": "Word of the day",
         "news": "Headlines", "sports": "Scores", "stocks": "Markets", "commute": "Commute", "welcome": "Welcome words",
         "quick": "Quick buttons", "wifi": "Guest Wi-Fi", "guide": "House guide", "screentime": "Screen time", "ask": "Ask AI",
-        "agent": "From your AI", "stack": "Smart stack"
+        "agent": "From your AI", "stack": "Smart stack", "pool": "Pool", "tvsettings": "TV settings"
     ]
     static let line = "Shows on Google TV, Android TV and Fire TV"
     static func name(_ kind: String) -> String { names[kind] ?? "This widget" }

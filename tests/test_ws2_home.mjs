@@ -179,7 +179,10 @@ ok((await draw({ id: "p1", kind: "mosaic", opts: { count: "auto" } }, phData, nu
   ok(noBooks.empty && /Add your bookings calendar/.test(noBooks.text), "agenda.calendars: bookings picked with none set: it says what to add: " + noBooks.text);
   await cycle("agenda.days week", { id: "a1", kind: "agenda" }, agData, { days: "week" }, (d, s) => {
     ok(!/Dentist/.test(d.text) && /Today/.test(d.text), "agenda: today and tomorrow by default, nothing three days on: " + d.text);
-    ok(/Dentist/.test(s.text) && /This week/.test(s.text) && /(Sun|Mon|Tue|Wed|Thu|Fri|Sat) 10/.test(s.text), "agenda.days: This week, with each day named: " + s.text);
+    // P3a (any size): the agenda is drawn at its own 560 x 360 layout and scaled up, so a few rows show, then "and N more";
+    // the week is told by its heading and its count, which now takes in Dentist three days on
+    const cnt = (x) => +((/· (\d+) events?/.exec(x.text) || [])[1] || 0);
+    ok(/This week/.test(s.text) && cnt(s) > cnt(d) && (/Dentist/.test(s.text) || /and \d+ more/.test(s.text)), "agenda.days: This week, counting the whole week: " + d.text + " / " + s.text);
   });
   const tmw = { home: { cal: { set: true, events: main.slice(1) }, books: { set: false } } };
   await cycle("agenda.days today", { id: "a1", kind: "agenda" }, tmw, { days: "today" }, (d, s) => {

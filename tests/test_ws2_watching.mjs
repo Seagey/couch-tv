@@ -256,6 +256,8 @@ const WATCH = { who: "sam", shows: MINE, apps: INSTALLED, bridge: true,
   a = await draw(fo, WATCH); b = await draw(fo, WATCH, { cols: 1 }); c = await draw(fo, WATCH, { label: "Shows" });
   ok(/Kids/.test(a.text) && /Shows/.test(c.text) && !/Kids/.test(c.text), "folder, Folder name"); tested("folder", "label");
   ok(b.appRows >= 4 && a.appRows < b.appRows, "folder, Apps across 1: one app in each row: " + a.appRows + " then " + b.appRows); tested("folder", "cols");
+  // Phase 3 looks (P3c): a folder can show the names under its icons (off by default)
+  { const n = await draw(fo, WATCH, { names: true }); ok(n.text.length > a.text.length, "folder, Names under the icons on (off by default in a folder): " + a.text.slice(0, 60) + " / " + n.text.slice(0, 80)); tested("folder", "names"); }
   const fe = await draw(fo, WATCH, null, { edits: { "fo|folder": ["iview"] } });
   ok(fe.apps.join() === "au.net.abc.iview", "folder, apps: Hold OK's changes"); tested("folder", "apps");
   // a folder tile shows four small apps; its name, set on this TV, shows when it is opened (OK)
@@ -317,7 +319,7 @@ await page.close();
 // ================= B. the real home: shown only while on the design =================
 const KINDS = ["keep", "keeprow", "upnext", "picks", "nowplaying", "soundscape", "games", "app", "appgrid", "dock", "folder", "quick", "stack"];
 const KEYS = { keep: ["person"], keeprow: ["label", "shows", "person"], upnext: ["sport", "apps"], picks: ["label", "mix"], nowplaying: ["buttons", "cover"],
-  soundscape: ["sound", "volume"], games: ["apps", "label"], app: ["apps"], appgrid: ["apps", "cols", "names"], dock: ["apps", "more"], folder: ["label", "apps", "cols"], quick: ["quick"], stack: ["turn"] };
+  soundscape: ["sound", "volume"], games: ["apps", "label"], app: ["apps"], appgrid: ["apps", "cols", "names"], dock: ["apps", "more"], folder: ["label", "apps", "cols", "names"], quick: ["quick"], stack: ["turn"] };
 const NAMES = { keep: "Keep watching", keeprow: "Keep watching row", upnext: "Up next", picks: "Picks for you", nowplaying: "Now playing", soundscape: "Soundscape",
   games: "Games", app: "One app", appgrid: "App grid", dock: "Dock", folder: "App folder", quick: "Quick buttons", stack: "Smart stack" };
 const POS = { keep: [40, 40, 360, 360], keeprow: [420, 40, 760, 300], upnext: [1220, 40, 660, 360], picks: [40, 440, 760, 300], nowplaying: [840, 440, 520, 300],

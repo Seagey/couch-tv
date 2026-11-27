@@ -76,7 +76,7 @@ export const WORDS = {
   sent: 'Sent. On the TV, pick Use this design, then press OK.',
   notListening: 'Sent. Open the Couch TV home on the TV in the next 10 minutes.',
   failed: 'The TV did not take it. Check this phone is on the home Wi-Fi and try again.',
-  cannot: 'This TV can\'t take a design from the phone: type the code on the TV, in Home settings, Designs, Get a design.',
+  cannot: 'This TV can\'t take a design from the phone: type the code on the TV, in Settings, More, Designs, Get a design.',
   ask: 'Send this design to the TV?',
   askSend: 'Send',
   askLater: 'Not now',

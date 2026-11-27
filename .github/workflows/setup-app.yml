@@ -86,7 +86,7 @@ jobs:
             HELPER="$HELPER --copy-metadata mcp"
             # the standard library modules only the bridge uses (imaplib broke the first build): PyInstaller cannot see
             # into bridge/ because it is added as data. Made from the bridge's own imports (see setup-app/BUILD.md).
-            for m in imaplib asyncio atexit collections collections.abc contextlib contextvars email itertools logging math signal stat uuid colorsys csv zoneinfo html mimetypes unicodedata hmac email.policy email.utils xml.etree.ElementTree xml.sax.saxutils importlib.util; do HELPER="$HELPER --hidden-import $m"; done
+            for m in __future__ imaplib asyncio atexit collections collections.abc contextlib contextvars email itertools logging math signal stat uuid colorsys csv zoneinfo html mimetypes unicodedata hmac email.policy email.utils xml.etree.ElementTree xml.sax.saxutils importlib.util; do HELPER="$HELPER --hidden-import $m"; done
             [ "$RUNNER_OS" = "Windows" ] && HELPER="$HELPER --collect-data tzdata"
             for m in aiohttp androidtvremote2 zeroconf airtouch5py; do HELPER="$HELPER --copy-metadata $m"; done
             if [ "$RUNNER_OS" = "macOS" ]; then HELPER="$HELPER --hidden-import rumps"; else HELPER="$HELPER --hidden-import pystray"; fi

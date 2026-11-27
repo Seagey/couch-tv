@@ -4,6 +4,7 @@ private address is never kept or logged."""
 import asyncio
 import os
 import pathlib
+import re
 import socket
 import sys
 import unittest
@@ -125,7 +126,9 @@ class ServerTests(unittest.TestCase):
     def test_the_route_and_nothing_kept(self):
         src = pathlib.Path(__file__).resolve().parent.parent.joinpath("bridge", "server.py").read_text(encoding="utf-8")
         self.assertIn('r.add_post("/api/calendar", h_calendar)', src)
-        h = src[src.index("async def h_calendar"):src.index("async def h_sleep_get")]
+        # the handler itself, up to the next top level line (other handlers sit after it, lane C AirPlay logs its own errors)
+        start = src.index("async def h_calendar")
+        h = src[start:start + 1 + re.search(r"\n(?=\S)", src[start + 1:]).end()]
         for never in ["record_action", "log.", "store.", "_write", "print("]:
             self.assertNotIn(never, h, "the calendar address is never kept or logged (" + never + ")")
         a = pathlib.Path(__file__).resolve().parent.parent.joinpath("bridge", "agenda.py").read_text(encoding="utf-8")
