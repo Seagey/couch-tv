@@ -108,6 +108,41 @@ async def _look_up(session, name):
     return body if r.status == 200 and body.startswith(b"\x89PNG") else None
 
 
+INSET = 0.07   # past the corner of a rounded square with a radius up to about a quarter of its side
+
+
+def full_bleed(png):
+    """The icon filling its square. Some App Store pictures are a rounded square on a plain ground
+    (SonyLIV: white corners and a thin rim), which showed as a picture inside the tile's own rounded
+    corners. Such a picture (four corners of one colour, the middle of each side another) is trimmed
+    to its rounded square and in past the corners. One that fills its square, or a logo on a plain
+    ground that reaches no side (Apple Music), is left as it is."""
+    try:
+        import io
+        from PIL import Image, ImageChops
+        im = Image.open(io.BytesIO(png)).convert("RGB")
+        w, h = im.size
+        corners = [im.getpixel(p) for p in ((0, 0), (w - 1, 0), (0, h - 1), (w - 1, h - 1))]
+        ground = corners[0]
+        if any(max(abs(a - b) for a, b in zip(c, ground)) > 16 for c in corners):
+            return png
+        sides = [im.getpixel(p) for p in ((w // 2, 1), (w // 2, h - 2), (1, h // 2), (w - 2, h // 2))]
+        if not all(max(abs(a - b) for a, b in zip(c, ground)) > 40 for c in sides):
+            return png
+        diff = ImageChops.difference(im, Image.new("RGB", im.size, ground)).convert("L").point(lambda v: 255 if v > 24 else 0)
+        box = diff.getbbox()
+        if not box:
+            return png
+        left, top, right, bottom = box
+        dx, dy = round((right - left) * INSET), round((bottom - top) * INSET)
+        im = im.crop((left + dx, top + dy, right - dx, bottom - dy)).resize((w, h), Image.LANCZOS)
+        out = io.BytesIO()
+        im.save(out, "PNG")
+        return out.getvalue()
+    except Exception:
+        return png
+
+
 async def icon(name):
     """The app's icon (PNG bytes), or None when there is none to be had."""
     name = str(name or "").strip()
@@ -136,6 +171,7 @@ async def icon(name):
         if not body:
             _miss(name)
             return None
+        body = full_bleed(body)
         tmp = path + ".tmp"
         with open(tmp, "wb") as f:
             f.write(body)
