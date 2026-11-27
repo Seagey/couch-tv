@@ -56,6 +56,7 @@ import bookings
 import direct
 import matter
 import airplay
+import pool
 import say
 import phonepage
 
@@ -3666,6 +3667,24 @@ async def h_airplay_volume(request):
     return ok(result={"ok": True}, airplay=AIRPLAY.state())
 
 
+# ---------- AstralPool Connect 10 for the web TVs this computer runs (bridge/pool.py, lane C) ----------
+# The approval code is in .env (CONNECTMYPOOL_CODE), never in config.json and never sent to a TV: the TV gets the readings only.
+POOL = pool.Pool(config.CONFIG.get("pool"), os.environ.get("CONNECTMYPOOL_CODE"))
+
+
+@tv_or_paired
+async def h_pool(request):
+    data = await body(request)
+    if not POOL.enabled:
+        return ok(pool={"ok": False, "error": "computer_key"})
+    try:
+        if data.get("action") is not None:
+            await POOL.act(data.get("action"))
+        return ok(pool=await POOL.status())
+    except pool.PoolError as e:
+        return ok(pool={"ok": False, "error": e.code})
+
+
 @tv_or_paired
 async def h_matter_devices(request):
     return ok(**MATTER.answer())
@@ -6082,6 +6101,7 @@ def make_app():
     r.add_post("/api/airplay/play", h_airplay_play)
     r.add_post("/api/airplay/stop", h_airplay_stop)
     r.add_post("/api/airplay/volume", h_airplay_volume)
+    r.add_post("/api/pool", h_pool)
     r.add_get("/api/settings", h_settings_get)
     r.add_post("/api/settings", h_settings_set)
     # the phone's Home settings page (phonepage.py) and the TV home's side of it

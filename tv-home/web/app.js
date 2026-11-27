@@ -3569,7 +3569,15 @@
   var POOL, poolAt = 0, poolBusy = false;
   function refreshPool(force) {
     if (document.hidden || !document.querySelector(".cd-layer [data-pool=c10]")) return;
-    if (!(TV && typeof TV.accountPool === "function")) { if (!POOL) { POOL = { ok: false, error: "no_tv" }; poolChanged(); } return; }
+    if (!(TV && typeof TV.accountPool === "function")) {
+      // a TV whose home the computer runs (Samsung, LG, VIDAA and the rest): the computer asks ConnectMyPool (bridge/pool.py)
+      if (OFFLINE) { if (!POOL) { POOL = { ok: false, error: "no_tv" }; poolChanged(); } return; }
+      if (poolBusy && !force) return;
+      poolAt = Date.now(); poolBusy = true;
+      api("POST", "/api/pool", {}, 20000).then(function (j) { poolBusy = false; POOL = j && j.pool && typeof j.pool === "object" ? j.pool : { ok: false, error: "error" }; poolChanged(); },
+        function () { poolBusy = false; if (!POOL) POOL = { ok: false, error: "no_tv" }; poolChanged(); });
+      return;
+    }
     if (poolBusy && !force) return;
     poolAt = Date.now();
     try { poolBusy = TV.accountPool("") !== false; } catch (e) { poolBusy = false; }
@@ -3589,7 +3597,14 @@
     poolChanged();
   }
   function poolAction(kind, dev, value) {
-    if (!(TV && typeof TV.accountPool === "function")) return Promise.resolve({ ok: false, error: "no_tv" });
+    if (!(TV && typeof TV.accountPool === "function")) {
+      if (OFFLINE) return Promise.resolve({ ok: false, error: "no_tv" });
+      return api("POST", "/api/pool", { action: { kind: kind, dev: dev, value: value } }, 30000).then(function (j) {
+        var p = j && j.pool;
+        if (p && p.ok) { POOL = p; poolChanged(); return { ok: true }; }
+        return { ok: false, error: (p && p.error) || "error" };
+      }, function () { return { ok: false, error: "error" }; });
+    }
     var id = "a" + Date.now().toString(36) + Math.floor(Math.random() * 1e6).toString(36);
     return new Promise(function (resolve) {
       POOL_WAITS[id] = resolve;
@@ -7140,7 +7155,8 @@
   function accountNewNotice() {
     if (typeof CouchDesignCode === "undefined" || !CouchDesignCode.undoFresh || MOCK || PREVIEW) return;
     var u = CouchDesignCode.undoFresh();
-    if (u) toast("New design from your account" + (u.title ? ": " + u.title : "") + ". To undo it, open Home settings, Designs.");
+    // the two lines as i18n.js has them (tw_acct_new_title, tw_acct_new), so tv-words.js shows them in the TV's language
+    if (u) toast(u.title ? "New design from your account: " + u.title + ". To undo it, open Home settings, Designs." : "New design from your account. To undo it, open Home settings, Designs.");
   }
   function undoAccountDesign() {
     var choice = CouchDesignCode.undoNew();

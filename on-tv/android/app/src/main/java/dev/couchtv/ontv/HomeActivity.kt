@@ -288,6 +288,16 @@ class HomeActivity : Activity() {
             }.start()
             return true
         }
+        // the pool's readings or a switch through the account (AccountLink.pool, lane C); the answer comes back through tv.accountPool
+        @JavascriptInterface fun accountPool(arg: String?): Boolean {
+            val kv = AccountLink.kv(this@HomeActivity)
+            if (!AccountLink.linked(kv) || AccountLink.poolBody(arg) == null) return false
+            Thread {
+                val r = AccountLink.pool(kv, arg)
+                main.post { js("window.tv && tv.accountPool && tv.accountPool(" + JSONObject.quote(r.toString()) + ")") }
+            }.start()
+            return true
+        }
         @JavascriptInterface fun keep(key: String, value: String) { getSharedPreferences("page", MODE_PRIVATE).edit().putString(key, value).apply() }
         @JavascriptInterface fun kept(key: String): String? = getSharedPreferences("page", MODE_PRIVATE).getString(key, null)
         @JavascriptInterface fun setScreenOff(off: Boolean): Boolean {

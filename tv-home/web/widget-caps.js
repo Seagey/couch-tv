@@ -365,7 +365,7 @@
         return { android: [c10].concat(st.android.slice(1)), web: st.web, vidaa: st.vidaa };
       })()),
       until: "\"Needs Home Assistant\", and where it is set up", build: "",
-      ok: "Opens the pool: switch the pump, the heater and the lights", platforms: plat("setup", "computer", "computer", { android: "Home Assistant: set up on the TV. Connect 10: through your Couch TV account, on a TV linked to it.", web: "Home Assistant: the home computer talks to it for this TV. Connect 10 is not on these TVs yet.", vidaa: "Needs a home computer: the website home cannot reach Home Assistant." }), sizes: sz(["tile", "wtile", "small", "medium", "wide", "large"], [2, 2]) },
+      ok: "Opens the pool: switch the pump, the heater and the lights", platforms: plat("setup", "computer", "computer", { android: "Home Assistant: set up on the TV. Connect 10: through your Couch TV account, on a TV linked to it.", web: "Home Assistant or Connect 10: the home computer talks to it for this TV.", vidaa: "Needs a home computer: the website home cannot reach Home Assistant." }), sizes: sz(["tile", "wtile", "small", "medium", "wide", "large"], [2, 2]) },
     // the launcher reads Android's own Bluetooth battery levels (tv-home/android Batteries.kt)
     battery: { name: "Batteries", status: "setup", what: "The remotes, game controllers and headphones paired with this TV, and the charge left in each, as rings",
       needs: ["A Google TV, Android TV or Fire TV, with Bluetooth remotes or controllers that report their charge"],

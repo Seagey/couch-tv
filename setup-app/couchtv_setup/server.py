@@ -28,6 +28,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 from . import errors, finder, guide, health, linkin, pairing, paths, release, scanlog, steps, studio, tidy, tvprofile
+from . import airplay_find
 from .helper import autostart as hautostart, config as hconfig, deeplink
 from .identity import Identity
 from .tv import Tv, TvError
@@ -293,6 +294,8 @@ def _say_yes(offer_id):
     if S.link.token:
         studio.end(S.link)
     S.link, S.health, S.account_error = new, None, None
+    # AirPlay 2 speakers heard on the Wi-Fi, by name only, so the editor and Rooms can pick them (lane C; in the background)
+    airplay_find.report_soon(S.link.token)
     return {"account": S.link.account}
 
 

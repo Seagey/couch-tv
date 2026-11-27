@@ -1993,8 +1993,20 @@
     return a && typeof a === "object" && a.available === true && Array.isArray(a.speakers) ? a : null;
   }
   // an AirPlay speaker in the same shape as a Home Assistant one (its id starts airplay:, never an entity)
-  function apSpeakers(a) {
-    return (a ? a.speakers : []).slice(0, 12).map(function (s) {
+  // the account's choice (lane C): this widget's picks, else this TV's room, when either names an AirPlay speaker; else every one
+  function apAllowed(o) {
+    var d = null;
+    try { d = window.CouchAccountDetails ? window.CouchAccountDetails() : null; } catch (e) { d = null; }
+    if (!d) return null;
+    var ap = function (l) { return (Array.isArray(l) ? l : []).filter(function (x) { return /^airplay:/.test(x); }).map(function (x) { return x.slice(8).toLowerCase(); }); };
+    var mine = ap(d.smart && d.smart.picks && o && o.id ? d.smart.picks[o.id] : null);
+    if (mine.length) return mine;
+    var rooms = d.rooms || {}, ids = Object.keys(rooms), room = ids.length === 1 ? ap(rooms[ids[0]].speakers) : [];
+    return room.length ? room : null;
+  }
+  function apSpeakers(a, o) {
+    var ok = a ? apAllowed(o) : null;
+    return (a ? a.speakers : []).filter(function (s) { return !ok || ok.indexOf(String(s.name).toLowerCase()) >= 0; }).slice(0, 12).map(function (s) {
       return { entity: "airplay:" + s.name, name: s.name, ok: s.available !== false, airplay: true, state: a.active && s.selected ? "playing" : "idle", volume: s.volume, can_volume: s.volume != null };
     });
   }
@@ -2005,7 +2017,7 @@
     if (!haOn && !(ap && ap.speakers.length)) return soonFit(root, b, "speakers", "speakers");
     var list = haOn ? speakersOf(env, o) : [], title = op(o).label || "Speakers";
     if (haOn && !list && !ap) return haWait(root, b, o, "speakers", title, "Checking Home Assistant");
-    list = (list || []).concat(apSpeakers(ap));
+    list = (list || []).concat(apSpeakers(ap, o));
     if (!list.length) return haWait(root, b, o, "speakers", title, "No speaker is answering");
     alignRoot(root, al);
     var bar = function (s) { return E("div", "cw-bar", "width:100%;margin-top:10px;height:12px;border-radius:6px", [E("b", "", "width:" + (s.ok === false || s.state === "off" ? 0 : clamp(s.volume || 0, 0, 100)) + "%")]); };
@@ -2462,7 +2474,7 @@
   }
   var POOL_WAIT = { no_key: "Add your pool's approval code in Couch TV Studio", not_allowed: "Let this TV use your pool in Couch TV Studio, My TVs",
     unlinked: "Link this TV to your Couch TV account", offline: "Your pool is not connected to ConnectMyPool", throttle: "Checking your pool", busy: "Checking your pool",
-    no_tv: "Not on this TV yet: needs a Google TV or Android TV" };
+    no_tv: "Not on this TV yet: needs a Google TV or Android TV", computer_key: "Add your pool's approval code on the home computer" };
   function poolDeg(v, unit) { return v == null || !isFinite(v) ? "--" : Math.round(v) + "°"; }
   function poolMod(root, p, w, h) {
     var name = fitWords(root, p.name, w - 28, 27, 1, 680, "color:inherit"), st = fitWords(root, p.word, w - 28, 24, 1, 560, "color:var(--sub)");
@@ -2474,7 +2486,7 @@
     if (c10) root.setAttribute("data-pool", "c10");   // app.js asks the account for this pool only while one shows
     if (p && p.none) return soonFit(root, b, "pool", "pool");
     if (!p) return haWait(root, b, o, "pool", title, c10 ? "Checking your pool" : "Checking Home Assistant");
-    if (p.error) return p.error === "no_key" || p.error === "not_allowed" || p.error === "unlinked" || p.error === "no_tv" ? haWait(root, b, o, "pool", title, POOL_WAIT[p.error]) : haWait(root, b, o, "pool", title, POOL_WAIT[p.error] || "Your pool is not answering");
+    if (p.error) return p.error === "no_key" || p.error === "not_allowed" || p.error === "unlinked" || p.error === "no_tv" || p.error === "computer_key" ? haWait(root, b, o, "pool", title, POOL_WAIT[p.error]) : haWait(root, b, o, "pool", title, POOL_WAIT[p.error] || "Your pool is not answering");
     alignRoot(root, al);
     var deg = poolDeg(p.temp, p.unit), pump = p.parts.filter(function (x) { return x.key === "pump"; })[0];
     if (b.w < 300 || (b.h < 300 && b.w < 560)) {

@@ -846,7 +846,7 @@
     if (!haOn && !(ap && ap.speakers.length)) return B.setup(o, env);
     var copy = function (l) { return l ? l.map(function (c) { var x = {}; for (var k in c) x[k] = c[k]; return x; }) : null; };
     var list = haOn ? copy(H.speakersOf(env, o)) : [], joinT = null;
-    if (ap) { list = (list || []).concat(H.apSpeakers(ap)); ap = JSON.parse(JSON.stringify(ap)); }
+    if (ap) { list = (list || []).concat(H.apSpeakers(ap, o)); ap = JSON.parse(JSON.stringify(ap)); }
     // AirPlay: through the home computer (api.airplay, bridge/airplay.py); a speaker in or out of the group, the group on or off
     var apSend = function (action, body, say) {
       if (demo || S.api.designer) { designerSays(); return; }
@@ -854,7 +854,7 @@
       if (say) msg(say);
       S.api.airplay(action, body).then(function (r) {
         if (!S) return;
-        if (r && r.airplay) { ap = r.airplay; list = (haOn ? list.filter(function (x) { return !x.airplay; }) : []).concat(H.apSpeakers(ap)); draw(); }
+        if (r && r.airplay) { ap = r.airplay; list = (haOn ? list.filter(function (x) { return !x.airplay; }) : []).concat(H.apSpeakers(ap, o)); draw(); }
         if (!r || !r.ok) msg(r && r.error === "speakers" ? "None of those speakers answered" : "The Mac at home did not answer. Try again.");
       });
     };
@@ -876,12 +876,12 @@
       if (!S || demo || !S.api.ha || joinT) return;
       S.readAt = Date.now();
       if (ap && S.api.airplay) S.api.airplay("state").then(function (r) {
-        if (S && r && r.airplay && r.airplay.available && !joinT) { ap = r.airplay; list = (list || []).filter(function (x) { return !x.airplay; }).concat(H.apSpeakers(ap)); draw(); }
+        if (S && r && r.airplay && r.airplay.available && !joinT) { ap = r.airplay; list = (list || []).filter(function (x) { return !x.airplay; }).concat(H.apSpeakers(ap, o)); draw(); }
       });
       if (haOn) S.api.ha("speakers").then(function (r) {
         if (!S || joinT) return;
         if (!r || !r.ok) { if (!list) { list = []; draw(); msg("Home Assistant is not answering"); } return; }
-        list = H.pickedOf((r.speakers || []).filter(function (c) { return c && c.entity; }), kit().setting(o, env, "players")).concat(H.apSpeakers(ap && ap.available ? ap : null)); draw();
+        list = H.pickedOf((r.speakers || []).filter(function (c) { return c && c.entity; }), kit().setting(o, env, "players")).concat(H.apSpeakers(ap && ap.available ? ap : null, o)); draw();
       });
     };
     var draw = function () {

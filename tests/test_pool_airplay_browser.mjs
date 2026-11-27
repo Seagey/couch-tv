@@ -99,8 +99,9 @@ console.log("Running the pool and AirPlay browser tests...");
 // ---- 2. pool through Connect 10
 {
   const page = await home([W("c1", "pool", [0, 0, 1160, 200], { via: "connect10" })], "");
-  await page.waitForFunction(() => /Not on this TV yet/.test(document.querySelector(".cw-k-pool").innerText), null, { timeout: 10000 }).catch(() => {});
-  ok(/Not on this TV yet/.test(await text(page, ".cw-k-pool")), "no launcher: says so plainly: " + JSON.stringify(await text(page, ".cw-k-pool")));
+  // a web TV with no approval code on the home computer says where to add it
+  await page.waitForFunction(() => /home computer/.test(document.querySelector(".cw-k-pool").innerText), null, { timeout: 10000 }).catch(() => {});
+  ok(/approval code on the home computer/.test(await text(page, ".cw-k-pool")), "web TV, no code on the computer: says where to add it: " + JSON.stringify(await text(page, ".cw-k-pool")));
   ok(await page.evaluate(() => !!document.querySelector('.cd-layer [data-pool="c10"]')), "the widget is marked for the account's readings");
   // the launcher's answer, as AccountLink.pool hands it on
   await page.evaluate(() => window.tv.accountPool(JSON.stringify({ ok: true, pool: { ok: true, unit: "c", temp: 28, pump: { n: 1, name: "Filter Pump", mode: 1 }, heater: { n: 1, mode: 0, set: 29 }, light: { n: 1, name: "Pool lights", mode: 2, colour: "Blue" } } })));
@@ -115,6 +116,21 @@ console.log("Running the pool and AirPlay browser tests...");
     ok((await text(page, ".cw-k-pool")).length > 0, "error " + err + " says something");
   }
   ok(page.errors.length === 0, "Connect 10: no page errors " + page.errors.join(" | "));
+  await page.close();
+}
+
+// ---- 2b. Connect 10 on a web TV: the home computer asks ConnectMyPool (bridge/pool.py; mock.js ?pool=1)
+{
+  const page = await home([W("c2", "pool", [0, 0, 760, 760], { via: "connect10" })], "&pool=1");
+  await page.waitForFunction(() => /28°/.test(document.querySelector(".cw-k-pool").innerText), null, { timeout: 10000 });
+  const t = await text(page, ".cw-k-pool");
+  ok(/Filter Pump/.test(t) && /Heater/.test(t) && /Blue/.test(t), "web TV: the readings from the home computer: " + JSON.stringify(t));
+  await openOn(page, "c2");
+  await page.waitForSelector(".cwd-toggle", { timeout: 5000 });
+  for (let k = 0; k < 4 && (await page.evaluate(() => window.CouchDetail.current().focusName)) !== "Heater"; k++) await press(page, "ArrowRight", 200);
+  await press(page, "Enter", 900);
+  ok(await page.evaluate(() => window.__mockPool && window.__mockPool.heater.mode === 1), "web TV: the heater switch went to the home computer");
+  ok(page.errors.length === 0, "web TV pool: no page errors " + page.errors.join(" | "));
   await page.close();
 }
 

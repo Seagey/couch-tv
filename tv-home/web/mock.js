@@ -571,6 +571,16 @@
           var daily = [0, 1, 2, 3, 4, 5, 6].map(function (i) { var d = new Date(nw.getTime() + i * 86400000); return { date: iso(d), code: [c0, 95, 61, 2, 0, 0, 3][i], hi: t0 + [3, 1, -2, 0, 2, 4, 2][i], lo: t0 - [7, 6, 7, 8, 9, 7, 6][i], sunrise: iso(d) + "T04:41", sunset: iso(d) + "T18:22", uv: 11 }; });
           return resolve({ ok: true, temp: t0, code: c0, text: "", is_day: true, hourly: hourly, daily: daily, hi: daily[0].hi, lo: daily[0].lo, uv: 11, rain15: [0, 0, 0.1, 0.4, 1.2, 2.8, 3, 1, 0.4, 0, 0, 0] });
         }
+        // the pool through the home computer (?pool=1: a pretend Connect 10; none: no approval code on this computer)
+        if (path.indexOf("/api/pool") === 0) {
+          if (!arg("pool")) return resolve({ ok: true, pool: { ok: false, error: "computer_key" } });
+          var PL = window.__mockPool || (window.__mockPool = { ok: true, unit: "c", temp: 28, pump: { n: 1, name: "Filter Pump", mode: 1 }, heater: { n: 1, mode: 0, set: 29 }, light: { n: 1, name: "Pool lights", mode: 2, colour: "Blue" } });
+          var pa = body && body.action;
+          if (pa && pa.kind === "heater") PL.heater.mode = pa.value === 1 ? 1 : 0;
+          if (pa && pa.kind === "light") PL.light.mode = pa.value | 0;
+          if (pa && pa.kind === "pump") PL.pump.mode = (PL.pump.mode + 1) % 3;
+          return resolve({ ok: true, pool: JSON.parse(JSON.stringify(PL)) });
+        }
         // AirPlay speakers (?airplay=1: a pretend Mac with three speakers, the same as the bridge's FAKE_AIRPLAY; none: no AirPlay here)
         if (path.indexOf("/api/airplay") === 0) {
           if (!arg("airplay")) return resolve({ ok: true, airplay: { available: false, reason: "off" } });
