@@ -41,7 +41,7 @@ def find_host():
     if env:
         return env if os.path.exists(env) else None
     tools = os.path.abspath(os.path.join(HERE, "..", "..", ".."))   # .../tools when this is tools/couch-tv/<tree>/setup-app/tests
-    for d in ("td-work/link-site", "tv-designer"):
+    for d in ("tv-designer", "td-work/link-site"):
         for up in (tools, os.path.abspath(os.path.join(tools, ".."))):
             p = os.path.join(up, d, HOST_NAME)
             if os.path.exists(p):
@@ -251,6 +251,15 @@ class LinkEndToEnd:
         self.assertEqual(got["account"]["email"], "r***@example.test")
         self.assertEqual(self.api("/api/account")["account"]["email"], "r***@example.test")
         self.assertIsNone(self.api("/api/account")["ask"])
+
+    def test_no_on_the_website_ends_the_request_and_setup_hears_it(self):
+        d = self.api("/api/device/start", {"silent": True, "tv_name": "TCL lounge TV"})
+        code = d["user_code"]
+        self.assertEqual(self.web("POST", "/v1/setup/deny", {"user_code": code}, "2")[0], 200)
+        self.assertEqual(self.web("POST", "/v1/setup/deny", {"user_code": "ZZZZ-ZZZZ"}, "2")[0], 200, "a code that is not there says the same")
+        self.assertEqual(self.web("POST", "/v1/setup/allow", {"user_code": code}, "2")[0], 404, "it can no longer be allowed")
+        self.refused("expired", "/api/device/poll", {})
+        self.assertIsNone(self.api("/api/account")["account"])
 
     # ---- 3: linked means linked ----
     def test_an_old_couch_tv_is_told_before_anything_is_sent(self):

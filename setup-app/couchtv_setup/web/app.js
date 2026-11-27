@@ -642,7 +642,7 @@
     var on = !!state.account;
     text("lk-name", tvName());
     $("lk-go").hidden = on; $("lk-go").disabled = false; $("lk-skip-row").hidden = on;
-    $("lk-wait").hidden = true; $("lk-status").hidden = true;
+    $("lk-wait").hidden = true; $("lk-status").hidden = true; $("lk-code-row").hidden = true;
     $("lk-next").hidden = !on; $("lk-done").hidden = !on;
     if (on) text("lk-done", signedInWords(state.account.name || state.account.email) + ". Your designs, people, photos and town arrive on this TV as it is set up.");
   }
@@ -651,13 +651,18 @@
   function browserLink(done, failed) {
     api("/api/device/start", { silent: true, tv_name: tvName() }).then(function (d) {
       var a = $("lk-open"); a.href = d.open;
+      if ($("lk-code")) { text("lk-code", d.user_code); $("lk-code-row").hidden = false; }
       try { window.open(d.open, "_blank", "noopener"); } catch (e) {}
       clearInterval(lkTimer);
       lkTimer = setInterval(function () {
         api("/api/device/poll").then(function (r) {
           if (r.account) { clearInterval(lkTimer); signedIn(r.account); done(r.account); }
           else if (r.ask) { clearInterval(lkTimer); ask(r.ask, null); }
-        }, function (e) { clearInterval(lkTimer); failed((e && e.message) || "That did not work. Try again."); });
+        }, function (e) {
+          clearInterval(lkTimer);
+          // 401 expired: the person pressed No on the website, or the 10 minutes ran out
+          failed(e && e.code === "expired" ? "Not linked. The request was ended or ran out." : (e && e.message) || "That did not work. Try again.");
+        });
       }, Math.max(2, d.interval || 3) * 1000);
     }, function (e) { failed((e && e.message) || "That did not work. Try again."); });
   }
@@ -668,7 +673,7 @@
       planAccount(); refreshPlan();
       if (current === "link") toPlan();
     }, function (m) {
-      $("lk-wait").hidden = true; $("lk-go").disabled = false;
+      $("lk-wait").hidden = true; $("lk-code-row").hidden = true; $("lk-go").disabled = false;
       text("lk-status", m + " Press Link this TV to try again."); $("lk-status").hidden = false;
     });
   });

@@ -431,6 +431,8 @@ class Page(unittest.TestCase):
         pg.click("#lk-go")
         self.assertTrue(pg.is_visible("#lk-wait"))
         self.assertIn("Waiting for you to say Yes in your browser", pg.inner_text("#lk-wait"))
+        pg.wait_for_selector("#lk-code-row:not([hidden])", timeout=5000)
+        self.assertIn("ABCD-EFGH", pg.inner_text("#lk-code-row"), "the code to compare with the website")
         pg.wait_for_selector('section[data-step="plan"]:not([hidden])', timeout=15000)
         self.assertTrue(pg.is_hidden("#link-ask"), "the website's Yes is the only question")
         self.assertTrue(pg.is_visible("#acct-top"))
@@ -446,6 +448,8 @@ class Page(unittest.TestCase):
         pg.click("#lk-go")
         pg.wait_for_selector("#lk-status:not([hidden])", timeout=15000)
         self.assertIn("Press Link this TV to try again", pg.inner_text("#lk-status"))
+        self.assertIn("Not linked. The request was ended or ran out.", pg.inner_text("#lk-status"))
+        self.assertTrue(pg.is_hidden("#lk-code-row"))
         self.assertTrue(pg.is_enabled("#lk-go"))
         self.assertTrue(pg.is_hidden("#lk-wait"))
 

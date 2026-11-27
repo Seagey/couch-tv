@@ -66,7 +66,7 @@ class Studio:
         p = path.replace("/v1/setup/", "")
         if self.old and p in ("who", "seen", "end", "leave", "signout"):
             raise Said(404, "not_found")
-        if p in ("start", "mine", "unlink", "signout", "allow"):
+        if p in ("start", "mine", "unlink", "signout", "allow", "deny"):
             cookie = headers.get("Cookie") or ""
             who = PEOPLE.get(cookie[-1:]) if cookie.startswith("tvm_s=") else None
             if not who:
@@ -129,6 +129,11 @@ class Studio:
             c = {"uid": uid, "long": secrets.token_urlsafe(32), "short": s[:4] + "-" + s[4:], "used": False, "exp": self.now() + 10 * MIN}
             self.codes.append(c)
             return 201, {"handoff": c["long"], "short": c["short"], "open": "couchtv://setup?handoff=" + c["long"]}
+        if p == "deny":
+            for k, d in list(self.devices.items()):
+                if d["user"] == str(body.get("user_code")).replace("-", "") and not d["uid"]:
+                    del self.devices[k]          # the request ends: its poll now says it ran out
+            return 200, {"ok": True}
         if p == "allow":
             for d in self.devices.values():
                 if d["user"] == str(body.get("user_code")).replace("-", ""):
