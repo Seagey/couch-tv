@@ -26,12 +26,8 @@ import secrets
 import struct
 import time
 
-from cryptography.exceptions import InvalidSignature
-from cryptography.hazmat.primitives import hashes, serialization
-from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey, Ed25519PublicKey
-from cryptography.hazmat.primitives.asymmetric.x25519 import X25519PrivateKey, X25519PublicKey
-from cryptography.hazmat.primitives.ciphers.aead import ChaCha20Poly1305
-from cryptography.hazmat.primitives.kdf.hkdf import HKDF
+# cryptography is imported inside the functions below that use it, not here: server.py imports this
+# module on every bridge, and a bridge with no Apple TV should not load it (couch-tv#336).
 
 import apps
 import config
@@ -296,6 +292,8 @@ class SRPClient:
 
 # ---------- the HomeKit style key steps ----------
 def hkdf(secret, salt, info, n=32):
+    from cryptography.hazmat.primitives import hashes
+    from cryptography.hazmat.primitives.kdf.hkdf import HKDF
     return HKDF(algorithm=hashes.SHA512(), length=n, salt=salt, info=info).derive(secret)
 
 
@@ -304,10 +302,12 @@ def _nonce(label):
 
 
 def seal(key, label, data):
+    from cryptography.hazmat.primitives.ciphers.aead import ChaCha20Poly1305
     return ChaCha20Poly1305(key).encrypt(_nonce(label), data, b"")
 
 
 def unseal(key, label, data):
+    from cryptography.hazmat.primitives.ciphers.aead import ChaCha20Poly1305
     try:
         return ChaCha20Poly1305(key).decrypt(_nonce(label), data, b"")
     except Exception:
@@ -315,10 +315,12 @@ def unseal(key, label, data):
 
 
 def raw_public(key):
+    from cryptography.hazmat.primitives import serialization
     return key.public_key().public_bytes(serialization.Encoding.Raw, serialization.PublicFormat.Raw)
 
 
 def raw_private(key):
+    from cryptography.hazmat.primitives import serialization
     return key.private_bytes(serialization.Encoding.Raw, serialization.PrivateFormat.Raw, serialization.NoEncryption())
 
 
@@ -422,6 +424,7 @@ class Link:
             header = bytes([ftype]) + (len(payload) + 16).to_bytes(3, "big")
             nonce = self.out_n.to_bytes(12, "little")
             self.out_n += 1
+            from cryptography.hazmat.primitives.ciphers.aead import ChaCha20Poly1305
             payload = ChaCha20Poly1305(self.out_key).encrypt(nonce, payload, header)
         self.w.write(bytes([ftype]) + len(payload).to_bytes(3, "big") + payload)
         await self.w.drain()
@@ -440,6 +443,7 @@ class Link:
                 vars={"error": type(e).__name__},
             ) from None
         if self.in_key:
+            from cryptography.hazmat.primitives.ciphers.aead import ChaCha20Poly1305
             nonce = self.in_n.to_bytes(12, "little")
             self.in_n += 1
             try:
@@ -475,6 +479,8 @@ class Link:
         return t
 
     async def pair_setup_finish(self, t2, pin):
+        from cryptography.exceptions import InvalidSignature
+        from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey, Ed25519PublicKey
         srp = SRPClient(password=str(pin).encode())
         m1 = srp.process(t2[T_SALT], t2[T_PUBLIC_KEY])
         m4 = await self.step(F_PS_NEXT, {"_pd": tlv_encode([(T_SEQ, b"\3"), (T_PUBLIC_KEY, _i2b(srp.a_pub)),
@@ -506,6 +512,9 @@ class Link:
 
     # ----- pair verify: every connection, with what pairing kept -----
     async def verify(self, cred):
+        from cryptography.exceptions import InvalidSignature
+        from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey, Ed25519PublicKey
+        from cryptography.hazmat.primitives.asymmetric.x25519 import X25519PrivateKey, X25519PublicKey
         eph = X25519PrivateKey.generate()
         pub = raw_public(eph)
         m2 = await self.step(F_PV_START, {"_pd": tlv_encode([(T_SEQ, b"\1"), (T_PUBLIC_KEY, pub)]), "_auTy": 4})

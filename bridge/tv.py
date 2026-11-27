@@ -20,10 +20,6 @@ import re
 import socket
 import time
 
-from adb_shell.adb_device_async import AdbDeviceTcpAsync
-from adb_shell.auth.sign_pythonrsa import PythonRSASigner
-from androidtvremote2 import AndroidTVRemote, CannotConnect, ConnectionClosed, InvalidAuth
-
 import apps
 import config
 import messages
@@ -33,6 +29,26 @@ log = logging.getLogger("tv")
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 CERT, KEY = os.path.join(config.DATA, "cert.pem"), os.path.join(config.DATA, "key.pem")
 ADB_KEY = os.path.expanduser(os.environ.get("ADB_KEY", "~/.android/adbkey"))
+
+# The Android TV libraries are loaded by TV() (load_android_libraries below), not at the top: every
+# bridge imports this module for TVUnavailable and check_package, and androidtvremote2 brings protobuf
+# and cryptography and adb_shell brings rsa, none of which a Samsung or an LG uses (couch-tv#336).
+AdbDeviceTcpAsync = PythonRSASigner = AndroidTVRemote = None
+CannotConnect = ConnectionClosed = InvalidAuth = None
+_android_loaded = False
+
+
+def load_android_libraries():
+    """Import adb_shell and androidtvremote2 into this module, once. Only an Android or Google TV
+    (a TV here) needs them."""
+    global AdbDeviceTcpAsync, PythonRSASigner, AndroidTVRemote, CannotConnect, ConnectionClosed, InvalidAuth
+    global _android_loaded
+    if _android_loaded:
+        return
+    from adb_shell.adb_device_async import AdbDeviceTcpAsync
+    from adb_shell.auth.sign_pythonrsa import PythonRSASigner
+    from androidtvremote2 import AndroidTVRemote, CannotConnect, ConnectionClosed, InvalidAuth
+    _android_loaded = True
 
 
 # Android package names only: letters, digits and underscores, in two or more dot separated parts.
@@ -152,6 +168,7 @@ class TV:
         return True
 
     def __init__(self, cfg):
+        load_android_libraries()
         self.id = cfg["id"]
         self.log = logging.getLogger(f"tv.{self.id}")
         self.name = cfg["name"]
