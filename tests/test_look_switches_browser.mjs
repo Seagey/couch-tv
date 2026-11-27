@@ -78,9 +78,9 @@ const press = async (page, k, wait) => { await page.keyboard.press(k); await pag
 const cls = (page, c) => page.evaluate((x) => document.documentElement.classList.contains(x), c);
 async function openLook(page) {
   await page.evaluate(() => window.tv.settingsKey()); await page.waitForTimeout(250); await press(page, "Enter", 400);
-  const names = await page.evaluate(() => [...document.querySelectorAll("#set-secs .ssec")].map((e) => e.textContent.trim()));
-  const i = names.indexOf("Look and scenes");
-  assert.ok(i >= 0, "Look and scenes in " + names.join(", "));
+  const names = await page.evaluate(() => { window.tv.settingsMore(); return [...document.querySelectorAll("#set-secs .ssec")].map((e) => e.textContent.trim()); });
+  const i = names.indexOf("Picture and sound");
+  assert.ok(i >= 0, "Picture and sound in " + names.join(", "));
   for (let k = 0; k < 4 && await page.evaluate(() => !document.querySelector("#set-secs .ssec.focus")); k++) await press(page, "ArrowLeft");
   const at = await page.evaluate(() => [...document.querySelectorAll("#set-secs .ssec")].findIndex((e) => e.classList.contains("focus")));
   for (let k = 0; k < Math.abs(i - at); k++) await press(page, i > at ? "ArrowDown" : "ArrowUp", 80);

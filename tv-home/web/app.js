@@ -6389,6 +6389,9 @@
     if (thisTvName()) rows.push(info("tv-name", "Name", thisTvName()));
     rows.push(info("ver", t("about_version"), ver || t("about_web")));
     rows.push(info("run", t("about_running"), t(run)));
+    // what the account sent (names, photos, town, guest Wi-Fi) is changed in the account; this takes it off the TV
+    if (peopleNow().some(function (p) { return p.src === "account"; }))
+      rows.push({ kind: "action", key: "people-account-clear", label: t("people_account_clear"), danger: true, act: clearAccountHome });
     return rows;
   }
   function thisTvName() {
@@ -8685,6 +8688,8 @@
       else SET.col = "secs";
     }
     $("set-title").textContent = t("set_title");
+    // landing on More opens it: the sections under it show in the list below
+    if (!SET.more && secsNow()[SET.sec] && secsNow()[SET.sec][0] === "more") SET.more = true;
     $("set-secs").innerHTML = secsNow().map(function (sc, i) {
       var cls = "ssec" + (i === SET.sec ? (SET.col === "secs" ? " focus" : " on") : "");
       return '<div class="' + cls + '"><i>' + ICONS[sc[1]] + "</i><span>" + esc(secName(sc[0])) + "</span></div>";
@@ -10081,6 +10086,7 @@
     noDream: function () { note(t("no_dream")); },
     // the remote's Settings/gear key, caught by the launcher natively (MainActivity.dispatchKeyEvent)
     settingsKey: function () { blip(0, 0); settingsKey(); },
+    settingsMore: function () { SET.more = true; if (zone === "settings") renderSettings(); },   // tests: open More so every section is in the list
     // the phone code changed (HomeActivity, Auth.onPin): the QR and computer line draw the new one
     phoneLink: function () { PHONE_QR.url = ""; phoneQr(); if (typeof CouchDesign !== "undefined" && CouchDesign.nav && CouchDesign.nav.phoneAgain) CouchDesign.nav.phoneAgain(); },
     // also the on-TV app's HomeActivity.refresh() after a phone or setup save, with the home already in front

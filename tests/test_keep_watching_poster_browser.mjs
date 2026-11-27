@@ -133,7 +133,7 @@ await page.evaluate(() => document.dispatchEvent(new KeyboardEvent("keydown", { 
 await page.waitForTimeout(400);
 await press("Enter");
 await page.waitForTimeout(400);
-for (let i = 0; i < 9 && !(await page.evaluate(() => /Look/.test((document.querySelector(".ssec.focus") || {}).textContent || ""))); i++) await press("ArrowDown");
+for (let i = 0; i < 9 && !(await page.evaluate(() => /Picture/.test((document.querySelector(".ssec.focus") || {}).textContent || ""))); i++) await press("ArrowDown");
 await press("ArrowRight");
 let label = "";
 for (let i = 0; i < 80; i++) {

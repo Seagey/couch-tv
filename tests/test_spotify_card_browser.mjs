@@ -61,7 +61,7 @@ async function open(query, tvos, settings) {
 async function lookRows(page) {
   await page.evaluate(() => window.tv.settingsKey()); await page.waitForTimeout(300);
   await page.keyboard.press("Enter"); await page.waitForTimeout(400);
-  for (let i = 0; i < 16 && !(await page.evaluate(() => /^Look/.test((document.querySelector(".ssec.focus") || {}).textContent || ""))); i++) {
+  for (let i = 0; i < 16 && !(await page.evaluate(() => /^Picture/.test((document.querySelector(".ssec.focus") || {}).textContent || ""))); i++) {
     await page.keyboard.press("ArrowDown"); await page.waitForTimeout(120);
   }
   await page.keyboard.press("ArrowRight"); await page.waitForTimeout(300);

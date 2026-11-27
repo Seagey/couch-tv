@@ -129,7 +129,7 @@ async function tvPage(d, q) {
 }
 async function closeSettings(page) { for (let k = 0; k < 6 && await page.evaluate(() => document.getElementById("settings").classList.contains("on")); k++) await press(page, "Escape", 250); await page.waitForTimeout(900); await page.waitForFunction(() => window.tv && document.getElementById("settings")); }
 async function openSettings(page) { await page.evaluate(() => window.tv.settingsKey()); await page.waitForTimeout(250); await press(page, "Enter", 500); }
-const secs = (page) => page.evaluate(() => [...document.querySelectorAll("#set-secs .ssec")].map((e) => e.textContent.trim()));
+const secs = (page) => page.evaluate(() => { window.tv.settingsMore(); return [...document.querySelectorAll("#set-secs .ssec")].map((e) => e.textContent.trim()); });
 const rowsText = (page) => page.evaluate(() => [...document.querySelectorAll("#set-rows .srow")].map((e) => e.textContent.trim()));
 async function goSec(page, name) {
   const list = await secs(page), i = list.indexOf(name);
@@ -148,8 +148,8 @@ let allSecs;
   const page = await tvPage(null);
   await openSettings(page);
   allSecs = await secs(page);
-  ok(allSecs.includes("Apps") && allSecs.includes("People") && allSecs.includes("Quick buttons"), "no design: every section shows (" + allSecs.join(", ") + ")");
-  await goSec(page, "Look and scenes");
+  ok(["Set up from your phone", "Picture and sound", "Remote and buttons", "This TV", "More", "Language", "Weather", "Designs", "Help and reset"].every((n) => allSecs.includes(n)) && !allSecs.includes("People") && !allSecs.includes("Location"), "no design: the slimmed sections show (" + allSecs.join(", ") + ")");
+  await goSec(page, "Picture and sound");
   const look = (await rowsText(page)).join(" | ");
   ok(/Night scenes/.test(look) && /Inputs tile/.test(look) && /Video link/.test(look), "no design: Look has the looks, Inputs tile and the video link: " + look);
   ok(!(await rowsText(page)).some((t) => /Couch TV Studio design/.test(t)), "no design: no design line");
@@ -163,11 +163,11 @@ TV = tv;
 {
   await openSettings(tv);
   const s = await secs(tv);
-  ok(!s.includes("Apps") && !s.includes("People") && !s.includes("Quick buttons"), "with the design: no Apps, People or Quick buttons (" + s.join(", ") + ")");
-  ok(s.includes("Location") && s.includes("Weather") && s.includes("Designs") && s.includes("Language") && s.includes("About"), "the town and weather stay: the surf report reads them");
+  ok(!s.includes("People") && !s.includes("Location"), "with the design: no People or Location on the TV (" + s.join(", ") + ")");
+  ok(s.includes("Weather") && s.includes("Designs") && s.includes("Language") && s.includes("Help and reset"), "weather stays: the surf report reads it");
   const top = (await rowsText(tv)).slice(0, 2).join(" | ");
   ok(/This home uses a Couch TV Studio design/.test(top) && /Settings for parts it doesn't show are hidden/.test(top) && /Show all settings/.test(top), "one line at the top says so, with Show all settings: " + top);
-  await goSec(tv, "Look and scenes");
+  await goSec(tv, "Picture and sound");
   const look = (await rowsText(tv)).join(" | ");
   ok(!/Night scenes/.test(look), "Look: no look choices (the design is the look)");
   ok(!/Inputs tile/.test(look), "Look: no Inputs tile (it never shows with a design)");
@@ -176,17 +176,17 @@ TV = tv;
   ok(/Lighter home|Navigation sound|sound/i.test(look), "Look: what still applies stays (" + look.slice(0, 160) + ")");
   if (SHOTS) await tv.screenshot({ path: path.join(SHOTS, "tv-home-settings-design-look.png") });
   // Show all settings, from the first section
-  await goSec(tv, "Language");
+  await goSec(tv, "Set up from your phone");
   if (SHOTS) await tv.screenshot({ path: path.join(SHOTS, "tv-home-settings-design.png") });
   await press(tv, "ArrowRight", 200);
   ok(/Show all settings/.test(await tv.evaluate(() => (document.querySelector("#set-rows .srow.focus") || {}).textContent || "")), "Right lands on Show all settings");
   await press(tv, "Enter", 300);
   const all = await secs(tv);
-  ok(all.length === allSecs.length && all.includes("Apps") && all.includes("Quick buttons"), "Show all settings brings every section back (" + all.join(", ") + ")");
+  ok(all.length === allSecs.length && all.includes("Remote and buttons"), "Show all settings keeps every section (" + all.join(", ") + ")");
   ok(/Show only what this design uses/.test((await rowsText(tv)).join(" ")), "and offers to go back to only what it uses");
   await closeSettings(tv);
   await openSettings(tv);
-  ok(!(await secs(tv)).includes("Apps"), "closing Home settings goes back to only what the design uses");
+  ok(/This home uses a Couch TV Studio design/.test((await rowsText(tv)).join(" ")), "closing Home settings goes back to only what the design uses");
 
   // ---- 3. each widget's own settings, drawn from widget-caps.js settings (pre: true only) ----
   await goSec(tv, "Designs");

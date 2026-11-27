@@ -194,7 +194,7 @@ try {
       const phone = await tv.evaluate(() => { const v = window.tv.atHomeRead(); return ((v && v.design && v.design.widgets) || []).map((w) => w.kind); });
       // Home settings, Designs: the widgets on this home
       await tv.evaluate(() => window.tv.settingsKey()); await tv.waitForTimeout(250); await press("Enter", 500);
-      const secs = await tv.evaluate(() => [...document.querySelectorAll("#set-secs .ssec")].map((e) => e.textContent.trim()));
+      const secs = await tv.evaluate(() => { window.tv.settingsMore(); return [...document.querySelectorAll("#set-secs .ssec")].map((e) => e.textContent.trim()); });
       const i = secs.indexOf("Designs");
       for (let k = 0; k < 4 && await tv.evaluate(() => !document.querySelector("#set-secs .ssec.focus")); k++) await press("ArrowLeft", 120);
       const at = await tv.evaluate(() => [...document.querySelectorAll("#set-secs .ssec")].findIndex((e) => e.classList.contains("focus")));

@@ -533,7 +533,7 @@ async function tvPage(d, q, keep) {
   await p.waitForTimeout(1200);
   return p;
 }
-const secs = (p) => p.evaluate(() => [...document.querySelectorAll("#set-secs .ssec")].map((e) => e.textContent.trim()));
+const secs = (p) => p.evaluate(() => { window.tv.settingsMore(); return [...document.querySelectorAll("#set-secs .ssec")].map((e) => e.textContent.trim()); });
 const rowsText = (p) => p.evaluate(() => [...document.querySelectorAll("#set-rows .srow")].map((e) => e.textContent.trim()));
 async function openSettings(p) { await p.evaluate(() => window.tv.settingsKey()); await p.waitForTimeout(250); await press(p, "Enter", 500); }
 // Back closes Home settings; five Backs within 4 s switch a design off (design.js), so wait that out
