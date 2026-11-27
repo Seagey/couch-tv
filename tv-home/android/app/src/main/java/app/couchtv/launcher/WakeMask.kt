@@ -27,6 +27,10 @@ internal enum class WakeEvent { SCREEN_OFF, SCREEN_ON, CHECK, DOORBELL, FADE_END
 internal fun isOtherWakeApp(pkg: String?, homePackage: String): Boolean =
     pkg != null && pkg != homePackage && pkg != FireWatch.GOOGLE_TV_HOME && pkg != "com.android.systemui"
 
+/** Arm only over couch-tv or the Google TV home, so a TV that sleeps on HDMI or live TV wakes back to it uncovered. */
+internal fun shouldArmWakeMask(lastFront: String?, homePackage: String): Boolean =
+    lastFront == homePackage || lastFront == FireWatch.GOOGLE_TV_HOME
+
 internal fun decideWakeMask(
     phase: WakePhase,
     event: WakeEvent,
@@ -58,6 +62,7 @@ internal class WakeMask private constructor(
     private var wokeAt = 0L
     private var token: Any? = null
     private var latestPackage: String? = null
+    private var lastFront: String? = null
     private var ownDialog = false
     private val check = Runnable { checkContent() }
     private val settle = Runnable { checkContent() }
@@ -87,8 +92,8 @@ internal class WakeMask private constructor(
     private fun screenOff() {
         if (phase == WakePhase.ARMED) return
         // A late SCREEN_OFF after the screen already came back on must not cover it.
-        if (runCatching { service.getSystemService(PowerManager::class.java)?.isInteractive == true }
-                .getOrDefault(false)) return
+        if (interactive()) return
+        if (phase == WakePhase.IDLE && !shouldArmWakeMask(lastFront, service.packageName)) return
         if (phase == WakePhase.IDLE && !runCatching {
                 HomeRole.googleTv(service) && HomeRole.held(service) && !CrashGuard.standingAside(service)
             }.getOrDefault(false)) return
@@ -99,7 +104,14 @@ internal class WakeMask private constructor(
         transition(WakeEvent.SCREEN_ON)
     }
 
+    private fun interactive(): Boolean =
+        runCatching { service.getSystemService(PowerManager::class.java)?.isInteractive == true }.getOrDefault(false)
+
     fun windowChanged(pkg: String?, cls: String?) {
+        if (pkg != null && pkg != "com.android.systemui") lastFront = pkg
+        // Backstop: a window event on a lit screen means the wake happened even if neither
+        // SCREEN_ON nor the display callback reached us, so the 6 s timeout starts here at the latest.
+        if (phase == WakePhase.ARMED && interactive()) screenOn()
         if (phase != WakePhase.ARMED && phase != WakePhase.AWAKE) return
         latestPackage = pkg
         // An app-owned native dialog has its own window while MainActivity stays resumed.

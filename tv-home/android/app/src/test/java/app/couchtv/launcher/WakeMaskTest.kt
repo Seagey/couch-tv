@@ -64,4 +64,14 @@ class WakeMaskTest {
         assertEquals(ARMED, decideWakeMask(off, FADE_ENDED))
         assertEquals(AWAKE, decideWakeMask(off, SCREEN_ON))
     }
+
+    @Test
+    fun armsOnlyOverCouchTvOrGoogleTvHome() {
+        val home = "app.couchtv.launcher"
+        assertTrue(shouldArmWakeMask(home, home))
+        assertTrue(shouldArmWakeMask(FireWatch.GOOGLE_TV_HOME, home))
+        assertFalse(shouldArmWakeMask("com.tcl.tv", home))
+        assertFalse(shouldArmWakeMask("com.google.android.youtube.tv", home))
+        assertFalse(shouldArmWakeMask(null, home))
+    }
 }
