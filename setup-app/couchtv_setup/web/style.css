@@ -401,3 +401,14 @@ section.tidy .tidy-link:disabled { color: var(--ink3); }
 section.tidy .actions { gap: 20px; margin-top: 28px; }
 section.tidy .actions button { height: 76px; padding: 0 48px; font-size: 24px; font-weight: 800; }
 section.tidy .actions button.primary { box-shadow: 0 16px 34px -14px rgba(168,43,10,.75); }
+
+/* link this TV step (no codes) */
+.linkstep .kicker { margin: 0 0 6px; font: 700 13px var(--body); letter-spacing: .08em; text-transform: uppercase; color: var(--ink2); }
+.linkstep .tvrow { display: flex; gap: 16px; align-items: center; border: 1.5px solid #E4E0D8; border-radius: 14px; padding: 16px; margin: 20px 0; background: #fff; }
+.linkstep .tvrow b { display: block; font-size: 20px; }
+.linkstep .tvico { flex: none; width: 72px; height: 44px; border-radius: 6px; background: var(--ink); border: 4px solid #0B0B0D; }
+.linkstep .waitbox { display: flex; gap: 12px; align-items: center; margin-top: 18px; padding: 14px 16px; border-radius: 12px; background: #FFF6D6; font-size: 16px; }
+.linkstep .spin { flex: none; width: 18px; height: 18px; border-radius: 50%; border: 3px solid #F5A800; border-top-color: transparent; animation: lkspin 1s linear infinite; }
+@keyframes lkspin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .linkstep .spin { animation: none; } }
+.linkstep .actions { margin-top: 18px; }

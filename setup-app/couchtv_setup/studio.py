@@ -282,7 +282,18 @@ def handoff(link, code):
     return _signed_in(link, call("/v1/setup/handoff", {"handoff": c}))
 
 
-def device_start(link):
+def open_address(verify, user_code, tv_name=None):
+    """The address Setup opens for "Link this TV": the website's link page with the request in it, so the person
+    sees "Is this your TV?" and presses Yes, with no code to type. The name is only shown there."""
+    q = {"c": re.sub(r"[^A-Z0-9]", "", str(user_code).upper())}
+    name = re.sub(r"[^\w .,'&()+-]+", " ", str(tv_name or ""))
+    name = re.sub(r"\s+", " ", name).strip()[:40]
+    if name:
+        q["n"] = name
+    return verify + "?" + urllib.parse.urlencode(q, quote_via=urllib.parse.quote)
+
+
+def device_start(link, tv_name=None):
     ans = call("/v1/setup/device", {})
     code, dev = str(ans.get("user_code") or ""), str(ans.get("device_code") or "")
     if not (re.fullmatch(r"[A-Z0-9]{4}-?[A-Z0-9]{4}", code) and LONG_RE.match(dev)):
@@ -291,7 +302,8 @@ def device_start(link):
     verify = str(ans.get("verify") or base() + "/link-setup")
     if not verify.startswith(base() + "/"):
         verify = base() + "/link-setup"
-    return {"user_code": code, "verify": verify, "interval": max(2, min(int(ans.get("interval") or 3), 10))}
+    return {"user_code": code, "verify": verify, "open": open_address(verify, code, tv_name),
+            "interval": max(2, min(int(ans.get("interval") or 3), 10))}
 
 
 def device_poll(link):

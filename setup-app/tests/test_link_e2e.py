@@ -238,6 +238,20 @@ class LinkEndToEnd:
         self.api("/api/link-no")
         self.assertEqual(self.mine("2")["setups"], 0)
 
+    def test_link_this_tv_from_setup_needs_only_the_websites_yes(self):
+        """"Link this TV" (no codes): the address Setup opens carries the code, the website's Yes is Allow, and the
+        poll then signs Setup in with no "Link as X?" question."""
+        d = self.api("/api/device/start", {"silent": True, "tv_name": "TCL lounge TV"})
+        self.assertRegex(d["open"], r"^https?://[^?]+/link-setup\?c=[A-Z0-9]{8}&n=TCL%20lounge%20TV$")
+        code = re.search(r"c=([A-Z0-9]{8})", d["open"]).group(1)
+        self.assertEqual(code, d["user_code"].replace("-", ""))
+        self.assertEqual(self.web("POST", "/v1/setup/allow", {"user_code": code[:4] + "-" + code[4:]}, "2")[0], 200)
+        got = self.api("/api/device/poll")
+        self.assertNotIn("ask", got)
+        self.assertEqual(got["account"]["email"], "r***@example.test")
+        self.assertEqual(self.api("/api/account")["account"]["email"], "r***@example.test")
+        self.assertIsNone(self.api("/api/account")["ask"])
+
     # ---- 3: linked means linked ----
     def test_an_old_couch_tv_is_told_before_anything_is_sent(self):
         self.sign_in()

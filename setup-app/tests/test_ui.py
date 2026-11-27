@@ -63,7 +63,16 @@ class Page(unittest.TestCase):
         pg.click("#setup-start")
         pg.wait_for_selector("#found .tvc")
         pg.locator("#found .tvc").nth(which).get_by_role("button", name="Set up this TV").click()
+        # a signed out Setup that links accounts asks "Link this TV to your account" first: these tests skip it
+        pg.wait_for_selector('section[data-step="plan"]:not([hidden]), section[data-step="link"]:not([hidden])', timeout=20000)
+        if step(pg) == "link":
+            pg.click("#lk-skip")
         pg.wait_for_selector('section[data-step="plan"]:not([hidden])', timeout=20000)
+
+    def code_panel(self, pg):
+        """The typed code panel on Finish. Linking by code is no longer offered on screen (Link this TV opens the
+        website instead), but a hand off still arrives as a code: this opens the panel to test that way in."""
+        pg.evaluate("document.getElementById('fl-panel').hidden = false")
 
     def install(self, pg, name=None):
         if name:
@@ -100,6 +109,9 @@ class Page(unittest.TestCase):
 
     def to_plan_from_find(self, pg):
         pg.locator("#found .tvc").nth(0).get_by_role("button", name="Set up this TV").click()
+        pg.wait_for_selector('section[data-step="plan"]:not([hidden]), section[data-step="link"]:not([hidden])', timeout=20000)
+        if step(pg) == "link":
+            pg.click("#lk-skip")
         pg.wait_for_selector('section[data-step="plan"]:not([hidden])', timeout=20000)
 
     def test_back_on_the_plan_page_button_too(self):
@@ -327,7 +339,7 @@ class Page(unittest.TestCase):
         pg = self.open(harness)
         self.to_plan(pg)
         self.install(pg)
-        pg.click("#link-cta")
+        self.code_panel(pg)
         pg.fill("#fl-code", "ABCD-EFGH")
         pg.click("#fl-go")
         pg.wait_for_selector("#link-ask:not([hidden])")
@@ -355,7 +367,7 @@ class Page(unittest.TestCase):
                 uh.real_sleep(7)                 # the answer is slow: the 5 s look shows the question before it
             return r
         with mock.patch.object(server, "api", slow):
-            pg.click("#link-cta")
+            self.code_panel(pg)
             pg.fill("#fl-code", "ABCD-EFGH")
             pg.click("#fl-go")
             pg.wait_for_selector("#link-ask:not([hidden])", timeout=6500)
@@ -368,7 +380,7 @@ class Page(unittest.TestCase):
         pg.click("#another-go")
         pg.wait_for_selector("#found .tvc")
         pg.locator("#found .tvc").nth(1).get_by_role("button", name="Set up this TV").click()
-        pg.wait_for_selector('section[data-step="plan"]:not([hidden])', timeout=20000)
+        pg.wait_for_selector('section[data-step="plan"]:not([hidden]), section[data-step="link"]:not([hidden])', timeout=20000)
         pg.click("#link-ask-yes")                # signs Setup in, which is what it asks
         pg.wait_for_selector("#acct-top:not([hidden])")
         pg.wait_for_timeout(1500)
@@ -382,6 +394,70 @@ class Page(unittest.TestCase):
         pg.wait_for_selector("#acct-top:not([hidden])")
         pg.wait_for_timeout(1000)
         self.assertNotIn("/api/link-tv", self.calls())
+
+    # ---- Link this TV, no codes (mockup 1 of 27 Nov 2026) ----
+
+    def to_link_step(self, pg):
+        pg.click("#setup-start")
+        pg.wait_for_selector("#found .tvc")
+        pg.locator("#found .tvc").nth(0).get_by_role("button", name="Set up this TV").click()
+        pg.wait_for_selector('section[data-step="link"]:not([hidden])', timeout=20000)
+
+    def test_link_step_comes_before_the_plan_with_the_words_of_the_mockup(self):
+        pg = self.open(uh.Harness(stub=uh.stub_account()))
+        self.to_link_step(pg)
+        body = visible_text(pg)
+        self.assertIn("Link this TV to your account", body)
+        self.assertIn("Your designs, people, photos and town then arrive on this TV finished.", body)
+        self.assertIn("Skip linking", body)
+        self.assertIn("The TV will show empty cards until you link it.", body)
+        self.assertTrue(pg.is_visible("#lk-go"))
+        self.assertTrue(pg.is_hidden("#lk-wait"))
+        self.assertTrue(pg.is_hidden("#fl-code"), "no code to type")
+        self.assertNotIn("code", pg.inner_text('section[data-step="link"]').lower())
+
+    def test_skip_linking_goes_on_and_back_goes_to_the_tv_list(self):
+        pg = self.open(uh.Harness(stub=uh.stub_account()))
+        self.to_link_step(pg)
+        pg.click("#lk-skip")
+        pg.wait_for_selector('section[data-step="plan"]:not([hidden])')
+        self.assertTrue(pg.is_hidden("#acct-top"))
+        pg.click("#back")
+        self.assertEqual(step(pg), "find")
+
+    def test_link_this_tv_waits_for_the_website_then_moves_on_with_no_question(self):
+        pg = self.open(uh.Harness(stub=uh.stub_account()))
+        self.to_link_step(pg)
+        pg.click("#lk-go")
+        self.assertTrue(pg.is_visible("#lk-wait"))
+        self.assertIn("Waiting for you to say Yes in your browser", pg.inner_text("#lk-wait"))
+        pg.wait_for_selector('section[data-step="plan"]:not([hidden])', timeout=15000)
+        self.assertTrue(pg.is_hidden("#link-ask"), "the website's Yes is the only question")
+        self.assertTrue(pg.is_visible("#acct-top"))
+        self.assertIn("Signed in as Sam", pg.inner_text("#plan-account"))
+        self.assertIn("/api/device/start", self.calls())
+        pg.click("#back")
+        self.assertEqual(step(pg), "find")
+
+    def test_link_this_tv_that_runs_out_says_so_and_can_try_again(self):
+        stub = dict(uh.stub_account(), **{"/v1/setup/device/poll": {"_status": 401, "error": "That sign in ran out. Start again in Setup.", "code": "expired"}})
+        pg = self.open(uh.Harness(stub=stub))
+        self.to_link_step(pg)
+        pg.click("#lk-go")
+        pg.wait_for_selector("#lk-status:not([hidden])", timeout=15000)
+        self.assertIn("Press Link this TV to try again", pg.inner_text("#lk-status"))
+        self.assertTrue(pg.is_enabled("#lk-go"))
+        self.assertTrue(pg.is_hidden("#lk-wait"))
+
+    def test_finish_link_it_uses_the_website_not_a_code(self):
+        pg = self.open(uh.Harness(stub=uh.stub_account()))
+        self.to_plan(pg)
+        self.install(pg)
+        pg.click("#link-cta")
+        self.assertTrue(pg.is_hidden("#fl-panel"), "no code box")
+        pg.wait_for_selector("#studio-cta:not([hidden])", timeout=25000)
+        self.assertEqual(self.calls().count("/api/link-tv"), 1)
+        self.assertIn("already linked", pg.inner_text("#fin-cap"))
 
     def test_tidy_never_shows_the_last_tvs_switches_and_never_gets_stuck(self):
         from couchtv_setup import server, tidy
@@ -432,7 +508,7 @@ class Page(unittest.TestCase):
                 raise server.TvError("Gone.", "no_tv")
             return orig(method, path, body)
         with mock.patch.object(server, "api", api):
-            pg.click("#link-cta")
+            self.code_panel(pg)
             pg.fill("#fl-code", "ABCD-EFGH")
             pg.click("#fl-go")
             pg.click("#link-ask-yes")

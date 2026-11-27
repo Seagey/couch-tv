@@ -148,7 +148,10 @@ def stub_account(name="Sam", design="Couch Original"):
     return {"/v1/setup/who": {"account": {"email": "s***@example.test", "name": name}},
             "/v1/setup/handoff": {"token": "T" * 40, "account": {"email": "s***@example.test", "name": name, "design": design}},
             "/v1/setup/tv": {"tv_id": "tv_abc123", "link": LINK, "code": "CTV1-ABCD", "design": design, "home": None},
-            "/v1/setup/done": {"ok": True}}
+            "/v1/setup/done": {"ok": True},
+            "/v1/setup/device": {"device_code": "d" * 43, "user_code": "ABCD-EFGH", "interval": 2,
+                                 "verify": "https://couchtv.joshuaseage.com/link-setup"},
+            "/v1/setup/device/poll": {"token": "T" * 40, "account": {"email": "s***@example.test", "name": name, "design": design}}}
 
 
 def chromium():

@@ -367,6 +367,16 @@ class Account(unittest.TestCase):
             self.assertEqual(studio.device_poll(link)["account"]["name"], "Sam")
         self.assertEqual(link.token, TOKEN)
 
+    def test_open_address_carries_the_request_and_only_a_clean_name(self):
+        v = "https://couchtv.joshuaseage.com/link-setup"
+        self.assertEqual(studio.open_address(v, "abcd-efgh"), v + "?c=ABCDEFGH")
+        self.assertEqual(studio.open_address(v, "ABCD-EFGH", "TCL lounge TV"), v + "?c=ABCDEFGH&n=TCL%20lounge%20TV")
+        bad = studio.open_address(v, "ABCD-EFGH", "<b>x</b>&c=EVIL\nTV " + "y" * 80)
+        self.assertNotIn("<", bad)
+        self.assertNotIn("\n", bad)
+        self.assertEqual(bad.count("c="), 1)
+        self.assertLessEqual(len(bad.split("&n=")[1]), 3 * 40)
+
     def test_device_code_shapes(self):
         for good in ("ABCDEFGH", "ABCD-EFGH", "2345-6789"):
             with self.stub({"/v1/setup/device": {"device_code": "d" * 40, "user_code": good}}):

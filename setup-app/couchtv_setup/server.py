@@ -63,6 +63,7 @@ class State:
         self.started = time.time()
         self.link = studio.Link()      # the Couch TV account, in memory only
         self.handoff = None            # a code from couchtv://setup?handoff=..., not used yet
+        self.device_silent = False     # the device sign in was started by "Link this TV": no second question
         self.offer = None              # an account shown as "Link as X?", waiting for Yes (nothing used yet)
         self.device = None             # the website's Allow, being waited for
         self.health = None
@@ -522,7 +523,10 @@ def api(method, path, body):
         return {"ok": True}
     if path == "/api/device/start":
         S.device = studio.Link()
-        return studio.device_start(S.device)
+        # silent: the person pressed "Link this TV" here and says Yes on the website ("Is this your TV?"), so
+        # Setup does not ask again when the website answers (no codes, mockup 1 of 27 Nov 2026)
+        S.device_silent = body.get("silent") is True
+        return studio.device_start(S.device, body.get("tv_name"))
     if path == "/api/device/poll":
         if not S.device:
             raise TvError("Start signing in first.", "no_device")
@@ -530,6 +534,15 @@ def api(method, path, body):
         if got.get("pending"):
             return got
         link, S.device = S.device, None
+        if S.device_silent:
+            S.device_silent = False
+            if S.job.get("running"):
+                studio.end(link)
+                raise TvError("Still busy with the last step. Try Link this TV again in a moment.", "busy")
+            if S.link.token:
+                studio.end(S.link)
+            S.link, S.health, S.account_error = link, None, None
+            return {"account": S.link.account}
         try:
             return _offer(link.account, link=link)
         except TvError:

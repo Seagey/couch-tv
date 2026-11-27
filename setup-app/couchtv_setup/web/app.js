@@ -114,7 +114,9 @@
     flow += 1;                      // an answer still on its way for the screen we leave is ignored
     clearInterval(countdown);
     if (cur === "find") { clearTimeout(poll); poll = null; }
+    if (cur === "link") clearInterval(lkTimer);
     show(prev, { back: true });
+    if (prev === "link") paintLink();
     if (prev === "find") lookAgain();
   }
   $("back").addEventListener("click", goBack);
@@ -614,12 +616,72 @@
     state.tvName = (t && t.known && t.known.room) || (t && t.label) || f.name || "";
     $("tv-room").value = state.tvName;
     syncName();
+    planAccount();
+    refreshPlan();
+    if (needsLink()) { paintLink(); show("link"); return; }
+    show("plan");
+  }
+
+  function planAccount() {
     if (state.account) {
       $("plan-account").textContent = signedInWords(state.account.name || state.account.email) + ". Couch TV gets your home details" +
         (state.account.design ? " and \"" + state.account.design + "\"" : "") + " as it goes on.";
     }
     $("plan-account").hidden = !state.account;
-    refreshPlan();
+  }
+
+  // ---- link this TV to the account, no codes: the website asks "Is this your TV?" and Setup moves on ----
+  // Shown after the TV is connected and before the plan, only when this Setup links accounts, nobody is signed in yet,
+  // and the person has not skipped it for this TV. Skipping is allowed; it says what the TV shows until it is linked.
+  var lkTimer = null;
+  function needsLink() {
+    return state.accountMode !== "off" && hasFeature("link-tv") && !state.account && state.linkSkipIp !== state.ip;
+  }
+  function paintLink() {
+    clearInterval(lkTimer);
+    var on = !!state.account;
+    text("lk-name", tvName());
+    $("lk-go").hidden = on; $("lk-go").disabled = false; $("lk-skip-row").hidden = on;
+    $("lk-wait").hidden = true; $("lk-status").hidden = true;
+    $("lk-next").hidden = !on; $("lk-done").hidden = !on;
+    if (on) text("lk-done", signedInWords(state.account.name || state.account.email) + ". Your designs, people, photos and town arrive on this TV as it is set up.");
+  }
+  // Starts the website's "Is this your TV?" for this computer and waits for the Yes. done(account) when it comes;
+  // failed(message) when it ran out or could not start. Nothing is typed or copied.
+  function browserLink(done, failed) {
+    api("/api/device/start", { silent: true, tv_name: tvName() }).then(function (d) {
+      var a = $("lk-open"); a.href = d.open;
+      try { window.open(d.open, "_blank", "noopener"); } catch (e) {}
+      clearInterval(lkTimer);
+      lkTimer = setInterval(function () {
+        api("/api/device/poll").then(function (r) {
+          if (r.account) { clearInterval(lkTimer); signedIn(r.account); done(r.account); }
+          else if (r.ask) { clearInterval(lkTimer); ask(r.ask, null); }
+        }, function (e) { clearInterval(lkTimer); failed((e && e.message) || "That did not work. Try again."); });
+      }, Math.max(2, d.interval || 3) * 1000);
+    }, function (e) { failed((e && e.message) || "That did not work. Try again."); });
+  }
+  $("lk-go").addEventListener("click", function () {
+    $("lk-go").disabled = true; $("lk-status").hidden = true; $("lk-wait").hidden = false;
+    browserLink(function () {
+      $("lk-wait").hidden = true;
+      planAccount(); refreshPlan();
+      if (current === "link") toPlan();
+    }, function (m) {
+      $("lk-wait").hidden = true; $("lk-go").disabled = false;
+      text("lk-status", m + " Press Link this TV to try again."); $("lk-status").hidden = false;
+    });
+  });
+  $("lk-skip").addEventListener("click", function () {
+    clearInterval(lkTimer);
+    state.linkSkipIp = state.ip;
+    refreshPlan(); toPlan();
+  });
+  $("lk-next").addEventListener("click", function () { planAccount(); refreshPlan(); toPlan(); });
+  // the link screen is a one way door: Back from the plan goes to the TV list, not to it again
+  function toPlan() {
+    var i = nav.lastIndexOf("link");
+    if (i >= 0) nav.splice(i, 1);
     show("plan");
   }
 
@@ -855,8 +917,11 @@
 
   $("link-cta").addEventListener("click", function () {
     if (state.account) return linkRun();
-    $("fl-panel").hidden = false;
-    $("fl-code").focus();
+    $("link-cta").disabled = true;
+    text("link-status", "Waiting for you to say Yes in your browser\u2026"); $("link-status").hidden = false;
+    browserLink(function () { linkRun(); }, function (m) {
+      $("link-cta").disabled = false; text("link-status", m); $("link-status").hidden = false;
+    });
   });
 
   // Every way linking can fail has a way on: sign in again, find the TV again, update Couch TV, or the same button.
@@ -953,7 +1018,8 @@
   function resetTv() {
     flow += 1;
     askThen = null;                  // a question still open signs Setup in; it never links the next TV by itself
-    clearInterval(countdown); clearInterval(portTimer); clearInterval(linkTimer);
+    clearInterval(countdown); clearInterval(portTimer); clearInterval(linkTimer); clearInterval(lkTimer);
+    state.linkSkipIp = null;
     clearTimeout(poll); poll = null;
     state.ip = null; state.kind = null; state.facts = null; state.route = null; state.weather = null; state.remote = false;
     state.look = null; state.tried = 0; state.guide = null; state.helperTv = null; state.ontvTakes = false;

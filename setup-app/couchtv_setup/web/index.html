@@ -340,6 +340,20 @@
   </section>
 
   <!-- the plan, and the yes -->
+  <!-- link this TV to the account: the website says "Is this your TV?" and Setup moves on (no codes) -->
+  <section data-step="link" class="sheet linkstep">
+    <p class="kicker">Step 3 of 4</p>
+    <h1>Link this TV to your account</h1>
+    <p class="lede">Your designs, people, photos and town then arrive on this TV finished.</p>
+    <div class="tvrow"><span class="tvico" aria-hidden="true"></span><div><b id="lk-name">Your TV</b><span class="small">Found on your Wi-Fi</span></div></div>
+    <button class="btn go big" id="lk-go" type="button"><span>Link this TV</span></button>
+    <div class="waitbox" id="lk-wait" aria-live="polite" hidden><span class="spin" aria-hidden="true"></span><span>Waiting for you to say Yes in your browser&hellip; <a id="lk-open" class="small" target="_blank" rel="noopener" href="#">Nothing opened? Open the website</a></span></div>
+    <p class="notice" id="lk-done" aria-live="polite" hidden></p>
+    <p class="hint" id="lk-status" aria-live="polite" hidden></p>
+    <div class="actions"><button class="btn go" id="lk-next" type="button" hidden><span>Carry on</span> <svg class="arr" viewBox="0 0 24 24" aria-hidden="true"><use href="#arrow"/></svg></button></div>
+    <p class="small" id="lk-skip-row">Not now? <button class="link" id="lk-skip" type="button">Skip linking</button>. The TV will show empty cards until you link it.</p>
+  </section>
+
   <section data-step="plan" class="sheet wide">
     <div class="planhead">
       <div class="tv stand"><div class="scr sky"><svg width="112" height="92" aria-hidden="true"><use href="#logo"/></svg></div></div>
