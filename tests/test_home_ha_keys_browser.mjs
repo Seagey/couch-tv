@@ -137,6 +137,22 @@ await page.evaluate(() => window.tv && window.tv.accountInbox(JSON.stringify({ i
 await page.waitForTimeout(500);
 ok((await haState(page)).kept === null, "drop_keys from the inbox drops it too");
 await page.close();
+// 5. the account changes its smart home picks (the key is the same): the ticks follow, once; a set up made here is left alone
+page = await fresh();
+await arrive(page, pack(1, { ha: HA }, { smart: { picks: { w: ["light.hall"] } } }));
+ok((await stats(page)).saves === 1, "set up with the first picks");
+await arrive(page, pack(2, { ha: HA }, { smart: { picks: { w: ["light.hall", "light.deck"] } } }));
+st = await haState(page);
+ok(st.stats.saves === 2 && st.kept.controls.some((c) => c.entity === "light.deck"), "new picks reach the ticks without a new key: " + JSON.stringify(st));
+await arrive(page, pack(3, { ha: HA }, { smart: { picks: { w: ["light.hall", "light.deck"] } } }));
+ok((await stats(page)).saves === 2, "the same picks again change nothing");
+await page.close();
+page = await fresh("&haown=1");
+const own2 = (await haState(page)).kept;
+await arrive(page, pack(1, { ha: HA }, { smart: { picks: { w: ["light.hall"] } } }), "&haown=1");
+await arrive(page, pack(2, { ha: HA }, { smart: { picks: { w: ["light.deck"] } } }), "&haown=1");
+ok(JSON.stringify((await haState(page)).kept) === JSON.stringify(own2), "new picks never touch a set up made on this TV");
+await page.close();
 await browser.close();
 server.close();
 console.log("Home Assistant key tests passed (" + n + " checks).");

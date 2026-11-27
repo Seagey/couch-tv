@@ -635,7 +635,7 @@
         // each pack carries the keys again: act only when the key or its address is new (a model or ticks changed on this TV stay)
         var same = held[kind] && held[kind].sig === rec.sig && held[kind].url === rec.url;
         // a Home Assistant token waits in the private store until the launcher has taken it (the page may restart first): see resumeAccountKeys
-        if (kind === "ha") rec.pending = ks[kind].token;
+        if (kind === "ha") { if (!same) rec.pending = ks[kind].token; else if (held[kind].pending) rec.pending = held[kind].pending; }
         held[kind] = rec;
         if (!same) { changed = true; useAccountKey(kind, ks[kind]); }
       } else if (held[kind]) {
@@ -708,6 +708,7 @@
     return "";
   }
   function addAccountPhoto(pid, localId, file, url, day) {
+    if (ACCOUNT && ACCOUNT.photoPending && ACCOUNT.photoPending[pid]) { delete ACCOUNT.photoPending[pid]; if (!Object.keys(ACCOUNT.photoPending).length) delete ACCOUNT.photoPending; }
     var list = Array.isArray(ST.photos) ? ST.photos.slice() : [];
     if (list.length >= MAX_PHOTOS || list.some(function (x) { return x && x.id === localId; })) return;
     list.push(file ? { id: localId, file: file } : { id: localId, url: url });
@@ -722,7 +723,9 @@
   }
   // the Android launcher copies the file itself (TVOS.fetchAccountPhoto); a TV whose home a computer runs hands the bytes to that
   // computer; a TV with neither keeps the link (it is renewed at every send)
-  function fetchAccountPhoto(pid, url, day) {
+  function fetchAccountPhoto(pid, url, day, resumed) {
+    // the page may start again before the copy is done (a pack taken at start restarts it): the link waits in the account record until the picture is in
+    if (!resumed) { ACCOUNT = ACCOUNT || {}; ACCOUNT.photoPending = ACCOUNT.photoPending || {}; ACCOUNT.photoPending[pid] = { url: url, day: day || "", at: Date.now() }; keepAccount(ACCOUNT); }
     if (TV && TV.fetchAccountPhoto) { ACC_PENDING[pid] = day || ""; try { TV.fetchAccountPhoto(pid, url); } catch (e) { delete ACC_PENDING[pid]; } return; }
     if (!OFFLINE && !STANDALONE && API) {
       var x = new XMLHttpRequest();
@@ -740,7 +743,60 @@
       } catch (e) {}
       return;
     }
-    addAccountPhoto(pid, "acc_" + pid, "", url, day);
+    // a web TV with no launcher and no home computer (this page alone): the picture is kept in this browser's own database (IndexedDB), so it keeps
+    // showing after the link runs out; a browser with none keeps the link, which is renewed at every send
+    idbCopy(pid, url, function (ok) { addAccountPhoto(pid, "acc_" + pid, "", ok ? "idb:acc_" + pid : url, day); });
+  }
+  // ---- pictures kept in the browser's own database (G3): { id: blob url } for this session, the blobs in IndexedDB "couchtv-photos" ----
+  var IDB_URL = {};
+  function idbOpen(cb) {
+    try {
+      var r = indexedDB.open("couchtv-photos", 1);
+      r.onupgradeneeded = function () { r.result.createObjectStore("p"); };
+      r.onsuccess = function () { cb(r.result); };
+      r.onerror = function () { cb(null); };
+    } catch (e) { cb(null); }
+  }
+  function idbCopy(pid, url, done) {
+    var x = new XMLHttpRequest();
+    try {
+      x.open("GET", url); x.responseType = "blob"; x.timeout = 30000;
+      x.onload = function () {
+        if (x.status !== 200 || !x.response || x.response.size > 2 * 1024 * 1024) return done(false);
+        idbOpen(function (db) {
+          if (!db) return done(false);
+          try {
+            var tx = db.transaction("p", "readwrite"); tx.objectStore("p").put(x.response, "acc_" + pid);
+            tx.oncomplete = function () { try { IDB_URL["acc_" + pid] = URL.createObjectURL(x.response); } catch (e) {} done(true); };
+            tx.onerror = tx.onabort = function () { done(false); };
+          } catch (e) { done(false); }
+        });
+      };
+      x.onerror = x.ontimeout = function () { done(false); };
+      x.send();
+    } catch (e) { done(false); }
+  }
+  function idbForget(p) {
+    if (!p || typeof p.url !== "string" || p.url.indexOf("idb:") !== 0) return;
+    var id = p.url.slice(4);
+    try { if (IDB_URL[id]) URL.revokeObjectURL(IDB_URL[id]); } catch (e) {}
+    delete IDB_URL[id];
+    idbOpen(function (db) { if (db) try { db.transaction("p", "readwrite").objectStore("p").delete(id); } catch (e) {} });
+  }
+  // at start: the pictures kept in the browser become blob links again (a blob link only lasts for the page)
+  function idbLoad() {
+    var mine = (Array.isArray(ST.photos) ? ST.photos : []).filter(function (p) { return p && typeof p.url === "string" && p.url.indexOf("idb:") === 0; });
+    if (!mine.length) return;
+    idbOpen(function (db) {
+      if (!db) return;
+      var left = mine.length;
+      mine.forEach(function (p) {
+        var id = p.url.slice(4), g;
+        try { g = db.transaction("p").objectStore("p").get(id); } catch (e) { left--; return; }
+        g.onsuccess = function () { if (g.result) { try { IDB_URL[id] = URL.createObjectURL(g.result); } catch (e) {} } if (--left === 0) { DATES = null; ahChanged(); try { if (typeof CouchDesign !== "undefined" && CouchDesign.dataChanged) CouchDesign.dataChanged("photos"); } catch (e) {} } };
+        g.onerror = function () { left--; };
+      });
+    });
   }
   function accountPhotoFetched(pid, ok) {
     var day = ACC_PENDING[pid]; delete ACC_PENDING[pid];
@@ -752,6 +808,7 @@
       var gone = list.filter(function (x) { return x && x.id === id; })[0];
       if (!gone) return;
       if (gone.file) try { if (TV && TV.removePhoto) TV.removePhoto(gone.file); } catch (e) {}
+      idbForget(gone);
       list = list.filter(function (x) { return x !== gone; }); changed = true;
     });
     (p.update || []).forEach(function (u) { list.forEach(function (x) { if (x && x.id === u.id && !x.file && x.url !== u.url) { x.url = u.url; changed = true; } }); });
@@ -762,6 +819,7 @@
   // what mergeHome worked out, kept: the record (with the photos), the town in Location, the guest Wi-Fi in At home, and (pack v2) the
   // details in At home, the account's photos and the keys. The people are the caller's (the list on screen changes differently at start and later).
   function keepHome(r) {
+    var prevDetails = ACCOUNT && ACCOUNT.details || null;
     ACCOUNT = r.account;
     keepAccount(ACCOUNT);
     if (r.place) ST.place = r.place; else if (ST.place) { delete ST.place; WXCFG = CFG.weather || WX_DEFAULT; }
@@ -776,6 +834,8 @@
     }
     if (r.photos && applyAccountPhotos(r.photos)) { saveSettings(); ahChanged(); }
     if (r.keys) applyAccountKeys(r.keys);
+    accountWidgets();
+    accountSmartPicks(prevDetails);
     applyAccountRoom();
   }
   // Lane B (28 Nov 2026): the room the account gave this TV (a pack's details.rooms holds only this TV's own one). Smart home then shows and
@@ -787,6 +847,64 @@
     var r = d.rooms && typeof d.rooms === "object" ? d.rooms : null, k = r ? Object.keys(r) : [];
     try { window.smartHome.setRoom(k.length === 1 && r[k[0]] && typeof r[k[0]] === "object" ? r[k[0]] : null); } catch (e) {}
   }
+  // ---- the account's details onto each widget on the design (Phase 2): own places (week, surf, weather and the rest), the commute's two
+  // ends, bin night and names and lids, whose shows. design-code.js planWidgets works out what changes; the TV's own change to one of
+  // these stays until the account's value changes. Runs after a pack and whenever the design's widgets are known (wsNewDesign).
+  function accountWidgets() {
+    try {
+      if (!ACCOUNT || typeof CouchDesignCode === "undefined" || !CouchDesignCode.planWidgets || typeof CouchDesign === "undefined" || !CouchDesign.on || !CouchDesign.on() || !CouchDesign.widgetList) return;
+      var recs = {}, list = CouchDesign.widgetList().filter(function (w) { return w.kind !== "stack"; }).map(function (w) {
+        if (!recs[w.kind]) recs[w.kind] = wsRecords(w.kind).map(function (r) { return r.key; });
+        return { key: w.key, id: w.id, kind: w.kind, fields: recs[w.kind], opts: w.opts };
+      });
+      var plan = CouchDesignCode.planWidgets(ACCOUNT, list, wsAll());
+      var wl = {}; list.forEach(function (w) { wl[w.key] = w; });
+      plan.sets.forEach(function (x) {
+        if (x.field === "thisweek") {
+          var w = wl[x.key];
+          if (w) wsSets({ key: x.key, opts: w.opts || {}, settings: wsRecords(w.kind) }, { sets: "anchor" }, x.value);
+        } else wsSet(x.key, x.field, x.value);
+      });
+      var was = stableJson(ACCOUNT.wsApplied || {});
+      if (stableJson(plan.next) !== was) { ACCOUNT.wsApplied = plan.next; keepAccount(ACCOUNT); }
+    } catch (e) {}
+  }
+  function stableJson(v) { try { return CouchDesignCode.stable ? CouchDesignCode.stable(v) : JSON.stringify(v); } catch (e) { return ""; } }
+  // the smart home picks the account names (by widget, and this TV's room): when they change while the account's Home Assistant is set up
+  // here, the launcher's ticks follow (never over a set up made on this TV, as applyAccountKeys)
+  function accountSmartPicks(prev, tries) {
+    try {
+      var d = ACCOUNT && ACCOUNT.details, kept = keptKeys();
+      if (!d || !kept.ha || kept.ha.pending || kept.ha.dropping) return;
+      var sig = function (x) { return stableJson({ s: x && x.smart || null, r: x && x.rooms || null }); };
+      // the page may start again before the launcher has answered: the wish waits in the account record (smartPending) and is tried at start
+      if (!ACCOUNT.smartPending) {
+        if (prev !== undefined && sig(prev) === sig(d)) return;
+        ACCOUNT.smartPending = true; keepAccount(ACCOUNT);
+      }
+      var S = window.smartHome && window.smartHome.setup;
+      // the launcher's smart home bridge may not be there yet when the pack is applied at start: look again a few times
+      if (!S || !S.canFromAccount || !S.canFromAccount() || !S.saveFromAccount) { if ((tries || 0) < 6) setTimeout(function () { accountSmartPicks(prev, (tries || 0) + 1); }, 1000); return; }
+      var st = null; try { st = S.status(); } catch (e) {}
+      var done = function () { if (ACCOUNT && ACCOUNT.smartPending) { delete ACCOUNT.smartPending; keepAccount(ACCOUNT); } };
+      if (st && st.set && st.from_account) S.saveFromAccount(haPicks(d)).then(done); else done();
+    } catch (e) {}
+  }
+  // at start: smart home picks that were waiting for the launcher are applied now
+  function resumePhotos() {
+    if (!ACCOUNT) ACCOUNT = keptAccount();
+    var pp = ACCOUNT && ACCOUNT.photoPending;
+    if (!pp) return;
+    Object.keys(pp).forEach(function (pid) {
+      var x = pp[pid];
+      if (!x || !x.url || Date.now() - (x.at || 0) > 23 * 3600 * 1000) { delete pp[pid]; return; }
+      var have = ACCOUNT.photoMap && ACCOUNT.photoMap[pid];
+      if (have) { delete pp[pid]; return; }
+      fetchAccountPhoto(pid, x.url, x.day, true);
+    });
+    if (!Object.keys(pp).length) { delete ACCOUNT.photoPending; keepAccount(ACCOUNT); }
+  }
+  function resumeSmartPicks() { if (!ACCOUNT) ACCOUNT = keptAccount(); if (ACCOUNT && ACCOUNT.smartPending) accountSmartPicks(undefined); }
   // A pack that arrived with a design (held by design-code.js until now). The account wins: its people
   // first, then the ones added on this TV; the town and the guest Wi-Fi too. A wipe takes out only what
   // came from it.
@@ -870,6 +988,7 @@
     if (typeof CouchDesign !== "undefined" && CFG.design) HOME = CouchDesign.home(HOME, CFG.design, { fromCode: DESIGN_FROM_CODE });
     ON_TV = CFG.mode === "on-tv";
     ST = loadSettings();
+    idbLoad();
     ACCOUNT = keptAccount();
     if (OFFLINE || ALONE) takeAccountHome();
     KEEP_PHOTO = typeof ST.keep_photo === "boolean" ? ST.keep_photo : HOME.keep_photo === true;
@@ -1472,6 +1591,7 @@
   function photoSrc(p) {
     // a photo the phone's Home settings page sent to the home computer (bridge/phonepage.py): from there
     if (p.file && /^bridge[a-z0-9]+\.jpg$/.test(p.file) && !OFFLINE) return API + "/api/photo/" + encodeURIComponent(p.file) + (KEY ? "?key=" + encodeURIComponent(KEY) : "");
+    if (p.url && p.url.indexOf("idb:") === 0) return IDB_URL[p.url.slice(4)] || "";
     return p.file ? "http://tvos.invalid/photo/" + encodeURIComponent(p.file) : p.url;
   }
   function ownScenes() {
@@ -7650,6 +7770,7 @@
     var p = (ST.photos || []).filter(function (x) { return x.id === id; })[0];
     if (!p) return;
     if (p.file) try { if (TV && TV.removePhoto) TV.removePhoto(p.file); } catch (e) {}
+    idbForget(p);
     ST.photos = ST.photos.filter(function (x) { return x.id !== id; });
     saveSettings();
   }
@@ -8694,6 +8815,7 @@
   function resetSettings() {
     (Array.isArray(ST.photos) ? ST.photos : []).forEach(function (p) {
       if (p.file) try { if (TV && TV.removePhoto) TV.removePhoto(p.file); } catch (e) {}
+      idbForget(p);
     });
     ST = Array.isArray(ST.hidden_apps) ? { hidden_apps: ST.hidden_apps } : {};
     keep("tvhome.look", null);
@@ -9542,6 +9664,8 @@
   function ahRead(key) { try { var v = AH.io.get(key); return v ? JSON.parse(v) : null; } catch (e) { return null; } }
   function ahWrite(key, v) { try { AH.io.set(key, JSON.stringify(v)); } catch (e) {} }
   resumeAccountKeys();
+  resumeSmartPicks();
+  resumePhotos();
   // a home with no computer took its pack before At home was ready (takeAccountHome waits for it): take it now
   if ((OFFLINE || ALONE) && AH && typeof CouchDesignCode !== "undefined" && CouchDesignCode.takeHome && CouchDesignCode.takeHome(true))
     setTimeout(function () { if (takeAccountHome()) { try { restart(); } catch (e) {} } }, 0);
@@ -9723,6 +9847,9 @@
     out.books = { set: booksSet(r), events: booksSet(r) ? booksEvents(r) : null, err: STAY.err };
     var ps = photoDates();
     out.memory = { photos: ps.length, dated: ps.filter(function (p) { return p.date; }).length, today: CouchAtHome.onThisDay(ps, new Date()), week: CouchAtHome.nearDay(ps, new Date(), 3) };
+    // On this day is chosen per TV in the account (details.photos.on_this_day: false here): this TV shows none
+    var otd = ACCOUNT && ACCOUNT.details && ACCOUNT.details.photos;
+    if (otd && otd.on_this_day === false) { out.memory.today = []; out.memory.week = []; }
     out.screen = ahWants("screentime") ? screenNow() : { ok: false, why: "off" };
     return out;
   }
@@ -10639,7 +10766,10 @@
       return n.join(",") === m.join(",") && n.every(function (s) { return x[s] === y[s]; });
     });
   }
-  function wsNewDesign() {
+  function wsNewDesign() { wsNewDesign0(); accountWidgets(); }
+  function wsNewDesign0() {
+    // the editor's picture holds the person's details for the design on screen: a design arriving there is not a new design on a TV, nothing is dropped
+    if (/[?&]designer=1\b/.test(Q)) return;
     if (typeof CouchDesign === "undefined" || !CouchDesign.on || !CouchDesign.on() || !CFG.design || !CouchDesign.widgetList) return;
     var wl = CouchDesign.widgetList();
     var s = wl.map(function (w) { return w.key; }).sort().join(","), h = 0;
@@ -11154,6 +11284,12 @@
         return { weather: WX_SHOW ? data.weather : null, wxOff: !WX_SHOW, place: { name: String((WXCFG && WXCFG.place) || "").split(",")[0], lat: WXCFG && WXCFG.lat, lon: WXCFG && WXCFG.lon },
           shows: data.shows || [], music: music, apps: (function () { try { return arrangeItems().items.map(function (it) { return { package: it.package, name: it.name }; }); } catch (e) { return []; } })(),
           photos: (Array.isArray(ST.photos) ? ST.photos : []).filter(function (p) { return p && (p.file || p.url); }).map(photoSrc),
+          // the editor's picture only (Couch TV Studio's app/home-config.js sets these from the person's saved account, in memory): their smart home picks and
+          // album photos drawn over the demo readings. Never set on a TV.
+          previewPicks: window.COUCH_PREVIEW_PICKS && typeof window.COUCH_PREVIEW_PICKS === "object" ? window.COUCH_PREVIEW_PICKS : undefined,
+          previewPeople: Array.isArray(window.COUCH_PREVIEW_PEOPLE) ? window.COUCH_PREVIEW_PEOPLE : undefined,
+          previewTown: typeof window.COUCH_PREVIEW_TOWN === "string" ? window.COUCH_PREVIEW_TOWN : undefined,
+          previewPhotos: Array.isArray(window.COUCH_PREVIEW_PHOTOS) ? window.COUCH_PREVIEW_PHOTOS : undefined,
           // with the account's photo (Your home) when there is one: drawn on this TV only
           people: NOBODY ? [] : PEOPLE.map(function (p) { var o = { id: p.id, name: p.name }, ph = photoOfPerson(p); if (ph) o.photo = ph; return o; }), who: who, quick: quickVisible(), quickCan: QUICK_ALL.filter(quickCan), cards: CARDS.slice(0, 8), iconUrl: iconUrl,
           // no bridge at all (option A, or the standalone home): widgets that need one say so
