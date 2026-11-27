@@ -43,6 +43,8 @@ ok(C.apps.some((x) => !x.verified), "apps not yet seen on a TV say so");
 
 // 2. helpers
 ok(A.iconFor("netflix", 100) === "app-icons/netflix.png" && A.iconFor("netflix", 300) === "app-icons/netflix-512.png" && A.iconFor("netflix") === "app-icons/netflix-512.png", "iconFor: 160 picture when small, 512 when large");
+const wsrc = fs.readFileSync(path.join(web, "widgets.js"), "utf8");
+ok(/function realPx\(a\)[^\n]*devicePixelRatio/.test(wsrc) && /iconFor\(c\.id, realPx\(a\)\)/.test(wsrc) && /iconUrl\(pkg, env, a\)/.test(wsrc), "widgets.js picks each app picture by the tile's real screen size");
 ok(A.iconFor("plex", 600) === "" && A.iconFor("nope", 600) === "", "iconFor: no picture gives empty");
 ok(A.idOf("com.netflix.ninja") === "netflix" && A.idOf("au.net.abc.iview") === "iview" && A.idOf("nope") === null && A.idOf("__proto__") === null, "idOf maps packages to ids");
 ok(A.get("__proto__") === null && A.get("constructor") === null, "no prototype keys");
