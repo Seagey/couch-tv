@@ -78,6 +78,8 @@ APPS = [
      "jw": [], "deeplink": "app"},
     {"id": "spotify", "name": "Spotify", "package": "com.spotify.tv.android", "colour": "#1DB954",
      "jw": [], "deeplink": "app"},
+    {"id": "apple-music", "name": "Apple Music", "package": "com.apple.android.music", "colour": "#FA2D48",
+     "jw": [], "deeplink": "app"},
     {"id": "audible", "name": "Audible", "package": "com.audible.application.firetv", "colour": "#F8991D",
      "jw": [], "deeplink": "app"},
     {"id": "moonlight", "name": "Moonlight", "package": "com.limelight", "colour": "#2A2A2A",
@@ -121,6 +123,8 @@ TIZEN = {
     "hbo-max": {"ids": ["3202301029760", "3201601007230"], "app": "5b8c3eb16b.BeamCTVDev"},
     "twitch": {"ids": ["3202203026841"], "app": "Jz7aUrV2Q4.Twitch"},
     "spotify": {"ids": ["3201606009684"], "app": "rJeHak5zRg.Spotify"},
+    # As a 2025 QN90F (Tizen 9.0, India) lists it, November 2026: Apple Music is a system app there.
+    "apple-music": {"ids": ["3201908019041"], "app": "org.tizen.apple.apple-music"},
 }
 
 # LG (webOS) app ids, for a TV with "kind": "lg" (bridge/lg.py, docs/LG.md). From public lists, not
