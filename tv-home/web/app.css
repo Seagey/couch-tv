@@ -227,6 +227,13 @@ html:not(.amb-fx) .weather-canvas, html:not(.amb-fx) .ambient-lighting,   /* g01
   to { transform: perspective(60rem) rotateX(-1.2deg) rotateY(1.8deg); }
 }
 @keyframes glint { from { background-position: 100% 0; } to { background-position: 0% 0; } }
+/* The same glint moved by a transform instead (lane L, 28 Nov 2026): the light is drawn once on a strip 2.5
+   tiles wide that slides across, so the TV's compositor moves it and the page does not paint the tile again
+   on every frame (background-position is painted each frame). The same pixels: 60% of 2.5 tiles is the 1.5
+   tiles the background moved. Not on old engines, which round the glint's own corners (below). */
+html:not(.old-engine) .face::after { right: auto; width: 250%; background-size: 100% 100%; background-position: 0 0; transform: translateX(-60%); }
+html:not(.old-engine) .tile.focus .face::after { animation-name: glint-slide; }
+@keyframes glint-slide { from { transform: translateX(-60%); } to { transform: translateX(0); } }
 /* a few seconds after the focus last moved (app.js, unsettle), the sway and glint hold still where they
    are: while anything moves the TV draws the whole screen every frame, and on a 2 GB TV with frosted
    panels that is 22 frames a second instead of 60. Any key or pointer move starts them again. */
@@ -531,6 +538,12 @@ html.who-gentle.scene-fog .mood:not(.dark) .mood-hi { text-shadow: 0 0 0.5rem rg
 .theme-night .people, .theme-night .qbtn, .theme-night .grid, .theme-night .ncard {
   background: rgba(30, 20, 28, 0.32); -webkit-backdrop-filter: blur(1.75rem) saturate(170%); backdrop-filter: blur(1.75rem) saturate(170%);
   box-shadow: inset 0 0 0 0.0625rem rgba(255, 210, 220, 0.16), inset 0 0.0625rem 0 rgba(255, 220, 230, 0.14), 0 1.5rem 3.75rem rgba(0, 0, 0, 0.28);
+}
+/* frost.js: the same glass, drawn once per scene (the panel's part of the scene, blurred and saturated the
+   same way) under the panel's own tint, instead of a blur worked out again on every frame */
+html.frost.theme-night .fz {
+  -webkit-backdrop-filter: none; backdrop-filter: none; background-color: transparent;
+  background-image: linear-gradient(var(--ft), var(--ft)), var(--fz); background-size: 100% 100%; background-repeat: no-repeat;
 }
 .theme-night .hero, .theme-night .time, .theme-night .place { display: none; }
 .theme-night .date {
