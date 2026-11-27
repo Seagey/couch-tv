@@ -57,6 +57,7 @@ import direct
 import matter
 import say
 import phonepage
+import appicons
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
@@ -1236,6 +1237,15 @@ async def play(title, season=None, episode=None, service=None, who=None, resume=
     if started is not None:
         result["started"] = started
     return result
+
+
+async def h_tizen_icon(request):
+    """A Samsung app's icon, looked up by its name (bridge/appicons.py): the TV hands couch-tv no
+    other app's icon."""
+    data = await appicons.icon(request.query.get("name"))
+    if not data:
+        raise ApiError(404, "no icon for that app", key="err_not_found")
+    return web.Response(body=data, content_type="image/png", headers={"Cache-Control": "max-age=604800"})
 
 
 async def h_tizen_next(request):
@@ -5964,6 +5974,7 @@ def make_app():
     r.add_post("/api/say/scene", h_say_scene)
     r.add_get("/api/tizen/next", h_tizen_next)
     r.add_post("/api/tizen/answer", h_tizen_answer)
+    r.add_get("/api/tizen/icon", h_tizen_icon)
     r.add_get("/api/webos/apps", h_webos_apps)
     r.add_get("/api/webos/icon/{id}", h_webos_icon)
     r.add_get("/api/roku/apps", h_roku_apps)

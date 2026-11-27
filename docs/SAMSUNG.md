@@ -382,6 +382,21 @@ name. Then rebuild and reinstall the app:
 ```
 
 The key is the app's package in `bridge/apps.py`.
+## App pictures
+
+The TV hands couch-tv no other app's icon file, and a 2025 QN90F (Tizen 9.0) answers neither the
+remote channel's app list (`ed.installedApp.get`) nor its icon call (`ed.apps.icon`), so the icons
+can't come from the TV. An app couch-tv has no logo for gets one from the bridge
+(`/api/tizen/icon?name=<the app's name on the TV>`, `bridge/appicons.py`): it looks the name up in
+Apple's public app search, takes only an app whose name is the same or starts with it ("Perplexity"
+for "Perplexity - Ask Anything"), or, for a name of two words or more, has it inside ("Xstream Play"
+in "Airtel Xstream Play"), also tries the name without a store tagline ("ZEE5" for "ZEE5 - Movies,
+Shows, ..."; the tile shows that shorter name too), and keeps the picture in `data/app-icons/`. A
+name not found is asked again after a week, and its tile shows the app's name. For an app the
+look-up can't find (Samsung's own Workspace is on no app store), put a picture of your own in
+`samsung/my-logos/` named after the app's name as the TV shows it (`Workspace.png`), its Tizen app id
+or package id, then rebuild and reinstall the app. Without a bridge the tile tries the TV's own icon
+file.
 
 ## Turning it on
 
