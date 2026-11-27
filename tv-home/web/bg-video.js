@@ -170,7 +170,7 @@
   function tier(env) {
     env = env || {};
     if (env.designer) return "1080";
-    // the person chose the still picture on this TV (Home settings, Designs): kept until they turn it off
+    // the person chose the still picture on this TV (Settings, More, Designs): kept until they turn it off
     if (env.stillChosen) return { tier: "still", why: "the still picture was chosen on this TV" };
     // Lighter home turns itself on at 1 GB, where a video design still plays (a 939 MB TCL played the
     // Aquarium video at about 27 frames a second, 0.13.10): there it keeps its other savings only

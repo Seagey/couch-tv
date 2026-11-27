@@ -1,4 +1,4 @@
-// Share this home (Home settings, Designs). Turns the home this TV shows now (made on the TV,
+// Share this home (Settings, More, Designs). Turns the home this TV shows now (made on the TV,
 // from the phone, the scenes or config.json, or a Couch TV Studio design) into a Couch TV Studio design,
 // hands it to the design store, and shows a QR code and a short code. On a phone,
 // <store>/design/?from=<code> opens it in Couch TV Studio, to change it and share or sell it.

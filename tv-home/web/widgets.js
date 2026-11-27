@@ -1762,8 +1762,11 @@
     var list = appsFor(o, env, 1);
     if (!list.length && canAdd(env)) list = ["add:"];
     if (!list.length) return noApps(root, b, (op(o).apps || []).length);
-    var n = appNode(list[0], Math.min(b.w, b.h), env), act = n.getAttribute("data-act"), arg = n.getAttribute("data-arg");
-    n.style.borderRadius = px(Math.min(b.w, b.h) * 0.22);
+    // the tile fits inside the panel's padding (24 a side; none with no panel): a glass App tile drew its tile
+    // the whole widget wide and 24 px off, so "ABC iview" lost its last letter (28 Nov 2026)
+    var a = Math.max(40, Math.min(b.w, b.h) - (root.classList.contains("cw-photo") ? 0 : 48));
+    var n = appNode(list[0], a, env), act = n.getAttribute("data-act"), arg = n.getAttribute("data-arg");
+    n.style.borderRadius = px(a * 0.22);
     n.removeAttribute("data-act");
     add(root, n);
     stop(root, act, arg === null ? undefined : arg, n.getAttribute("data-name"));
@@ -3168,7 +3171,7 @@
     if (q.source === "calendar") {
       var st = stayOf(env || {});
       if ((!st || !st.set) && typed) text = withName(greetingOf(text), typed);
-      else if (!st || !st.set) return empty(root, b, "calendar", b.w < 300 ? "Add bookings" : "Add your bookings calendar", "Settings (hold OK), Home settings, Designs, At home");
+      else if (!st || !st.set) return empty(root, b, "calendar", b.w < 300 ? "Add bookings" : "Add your bookings calendar", "Settings (hold OK), Settings, More, Designs, At home");
       var v = st && st.view;
       if (v && v.phase !== "between") {
         text = withName(text, v.guest || typed);
@@ -3515,10 +3518,10 @@
     var a = agendaEvents(o, env);
     if (!a) {
       var pick = String(setting(o, env, "calendars", "all"));
-      if (pick === "bookings") { empty(root, b, "calendar", b.w < 300 ? "Add bookings" : "Add your bookings calendar", "Settings (hold OK), Home settings, Designs, At home"); return null; }
+      if (pick === "bookings") { empty(root, b, "calendar", b.w < 300 ? "Add bookings" : "Add your bookings calendar", "Settings (hold OK), Settings, More, Designs, At home"); return null; }
       soon(root, b, "calendar", "agenda"); return null;
     }
-    if (a.wait) { empty(root, b, "calendar", a.err ? (b.w < 300 ? "Calendar not read" : a.err) : (b.w < 300 ? "Reading..." : "Reading your calendar"), a.err ? "Settings (hold OK), Home settings, Designs, At home" : ""); return null; }
+    if (a.wait) { empty(root, b, "calendar", a.err ? (b.w < 300 ? "Calendar not read" : a.err) : (b.w < 300 ? "Reading..." : "Reading your calendar"), a.err ? "Settings (hold OK), Settings, More, Designs, At home" : ""); return null; }
     var out = { days: days, today: evDay(a.events, 0, env), tomorrow: days === "today" ? [] : evDay(a.events, 1, env), week: [] };
     if (days === "week") for (var k = 0; k < 7; k++) evDay(a.events, k, env).forEach(function (x) { if (k && out.week.some(function (y) { return y.start === x.start && y.title === x.title; })) return; x.when = (k ? DAYS[new Date(dayStart(now()) + k * 86400000 + 43200000).getDay()].slice(0, 3) + " " : "") + x.when; x.col = EV_COL[out.week.length % EV_COL.length]; x.k = k; out.week.push(x); });
     return out;
@@ -3714,7 +3717,7 @@
     if (!s || s.why === "off") { soon(root, b, "timer", "screentime"); return null; }
     if (s.why === "tv") { empty(root, b, "timer", b.w < 300 ? "Not on this TV" : "Screen time is not on this TV", ""); return null; }
     if (s.why === "ontv") { empty(root, b, "timer", b.w < 300 ? "Needs a computer once" : "Screen time needs the Couch TV home app", "Put it on once from a computer with the free Setup app"); return null; }
-    if (!s.ok) { empty(root, b, "timer", s.why === "access" ? (b.w < 300 ? "Allow it first" : "Allow screen time on this TV") : (b.w < 300 ? "Needs an update" : "Needs a newer Couch TV"), s.why === "access" ? "Settings (hold OK), Home settings, Designs, At home" : ""); return null; }
+    if (!s.ok) { empty(root, b, "timer", s.why === "access" ? (b.w < 300 ? "Allow it first" : "Allow screen time on this TV") : (b.w < 300 ? "Needs an update" : "Needs a newer Couch TV"), s.why === "access" ? "Settings (hold OK), Settings, More, Designs, At home" : ""); return null; }
     return { ok: true, minutes: s.minutes || 0, goal: h.goal || 0, apps: s.apps || [] };
   }
   R.screentime = function (root, o, b, env) {

@@ -225,10 +225,12 @@ OLD_SITE = "The website is not ready for this Setup yet. Try again later."
 
 
 def clean_account(acct):
-    """The account as the page may show it: name, covered email ("s***@example.com") and design name."""
+    """The account as the page may show it: name, email and design name. The website sends the whole address since
+    28 Nov 2026 (the owner: the person must see which account it is); a website from before sends it covered
+    ("s***@example.com"), and that still passes."""
     acct = acct if isinstance(acct, dict) else {}
     mail = acct.get("email")
-    ok = isinstance(mail, str) and re.fullmatch(r"[^\s@<>\x00-\x1f]{1,4}\*\*\*@[A-Za-z0-9.-]{1,80}", mail)
+    ok = isinstance(mail, str) and re.fullmatch(r"[^\s@<>\x00-\x1f‪-‮⁦-⁩]{1,64}@[A-Za-z0-9.-]{1,80}", mail)
     # the name is whatever its account says: letters that turn text round, and what makes it look like an email, go
     name = re.sub(r"[^\w .,'\u2019-]+", " ", str(acct.get("name") or ""))
     return {"name": re.sub(r"\s+", " ", name).strip()[:40] or None,

@@ -983,7 +983,7 @@
     CFG = window.COUCH_CONFIG || {};
     // Couch TV Studio is opt in (designer-gate.js): until the person at this TV turns it on, no design
     // reaches design.js at all and the home is exactly as it was. A design got by code at this TV
-    // (design-code.js, Home settings, Designs, Get a design) wins over one in config.json; it is
+    // (design-code.js, Settings, More, Designs, Get a design) wins over one in config.json; it is
     // always asked about first (CouchDesign.start with fromCode).
     var GOT = typeof CouchDesignCode !== "undefined" ? CouchDesignCode.kept() : null;
     GATE = typeof CouchDesigner !== "undefined" ? CouchDesigner.decide({ choice: CouchDesigner.readChoice(kept(CouchDesigner.KEY)),
@@ -6639,9 +6639,9 @@
   // ---- rows ----
   // Couch TV Studio is a name, the same in every language
   function secName(id) {
-    var n = { phone: "Set up from your phone", picture: "Picture and sound", remote: "Remote and buttons",
-      thistv: "This TV", more: "More", about: "Help and reset" };
-    return id === "designer" ? "Designs" : n[id] || t("sec_" + id);
+    // the new left list (28 Nov 2026: in every language the TV speaks); about is now Help and reset
+    var n = { about: "sec_help" };
+    return id === "designer" ? "Designs" : t(n[id] || "sec_" + id);
   }
   function rowsNow() { return SET.sub ? SET.sub.rows() : sectionRows(secsNow()[SET.sec][0]); }
   function focusable(r) { return !!r && r.kind !== "head" && r.kind !== "info" && r.kind !== "code" && r.kind !== "qr"; }
@@ -7164,12 +7164,12 @@
   // The account's TV inbox (Send to Living room TV in Couch TV Studio, no code): asked by the app with the
   // link Setup wrote (AccountLink.kt). When (owner, 24 Nov 2026), and never more often:
   //  1. the TV wakes, or the home opens or comes back to the front, after 30 minutes or more away;
-  //  2. the person presses Check for new designs now in Home settings, Designs;
+  //  2. the person presses Check for new designs now in Settings, More, Designs;
   //  3. otherwise once a week (Studio's "poll" only when it is longer, design-code.js inboxDelay).
   // A 429's wait is a time before which the TV does not look at all. Nothing while another app or the
   // screensaver is in front. The times are kept in the page's storage, so a restart of the home is not "away".
   // A design that comes is got like a typed code (its home pack too) and goes on at once, as the account owner
-  // asked for it on their own TV: "New design from your account", with Undo in Home settings, Designs for a day.
+  // asked for it on their own TV: "New design from your account", with Undo in Settings, More, Designs for a day.
   // ACCT_INBOX, not INBOX: INBOX is the phone inbox's (Get a design from your phone) above.
   var ACCT_INBOX = { timer: 0, stopped: false, manual: false, pausedAt: 0 };
   var INBOX_PRESS_MS = 30000, IK = { last: "couchtv.inbox.last", next: "couchtv.inbox.next", wait: "couchtv.inbox.wait", seen: "couchtv.inbox.seen" };
@@ -7221,7 +7221,7 @@
   function inboxAway() { ACCT_INBOX.pausedAt = Date.now(); inboxTime("seen", ACCT_INBOX.pausedAt); inboxLater(0); }
   // the home starting again in front (a restart for a new design or a setting) is not time away
   window.addEventListener("pagehide", function () { if (!PAGE_PAUSED && inboxTime("seen")) inboxTime("seen", Date.now()); });
-  // Home settings, Designs, Check for new designs now
+  // Settings, More, Designs, Check for new designs now
   function inboxCheckNow() {
     var now = Date.now();
     if (!inboxCan()) { SET.msg = INBOX_SAID.unlinked; return; }
@@ -7297,7 +7297,7 @@
     if (typeof CouchDesignCode === "undefined" || !CouchDesignCode.undoFresh || MOCK || PREVIEW) return;
     var u = CouchDesignCode.undoFresh();
     // the two lines as i18n.js has them (tw_acct_new_title, tw_acct_new), so tv-words.js shows them in the TV's language
-    if (u) toast(u.title ? "New design from your account: " + u.title + ". To undo it, open Home settings, Designs." : "New design from your account. To undo it, open Home settings, Designs.");
+    if (u) toast(u.title ? "New design from your account: " + u.title + ". To undo it, open Settings, More, Designs." : "New design from your account. To undo it, open Settings, More, Designs.");
   }
   function undoAccountDesign() {
     var choice = CouchDesignCode.undoNew();
@@ -8491,7 +8491,7 @@
   }
   // ---- the first-run welcome (owner's TCL test of 0.13.9, 23 Nov 2026) ----
   // Most people come from Couch TV Studio's website with a design picked and a short code to type. The
-  // home used to open on the standard home, and the code was three screens deep (Home settings, Designs,
+  // home used to open on the standard home, and the code was three screens deep (Settings, More, Designs,
   // Get a design). Now a TV that was never set up opens on one full screen question: I have a design
   // code (straight to the same Get a design typing box) or Use Couch Original (the standard home, as it
   // always was). Back counts as Couch Original. Once answered it never comes back.
@@ -8600,7 +8600,7 @@
   function welcomeChoose(i) {
     if (zone !== "welcome") return;
     if (i === 0) {
-      // the same Get a design typing box as Home settings, Designs (and Back there shows Get a
+      // the same Get a design typing box as Settings, More, Designs (and Back there shows Get a
       // design from your phone right under it)
       welcomeClose("code");
       openSettings();
@@ -8625,7 +8625,7 @@
   // arrives is replaced by it. The card is: a QR code and an address to design its own screen on a phone. Never on an
   // update (only the welcome's answer in this version makes it due), never once a design or home pack is here,
   // in a guest's or kids profile, in setup or while a question or sheet is up, over an app or the screensaver.
-  // Back (or OK) closes it for good; Home settings, Designs, Make it yours shows the same card again.
+  // Back (or OK) closes it for good; Settings, More, Designs, Make it yours shows the same card again.
   // The card is built only when it is shown and taken out of the page when it closes, so a TV that never
   // shows it pays for none of it. No blur, no animation. The QR is drawn here (qr.js): it carries the address
   // below and nothing else, no code, token, device id or any personal data.
@@ -9118,7 +9118,7 @@
     if (!SET.more && secsNow()[SET.sec] && secsNow()[SET.sec][0] === "more") SET.more = true;
     $("set-secs").innerHTML = secsNow().map(function (sc, i) {
       var cls = "ssec" + (i === SET.sec ? (SET.col === "secs" ? " focus" : " on") : "");
-      if (sc[0] === "more") return '<div class="' + cls + ' more"><span>' + esc(secName("more")) + " \u25BE" + (SET.more ? "" : "<small>(Updates, help, reset)</small>") + "</span></div>";
+      if (sc[0] === "more") return '<div class="' + cls + ' more"><span>' + esc(secName("more")) + " \u25BE" + (SET.more ? "" : "<small>" + esc(t("set_more_hint")) + "</small>") + "</span></div>";
       return '<div class="' + cls + '"><i>' + ICONS[sc[1]] + "</i><span>" + esc(secName(sc[0])) + "</span></div>";
     }).join("");
     var curSecEl = $("set-secs").querySelector(".ssec.focus, .ssec.on");
@@ -10037,7 +10037,7 @@
     return w;
   }
 
-  // Home settings, Designs, At home: one page with the note, lists, Wi-Fi, guide, calendar and
+  // Settings, More, Designs, At home: one page with the note, lists, Wi-Fi, guide, calendar and
   // screen time; a list and a guide entry each open their own page. English only for now, like the
   // rest of the Couch TV Studio section (needs i18n).
   var AH_INTRO = "Words for the widgets on your home. They stay on this TV and never go into a design or Share this home. Typing is quicker with Type on the TV in the phone remote.";
@@ -10299,7 +10299,7 @@
   }
   if (window.CouchMatter) window.CouchMatter.onChange(function () { if (zone === "settings") renderSettings(); });
 
-  // ---- Home settings, Designs, Smart home: Home Assistant set up on the TV, no computer ----
+  // ---- Settings, More, Designs, Smart home: Home Assistant set up on the TV, no computer ----
   // The launcher (HomeAssistant.kt) or, on a TV whose home a computer runs, that computer's bridge
   // checks the address and token and lists what Home Assistant has; the person ticks what shows. The
   // token is handed over once and never comes back to this page. English only, like the rest of the
@@ -10746,7 +10746,7 @@
 
   // ---------------- each widget's own settings (docs/WIDGET-SETTINGS-CONTRACT.md) ----------------
   // Every widget on the design now with a `settings` list in widget-caps.js gets its own page: Hold OK
-  // on it, "Edit on the TV" (design.js), or Home settings, Designs, "Widgets on this
+  // on it, "Edit on the TV" (design.js), or Settings, More, Designs, "Widgets on this
   // home", where each is named by kind and where it sits ("Surf, top right"). The phone's Home settings
   // page shows the same list ("Widgets on this TV", designView). Nothing here is written per widget: each
   // row is drawn from the setting's type. Values live in Home settings, ST.widgets["<id>|<kind>"] =
@@ -11095,7 +11095,7 @@
           set(o[0]);
         } });
       } else if (s.type === "tvlist") {
-        rows.push(info(id, s.label, "Nothing to pick on this TV yet", s.from === "photos" ? "Add photos in Look and scenes, Your photos" : s.from === "lists" ? "Add a list in Home settings, Designs, At home" : s.help));
+        rows.push(info(id, s.label, "Nothing to pick on this TV yet", s.from === "photos" ? "Add photos in Look and scenes, Your photos" : s.from === "lists" ? "Add a list in Settings, More, Designs, At home" : s.help));
       } else if (s.type === "toggle") {
         rows.push({ kind: "toggle", key: id, label: s.label, sub: s.help, value: cur ? t("on") : t("off"), act: function () { set(!cur); } });
       } else if (s.type === "number") {
@@ -11376,7 +11376,7 @@
           watchNext: !!(TV && TV.watchNext && KW_ON), musicHere: !OFFLINE || ON_TV || LOCAL_SPOTIFY,
           // the scenes the launcher's Home Assistant allows (names and entities only, never its address)
           scenes: window.smartHome && window.smartHome.scenes ? window.smartHome.scenes() : [],
-          // things typed at home (Home settings, Designs, At home): kept on this TV only
+          // things typed at home (Settings, More, Designs, At home): kept on this TV only
           home: homeView(),
           // the web widgets' answers (widget-web.js): headlines, scores, prices, the drive
           web: WEB ? WEB.data() : null,

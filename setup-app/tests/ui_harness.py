@@ -40,7 +40,8 @@ THREE = [row("192.0.2.21", "Lounge TV 2", "ready", "AI PONT"), row("192.0.2.22",
 
 
 class Harness:
-    def __init__(self, rows=None, stub=None, kind="google", slow=0.0, features=None, partial=0.0):
+    def __init__(self, rows=None, stub=None, kind="google", slow=0.0, features=None, partial=0.0, known=None):
+        self.known = known or {}       # known-tvs.json as Setup has it (the asleep cards come from it)
         self.partial = partial         # seconds the full scan takes after the TVs' own announcements are in
         self.rows = rows if rows is not None else list(THREE)
         self.stub = stub               # Couch TV Studio's answers, or None for "no account on this Setup"
@@ -111,7 +112,7 @@ class Harness:
             mock.patch.object(server.release, "get", get),
             mock.patch.object(health, "speed_test", lambda tv: {"cls": "c"}),
             mock.patch.object(steps.time, "sleep", lambda s: None),
-            mock.patch.object(server, "_known", lambda: {}),
+            mock.patch.object(server, "_known", lambda: dict(h.known)),
             mock.patch.object(server, "_remember", lambda *a, **k: None),
         ]
         if self.features is not None:

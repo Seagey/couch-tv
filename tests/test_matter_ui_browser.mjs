@@ -2,7 +2,7 @@
 // pretend Matter controller) and the phone's Home settings page at 390x844 against a pretend TV:
 //  1. a design's Control Centre, Aircon and Sensor widgets take Matter devices by id (design.js keeps
 //     them), show them, and OK switches one: only its Matter id reaches /api/matter/command;
-//  2. Home settings, Designs, Smart home lists every Matter device (never the lock or the garage),
+//  2. Settings, More, Designs, Smart home lists every Matter device (never the lock or the garage),
 //     adds one by code (a typo caught on the TV), renames it and removes it;
 //  3. the phone page: the Matter section shows, says where each app keeps the code, catches a typo,
 //     says plainly when a code ran out, adds, renames and removes.
@@ -128,7 +128,7 @@ console.log("Running Matter UI browser tests...");
   await page.close();
 }
 
-// 2. Home settings, Designs, Smart home
+// 2. Settings, More, Designs, Smart home
 {
   const page = await home("&matter=1&hasetup=1", [["controls", {}]]);
   await page.evaluate(() => window.tv.settingsKey()); await page.waitForTimeout(300); await press(page, "Enter", 400);
@@ -138,7 +138,7 @@ console.log("Running Matter UI browser tests...");
   const rows = () => page.evaluate(() => Array.prototype.map.call(document.querySelectorAll("#settings .srow, #settings .shead"), (e) => e.textContent.trim()));
   const type = async (words) => { await press(page, "Enter", 300); await page.fill("#set-input", words); await press(page, "Enter", 900); };
   const said = () => page.evaluate(() => { const e = document.querySelector("#settings .smsg, #set-msg, .set-msg"); return e ? e.textContent : document.querySelector("#settings").textContent; });
-  ok(await toRow(/^Smart home/), "Home settings, Designs has Smart home");
+  ok(await toRow(/^Smart home/), "Settings, More, Designs has Smart home");
   await press(page, "Enter", 400);
   let all = (await rows()).join(" | ");
   ok(/Matter devices/.test(all), "a Matter devices heading");

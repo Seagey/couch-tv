@@ -186,7 +186,7 @@ TV = tvp;
   }
   ok(v.length === 12, "only the twelve on the design are listed: " + v.length);
 }
-// ---- Home settings, Designs, Widgets on this home ----
+// ---- Settings, More, Designs, Widgets on this home ----
 {
   await tvp.evaluate(() => window.tv.settingsKey()); await tvp.waitForTimeout(250); await press(tvp, "Enter", 500);
   await goSec(tvp, "Designs");

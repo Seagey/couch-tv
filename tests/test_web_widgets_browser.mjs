@@ -113,7 +113,7 @@ for (const c of CASES) {
     ok(/POST \/api\/continue\/open .*"who":"person2"/.test(calls), "picks: Play opens the show as Person 2's (" + calls.replace(/\n/g, "; ").slice(0, 200) + ")");
   }
   if (c.kind === "commute") {
-    // Home settings, Designs: the Commute rows, with the TV's own places, said to stay on the TV
+    // Settings, More, Designs: the Commute rows, with the TV's own places, said to stay on the TV
     await page.evaluate(() => window.tv.settingsKey()); await page.waitForTimeout(300);
     await press(page, "Enter", 400);
     let found = false;

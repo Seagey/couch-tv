@@ -202,7 +202,7 @@ class LinkEndToEnd:
     def test_a_code_is_never_used_before_yes(self):
         start = self.page_start()
         ask = self.api("/api/handoff", {"code": studio.parse_url(start["open"])})["ask"]
-        self.assertEqual(ask["account"]["email"], "s***@example.test")
+        self.assertEqual(ask["account"]["email"], "sam@example.com")
         self.assertIsNone(server.S.link.token)
         self.assertIsNone(self.api("/api/account")["account"])
         self.connected_tv()
@@ -215,25 +215,25 @@ class LinkEndToEnd:
         self.refused("no_offer", "/api/link-yes", {"id": ask["id"]})
         again = self.api("/api/handoff", {"code": start["short"]})["ask"]
         self.refused("no_offer", "/api/link-yes", {"id": "guess"})
-        self.assertEqual(self.api("/api/link-yes", {"id": again["id"]})["account"]["email"], "s***@example.test")
+        self.assertEqual(self.api("/api/link-yes", {"id": again["id"]})["account"]["email"], "sam@example.com")
 
     def test_a_signed_in_setup_never_swaps_accounts_by_itself(self):
         self.sign_in()
         self.api("/api/handoff-in", {"code": self.page_start("2")["handoff"]})       # somebody else's link
         ask = self.api("/api/handoff")["ask"]
-        self.assertEqual((ask["account"]["email"], ask["instead_of"]["email"]), ("r***@example.test", "s***@example.test"))
-        self.assertEqual(self.api("/api/account")["account"]["email"], "s***@example.test")
+        self.assertEqual((ask["account"]["email"], ask["instead_of"]["email"]), ("ruby@example.com", "sam@example.com"))
+        self.assertEqual(self.api("/api/account")["account"]["email"], "sam@example.com")
         self.api("/api/link-no")
-        self.assertEqual(self.api("/api/account")["account"]["email"], "s***@example.test")
+        self.assertEqual(self.api("/api/account")["account"]["email"], "sam@example.com")
         self.sign_in("2")                                                             # and with a Yes it does
-        self.assertEqual(self.api("/api/account")["account"]["email"], "r***@example.test")
+        self.assertEqual(self.api("/api/account")["account"]["email"], "ruby@example.com")
         self.assertEqual(self.mine()["setups"], 0)                                    # the one before ended at the account too
 
     def test_the_websites_allow_asks_too(self):
         d = self.api("/api/device/start")
         self.assertEqual(self.web("POST", "/v1/setup/allow", {"user_code": d["user_code"]}, "2")[0], 200)
         ask = self.api("/api/device/poll")["ask"]
-        self.assertEqual(ask["account"]["email"], "r***@example.test")
+        self.assertEqual(ask["account"]["email"], "ruby@example.com")
         self.assertIsNone(self.api("/api/account")["account"])
         self.api("/api/link-no")
         self.assertEqual(self.mine("2")["setups"], 0)
@@ -248,8 +248,8 @@ class LinkEndToEnd:
         self.assertEqual(self.web("POST", "/v1/setup/allow", {"user_code": code[:4] + "-" + code[4:]}, "2")[0], 200)
         got = self.api("/api/device/poll")
         self.assertNotIn("ask", got)
-        self.assertEqual(got["account"]["email"], "r***@example.test")
-        self.assertEqual(self.api("/api/account")["account"]["email"], "r***@example.test")
+        self.assertEqual(got["account"]["email"], "ruby@example.com")
+        self.assertEqual(self.api("/api/account")["account"]["email"], "ruby@example.com")
         self.assertIsNone(self.api("/api/account")["ask"])
 
     def test_no_on_the_website_ends_the_request_and_setup_hears_it(self):
@@ -365,6 +365,12 @@ class LinkEndToEnd:
         acct = studio.clean_account({"name": "Sam (s***@example.test)\u202e?", "email": "x***@evil.test"})
         self.assertEqual(acct, {"name": "Sam s example.test", "email": "x***@evil.test", "design": None})
 
+    def test_the_whole_email_is_shown_and_tricks_are_not(self):
+        """28 Nov 2026: "Link as" shows the full address, not s***@."""
+        self.assertEqual(studio.clean_account({"email": "sam.smith+tv@example.com"})["email"], "sam.smith+tv@example.com")
+        for bad in ("sam‮@example.test", "sam <x>@example.test", "two@@example.test", "sam@exa mple.test"):
+            self.assertIsNone(studio.clean_account({"email": bad})["email"], bad)
+
     # ---- 5 and 10: ways on, and signing out ----
     def test_a_sign_in_that_ran_out_signs_setup_out_and_a_new_code_works(self):
         self.sign_in()
@@ -451,7 +457,8 @@ class LinkEndToEnd:
             self.api("/api/name-tv", {"ip": ip, "room": room})
             self.run_job("/api/link-tv")
         self.connected_tv(a, "192.0.2.11")
-        self.assertIsNone(server._known()["192.0.2.11"]["room"])
+        # the TV is known by itself, not its address: a brings its own name, never b's (lane G, 28 Nov 2026)
+        self.assertEqual(server._known()["192.0.2.11"]["room"], "Lounge TV")
         self.run_job("/api/link-tv")
         self.connected_tv(b, "192.0.2.10")
         self.run_job("/api/link-tv")
@@ -519,7 +526,7 @@ class AgainstTheRealRoutes(LinkEndToEnd, unittest.TestCase):
         d = self.api("/api/device/start", {"silent": True, "tv_name": "TCL lounge TV"})
         code, ans = self.allow(d["user_code"], one_tap, headers)
         if code == 200:
-            self.assertEqual(self.api("/api/device/poll")["account"]["email"], "s***@example.test")
+            self.assertEqual(self.api("/api/device/poll")["account"]["email"], "sam@example.com")
             self.connected_tv()
             self.assertTrue(self.run_job("/api/link-tv")["account"]["linked"])
         return code, ans, server.S.link.tv and server.S.link.tv.get("tv_id")

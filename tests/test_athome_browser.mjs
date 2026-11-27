@@ -1,5 +1,5 @@
 // Things typed at home, in a real browser at 1920x1080 (the TV home in its ?mock preview):
-//  1. Home settings, Designs, At home: a note, a list and its items, the guest Wi-Fi, a guide
+//  1. Settings, More, Designs, At home: a note, a list and its items, the guest Wi-Fi, a guide
 //     entry and a calendar link typed with the remote land on the widgets straight away.
 //  2. The widgets show them at every size they come in, fitting and centred (2c): the note, the list (still to do first), a real
 //     Wi-Fi join code that reads back as the WIFI: words, the guide, today's events from the calendar,
@@ -86,7 +86,7 @@ console.log("Running at home browser tests...");
   const type = async (words) => { await press(page, "Enter", 250); await page.fill("#set-input", words); await press(page, "Enter", 300); };
   const atHomeRow = await toRow(/^At home/);
   if (!atHomeRow) console.log("DEBUG", await page.evaluate(() => document.getElementById("set-head").textContent + " | " + ((document.querySelector(".srow.focus") || {}).textContent || "none") + " | " + document.getElementById("set-rows").textContent.slice(0, 300)));
-  ok(atHomeRow, "Home settings, Designs has At home");
+  ok(atHomeRow, "Settings, More, Designs has At home");
   await press(page, "Enter", 300);
   ok(/At home/.test(await page.evaluate(() => document.getElementById("set-head").textContent)), "At home opens");
   ok(await toRow(/Write a note/), "a row to write the note"); await type("Dinner at 6. Feed Max!");

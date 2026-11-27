@@ -92,8 +92,16 @@ class Discovery(unittest.TestCase):
         self.assertEqual(finder.friendly_name(t, {"room": "Living room TV", "name": "Brand M1"}), "Living room TV")
         self.assertEqual(finder.friendly_name(t, {}), "Announced")
         self.assertEqual(finder.friendly_name({"model": "M1"}, {}), "M1")
-        self.assertEqual(finder.friendly_name({"adb_5555": True}, {}), "TV with debugging on")
-        self.assertEqual(finder.friendly_name({}, {}), "Android TV")
+        # 28 Nov 2026: never "TV with debugging on": the TV's own brand and model from its ADB answer, else "Your TV"
+        self.assertEqual(finder.friendly_name({"adb_5555": True, "ip": "192.0.2.99"}, {}), "Your TV")
+        self.assertEqual(finder.friendly_name({}, {}), "Your TV")
+        banner = b"device::ro.product.name=c2;ro.product.model=55C735;ro.product.device=x;ro.product.brand=tcl;features=shell_v2"
+        self.assertEqual(finder.banner_name(banner), "Tcl 55C735")
+        self.assertEqual(finder.banner_name(b"device::ro.product.model=Chromecast;ro.product.brand=google;"), "Google Chromecast")
+        self.assertEqual(finder.banner_name(b"device::ro.product.model=BRAVIA 4K;ro.product.brand=Sony;"), "Sony BRAVIA 4K")
+        self.assertIsNone(finder.banner_name(b"device::features=shell_v2"))
+        finder.BANNERS["192.0.2.98"] = "Tcl 55C735"
+        self.assertEqual(finder.friendly_name({"adb_5555": True, "ip": "192.0.2.98"}, {}), "Tcl 55C735")
 
     def test_names_are_cleaned(self):
         rows = finder.merge([heard(REMOTE, "192.0.2.10", "<b>Den</b>\x07")], [], {})

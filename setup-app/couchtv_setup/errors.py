@@ -29,7 +29,11 @@ BLOCK_ERRNOS = {errno.EHOSTUNREACH, errno.EPERM}
 if sys.platform == "win32":
     BLOCK_ERRNOS |= {10013, 10065}    # WSAEACCES, WSAEHOSTUNREACH
 
-FALLBACK = "That step did not work. Try it again. If it keeps happening, press Close setup and open the app again."
+# A TV asleep in standby is the usual reason it cannot be found or stops answering: many (a TCL on 24 and 28 Nov
+# 2026, twice) switch their Wi-Fi off then and may come back on a new address. Setup finds it again by name.
+ASLEEP = ("We can't reach your TV. It may be asleep. Turn it on with the TV remote, wait until you see its home "
+          "screen, check it is on the same Wi-Fi as this computer, then press Find my TV again.")
+FALLBACK ="That step did not work. Try it again. If it keeps happening, press Close setup and open the app again."
 
 
 def _platform():
@@ -111,8 +115,10 @@ def explain(exc, dest=None, platform=None, default_route=None):
     e = root(exc)
     no = getattr(e, "errno", None)
     if isinstance(e, (socket.timeout, TimeoutError)) or no == errno.ETIMEDOUT:
-        msg, code = ("The TV did not answer in time. Check it is switched on and on the same Wi-Fi as this "
-                     "computer, then try again."), "timeout"
+        dest = dest or getattr(e, "dest", None)
+        web = isinstance(exc, urllib.error.URLError) or (dest is not None and not _home_or_multicast(dest))
+        msg, code = ("The internet did not answer in time. Check this computer is online, then try again." if web
+                     else ASLEEP), "timeout"
     elif isinstance(e, ConnectionRefusedError) or no == errno.ECONNREFUSED:
         msg, code = ("The TV turned this computer away. Check the switch on the TV is still on (see the steps "
                      "above), then try again."), "refused"

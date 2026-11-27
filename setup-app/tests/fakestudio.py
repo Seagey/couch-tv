@@ -16,7 +16,7 @@ import urllib.parse
 
 LETTERS = "23456789ABCDEFGHJKMNPQRSTVWXYZ"
 MIN, DAY = 60, 86400
-PEOPLE = {"1": ("sam", "s***@example.test"), "2": ("ruby", "r***@example.test")}
+PEOPLE = {"1": ("sam", "sam@example.com"), "2": ("ruby", "ruby@example.com")}
 
 
 class Said(Exception):

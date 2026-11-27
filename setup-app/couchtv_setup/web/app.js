@@ -90,6 +90,9 @@
     var locked = step === "work";
     var back = $("back");
     back.disabled = locked || step === "welcome" || step === "closed";
+    // Setup has stopped: nothing left to sign out of or close (0.13.15 gate polish)
+    if ($("close-top")) $("close-top").hidden = step === "closed";
+    if (step === "closed" && $("acct-out")) $("acct-out").hidden = true;
     back.classList.toggle("locked", locked);
     $("back-note").hidden = !locked;
     if (locked) text("back-note", workKind === "setup" ? "Back is off while Couch TV installs." : "Back is off while this runs.");
@@ -143,8 +146,11 @@
     text("error-text", (e && e.message) || "That step did not work. Try it again.");
     text("error-detail", (e && e.detail) || "");
     $("error-more").hidden = !(e && e.detail);
+    // the TV went to sleep or moved address: one press looks for it again, by its name
+    $("error-find").hidden = !(e && { lost: 1, no_tv: 1, timeout: 1 }[e.code]);
     $("error").hidden = false;
   }
+  $("error-find").addEventListener("click", function () { $("error").hidden = true; scan(); });
 
   function text(id, t) { $(id).textContent = t; }
 
@@ -199,7 +205,7 @@
     }).then(function (r) {
       if (!onFind() || state.mode !== "setup" && state.mode !== "undo") return;
       $("error").hidden = true;
-      drawRows(r.tvs || []);
+      drawRows(r.tvs || [], r.asleep || []);
       lookSoon(6000);
     }, function (e) {
       if (!onFind()) return;
@@ -233,7 +239,37 @@
     return pill;
   }
 
-  function drawRows(tvs) {
+  // A TV set up from this computer before that the scan cannot see: by its own name, what to do, and a retry.
+  // The scan finds it by name when it wakes, even on a new address, and this card goes by itself.
+  function drawAsleep(list, found) {
+    var box = $("found");
+    list.forEach(function (a) {
+      var card = document.createElement("div");
+      card.className = "card tvc asleep";
+      var mini = document.createElement("div"); mini.className = "tvmini";
+      var tv = document.createElement("div"); tv.className = "tv stand";
+      var scr = document.createElement("div"); scr.className = "scr off";
+      tv.appendChild(scr); mini.appendChild(tv); card.appendChild(mini);
+      var h = document.createElement("h3"); h.textContent = a.label; card.appendChild(h);
+      var st = document.createElement("div"); st.className = "state"; st.appendChild(pillEl("Asleep or off", "warn")); card.appendChild(st);
+      var ol = document.createElement("ol"); ol.className = "small note howto";
+      ["Turn it on with the TV remote.", "Wait until you see its home screen.", "Check it is on the same Wi-Fi as this computer."]
+        .forEach(function (s) { var li = document.createElement("li"); li.textContent = s; ol.appendChild(li); });
+      card.appendChild(ol);
+      var b = document.createElement("button"); b.type = "button"; b.className = "btn ghost";
+      b.textContent = "Look again";
+      b.addEventListener("click", function () { b.disabled = true; b.textContent = "Looking…"; lookAgain(); });
+      card.appendChild(b);
+      box.appendChild(card);
+    });
+    if (list.length && !found) {
+      $("find-help").hidden = true;
+      text("find-status", list.length === 1 ? list[0].label + " is not on the Wi-Fi right now." : "Your TVs are not on the Wi-Fi right now.");
+      $("find-watch").hidden = false;
+    }
+  }
+
+  function drawRows(tvs, asleep) {
     var box = $("found");
     var before = rows; rows = {};
     box.textContent = "";
@@ -301,6 +337,7 @@
       card.appendChild(wrap);
       box.appendChild(card);
     });
+    drawAsleep(asleep || [], usable.length);
     // the TV whose steps are open just became ready, or its pairing screen just opened
     if (openRow && rows[openRow] && before[openRow] && rows[openRow].status !== before[openRow].status) openGuide(rows[openRow]);
   }
@@ -563,7 +600,7 @@
     $("allow-retry").hidden = true;
     var left = wait;
     var say = function () {
-      text("allow-status", "Tick Always allow from this computer, then press Allow on the TV. Waiting " + left + " more seconds…");
+      text("allow-status", "Tick Always allow from this computer, then press Allow on the TV, not Cancel. Waiting " + left + " more seconds…");
     };
     say();
     clearInterval(countdown);
@@ -710,7 +747,7 @@
     if (r.watch_bound === false) {
       w.push(state.facts && state.facts.fire ?
         "The Home button watch is switched on, but Fire TV has not started it yet. Fire TV sometimes needs one restart for that: " +
-        "Settings, My Fire TV, Restart. When the TV is back on its home, press Check it again." :
+        "Settings, My Fire TV, Restart. When the TV is back on its home, press Check the TV again." :
         "The Home button watch is switched on, but the TV has not started it yet. Restart the TV once. If Home still opens " +
         "the TV's own home after that, open this app again and set it up again.");
     } else if (!r.ok && r.other_front === "ontv") {
@@ -886,7 +923,7 @@
         cta.href = state.studio + "/design/"; cta.hidden = false;
         text("fin-cap", "Opens the editor with " + name + " already linked."); $("fin-cap").hidden = false;
       }
-      finish.className = "q"; text("finish-text", "Keep this one");
+      finish.className = "q"; text("finish-text", "Finish");
     } else {
       badge.className = "pill warn";
       $("fin-badge-tick").hidden = true; $("fin-badge-dot").hidden = false;

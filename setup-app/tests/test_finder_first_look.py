@@ -405,17 +405,41 @@ class SeenTvs(unittest.TestCase):
         return {"ip": addr, "status": status, "label": "TCL TV", "adb_5555": status == "ready", "pairing_port": None,
                 "android": True, "other": None}
 
-    def test_a_tv_missed_by_one_scan_stays_for_30_seconds_never_ready(self):
+    def test_a_tv_missed_by_one_scan_holds_still_then_is_never_ready(self):
+        # 28 Nov 2026: one missed scan no longer flicks it to Looking again (the emulator test); after the grace
+        # it is stale and never Ready, and it goes after the time to live
         now = [100.0]
         seen = finder.Seen(clock=lambda: now[0])
         self.assertEqual(seen.apply([self.row()])[0]["status"], "ready")
         now[0] = 112.0
+        held = seen.apply([])
+        self.assertEqual([(t["status"], t.get("held"), t.get("stale")) for t in held], [("ready", True, None)])
+        now[0] = 130.0
         out = seen.apply([])
         self.assertEqual([(t["ip"], t["status"], t["stale"], t["adb_5555"]) for t in out], [(TCL, "switch", True, False)])
-        now[0] = 129.0
+        now[0] = 159.0
         self.assertEqual(len(seen.apply([])), 1)
-        now[0] = 131.0
+        now[0] = 161.0
         self.assertEqual(seen.apply([]), [])
+
+    def test_the_list_keeps_its_order(self):
+        seen = finder.Seen(clock=lambda: 0.0)
+        a, b = self.row("switch", "192.0.2.31"), self.row("ready", "192.0.2.32")
+        self.assertEqual([t["ip"] for t in seen.apply([a, b])], ["192.0.2.31", "192.0.2.32"])
+        a2 = dict(a, status="ready")
+        self.assertEqual([t["ip"] for t in seen.apply([b, a2])], ["192.0.2.31", "192.0.2.32"])
+        c = self.row("ready", "192.0.2.10")
+        self.assertEqual([t["ip"] for t in seen.apply([c, b, a2])], ["192.0.2.31", "192.0.2.32", "192.0.2.10"])
+
+    def test_the_early_part_of_a_scan_never_makes_a_ready_tv_look_worse(self):
+        now = [0.0]
+        seen = finder.Seen(clock=lambda: now[0])
+        seen.apply([self.row("ready")])
+        now[0] = 9.0
+        out = seen.apply([self.row("switch")], partial=True)
+        self.assertEqual([t["status"] for t in out], ["ready"])
+        now[0] = 10.0
+        self.assertEqual([t["status"] for t in seen.apply([self.row("ready")])], ["ready"])
 
     def test_a_tv_found_again_is_fresh_and_ready(self):
         now = [0.0]

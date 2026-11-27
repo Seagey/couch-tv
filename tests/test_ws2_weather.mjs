@@ -558,7 +558,7 @@ const labelsOf = (kind) => CAPS.settings(kind).filter((s) => s.pre && s.where.so
 const tv = await tvPage(design);
 TV = tv;
 {
-  // Home settings, Designs: Widgets on this home lists each of the nine with its own settings
+  // Settings, More, Designs: Widgets on this home lists each of the nine with its own settings
   await openSettings(tv);
   await goSec(tv, "Designs");
   const rows = (await rowsText(tv)).join(" | ");

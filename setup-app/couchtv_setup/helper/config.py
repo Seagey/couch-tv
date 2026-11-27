@@ -127,7 +127,8 @@ def bridge_tvs(known, cfg):
         return cand
 
     for ip, k in sorted((known or {}).items()):
-        if not isinstance(k, dict) or not (k.get("route") or k.get("kind")):
+        # "?<key>": a TV whose address another TV took, kept until it is found again (no address to use)
+        if not isinstance(k, dict) or not (k.get("route") or k.get("kind")) or str(ip).startswith("?"):
             continue
         name = k.get("room") or k.get("name") or "TV"
         row = {"id": tv_id(name), "name": name, "label": name, "ip": ip, "adb_port": 5555,
