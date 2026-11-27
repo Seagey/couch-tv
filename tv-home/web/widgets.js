@@ -214,6 +214,9 @@
     hourly: [["Now", 2, 24], ["9am", 0, 25], ["10am", 0, 26], ["11am", 2, 27], ["12pm", 3, 27], ["1pm", 61, 25], ["2pm", 95, 23], ["3pm", 80, 22]],
     daily: [["Today", 2, 17, 27], ["Thu", 95, 18, 25], ["Fri", 61, 17, 22], ["Sat", 2, 16, 24], ["Sun", 0, 15, 26], ["Mon", 0, 17, 28], ["Tue", 3, 18, 26]],
     rain: [10, 15, 22, 40, 70, 85, 60, 35, 20, 12, 8, 5], rainFrom: "1:20", sunrise: "5:41", sunset: "7:22", uvFrom: "8:50", uvTo: "4:10" };
+  // a picture made with ?place=<town> (the mock's own setting, mock.js) shows that town in the demo too, so a
+  // gallery picture can name a real place without it being written into the home
+  try { var qp = /[?&]place=([^&#]{1,40})/.exec(String((window.location || {}).search || "")); if (qp) { var qn = decodeURIComponent(qp[1].replace(/\+/g, " ")); if (/^[A-Za-z][A-Za-z .'-]{1,39}$/.test(qn)) DEMO_WX.place = qn; } } catch (e) {}
   var WMO = { 0: "Clear", 1: "Mostly clear", 2: "Partly cloudy", 3: "Cloudy", 45: "Fog", 48: "Fog", 51: "Drizzle", 53: "Drizzle", 55: "Drizzle", 56: "Drizzle", 57: "Drizzle",
     61: "Light rain", 63: "Rain", 65: "Heavy rain", 66: "Rain", 67: "Rain", 71: "Snow", 73: "Snow", 75: "Snow", 77: "Snow", 80: "Showers", 81: "Showers", 82: "Heavy showers", 85: "Snow", 86: "Snow", 95: "Storms", 96: "Storms", 99: "Storms" };
   function wxIcon(code, day) {

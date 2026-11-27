@@ -1736,9 +1736,15 @@
     return i;
   }
 
+  // A design with its own background (a colour, or its photo once it has loaded: design.js html.cd-bg) covers the
+  // scenes completely, so they load no picture and do not take turns under it (Fast TV, 28 Nov 2026: a plain colour
+  // home was still fetching and decoding the night scene's three pictures behind the colour). Once the design is
+  // gone the next turn loads them as before.
+  function designBackground() { return document.documentElement.classList.contains("cd-bg"); }
   // draw a scene (load its pictures, place its clock) so it can fade in
   function readyScene(i) {
     var s = SCENES[i], el = sceneEls[i];
+    if (designBackground()) return;
     if (!el.classList.contains("ready")) {
       var sbg = el.querySelector(".sbg");
       if (s.dailyBing) s.src = bingPhotoUrl() || s.src;
@@ -2729,6 +2735,8 @@
   function covered() { return PAGE_PAUSED || document.hidden; }
   function active() { return !covered() && !screenOffActive; }
   function nextScene() {
+    if (designBackground()) return;
+    if (sceneEls[scene] && !sceneEls[scene].classList.contains("ready")) readyScene(scene);   // a design's background just went
     if (zone !== "settings" && active() && sceneMayChange()) {
       if (SUN_SYNC) applySunSync();
       else showScene(nextFrom(scene));

@@ -51,6 +51,11 @@ html:not(.lighter):not(.glass-lite) .cw-ink-liquid.cw-lq-on > :not(.cw-bg) * {
 .cw-sh-soft { box-shadow: 0 18px 44px rgba(0, 0, 0, 0.22); }
 .cw-sh-lifted { box-shadow: 0 28px 70px rgba(0, 0, 0, 0.42); }
 .cw-glass.cw-sh-none, .cw-solid.cw-sh-none { box-shadow: none; }
+/* Shadow: None means none (Fast TV, 28 Nov 2026): no soft shadow under the words either (a bare clock, date or
+   app name draws one inline, a blur the TV redraws), and none behind the focus ring. Glass words keep theirs:
+   their look is the shadow. */
+.cw-sh-none:not(.cw-ink-glass):not(.cw-ink-smoke):not(.cw-ink-liquid), .cw-sh-none:not(.cw-ink-glass):not(.cw-ink-smoke):not(.cw-ink-liquid) * { text-shadow: none !important; }
+.cw.cw-sh-none.cw-focus { box-shadow: none; }
 .cw-glass:not(.cw-sh-none):not(.cw-sh-lifted) { box-shadow: 0 24px 60px rgba(0, 0, 0, 0.22); }
 
 /* type, tvOS sizes */
