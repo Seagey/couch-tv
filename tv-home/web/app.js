@@ -4602,6 +4602,16 @@
     return list;
   }
 
+  // Some TVs number their HDMI inputs far from the port numbers (a TCL: HW15, HW16, HW17 are HDMI 1 to 3).
+  // Only then, count them in HW order, as the bridge does.
+  function portByOrder(detected, port) {
+    var hw = function (d) { var m = /HW(\d+)/i.exec(d.id || ""); return m ? Number(m[1]) : null; };
+    var hdmi = detected.filter(function (d) { return d.type === "hdmi" && hw(d) !== null; })
+      .sort(function (a, b) { return hw(a) - hw(b); });
+    if (!hdmi.length || hw(hdmi[0]) <= hdmi.length) return null;
+    return hdmi[port - 1] || null;
+  }
+
   function resolveInputs() {
     // this TV's own input tiles (tvs[].inputs in config.json) win over the shared home.inputs
     var raw = Array.isArray(TVCFG.inputs) ? TVCFG.inputs
@@ -4619,11 +4629,12 @@
         var found = detected.filter(function (d) {
           if (cfg.id && d.id === cfg.id) return true;
           if (cfg.port && (d.label || "").toLowerCase().indexOf("hdmi " + cfg.port) >= 0) return true;
-          if (cfg.port && (d.id || "").toLowerCase().indexOf("hw" + cfg.port) >= 0) return true;
+          if (cfg.port && new RegExp("hw" + cfg.port + "(?!\\d)", "i").test(d.id || "")) return true;   // "hw1" is not "HW15"
           if (cfg.match && ((d.label || "").toLowerCase().indexOf(cfg.match.toLowerCase()) >= 0 || (d.id || "").toLowerCase().indexOf(cfg.match.toLowerCase()) >= 0)) return true;
           if (cfg.device && (d.devices || []).some(function (dev) { return dev.toLowerCase().indexOf(cfg.device.toLowerCase()) >= 0; })) return true;
           return false;
         })[0];
+        if (!found && cfg.port && !cfg.id) found = portByOrder(detected, cfg.port);
         if (found) matchId = found.id;
       }
       if (!matchId) matchId = cfg.id || (cfg.port ? "HDMI_" + cfg.port : "input_" + label);
