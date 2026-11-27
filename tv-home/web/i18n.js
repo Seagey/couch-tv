@@ -408,7 +408,7 @@
     tv_settings_none: "This TV's own settings could not be opened.",
 
     // ---- the settings screen ----
-    set_title: "Home settings",
+    set_title: "Settings",
     set_phone: "Use your phone",
     set_phone_sub: "Scan to change this TV from your phone. Use the phone's camera, on the same Wi-Fi as the TV.",
     set_phone2_head: "Set up from your phone",
