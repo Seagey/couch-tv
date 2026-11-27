@@ -32,7 +32,8 @@ import android.view.accessibility.AccessibilityEvent
  * `tools/tv_app.py home`). They also grant WRITE_SECURE_SETTINGS, because Android drops the
  * watcher whenever the app is stopped or updated: with that grant the app puts it back by itself
  * (at start, after an update, after a reboot). The undo takes both away. It only sees which window
- * came forward and reads no screen content.
+ * came forward and reads no screen content. On a TCL with the Google TV home installed it also owns
+ * WakeMask, a black overlay over the wake from standby (see docs/TROUBLESHOOTING.md).
  *
  * If couch-tv itself keeps crashing (CrashGuard), the watch stands aside and leaves the TV's own
  * home on screen, so a broken couch-tv can never hold the TV in a loop.
@@ -40,6 +41,7 @@ import android.view.accessibility.AccessibilityEvent
 class FireWatch : AccessibilityService() {
     private var last = 0L
     private val handler = Handler(Looper.getMainLooper())
+    private var wakeMask: WakeMask? = null
     /** True while the latest window change this service saw was the TV's own home (events only, no screen reading). */
     private var stockInFront = false
     /** That home is Amazon's: see [moveToFront]. */
@@ -88,13 +90,22 @@ class FireWatch : AccessibilityService() {
             Log.i("couchtv.firewatch", "bound just after a restart: putting couch-tv in front")
             runCatching { startActivity(Intent(this, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
         }
+        wakeMask?.close()
+        wakeMask = WakeMask.start(this, handler)
     }
 
     override fun onUnbind(intent: Intent?): Boolean {
         connected = false
         handler.removeCallbacks(recheck)
         recheckPending = false
+        wakeMask?.close()
+        wakeMask = null
         return super.onUnbind(intent)
+    }
+
+    override fun onDestroy() {
+        wakeMask?.close()
+        super.onDestroy()
     }
 
     override fun onAccessibilityEvent(e: AccessibilityEvent) {
@@ -103,7 +114,9 @@ class FireWatch : AccessibilityService() {
         // Fibe opened from couch-tv's own tile stays open (see [fibeOpenedNow]). Once any other window
         // comes forward, after the launch has settled, Fibe is only ever replaced again by a new open.
         if (pkg != BELL_FIBE_HOME && pkg != null && fibeOpenedOnPurpose && !fibeInGrace()) fibeOpenedOnPurpose = false
-        stockInFront = isStockHome(pkg, e.className?.toString()) &&
+        val cls = e.className?.toString()
+        wakeMask?.windowChanged(pkg, cls)
+        stockInFront = isStockHome(pkg, cls) &&
             !(pkg == AMAZON_HOME && settingsAllowed()) &&
             !(pkg == BELL_FIBE_HOME && fibeOpenedOnPurpose)
         // Kept for the re-check (#175): a window event from an app that is closing arrives after the
