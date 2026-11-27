@@ -3239,6 +3239,10 @@ def clean_settings(s):
         out["ambient_weather"] = s["ambient_weather"]
     if isinstance(s.get("ambient_sun_grade"), bool):
         out["ambient_sun_grade"] = s["ambient_sun_grade"]
+    if isinstance(s.get("shabbat"), bool):
+        out["shabbat"] = s["shabbat"]
+    if isinstance(s.get("shabbat_look"), bool):
+        out["shabbat_look"] = s["shabbat_look"]
     if s.get("nav_sound") in ("system", "soft", "off"):
         out["nav_sound"] = s["nav_sound"]
     if s.get("start_focus") in ("people", "apps", "keep_watching"):

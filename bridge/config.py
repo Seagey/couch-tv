@@ -540,6 +540,11 @@ def _home(h):
         out["ambient_weather"] = h["ambient_weather"]
     if isinstance(h.get("ambient_sun_grade"), bool):
         out["ambient_sun_grade"] = h["ambient_sun_grade"]
+    # Shabbat times (Home settings, Weather): this week's candle lighting and havdalah from Hebcal
+    if isinstance(h.get("shabbat"), bool):
+        out["shabbat"] = h["shabbat"]
+    if isinstance(h.get("shabbat_look"), bool):
+        out["shabbat_look"] = h["shabbat_look"]
     if h.get("nav_sound") in ("system", "soft", "off"):
         out["nav_sound"] = h["nav_sound"]
     # where the remote starts on Home: people (default, as before), keep_watching or apps (#211)
