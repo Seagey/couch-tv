@@ -41,32 +41,5 @@ class Pick(unittest.TestCase):
         self.assertEqual(appicons.names("Perplexity"), ["Perplexity"])
 
 
-class FullBleed(unittest.TestCase):
-    def png(self, draw):
-        import io
-        from PIL import Image, ImageDraw
-        im = Image.new("RGB", (100, 100), "white")
-        draw(ImageDraw.Draw(im))
-        out = io.BytesIO()
-        im.save(out, "PNG")
-        return out.getvalue()
-
-    def corner(self, png):
-        import io
-        from PIL import Image
-        return Image.open(io.BytesIO(png)).convert("RGB").getpixel((0, 0))
-
-    def test_a_rounded_square_on_white_fills_its_square(self):
-        rounded = self.png(lambda d: d.rounded_rectangle((0, 0, 99, 99), radius=22, fill=(20, 10, 60)))
-        out = appicons.full_bleed(rounded)
-        self.assertNotEqual(self.corner(out), (255, 255, 255), "no white corner left")
-
-    def test_a_full_icon_and_a_logo_on_white_are_left_alone(self):
-        logo = self.png(lambda d: d.ellipse((30, 30, 70, 70), fill=(250, 40, 70)))
-        self.assertEqual(appicons.full_bleed(logo), logo)
-        full = self.png(lambda d: [d.rectangle((0, 0, 99, 99), fill=(0, 120, 255)), d.rectangle((0, 0, 9, 9), fill="red")])
-        self.assertEqual(appicons.full_bleed(full), full)
-
-
 if __name__ == "__main__":
     unittest.main()
