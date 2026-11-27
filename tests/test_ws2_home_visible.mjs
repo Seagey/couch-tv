@@ -25,6 +25,7 @@ const soft = [];
 const ok = (c, m) => { if (process.env.WS2_SOFT && !c) { soft.push(m); return; } assert.ok(c, m); n++; };
 // the cases where a setting draws the same at a size, and why ("kind size label")
 const SAME = {
+  "people line names off": "three people on a one row line: no room for names beside the faces, so the faces alone either way (the editor grows the card for them, item 11)",
   "agenda tile calendars bookings": "a tile shows only the next event, and the next is Tom's check in, a booking",
   "agenda wtile calendars bookings": "a wide tile shows only the next event, and the next is Tom's check in, a booking",
   "card tile live Solar": "each in turn (the default) shows Solar today at this time",
@@ -211,7 +212,7 @@ try {
 }
 // every reason in SAME is a real case (none left over from an older layout)
 Object.keys(SAME).forEach((k) => ok(usedSame[k], "SAME names a real case: " + k));
-ok(Object.keys(SAME).length === 24, "24 setting x size cases draw the same, each with its reason");
+ok(Object.keys(SAME).length === 25, "25 setting x size cases draw the same, each with its reason");
 console.log("  " + cases.all + " kind x size x setting cases, " + cases.same + " of them the same by design (" + Object.keys(SAME).length + " named)");
 if (soft.length) { console.log(soft.length + " FAILED:\n" + soft.join("\n")); process.exit(1); }
 console.log("All " + n + " checks passed.");

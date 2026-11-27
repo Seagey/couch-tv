@@ -2524,6 +2524,16 @@
   var NAV = (function () {
     var cur = null, last = null, sheet = null, okDown = false, okHeld = false, okT = null, okSoon = null, okStart = 0, okLast = 0, okSwallow = false, tipShown = false, tracing = false;
     function rectOf(el) { var r = el.getBoundingClientRect(); return { l: r.left, t: r.top, r: r.right, b: r.bottom, w: r.width, h: r.height }; }
+    // the focus lift on a widget (f: 1 is none). A widget drawn small and scaled up to fill its box (widgets.js
+    // GROW, data-zoom, origin top left) keeps its scale and lifts about its middle.
+    function cwLift(n, f) {
+      var z = +n.getAttribute("data-zoom") || 1;
+      if (z === 1) { if (f === 1) n.style.removeProperty("transform"); else n.style.transform = "scale(" + f + ")"; return; }
+      var w = n.offsetWidth * z, h = n.offsetHeight * z;
+      // the focus ring the same width as on any other widget (it is scaled with the widget)
+      n.style.outlineWidth = f === 1 ? "" : (6 / z).toFixed(2) + "px"; n.style.outlineOffset = f === 1 ? "" : (6 / z).toFixed(2) + "px";
+      n.style.transform = (f === 1 ? "" : "translate(" + Math.round(-(f - 1) * w / 2) + "px," + Math.round(-(f - 1) * h / 2) + "px) ") + "scale(" + Math.round(z * f * 1000) / 1000 + ")";
+    }
     // a setting the TV or the phone offers now (pre: true), as Home settings lists them
     function tvSetting(s) { return s && s.pre === true && (!Array.isArray(s.where) || s.where.indexOf("tv") >= 0 || s.where.indexOf("phone") >= 0); }
     function hasTvSettings(kind) { var Caps = window.CouchWidgetCaps; return !!(kind && Caps && Caps.settings && Caps.settings(kind).some(tvSetting)); }
@@ -2596,7 +2606,7 @@
     }
     function shown() { return ON && ROOT.classList.contains("cd-wmode") && !(DESIGNER && ROOT.classList.contains("cd-edit")); }
     function paint() {
-      [].forEach.call(document.querySelectorAll(".cw-focus, .cw-ifocus, .cw-hasfocus"), function (n) { n.classList.remove("cw-focus", "cw-ifocus", "cw-hasfocus"); if (n.classList.contains("cw")) n.style.removeProperty("transform"); });
+      [].forEach.call(document.querySelectorAll(".cw-focus, .cw-ifocus, .cw-hasfocus"), function (n) { n.classList.remove("cw-focus", "cw-ifocus", "cw-hasfocus"); if (n.classList.contains("cw")) cwLift(n, 1); });
       // a sheet open: its own focus stays (a redraw behind it, new data or a save, cleared it)
       if (sheet) { paintSheet(); return; }
       if (!cur || !shown()) return;
@@ -2604,7 +2614,7 @@
       if (!s) { cur = null; return; }
       s.wrap.classList.add("cw-hasfocus");
       if (cur.i >= 0 && s.inner[cur.i]) s.inner[cur.i].classList.add("cw-ifocus");
-      else { s.el.classList.add("cw-focus"); s.el.style.transform = "scale(" + Math.min(1.06, 1 + 40 / Math.max(160, s.box.w)) + ")"; }
+      else { s.el.classList.add("cw-focus"); cwLift(s.el, Math.min(1.06, 1 + 40 / Math.max(160, s.box.w))); }
     }
     // one press, worked out from boxes only: S = [{ id, box, inner: [box] }], cur = { id, i }, last = the
     // press before ({ dir, from, to }). Returns { cur, last, moved }. Pure, so it is tested without a page.

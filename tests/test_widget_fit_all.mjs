@@ -175,7 +175,7 @@ const CHECKS = String(function (root, tag, mode) {
   if (root.classList.contains("cw-photo")) addU(b);
   if (mode.centre !== false && isFinite(u.l) && pad.r - pad.l > 40) {
     const gl = u.l - pad.l, gr = pad.r - u.r, gt = u.t - pad.t, gb = pad.b - u.b;
-    const tolX = Math.max(16, (pad.r - pad.l) * 0.06), tolY = Math.max(24, (pad.b - pad.t) * 0.1);
+    const loose = mode.loose ? 2 : 1, tolX = loose * Math.max(16, (pad.r - pad.l) * 0.06), tolY = loose * Math.max(24, (pad.b - pad.t) * 0.1);
     if (mode.align === "left") { if (gl > tolX) say("opts.align left, yet " + Math.round(gl) + " px in from the left"); }
     else if (mode.align === "right") { if (gr > tolX) say("opts.align right, yet " + Math.round(gr) + " px in from the right"); }
     else {
@@ -184,13 +184,15 @@ const CHECKS = String(function (root, tag, mode) {
     }
     centred = 1;
   }
-  return { out, centred };
+  // how much of the box the content spans, across and up and down (the any size sweep's dead space check)
+  const fill = isFinite(u.l) ? { x: (Math.min(u.r, pad.r) - Math.max(u.l, pad.l)) / Math.max(1, pad.r - pad.l), y: (Math.min(u.b, pad.b) - Math.max(u.t, pad.t)) / Math.max(1, pad.b - pad.t) } : null;
+  return { out, centred, fill };
 });
 
 // 1. every widget, every size, every state
 {
   const page = await home([{ id: "w0", type: "widget", kind: "clock", x: 80, y: 60, w: 360, h: 160 }]);
-  const res = await page.evaluate(async ([CHECKS, F]) => {
+  const res = await page.evaluate(async ([CHECKS, F, SWEEP, ONLY]) => {
     const check = eval("(" + CHECKS + ")");
     const NAMED = { line: [4, 1], wline: [8, 1], tile: [2, 2], wtile: [4, 2], small: [4, 4], tall: [4, 6], medium: [8, 4], wide: [12, 4], large: [8, 8], xl: [12, 6], hero: [18, 7], full: [18, 10] };
     const C = window.CouchWidgetCaps, W = window.CouchWidgets, WW = window.CouchWidgetWeb, A = window.CouchAtHome, CD = window.CouchDesign;
@@ -248,9 +250,9 @@ const CHECKS = String(function (root, tag, mode) {
           hourly: Array.from({ length: 24 }, (_, i) => ({ time: iso(i), temp: 20 + (i % 6), code: [0, 2, 3, 61, 95][i % 5], uv: i % 9, pop: (i * 7) % 100 })),
           daily: Array.from({ length: 7 }, (_, i) => ({ date: new Date(t0 + i * 86400000).toISOString().slice(0, 10), code: [0, 61, 3][i % 3], hi: 25, lo: 15, sunrise: iso(-4), sunset: iso(8), uv: 10 })),
           air: { aqi: 33, hourly: [33, 35, 40] }, marine: { wave: 1.6, period: 10, dir: 120, wind: 12, windDir: 270, hourly: [1.6, 1.7, 1.8] } },
-        shows, music: { title: T("A song with quite a long title"), artist: T("Some Artist"), state: "playing", position: 40, duration: 200, package: "com.spotify.tv.android", source: "Spotify" },
+        shows, music: { title: T("A song with quite a long title"), artist: T("Some Artist"), art: pic, state: "playing", position: 40, duration: 200, package: "com.spotify.tv.android", source: "Spotify" },
         apps: [["com.netflix.ninja", "Netflix"], ["com.google.android.youtube.tv", "YouTube"], ["au.net.abc.iview", "ABC iview"], ["au.com.stan.and", "Stan"], ["com.spotify.tv.android", "Spotify"]].map((a) => ({ package: a[0], name: long ? a[1] + " " + LONG : a[1] })),
-        photos: ["demo/beach.jpg"], people: [{ id: "a", name: T("Alex") }, { id: "b", name: T("Sam") }], cards: [{ title: T("Solar today"), value: long ? "123,456.7 kWh" : "18.4 kWh" }],
+        photos: ["demo/beach.jpg"], people: [{ id: "a", name: T("Alex") }, { id: "b", name: T("Sam") }, { id: "c", name: T("Riley") }], cards: [{ title: T("Solar today"), value: long ? "123,456.7 kWh" : "18.4 kWh" }],
         scenes: [{ entity: "scene.a", name: T("Movie night") }, { entity: "scene.b", name: T("Good night") }],
         ha, queue, home: homeData, web, commute: { from: { name: "Riverside" }, to: { name: long ? "Llanfairpwllgwyngyllgogerychwyrndrobwllllantysiliogogogoch" : hindi ? "पुणे" : "Parramatta" }, key: "K" },
         household: [{ id: "a", name: T("Alex"), shows: [] }, { id: "b", name: T("Sam"), shows: shows.concat([{ title: T("Utopia"), progress: 0.3 }, { title: T("The Newsreader"), progress: 0.3 }]).map((s, i) => ({ id: "s" + i, title: s.title, progress: 0.3 })) }]
@@ -269,13 +271,18 @@ const CHECKS = String(function (root, tag, mode) {
     half.className = "cd-layer"; half.style.cssText = "position:fixed;left:0;top:0;width:1920px;height:1080px;z-index:98;transform:scale(.5);transform-origin:0 0";
     document.body.appendChild(half);
     const frame = () => new Promise((r) => requestAnimationFrame(() => r()));
-    const out = [], byKind = {}, kinds = C.kinds().filter((k) => k !== "stack");
+    const out = [], byKind = {}, kinds = C.kinds().filter((k) => k !== "stack" && (!ONLY || ONLY.indexOf(k) >= 0));
     let count = 0, centred = 0;
     for (const kind of kinds) {
       const s = C.get(kind).sizes, seen = {};
-      const list = s.s.map((id) => [id, NAMED[id][0], NAMED[id][1]]).concat((s.x || []).map((x) => [x[0], x[2], x[3]])).concat([["min", s.min[0], s.min[1]]]).filter((x) => { const k = x[1] + "x" + x[2]; if (seen[k]) return false; seen[k] = 1; return true; });
-      const aligns = keepsAlign(kind) ? ["left", "right"] : [];
-      for (const [id, w, h] of list) for (const st of Object.keys(STATES).concat(aligns)) {
+      let list = s.s.map((id) => [id, NAMED[id][0], NAMED[id][1]]).concat((s.x || []).map((x) => [x[0], x[2], x[3]])).concat([["min", s.min[0], s.min[1]]]);
+      // FIT_SWEEP: any size a widget can be dragged to (owner, 28 Nov 2026: "adjustable to any size"), from its
+      // smallest up to the whole wall, wide and tall shapes included
+      if (SWEEP) { list = []; const WS = [1, 2, 3, 4, 5, 6, 7, 8, 10, 12, 14, 18], HS = [1, 2, 3, 4, 5, 6, 7, 8, 10]; WS.forEach((w) => HS.forEach((h) => { if (w >= s.min[0] && h >= s.min[1]) list.push([w + "x" + h, w, h]); })); }
+      list = list.filter((x) => { const k = x[1] + "x" + x[2]; if (seen[k]) return false; seen[k] = 1; return true; });
+      const aligns = keepsAlign(kind) && !SWEEP ? ["left", "right"] : [];
+      const states = SWEEP ? ["designer", "tv", "long"] : Object.keys(STATES);
+      for (const [id, w, h] of list) for (const st of states.concat(aligns)) {
         while (host.firstChild) host.removeChild(host.firstChild);
         const env = STATES[st] ? STATES[st]() : STATES.tv();
         const o = { id: "t", kind, w: w * 100 - 40, h: h * 100 - 40 };
@@ -286,8 +293,17 @@ const CHECKS = String(function (root, tag, mode) {
         host.appendChild(el); count++;
         // widgets that fit their words after they are on screen (data-fits) get the frames they need
         for (let k = 0; k < 40 && el.getAttribute("data-fits") && !el.getAttribute("data-fitted"); k++) await frame();
-        const r = check(el, kind + " " + id + " (" + w + "x" + h + ") " + st, { widget: true, align: STATES[st] ? null : st });
+        // the any size sweep: odd shapes (a tall narrow box, the whole wall) are held to twice the centring tolerance, and very
+        // long names (cut with "...") are checked for cut offs and dead space only; the named sizes stay strict
+        const r = check(el, kind + " " + id + " (" + w + "x" + h + ") " + st, { widget: true, align: STATES[st] ? null : st, loose: SWEEP, centre: SWEEP && st === "long" ? false : undefined });
         centred += r.centred;
+        // dead space: the clocks fill their box at any size (the time grows with it); every other widget
+        // spans at least a third of its box one way or the other (more space is a style choice, never the default)
+        if (SWEEP && r.fill && st !== "long" && !el.getAttribute("data-empty")) {
+          const isClock = ["clock", "tallclock", "glassclock", "flipclock", "analog", "wordclock"].indexOf(kind) >= 0;
+          const need = isClock ? 0.6 : 0.34;
+          if (r.fill.x < need && r.fill.y < need) r.out.push(kind + " " + id + " (" + w + "x" + h + ") " + st + ": dead space, the content spans " + Math.round(r.fill.x * 100) + "% across and " + Math.round(r.fill.y * 100) + "% down");
+        }
         r.out.forEach((m) => { out.push(m); byKind[kind] = (byKind[kind] || 0) + 1; });
         // the same widget in a design layer scaled to half (as Couch TV Studio's preview and a 1280 wide
         // TV draw it) is laid out exactly the same: nothing measured on screen without the scale
@@ -304,12 +320,12 @@ const CHECKS = String(function (root, tag, mode) {
     }
     host.remove(); half.remove();
     return { out, count, centred, kinds: kinds.length, byKind };
-  }, [CHECKS, fixtures]);
+  }, [CHECKS, fixtures, !!process.env.FIT_SWEEP, process.env.FIT_KINDS ? process.env.FIT_KINDS.split(",") : null]);
   console.log("  drew " + res.count + " boxes (" + res.kinds + " kinds), " + res.centred + " measured for centring, " + res.out.length + " problems");
   if (res.out.length) console.log("  by kind: " + Object.keys(res.byKind).map((k) => k + " " + res.byKind[k]).join(", "));
   const show = process.env.FIT_LIST ? res.out : res.out.slice(0, 60);
-  ok(res.kinds >= 65, "every kind but the stack (which holds the others): " + res.kinds);
-  ok(res.count >= 1500, "drew " + res.count + " boxes");
+  ok(!!process.env.FIT_KINDS || res.kinds >= 65, "every kind but the stack (which holds the others): " + res.kinds);
+  ok(!!process.env.FIT_KINDS || res.count >= 1500, "drew " + res.count + " boxes");
   ok(page.errors.length === 0, "no page errors: " + page.errors.slice(0, 3).join(" | "));
   ok(res.out.length === 0, "every widget fits, nothing is cut off, words are 23 px or more, centred unless set:\n  " + show.join("\n  ") + (res.out.length > show.length ? "\n  ... and " + (res.out.length - show.length) + " more (FIT_LIST=1 for all)" : ""));
   await page.close();
