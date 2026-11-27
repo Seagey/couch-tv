@@ -169,6 +169,12 @@ python3 -m venv .venv
 cp config.example.json config.json
 ```
 
+`requirements.txt` installs the libraries for every kind of TV, but the bridge only loads the ones
+your TVs use: the Android TV ones (`androidtvremote2`, `adb-shell`) only when a TV in `config.json`
+is an Android or Google TV, `cryptography` only for those, an Apple TV or a Panasonic that asks for
+encryption, and the rest only when the feature that needs them is used. A bridge for, say, one
+Samsung starts with less in memory.
+
 Edit `config.json` (it is private, it never gets committed):
 
 - `tvs`: put your TV's address in `ip`. Give it a name. Add more TVs by adding more entries.
