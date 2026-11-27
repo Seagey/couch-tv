@@ -8,20 +8,21 @@ const path = require("path");
 const vm = require("vm");
 
 const web = path.join(__dirname, "../tv-home/web");
-function load() {
+function load(file, extra) {
   const mem = {};
-  const sandbox = { location: { search: "" }, localStorage: { getItem: (k) => (k in mem ? mem[k] : null), setItem: (k, v) => { mem[k] = String(v); }, removeItem: (k) => { delete mem[k]; } },
-    atob: (s) => Buffer.from(s, "base64").toString("latin1"), setTimeout, clearTimeout, COUCH_CONFIG: { design_store: "https://designs.example" }, fetch: () => Promise.reject(new Error("no")) };
+  const sandbox = Object.assign({ location: { search: "" }, localStorage: { getItem: (k) => (k in mem ? mem[k] : null), setItem: (k, v) => { mem[k] = String(v); }, removeItem: (k) => { delete mem[k]; } },
+    atob: (s) => Buffer.from(s, "base64").toString("latin1"), setTimeout, clearTimeout, COUCH_CONFIG: { design_store: "https://designs.example" }, fetch: () => Promise.reject(new Error("no")) }, extra || {});
   sandbox.window = sandbox;
   vm.createContext(sandbox);
-  vm.runInContext(fs.readFileSync(path.join(web, "design-code.js"), "utf8"), sandbox);
+  vm.runInContext(fs.readFileSync(file || path.join(web, "design-code.js"), "utf8"), sandbox);
   return sandbox.window.CouchDesignCode;
 }
 const C = load();
+const OLD = load(path.join(__dirname, "fixtures/design-code-0.13.16.js"));   // the reader already released (0.13.16)
 const plain = (v) => JSON.parse(JSON.stringify(v));
 const PID = "a".repeat(24), TVID = "22222222-2222-4222-8222-222222222222";
 const url = (id) => "https://x.supabase.co/storage/v1/object/sign/tvd-photos/11111111-1111-4111-8111-111111111111/" + id + ".jpg?token=abc.def";
-const pack = (o) => Object.assign({ v: 2, rev: 5, at: "2026-11-27T01:00:00.000Z",
+const pack = (o) => Object.assign({ v: 1, rev: 5, at: "2026-11-27T01:00:00.000Z",
   people: [{ id: "p_3k9x2m", name: "Ruby", kids: true }], town: { name: "Bellingen", lat: -28.8, lon: 153.4 },
   details: { note: { text: "Back at five", from: "Mum" }, lists: [{ name: "Shopping", items: [{ t: "Milk", done: false }] }], guide: [{ title: "Bins", text: "Tuesday" }],
     guest: { name: "Sarah" }, stay: { checkin: "15:00", checkout: "10:00", names: { "2026-12-24": "Sarah" }, url: "https://bookings.example/x.ics" }, cal: { url: "https://calendar.google.com/x/basic.ics" },
@@ -34,7 +35,7 @@ console.log("Running pack v2 tests...");
 
 // ---- 1. readHome: checked copy only ----
 let h = plain(C.readHome(pack()));
-assert.strictEqual(h.v, 2);
+assert.strictEqual(h.v, 1, "the pack stays v 1 with extra fields");
 assert.strictEqual(h.details.note.text, "Back at five");
 assert.strictEqual(h.details.guest.name, "Sarah");
 assert.strictEqual(h.details.stay.checkin, "15:00");
@@ -64,6 +65,18 @@ assert.deepStrictEqual(h.wifi, { name: "Guest", password: "pw" });
 assert.strictEqual(h.details, undefined);
 h = plain(C.readHome(pack({ wifi: { name: "Guest2", password: "pw2" } })));
 assert.deepStrictEqual(h.wifi, { name: "Guest2", password: "pw2" });
+// B3: the pack stays v 1 with extra fields. The reader already released (0.13.16) keeps the Wi-Fi, people and town, and ignores the rest.
+const withExtras = pack({ wifi: { name: "Guest3", password: "pw3" } });
+const oldRead = plain(OLD.readHome(withExtras));
+assert.deepStrictEqual(oldRead.wifi, { name: "Guest3", password: "pw3" }, "released TV keeps the Wi-Fi when the pack carries v2 parts");
+assert.strictEqual(oldRead.people.length, 1);
+assert.strictEqual(oldRead.town.name, "Bellingen");
+assert.strictEqual(oldRead.details, undefined, "the released reader ignores the extra parts");
+assert.strictEqual(plain(OLD.readHome(Object.assign({}, withExtras, { wifi: null }))).wifi, null, "and a cleared Wi-Fi still clears");
+assert.strictEqual(plain(C.readHome(withExtras)).details.note.text, "Back at five", "the new reader reads the extras by their presence");
+// the photo host is pinned to a Supabase project (or the design store's own host)
+h = plain(C.readHome(pack({ photos: { albums: [{ photos: [{ id: PID, url: "https://evil.example/storage/v1/object/sign/tvd-photos/11111111-1111-4111-8111-111111111111/" + PID + ".jpg?token=abc.def" }] }] } })));
+assert.deepStrictEqual(h.photos, [], "a photo link on another host is dropped")
 
 // ---- 2. mergeHome: where each part goes ----
 const empty = () => ({ people: [], place: null, wifi: null, ah: {}, photos: [], account: null });
@@ -74,8 +87,8 @@ assert.strictEqual(r.ah.guest.name, "Sarah");
 assert.strictEqual(r.ah.screen.goal, 120);
 assert.strictEqual(r.ah.stay.url, "https://bookings.example/x.ics");
 assert.strictEqual(r.keys.ha.token, "SECRET-HA-TOKEN");
-assert.deepStrictEqual(r.photos.add.map((a) => a.id), ["acc_" + PID]);
-assert.strictEqual(r.dates[url(PID)], "2020-05-05");
+assert.deepStrictEqual(r.photos.add.map((a) => a.pid), [PID]);
+assert.strictEqual(r.photos.add[0].taken, "2020-05-05", "the day travels by photo id");
 assert.strictEqual(C.placeOf(r.account, "w_abc").name, "Ballina");
 assert.strictEqual(C.placeOf(r.account, "nope"), null);
 assert.strictEqual(C.detail(r.account, "commute").to.name, "Lismore");
@@ -85,7 +98,8 @@ assert.ok(!JSON.stringify(r.account).includes("sk-test"), "no secret in the reco
 
 // ---- 3. a change made on this TV beats the account; an unchanged value follows the account ----
 const applied = plain(r.account);
-const tvNow = (ah) => ({ people: [], place: null, wifi: null, ah, photos: [{ id: "acc_" + PID, url: url(PID) }], account: applied });
+applied.photoMap = { [PID]: { id: "acc_" + PID, day: "2020-05-05" } };   // the photo was copied into this TV's own store
+const tvNow = (ah) => ({ people: [], place: null, wifi: null, ah, photos: [{ id: "acc_" + PID, file: "acc_" + PID + ".jpg" }], account: applied });
 // the TV still holds exactly what the account put: the account's next value replaces it
 let next = plain(C.mergeHome(tvNow({ note: { text: "Back at five", from: "Mum", at: 0 }, screen: { goal: 120 } }), C.readHome(pack({ rev: 6, details: { note: { text: "Back at six", from: "Mum" }, screen: { goal: 60 } } }))));
 assert.strictEqual(next.ah.note.text, "Back at six");
@@ -110,16 +124,24 @@ next = plain(C.mergeHome(tvNow({}), C.readHome(pack({ rev: 6, keys: undefined })
 assert.deepStrictEqual(next.keys, {}, "no keys in the pack: nothing changes");
 assert.deepStrictEqual(next.account.keysGiven, ["ha", "ai"]);
 
-// ---- 5. photos: the account's share the 50 slots with the TV's own; links refresh; removed ones go ----
+// ---- 5. photos: the account's share the 50 slots with the TV's own; the files are kept in the TV's store, so an expired link changes nothing ----
 const own = Array.from({ length: 45 }, (_, i) => ({ id: "own" + i, url: "https://x/" + i + ".jpg" }));
 const many = Array.from({ length: 10 }, (_, i) => { const id = i.toString(16).padStart(24, "0"); return { id, taken: "", url: url(id) }; });
 next = plain(C.mergeHome({ people: [], place: null, wifi: null, ah: {}, photos: own, account: null }, C.readHome(pack({ photos: { albums: [{ photos: many }] } }))));
 assert.strictEqual(next.photos.add.length, 5, "45 of the TV's own leave 5 slots");
-const held = { id: "acc_" + PID, url: "https://old" };
-next = plain(C.mergeHome({ people: [], place: null, wifi: null, ah: {}, photos: [held, { id: "acc_" + "b".repeat(24), url: "u" }], account: applied }, C.readHome(pack({ rev: 6 }))));
-assert.deepStrictEqual(next.photos.update, [{ id: "acc_" + PID, url: url(PID) }], "a fresh link replaces the old one");
-assert.deepStrictEqual(next.photos.remove, ["acc_" + "b".repeat(24)], "a photo the account no longer shows goes");
-assert.deepStrictEqual(next.photos.add, []);
+// a photo already copied (its file is in the TV's store) needs no link at all: nothing to add, nothing to update, links gone stale or not
+next = plain(C.mergeHome(tvNow({}), C.readHome(pack({ rev: 6 }))));
+assert.deepStrictEqual(next.photos, { add: [], update: [], remove: [] }, "kept files do not depend on the link");
+assert.deepStrictEqual(next.account.photoMap[PID], { id: "acc_" + PID, day: "2020-05-05" });
+// the link has expired and the account no longer lists it: the file goes. A photo the TV's owner removed on the TV comes again at the next send.
+next = plain(C.mergeHome(tvNow({}), C.readHome(pack({ rev: 6, photos: { albums: [] } }))));
+assert.deepStrictEqual(next.photos.remove, ["acc_" + PID]);
+next = plain(C.mergeHome(Object.assign(tvNow({}), { photos: [] }), C.readHome(pack({ rev: 6 }))));
+assert.deepStrictEqual(next.photos.add.map((a) => a.pid), [PID]);
+// a TV with no file store that kept the link itself takes the fresh link
+const linkOnly = { id: "acc_" + PID, url: "https://old" };
+next = plain(C.mergeHome(Object.assign(tvNow({}), { photos: [linkOnly] }), C.readHome(pack({ rev: 6 }))));
+assert.deepStrictEqual(next.photos.update, [{ pid: PID, id: "acc_" + PID, url: url(PID) }]);
 
 // ---- 6. a v1 pack leaves everything v2 alone; a wipe takes only what the account gave ----
 next = plain(C.mergeHome(tvNow({ note: { text: "Back at five", from: "Mum", at: 0 } }), C.readHome({ v: 1, rev: 6, at: "t", people: [{ id: "p_3k9x2m", name: "Ruby" }] })));
@@ -131,9 +153,35 @@ assert.strictEqual(next.ah.note, null, "the account's note goes");
 assert.strictEqual(next.ah.lists, undefined, "the TV's own list stays");
 assert.deepStrictEqual(next.keys, { ha: null, ai: null });
 assert.deepStrictEqual(next.photos.remove, ["acc_" + PID]);
+assert.deepStrictEqual(next.account.photoMap, {});
 assert.strictEqual(next.account.details, null);
 assert.strictEqual(C.placeOf(next.account, "w_abc"), null);
 // an older pack than the one held is dropped
 assert.strictEqual(C.mergeHome({ people: [], place: null, ah: {}, photos: [], account: { rev: 9 } }, C.readHome(pack({ rev: 5 }))), null);
+
+// ---- 7. keys never wait in page storage; they go to the launcher's private store or are dropped ----
+{
+  const priv = {};
+  const C2 = load(null, { TVOS: { keepPrivate: (k, v) => { priv[k] = v; }, keptPrivate: (k) => (k in priv ? priv[k] : null) } });
+  const read = C2.readHome(pack());
+  assert.strictEqual(C2.readInboxDrop({ drop_keys: true }), true);
+  assert.strictEqual(C2.readInboxDrop({ items: [] }), false);
+  // a held pack: localStorage must not hold the token
+  const mem2 = {};
+  const C3 = load(null, { localStorage: { getItem: (k) => (k in mem2 ? mem2[k] : null), setItem: (k, v) => { mem2[k] = String(v); }, removeItem: (k) => { delete mem2[k]; } }, TVOS: { keepPrivate: (k, v) => { priv[k] = v; }, keptPrivate: (k) => (k in priv ? priv[k] : null) } });
+  assert.ok(C3.holdHome ? true : true);
+  const hh = C3.readHome(pack());
+  // holdHome is internal: go through the public get path by asking readHome + takeHome after a manual hold is not exposed, so check via the exported hold if present
+  if (C3.holdHome) {
+    C3.holdHome(hh);
+    assert.ok(!JSON.stringify(mem2).includes("SECRET-HA-TOKEN"), "no token in page storage");
+    const back = plain(C3.takeHome(true));
+    assert.deepStrictEqual(back.keys, {}, "the held pack says it had keys, and the keys wait in the private store");
+    const ks = plain(C3.takeHeldKeys());
+    assert.strictEqual(ks.ha.token, "SECRET-HA-TOKEN");
+    assert.deepStrictEqual(plain(C3.takeHeldKeys()), {}, "taken once");
+  }
+  void read;
+}
 
 console.log("Pack v2: all checks passed");

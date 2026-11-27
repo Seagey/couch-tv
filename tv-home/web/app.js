@@ -603,50 +603,136 @@
   // ---- Phase 2 shared base: what a v2 pack adds (design-code.js planV2). The details go into At home (the TV's own changes win);
   // the account's photos join the photo list as "acc_<id>" with the day each was taken; the keys the account gave this TV are kept
   // in the launcher's private store and handed to the part that uses them (Ask AI, Home Assistant). Never in a design.
+  // Keys live ONLY in the launcher's private store (TVOS.keepPrivate, left out of Android's backups). A TV without one keeps no key at
+  // all: never in the page's storage.
   var KEYS_KEY = "tvhome.home.keys";
+  function privateStore() { return !!(TV && TV.keepPrivate && TV.keptPrivate); }
   function keptKeys() {
     var v = null;
-    try { if (TV && TV.keptPrivate) v = TV.keptPrivate(PFX + KEYS_KEY); } catch (e) {}
-    if (v == null || v === "") try { v = localStorage.getItem(PFX + KEYS_KEY); } catch (e) {}
+    try { if (privateStore()) v = TV.keptPrivate(PFX + KEYS_KEY); } catch (e) {}
     try { v = v ? JSON.parse(v) : null; } catch (e) { v = null; }
     return v && typeof v === "object" && !Array.isArray(v) ? v : {};
   }
-  function keepKeys(o) {
-    var j = JSON.stringify(o);
-    if (TV && TV.keepPrivate) { try { TV.keepPrivate(PFX + KEYS_KEY, j); try { localStorage.removeItem(PFX + KEYS_KEY); } catch (e) {} return; } catch (e) {} }
-    try { localStorage.setItem(PFX + KEYS_KEY, j); } catch (e) {}
-  }
+  function keepKeys(o) { if (privateStore()) try { TV.keepPrivate(PFX + KEYS_KEY, JSON.stringify(o)); } catch (e) {} }
   // a key the account gave this TV, or null (what the parts that use a key ask for)
   function accountKey(kind) { var k = keptKeys()[kind]; return k && typeof k === "object" ? k : null; }
+  function hostOfUrl(u) { var m = /^https?:\/\/([^/:?#]+)/i.exec(String(u || "")); return m ? m[1].toLowerCase() : ""; }
+  // Smart home picks for the account's Home Assistant: the entities the account's details name (smart picks by widget, this TV's room),
+  // sorted into the groups the launcher keeps them in
+  function haPicks(d) {
+    var by = { climate: [], scenes: [], controls: [], cameras: [], sensors: [], speakers: [] }, dom = { climate: "climate", scene: "scenes", script: "scenes", light: "controls", "switch": "controls", fan: "controls", cover: "controls", camera: "cameras", sensor: "sensors", media_player: "speakers" };
+    var all = [];
+    if (d && d.smart && d.smart.picks) Object.keys(d.smart.picks).forEach(function (w) { all = all.concat(d.smart.picks[w] || []); });
+    if (d && d.rooms) Object.keys(d.rooms).forEach(function (tv) { var r = d.rooms[tv] || {}; all = all.concat(r.climate || [], r.speakers || [], r.lights || []); });
+    all.forEach(function (e) { var g = dom[String(e).split(".")[0]]; if (g && by[g].filter(function (x) { return x.entity === e; }).length === 0) by[g].push({ entity: e, name: "" }); });
+    return by;
+  }
   function applyAccountKeys(ks) {
-    var held = keptKeys(), any = false;
+    var held = keptKeys(), changed = false;
     Object.keys(ks).forEach(function (kind) {
-      if (ks[kind]) { held[kind] = ks[kind]; any = true; } else if (held[kind]) { delete held[kind]; any = true; }
+      if (ks[kind]) {
+        held[kind] = { url: ks[kind].url || ks[kind].base || "", sig: (ks[kind].token || ks[kind].key || "").slice(-6) };
+        changed = true;
+        useAccountKey(kind, ks[kind]);
+      } else if (held[kind]) { dropAccountKey(kind, held[kind]); delete held[kind]; changed = true; }
     });
-    if (!any) return;
-    keepKeys(held);
-    // Ask AI: the key and where it goes (ask.js keeps them locked to that address)
+    if (changed) keepKeys(held);
+  }
+  function useAccountKey(kind, k) {
     try {
-      if (!ks.ai && ks.ai !== undefined && typeof CouchAsk !== "undefined" && CouchAsk.forget) CouchAsk.forget();
-      else if (ks.ai && typeof CouchAsk !== "undefined" && CouchAsk.save) CouchAsk.save({ route: "own", provider: ks.ai.provider || "", base: ks.ai.base || undefined, model: ks.ai.model || undefined, key: ks.ai.key });
-    } catch (e) {}
-    // Home Assistant: the launcher checks the address and token (smarthome.js setup.check); the picks come from the account's details
-    try {
-      if (ks.ha && window.smartHome && window.smartHome.setup && window.smartHome.setup.can()) window.smartHome.setup.check(ks.ha.url || "", ks.ha.token);
+      // Ask AI: the key and where it goes (ask.js keeps them locked to that address); only over https
+      if (kind === "ai" && typeof CouchAsk !== "undefined" && CouchAsk.save && (!k.base || /^https:\/\//i.test(k.base))) CouchAsk.save({ route: "own", provider: k.provider || "", base: k.base || undefined, model: k.model || undefined, key: k.key });
+      // Home Assistant: the launcher checks the address and token, then keeps them with the ticks the account's details name
+      else if (kind === "ha" && window.smartHome && window.smartHome.setup && window.smartHome.setup.can()) {
+        var st = null; try { st = window.smartHome.setup.status(); } catch (e) {}
+        // a Home Assistant set up on this TV by hand is left alone
+        if (st && st.set && st.made_on_tv && hostOfUrl(k.url) !== (st.host || "").toLowerCase()) return;
+        window.smartHome.setup.check(k.url || "", k.token).then(function (r) {
+          if (r && r.ok) window.smartHome.setup.save(haPicks(ACCOUNT && ACCOUNT.details));
+        });
+      }
     } catch (e) {}
   }
-  function applyAccountPhotos(p, dates) {
+  // the account took a key back: this TV forgets it, but only if what is kept here is still the account's (a key typed on the TV stays)
+  function dropAccountKey(kind, rec) {
+    try {
+      if (kind === "ai" && typeof CouchAsk !== "undefined" && CouchAsk.keyEnds && CouchAsk.forget) {
+        // only the last 6 characters of the key are kept here, to know it is still the one the account gave
+        if (rec && rec.sig && CouchAsk.keyEnds(rec.sig)) CouchAsk.forget();
+      } else if (kind === "ha" && window.smartHome && window.smartHome.setup && window.smartHome.setup.can()) {
+        var st = window.smartHome.setup.status();
+        if (st && st.set && rec && rec.url && hostOfUrl(rec.url) === (st.host || "").toLowerCase()) window.smartHome.setup.forget();
+      }
+    } catch (e) {}
+  }
+  // "Remove my keys" reached this TV through the inbox (drop_keys): everything the account gave goes
+  function dropAccountKeys() {
+    var held = keptKeys();
+    Object.keys(held).forEach(function (kind) { dropAccountKey(kind, held[kind]); });
+    keepKeys({});
+    if (ACCOUNT) { ACCOUNT.keysGiven = []; keepAccount(ACCOUNT); }
+  }
+  // ---- the account's photos: copied into this TV's own store on arrival, so they keep showing after the link runs out ----
+  var ACC_PENDING = {};
+  function accountDayOf(localId) {
+    var m = ACCOUNT && ACCOUNT.photoMap || {}, k;
+    for (k in m) if (m[k] && m[k].id === localId && /^\d{4}-\d{2}-\d{2}$/.test(m[k].day || "")) return m[k].day;
+    return "";
+  }
+  function addAccountPhoto(pid, localId, file, url, day) {
+    var list = Array.isArray(ST.photos) ? ST.photos.slice() : [];
+    if (list.length >= MAX_PHOTOS || list.some(function (x) { return x && x.id === localId; })) return;
+    list.push(file ? { id: localId, file: file } : { id: localId, url: url });
+    ST.photos = list;
+    ACCOUNT = ACCOUNT || {};
+    ACCOUNT.photoMap = ACCOUNT.photoMap || {};
+    ACCOUNT.photoMap[pid] = { id: localId, day: day || "" };
+    keepAccount(ACCOUNT);
+    saveSettings();
+    DATES = null;
+    ahChanged();
+  }
+  // the Android launcher copies the file itself (TVOS.fetchAccountPhoto); a TV whose home a computer runs hands the bytes to that
+  // computer; a TV with neither keeps the link (it is renewed at every send)
+  function fetchAccountPhoto(pid, url, day) {
+    if (TV && TV.fetchAccountPhoto) { ACC_PENDING[pid] = day || ""; try { TV.fetchAccountPhoto(pid, url); } catch (e) { delete ACC_PENDING[pid]; } return; }
+    if (!OFFLINE && !STANDALONE && API) {
+      var x = new XMLHttpRequest();
+      try {
+        x.open("GET", url); x.responseType = "arraybuffer"; x.timeout = 30000;
+        x.onload = function () {
+          if (x.status !== 200 || !x.response || x.response.byteLength > 2 * 1024 * 1024) return;
+          var up = new XMLHttpRequest();
+          up.open("POST", API + "/api/photos" + (KEY ? "?key=" + encodeURIComponent(KEY) : ""));
+          up.setRequestHeader("Content-Type", "image/jpeg");
+          up.onload = function () { var r = null; try { r = JSON.parse(up.responseText); } catch (e) {} if (r && r.ok && r.photo && r.photo.id && r.photo.file) addAccountPhoto(pid, r.photo.id, r.photo.file, "", day); };
+          up.send(x.response);
+        };
+        x.send();
+      } catch (e) {}
+      return;
+    }
+    addAccountPhoto(pid, "acc_" + pid, "", url, day);
+  }
+  function accountPhotoFetched(pid, ok) {
+    var day = ACC_PENDING[pid]; delete ACC_PENDING[pid];
+    if (ok) addAccountPhoto(pid, "acc_" + pid, "acc_" + pid + ".jpg", "", day);
+  }
+  function applyAccountPhotos(p) {
     var list = Array.isArray(ST.photos) ? ST.photos.slice() : [], changed = false;
-    (p.remove || []).forEach(function (id) { var n = list.length; list = list.filter(function (x) { return !(x && x.id === id); }); if (list.length !== n) changed = true; });
-    (p.update || []).forEach(function (u) { list.forEach(function (x) { if (x && x.id === u.id && x.url !== u.url) { x.url = u.url; changed = true; } }); });
-    (p.add || []).forEach(function (a) { if (list.length < MAX_PHOTOS) { list.push({ id: a.id, url: a.url, src: "account" }); changed = true; } });
-    if (changed) { ST.photos = list; }
-    var keys = Object.keys(dates || {});
-    if (keys.length) { var d = ahRead("tvhome.athome.dates") || {}; keys.forEach(function (u) { d[u] = dates[u]; }); ahWrite("tvhome.athome.dates", d); DATES = null; }
+    (p.remove || []).forEach(function (id) {
+      var gone = list.filter(function (x) { return x && x.id === id; })[0];
+      if (!gone) return;
+      if (gone.file) try { if (TV && TV.removePhoto) TV.removePhoto(gone.file); } catch (e) {}
+      list = list.filter(function (x) { return x !== gone; }); changed = true;
+    });
+    (p.update || []).forEach(function (u) { list.forEach(function (x) { if (x && x.id === u.id && !x.file && x.url !== u.url) { x.url = u.url; changed = true; } }); });
+    if (changed) ST.photos = list;
+    (p.add || []).forEach(function (a) { fetchAccountPhoto(a.pid, a.url, a.taken); });
     return changed;
   }
-  // what mergeHome worked out, kept: the record (with the photos), the town in Location, the guest Wi-Fi
-  // in At home. The people are the caller's (the list on screen changes differently at start and later).
+  // what mergeHome worked out, kept: the record (with the photos), the town in Location, the guest Wi-Fi in At home, and (pack v2) the
+  // details in At home, the account's photos and the keys. The people are the caller's (the list on screen changes differently at start and later).
   function keepHome(r) {
     ACCOUNT = r.account;
     keepAccount(ACCOUNT);
@@ -656,12 +742,11 @@
       AH.store.edit(function (x) { if (r.wifi) x.wifi = r.wifi; else delete x.wifi; });
       ahChanged();
     }
-    // pack v2 (design-code.js mergeHome): details into At home, the account's photos, the keys this TV may use
     if (r.ah && AH && Object.keys(r.ah).length) {
       AH.store.edit(function (x) { Object.keys(r.ah).forEach(function (f) { if (r.ah[f] === null) delete x[f]; else x[f] = r.ah[f]; }); });
       ahChanged();
     }
-    if (r.photos && applyAccountPhotos(r.photos, r.dates)) { saveSettings(); ahChanged(); }
+    if (r.photos && applyAccountPhotos(r.photos)) { saveSettings(); ahChanged(); }
     if (r.keys) applyAccountKeys(r.keys);
   }
   // A pack that arrived with a design (held by design-code.js until now). The account wins: its people
@@ -673,9 +758,12 @@
     if (typeof CouchDesignCode === "undefined" || !CouchDesignCode.takeHome || PREVIEW || /[?&]designer=1\b/.test(Q)) return false;
     var pack = CouchDesignCode.takeHome(true);
     if (!pack) return false;
+    if (!ACCOUNT) ACCOUNT = keptAccount();   // a late take (after At home is ready) may run before readConfig has loaded the record
     // a v2 pack fills At home: it waits (held) until At home is ready, then is taken
-    if ((pack.details || pack.photos || pack.keys) && !AH) return false;
+    if ((pack.details || pack.photos || pack.keys || pack.wipe) && !AH) return false;
     CouchDesignCode.takeHome();
+    // the keys that came with the pack waited in the launcher's private store (never in page storage)
+    if (pack.keys !== undefined && CouchDesignCode.takeHeldKeys) pack.keys = CouchDesignCode.takeHeldKeys();
     var now = homeNow();
     if (base) now.people = base;
     var r = CouchDesignCode.mergeHome(now, pack);
@@ -6916,6 +7004,8 @@
   };
   function accountInbox(raw) {
     if (typeof CouchDesignCode === "undefined" || !CouchDesignCode.readInboxAnswer) return;
+    // "Remove my keys" on the website: the store says so once, in the inbox answer
+    try { var rj = typeof raw === "string" ? JSON.parse(raw) : raw; if (CouchDesignCode.readInboxDrop && CouchDesignCode.readInboxDrop(rj)) dropAccountKeys(); } catch (e) {}
     var a = CouchDesignCode.readInboxAnswer(raw), now = Date.now();
     inboxTime("wait", a.state === "wait" ? now + a.wait * 1000 : 0);
     if (a.state !== "unlinked") inboxTime("next", now + CouchDesignCode.inboxDelay(a) * 1000);
@@ -9523,6 +9613,7 @@
     return (Array.isArray(ST.photos) ? ST.photos : []).filter(function (p) { return p && (p.file || p.url); }).map(function (p) {
       var src = photoSrc(p), d = CouchAtHome.nameDate(p.file || p.url), k = DATES[src];
       if (!d && k) { var m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(k); if (m) d = { y: +m[1], m: +m[2], d: +m[3] }; }
+      if (!d && p.id) { var ad = /^(\d{4})-(\d{2})-(\d{2})$/.exec(accountDayOf(p.id)); if (ad) d = { y: +ad[1], m: +ad[2], d: +ad[3] }; }
       return { src: src, date: d, url: !p.file && !d && k === undefined ? p.url : "" };
     });
   }
@@ -10198,6 +10289,7 @@
     scene: function (pick) { return phoneScene(pick); },
     // the launcher's file picker has copied the chosen photos into its own storage (Home settings)
     photosAdded: function (names) { photosAdded(names); },
+    accountPhotoFetched: function (id, ok) { accountPhotoFetched(String(id), ok === true); },
     // Android's speech screen closed (MainActivity.listen): what was said, or null
     heard: function (text) { if (window.Reminders) window.Reminders.heard(text); },
     // the launcher's updater has news (Updater.kt)

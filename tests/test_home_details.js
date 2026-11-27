@@ -135,8 +135,7 @@ assert.strictEqual(plain(C.readHome(pack({ wifi: null }))).wifi, null, "null: th
 for (const wifi of [{ name: "", password: "x" }, { name: "x".repeat(33), password: "" }, { name: "A", password: "p".repeat(64) }, { name: "A" }, { name: "A", password: "a\nb" }, "A", []]) {
   assert.ok(!("wifi" in plain(C.readHome(pack({ wifi })))), "a bad Wi-Fi is left out: " + JSON.stringify(wifi));
 }
-// pack v2 (Phase 2 shared base) carries the Wi-Fi too, read the same way (tests/test_home_v2.js)
-assert.deepStrictEqual(plain(C.readHome(Object.assign(pack(), { v: 2, wifi: { name: "A", password: "" } }))).wifi, { name: "A", password: "" }, "v2 keeps the Wi-Fi");
+assert.ok(!("wifi" in plain(C.readHome(Object.assign(pack(), { v: 2, wifi: { name: "A", password: "" } })))), "a newer format: no Wi-Fi");
 r = plain(C.mergeHome({ people: [], wifi: null, account: null }, C.readHome(pack({ wifi: { name: "Beach house guest", password: "correct horse battery" } }))));
 assert.deepStrictEqual(r.wifi, { ssid: "Beach house guest", sec: "WPA", pass: "correct horse battery", hidden: false });
 assert.ok(C.wifiFromAccount(r.account, r.wifi), "marked by being what the account sent");

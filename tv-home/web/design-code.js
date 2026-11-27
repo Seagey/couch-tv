@@ -161,13 +161,14 @@
       out.town = { name: cleanWords(t.name, 40), lat: round2(t.lat), lon: round2(t.lon) };
     // the guest Wi-Fi (v1): null when the account cleared it; a network name of 1 to 32 characters and
     // a password of 0 to 63 ("" for an open network), as the Guest Wi-Fi widget keeps them (athome.js)
-    if (h.v >= 1 && h.wifi === null) out.wifi = null;
-    else if (h.v >= 1 && h.wifi && typeof h.wifi === "object" && !Array.isArray(h.wifi)) {
+    if (h.v === 1 && h.wifi === null) out.wifi = null;
+    else if (h.v === 1 && h.wifi && typeof h.wifi === "object" && !Array.isArray(h.wifi)) {
       var ssid = typeof h.wifi.name === "string" ? h.wifi.name.replace(/[\u0000-\u001f\u007f]/g, "") : "", pw = h.wifi.password;
       if (ssid.trim() && ssid.length <= 32 && typeof pw === "string" && pw.length <= 63 && !/[\u0000-\u001f\u007f]/.test(pw)) out.wifi = { name: ssid, password: pw };
     }
-    // pack v2 (Phase 2 shared base, server/lib/home-v2.mjs): the rest of the home's details, the keys this TV may use, the photo album links
-    if (h.v >= 2) readV2(h, out);
+    // the rest of the home's details, the keys this TV may use, the photo album links (Phase 2 shared base, server/lib/home-v2.mjs).
+    // The pack stays v 1 with these as extra fields (a TV already released reads the v 1 parts and ignores them); found by being there.
+    if (h.details !== undefined || h.keys !== undefined || h.photos !== undefined || Array.isArray(h.keysHeld)) readV2(h, out);
     return out;
   }
   // ---- pack v2 ----
@@ -290,6 +291,12 @@
     return o;
   }
   // the photo links: only https, only our store's private photo path, flattened to one list in album order, at most 50
+  // only the store's own file host: a Supabase project address, or the host of this TV's design store
+  function photoHostOk(u) {
+    var m = /^https:\/\/([a-z0-9.-]+)\//i.exec(u), h = m ? m[1].toLowerCase() : "", sb = "";
+    try { sb = (/^https:\/\/([a-z0-9.-]+)/i.exec(base()) || [])[1] || ""; } catch (e) {}
+    return !!h && (/^[a-z0-9-]+\.supabase\.co$/.test(h) || (!!sb && h === sb.toLowerCase()));
+  }
   function readPhotos(p) {
     var out = [];
     if (!plainObj(p) || !Array.isArray(p.albums)) return out;
@@ -297,7 +304,7 @@
       if (!plainObj(a) || !Array.isArray(a.photos)) return;
       a.photos.forEach(function (ph) {
         if (out.length >= PHOTOS_TV_MAX || !plainObj(ph) || typeof ph.id !== "string" || !/^[0-9a-f]{24}$/.test(ph.id)) return;
-        if (typeof ph.url !== "string" || ph.url.length > 1500 || !/^https:\/\/[a-z0-9.-]+\/storage\/v1\/object\/sign\/tvd-photos\/[0-9a-f-]{36}\/[0-9a-f]{24}\.jpg\?token=[A-Za-z0-9._-]+$/i.test(ph.url)) return;
+        if (typeof ph.url !== "string" || ph.url.length > 1500 || !photoHostOk(ph.url) || !/^https:\/\/[a-z0-9.-]+\/storage\/v1\/object\/sign\/tvd-photos\/[0-9a-f-]{36}\/[0-9a-f]{24}\.jpg\?token=[A-Za-z0-9._-]+$/i.test(ph.url)) return;
         out.push({ id: ph.id, url: ph.url, taken: typeof ph.taken === "string" && DAYKEY.test(ph.taken) ? ph.taken : "", album: oneLine(a.name, 40) });
       });
     });
@@ -306,6 +313,7 @@
   function readV2(h, out) {
     if (plainObj(h.details)) out.details = readDetails(h.details);
     if (plainObj(h.keys)) out.keys = readKeys(h.keys);
+    else if (Array.isArray(h.keysHeld)) out.keys = {};   // the pack had keys; they wait in the private store (takeHeldKeys)
     if (plainObj(h.photos)) out.photos = readPhotos(h.photos);
   }
   // sorted-key JSON, so two records compare by what they hold, not the order they were written in
@@ -325,14 +333,14 @@
   // Works out what a v2 pack changes on this TV, touching nothing:
   //   ah     { field: value | null } to put into At home (null takes the field out)
   //   keys   { kind: record | null } to hold (null: drop what the account gave)
-  //   photos { add: [{ id, url, taken }], update: [{ id, url }], remove: [ids] } for the photo list (ids "acc_<photo id>")
-  //   dates  { url: "Y-M-D" } the day each account photo was taken (On this day)
+  //   photos { add: [{ pid, url, taken }], update: [{ pid, id, url }], remove: [local ids] } for the photo list; the day each photo was taken
+  //          (On this day) is kept in the account record's photoMap by photo id, never by link
   // now: { ah: the At home record, photos: the TV's photo list, account: what the last pack left }; pack: readHome's answer
   function planV2(now, pack, wipe) {
     var acc = now.account && typeof now.account === "object" ? now.account : {};
     var ahNow = plainObj(now.ah) ? now.ah : {}, applied = plainObj(acc.ahApplied) ? acc.ahApplied : {}, given = Array.isArray(acc.keysGiven) ? acc.keysGiven : [];
     var photosNow = Array.isArray(now.photos) ? now.photos : [];
-    var plan = { ah: {}, keys: {}, photos: { add: [], update: [], remove: [] }, dates: {}, next: { details: wipe ? null : (pack.details || acc.details || null), ahApplied: {}, keysGiven: given.slice(), photoIds: [] } };
+    var plan = { ah: {}, keys: {}, photos: { add: [], update: [], remove: [] }, next: { details: wipe ? null : (pack.details || acc.details || null), ahApplied: {}, keysGiven: given.slice(), photoMap: {} } };
     var d = wipe ? {} : pack.details, want = d ? ahWanted(d) : null;
     if (want || wipe) {
       AH_FIELDS.forEach(function (f) {
@@ -352,20 +360,28 @@
       given.forEach(function (k) { if (!pack.keys[k]) plan.keys[k] = null; });
       plan.next.keysGiven = now2;
     }
-    // photos
-    var mineCount = photosNow.filter(function (p) { return !(p && typeof p.id === "string" && p.id.indexOf("acc_") === 0); }).length;
-    var accNow = {};
-    photosNow.forEach(function (p) { if (p && typeof p.id === "string" && p.id.indexOf("acc_") === 0) accNow[p.id] = p; });
-    if (wipe) Object.keys(accNow).forEach(function (id) { plan.photos.remove.push(id); });
+    // photos. The account's photos are copied into this TV's own store on arrival (app.js fetchAccountPhoto), so they keep showing when
+    // the link runs out. acc.photoMap says which local photo is which account photo: { photoId: { id: localId, day } }. A local photo
+    // that is in that map is the account's; the rest are this TV's own and keep their slots.
+    var map = plainObj(acc.photoMap) ? acc.photoMap : {}, byLocal = {}, accLocal = {};
+    photosNow.forEach(function (p) { if (p && typeof p.id === "string") byLocal[p.id] = p; });
+    Object.keys(map).forEach(function (pid) { if (map[pid] && typeof map[pid].id === "string") accLocal[map[pid].id] = pid; });
+    var ownCount = photosNow.filter(function (p) { return p && !accLocal[p.id]; }).length, nextMap = {};
+    if (wipe) Object.keys(accLocal).forEach(function (id) { if (byLocal[id]) plan.photos.remove.push(id); });
     else if (pack.photos) {
-      var wantIds = {}, room = Math.max(0, PHOTOS_TV_MAX - mineCount);
+      var room = Math.max(0, PHOTOS_TV_MAX - ownCount), wantPid = {};
       pack.photos.forEach(function (ph) {
-        var id = "acc_" + ph.id;
-        if (accNow[id]) { wantIds[id] = true; if (accNow[id].url !== ph.url) plan.photos.update.push({ id: id, url: ph.url }); plan.next.photoIds.push(ph.id); if (ph.taken) plan.dates[ph.url] = ph.taken; }
-        else if (room > 0) { room--; wantIds[id] = true; plan.photos.add.push({ id: id, url: ph.url, taken: ph.taken }); plan.next.photoIds.push(ph.id); if (ph.taken) plan.dates[ph.url] = ph.taken; }
+        var m = map[ph.id];
+        wantPid[ph.id] = true;
+        if (m && byLocal[m.id]) {
+          nextMap[ph.id] = { id: m.id, day: ph.taken || m.day || "" };
+          // an entry that is still a link (no file store on this TV) takes the fresh link
+          if (!byLocal[m.id].file && byLocal[m.id].url !== ph.url) plan.photos.update.push({ pid: ph.id, id: m.id, url: ph.url });
+        } else if (room > 0) { room--; plan.photos.add.push({ pid: ph.id, url: ph.url, taken: ph.taken }); }
       });
-      Object.keys(accNow).forEach(function (id) { if (!wantIds[id]) plan.photos.remove.push(id); });
-    } else plan.next.photoIds = Array.isArray(acc.photoIds) ? acc.photoIds : [];
+      Object.keys(map).forEach(function (pid) { if (!wantPid[pid] && map[pid] && byLocal[map[pid].id]) plan.photos.remove.push(map[pid].id); });
+      plan.next.photoMap = nextMap;
+    } else plan.next.photoMap = map;
     return plan;
   }
   // a widget's own place (Phase 2): the account's, by widget id, or null (the widget then uses the home's town)
@@ -380,9 +396,26 @@
     if (!h) return false;
     var old = takeHome(true);
     if (old && old.rev > h.rev) return false;
-    var rec = JSON.stringify(h);
+    // the keys never wait in page storage: they go straight to the launcher's private store (held with the pack there), or are dropped
+    var keys = h.keys, held = h;
+    if (keys !== undefined) { held = {}; Object.keys(h).forEach(function (k) { if (k !== "keys") held[k] = h[k]; }); held.keysHeld = Object.keys(keys); if (!holdKeys(keys)) held.keysHeld = []; }
+    var rec = JSON.stringify(held);
     store(HOME_KEY, rec);
     return store(HOME_KEY) === rec;
+  }
+  var HELD_KEYS = "tvhome.home.keys.held";
+  function holdKeys(keys) {
+    var T = window.TVOS;
+    if (!T || !T.keepPrivate) return Object.keys(keys).length === 0;   // no private store on this TV: no key is kept
+    try { T.keepPrivate(HELD_KEYS, JSON.stringify(keys)); return true; } catch (e) { return false; }
+  }
+  // the keys a held pack came with, once (private store only)
+  function takeHeldKeys() {
+    var T = window.TVOS, v = null;
+    try { if (T && T.keptPrivate) v = T.keptPrivate(HELD_KEYS); } catch (e) {}
+    try { if (T && T.keepPrivate) T.keepPrivate(HELD_KEYS, ""); } catch (e) {}
+    try { v = v ? JSON.parse(v) : null; } catch (e) { v = null; }
+    return plainObj(v) ? readKeys(v) : {};
   }
   function takeHome(peek) {
     var raw = store(HOME_KEY), h = null;
@@ -418,8 +451,8 @@
       var out = { people: people, place: place, account: next };
       // what the account gave beyond people, town and Wi-Fi goes too: the details it put in At home, its keys, its photos
       var wp = planV2(now, {}, true);
-      next.details = null; next.ahApplied = wp.next.ahApplied; next.keysGiven = []; next.photoIds = [];
-      out.ah = wp.ah; out.keys = wp.keys; out.photos = wp.photos; out.dates = {};
+      next.details = null; next.ahApplied = wp.next.ahApplied; next.keysGiven = []; next.photoMap = {};
+      out.ah = wp.ah; out.keys = wp.keys; out.photos = wp.photos;
       if (wifiFromAccount) out.wifi = null;
       return out;
     }
@@ -442,12 +475,12 @@
     }
     // pack v2: the details, keys and photo links (kept in the record; the plan says what to put where)
     var v2 = null;
-    if (pack.v >= 2 || pack.details || pack.keys || pack.photos) {
+    if (pack.details || pack.keys || pack.photos) {
       v2 = planV2(now, pack, false);
-      next.details = v2.next.details; next.ahApplied = v2.next.ahApplied; next.keysGiven = v2.next.keysGiven; next.photoIds = v2.next.photoIds;
-    } else if (acc) { if (acc.details) next.details = acc.details; if (acc.ahApplied) next.ahApplied = acc.ahApplied; if (acc.keysGiven) next.keysGiven = acc.keysGiven; if (acc.photoIds) next.photoIds = acc.photoIds; }
+      next.details = v2.next.details; next.ahApplied = v2.next.ahApplied; next.keysGiven = v2.next.keysGiven; next.photoMap = v2.next.photoMap;
+    } else if (acc) { if (acc.details) next.details = acc.details; if (acc.ahApplied) next.ahApplied = acc.ahApplied; if (acc.keysGiven) next.keysGiven = acc.keysGiven; if (acc.photoMap) next.photoMap = acc.photoMap; }
     var res = { people: people, place: place, account: next };
-    if (v2) { res.ah = v2.ah; res.keys = v2.keys; res.photos = v2.photos; res.dates = v2.dates; }
+    if (v2) { res.ah = v2.ah; res.keys = v2.keys; res.photos = v2.photos; }
     // wifi in the answer only when it changes: an object to keep, null to take away
     if (pack.wifi === null) {
       if (wifiFromAccount) res.wifi = null;
@@ -770,5 +803,5 @@
   window.CouchDesignCode = { base: base, readCode: readCode, checkCode: checkCode, get: get, kept: kept, forget: forget, accept: accept, lockImages: lockImages, mediaSources: mediaSources,
     openInbox: openInbox, takeInbox: takeInbox, tvReport: tvReport, fromSetup: fromSetup, linked: linked, unlink: unlink,
     readInboxAnswer: readInboxAnswer, inboxDelay: inboxDelay, INBOX_WEEK: INBOX_WEEK, INBOX_AWAY: INBOX_AWAY, snapshot: snapshot, holdUndo: holdUndo, undoHeld: undoHeld, undoFresh: undoFresh, undoNew: undoNew, dropUndo: dropUndo,
-    readHome: readHome, takeHome: takeHome, mergeHome: mergeHome, planV2: planV2, placeOf: placeOf, detail: detail, fromAccount: fromAccount, photoOf: photoOf, wifiFromAccount: wifiFromAccount };
+    readHome: readHome, holdHome: holdHome, takeHome: takeHome, takeHeldKeys: takeHeldKeys, readInboxDrop: function (j) { return !!j && typeof j === "object" && j.drop_keys === true; }, mergeHome: mergeHome, planV2: planV2, placeOf: placeOf, detail: detail, fromAccount: fromAccount, photoOf: photoOf, wifiFromAccount: wifiFromAccount };
 })();

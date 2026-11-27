@@ -131,6 +131,8 @@ object AccountLink {
         }
         val j = try { org.json.JSONObject(body) } catch (e: Exception) { return out.put("state", "error") }
         val poll = clampSecs(j.opt("poll").let { if (it is Number) it.toLong() else null }, POLL_MIN, POLL_MAX, POLL_DEFAULT)
+        // "Remove my keys" was pressed on the website while this TV held keys: the page drops them (said once by the store)
+        if (j.optBoolean("drop_keys", false)) out.put("drop_keys", true)
         val items = j.optJSONArray("items") ?: return out.put("state", "error")
         for (i in items.length() - 1 downTo maxOf(0, items.length() - 5)) {
             val it = items.optJSONObject(i) ?: continue

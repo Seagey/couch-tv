@@ -610,6 +610,8 @@
 
   var API = {
     providers: function () { return PROVIDERS.map(function (p) { return { id: p.id, name: p.name, base: p.base, model: p.model, key: p.key, where: p.where }; }); },
+    // does the key kept on this TV end with these characters? (the account's key is dropped only if it is still the one it gave)
+    keyEnds: function (tail) { var m = getItem(SECRET_KEY, true) || ""; return !!m && !!tail && m.slice(-String(tail).length) === String(tail); },
     status: status, save: save, forget: forget, ask: ask, open: open, close: close, isOpen: function () { return !!sheet; }, off: off,
     last: function () { return last; }, message: function () { return message; },
     on: function (f) { listeners.push(f); },

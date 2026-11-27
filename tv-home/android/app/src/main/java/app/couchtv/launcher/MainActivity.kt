@@ -1199,6 +1199,50 @@ class MainActivity : Activity() {
             photoFile(name)?.delete()
         }
 
+        // An account photo (Couch TV Studio, Phase 2): the page hands over the photo's id and the store's short lived link; this
+        // copies the file into the TV's own photo folder as acc_<id>.jpg, so it keeps showing after the link runs out. Only our
+        // store's private photo path over https, no redirects, a JPEG of at most 2 MB. Answers tv.accountPhotoFetched(id, ok).
+        @JavascriptInterface
+        fun fetchAccountPhoto(id: String, url: String) {
+            if (!Regex("[0-9a-f]{24}").matches(id)) return
+            if (!Regex("https://[a-z0-9.-]+/storage/v1/object/sign/tvd-photos/[0-9a-f-]{36}/[0-9a-f]{24}\\.jpg\\?token=[A-Za-z0-9._-]+").matches(url)) return
+            Thread {
+                var ok = false
+                val name = "acc_$id.jpg"
+                val tmp = java.io.File(photoDir, "acc_$id.part")
+                try {
+                    val c = java.net.URL(url).openConnection() as java.net.HttpURLConnection
+                    c.connectTimeout = 15000
+                    c.readTimeout = 30000
+                    c.instanceFollowRedirects = false
+                    if (c.responseCode == 200) {
+                        val max = 2 * 1024 * 1024
+                        var total = 0
+                        var first = ByteArray(0)
+                        c.inputStream.use { input ->
+                            tmp.outputStream().use { out ->
+                                val buf = ByteArray(16 * 1024)
+                                while (true) {
+                                    val n = input.read(buf)
+                                    if (n < 0) break
+                                    if (total == 0) first = buf.copyOf(minOf(n, 3))
+                                    total += n
+                                    if (total > max) { total = -1; break }
+                                    out.write(buf, 0, n)
+                                }
+                            }
+                        }
+                        val jpeg = first.size == 3 && first[0] == 0xFF.toByte() && first[1] == 0xD8.toByte() && first[2] == 0xFF.toByte()
+                        if (total > 0 && jpeg) ok = tmp.renameTo(java.io.File(photoDir, name))
+                    }
+                } catch (e: Exception) {
+                    ok = false
+                }
+                if (!ok) tmp.delete()
+                main.post { js("window.tv && tv.accountPhotoFetched && tv.accountPhotoFetched('" + id + "', " + ok + ")") }
+            }.start()
+        }
+
         // ---------------- Spotify local media session ----------------
         @JavascriptInterface
         fun spotifyState(): String {

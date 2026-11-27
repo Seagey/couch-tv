@@ -101,6 +101,15 @@ class AccountLinkTest {
         assertEquals("https://couchtv.joshuaseage.com", AccountLink.STUDIO)
     }
 
+    // "Remove my keys" on the website: the store says drop_keys once in the inbox answer, and the page drops the account's keys
+    @Test fun inboxCarriesTheDropKeysFlag() {
+        val r = AccountLink.readInbox(200, """{"items":[],"poll":60,"drop_keys":true}""", null)
+        assertEquals("none", r.getString("state"))
+        assertTrue(r.getBoolean("drop_keys"))
+        assertFalse(AccountLink.readInbox(200, """{"items":[],"poll":60}""", null).has("drop_keys"))
+        assertTrue(AccountLink.readInbox(200, """{"items":[{"code":"$code","title":"x"}],"poll":60,"drop_keys":true}""", null).getBoolean("drop_keys"))
+    }
+
     @Test fun inboxStates() {
         assertEquals("none", AccountLink.readInbox(200, """{"items":[],"poll":60}""", null).getString("state"))
         assertEquals(30L, AccountLink.readInbox(200, """{"items":[],"poll":1}""", null).getLong("poll"))
