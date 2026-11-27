@@ -41,6 +41,8 @@
   // Ask AI and From your AI (ask.js): Ask AI has its own layer; From your AI shows how to connect an agent
   LAYER.battery = "batteries"; TITLE.batteries = "Batteries";
   LAYER.ask = "ask"; TITLE.ask = "Ask AI"; LAYER.agent = "agent"; TITLE.agent = "From your AI";
+  // the pool (lane C, 28 Nov 2026)
+  LAYER.pool = "pool"; TITLE.pool = "Pool";
 
   var K = null, S = null;   // the widgets.js kit; the open layer
   var STAGE = { w: 1920, h: 1080 }, PANEL = { left: 80, top: 60, width: 1760, height: 960 };
@@ -839,14 +841,28 @@
   // Speakers: each with its volume. Quieter and louder move it 5 at a time (presses are joined),
   // play or pause where the speaker can
   B.speakers = function (o, env) {
-    var H = kit().ha, demo = !!env.demo, info = H.haOf(env).info || {};
-    if (!demo && !(info.speakers && info.speakers.length)) return B.setup(o, env);
+    var H = kit().ha, demo = !!env.demo, info = H.haOf(env).info || {}, ap = H.airplayOf(env);
+    var haOn = demo ? !ap : !!(info.speakers && info.speakers.length);
+    if (!haOn && !(ap && ap.speakers.length)) return B.setup(o, env);
     var copy = function (l) { return l ? l.map(function (c) { var x = {}; for (var k in c) x[k] = c[k]; return x; }) : null; };
-    var list = copy(H.speakersOf(env, o)), joinT = null;
+    var list = haOn ? copy(H.speakersOf(env, o)) : [], joinT = null;
+    if (ap) { list = (list || []).concat(H.apSpeakers(ap)); ap = JSON.parse(JSON.stringify(ap)); }
+    // AirPlay: through the home computer (api.airplay, bridge/airplay.py); a speaker in or out of the group, the group on or off
+    var apSend = function (action, body, say) {
+      if (demo || S.api.designer) { designerSays(); return; }
+      if (!S.api.airplay) return msg("AirPlay needs the home computer on");
+      if (say) msg(say);
+      S.api.airplay(action, body).then(function (r) {
+        if (!S) return;
+        if (r && r.airplay) { ap = r.airplay; list = (haOn ? list.filter(function (x) { return !x.airplay; }) : []).concat(H.apSpeakers(ap)); draw(); }
+        if (!r || !r.ok) msg(r && r.error === "speakers" ? "None of those speakers answered" : "The Mac at home did not answer. Try again.");
+      });
+    };
     S.body.appendChild(head("speakers", op(o).label || "Speakers", "", "#ff375f"));
     var body = E("div", "cwd-col cwd-grow", "margin-top:30px");
     S.body.appendChild(body);
     var send = function (action, s, value, say) {
+      if (s.airplay) { if (action === "volume") apSend("volume", { name: s.name, value: value }, say); return; }
       if (demo || S.api.designer) { designerSays(); return; }
       if (!S.api.ha) return msg("Home Assistant is not set up on this TV");
       if (say) msg(say);
@@ -859,10 +875,13 @@
     var reread = function () {
       if (!S || demo || !S.api.ha || joinT) return;
       S.readAt = Date.now();
-      S.api.ha("speakers").then(function (r) {
+      if (ap && S.api.airplay) S.api.airplay("state").then(function (r) {
+        if (S && r && r.airplay && r.airplay.available && !joinT) { ap = r.airplay; list = (list || []).filter(function (x) { return !x.airplay; }).concat(H.apSpeakers(ap)); draw(); }
+      });
+      if (haOn) S.api.ha("speakers").then(function (r) {
         if (!S || joinT) return;
         if (!r || !r.ok) { if (!list) { list = []; draw(); msg("Home Assistant is not answering"); } return; }
-        list = H.pickedOf((r.speakers || []).filter(function (c) { return c && c.entity; }), kit().setting(o, env, "players")); draw();
+        list = H.pickedOf((r.speakers || []).filter(function (c) { return c && c.entity; }), kit().setting(o, env, "players")).concat(H.apSpeakers(ap && ap.available ? ap : null)); draw();
       });
     };
     var draw = function () {
@@ -871,6 +890,17 @@
       S.stops = [];
       if (!list) { S.subEl.textContent = "Checking Home Assistant"; return; }
       S.subEl.textContent = list.filter(function (s) { return s.state === "playing"; }).length + " of " + list.length + " playing";
+      if (ap) {
+        // the AirPlay group: its speakers play together, in sync (the Mac's Music app)
+        var inG = (ap.selected || []).slice(), avail = ap.speakers.filter(function (x) { return x.available !== false; }).map(function (x) { return x.name; });
+        body.appendChild(E("div", "cwd-row", "margin-bottom:22px;padding:18px 26px;border-radius:30px;background:" + (ap.active ? "#fff;color:#18171c" : "rgba(255,255,255,.08)"), [
+          E("div", "cwd-sic", "margin-right:20px", [ic("airplay", 44, ap.active ? "#18171c" : "#fff", "solid")]),
+          E("div", "cwd-col cwd-grow", "min-width:0", [E("div", "cwd-mid cwd-ell", "", [ap.name || "Whole House"]), E("div", "cwd-small cwd-ell", "", [inG.length ? inG.join(", ") : "Pick speakers below"])]),
+          F(btn(ap.active ? "pause" : "play", ap.active ? "Stop" : "Play together", "cwd-sm"), function () {
+            if (ap.active) apSend("stop", {}, "Letting the speakers go");
+            else apSend("play", { speakers: inG.length ? inG : avail }, tl("Playing on {n} speakers", { n: (inG.length ? inG : avail).length }));
+          }, "AirPlay group")]));
+      }
       list.slice(0, 6).forEach(function (s) {
         var ok = s.ok !== false, vol = ok && s.state !== "off" ? kit().clamp(s.volume || 0, 0, 100) : 0;
         var nudge = function (d) {
@@ -888,7 +918,13 @@
             E("div", "", "height:16px;border-radius:8px;background:rgba(255,255,255,.18);margin-top:10px;overflow:hidden", [E("div", "", "height:100%;border-radius:8px;background:#fff;width:" + vol + "%")])]),
           F(btn("minus", "", "cwd-round cwd-sm"), nudge(-5), s.name + " quieter"),
           E("div", "", "width:16px;flex:none"), F(btn("plus", "", "cwd-round cwd-sm"), nudge(5), s.name + " louder"),
-          E("div", "", "width:16px;flex:none"), F(btn(s.state === "playing" ? "pause" : "play", "", "cwd-round cwd-sm"), function () {
+          E("div", "", "width:16px;flex:none"), s.airplay ? F(btn((ap.selected || []).indexOf(s.name) >= 0 ? "check" : "plus", "", "cwd-round cwd-sm"), function () {
+            var sel = (ap.selected || []).slice(), i = sel.indexOf(s.name);
+            if (i >= 0) sel.splice(i, 1); else sel.push(s.name);
+            ap.selected = sel; draw();
+            if (ap.active && sel.length) apSend("play", { speakers: sel }, s.name + (i >= 0 ? " left the group" : " joined the group"));
+            else if (ap.active) apSend("stop", {}, "Letting the speakers go");
+          }, s.name + " in the group") : F(btn(s.state === "playing" ? "pause" : "play", "", "cwd-round cwd-sm"), function () {
             if (!ok) return msg(s.name + " is not answering");
             if (s.can_pause === false) return msg(s.name + " cannot play or pause from the TV");
             s.state = s.state === "playing" ? "paused" : "playing"; draw();
@@ -905,6 +941,55 @@
     S.every = 2000;
     S.tick = function () { if (Date.now() - (S.readAt || 0) > 10000) reread(); };
     if (!demo) reread();
+  };
+
+  // Pool: the water big, and a switch for each part. Home Assistant through the launcher (api.ha), Connect 10 through the account
+  // (api.pool: Couch TV Studio's server sends the action to ConnectMyPool; the approval code never reaches the TV)
+  B.pool = function (o, env) {
+    var H = kit().ha, demo = !!env.demo, c10 = !demo && kit().setting(o, env, "via") === "connect10";
+    var p = H.poolOf(env, o);
+    if (!p || p.none || p.error) {
+      if (p && p.none) return B.setup(o, env);
+      S.body.appendChild(head("pool", op(o).label || "Pool", p && p.error ? "Your pool is not answering" : c10 ? "Checking your pool" : "Checking Home Assistant", "#0a84ff"));
+      return;
+    }
+    var parts = p.parts.map(function (x) { var y = {}; for (var k in x) y[k] = x[k]; return y; });
+    S.body.appendChild(head("pool", op(o).label || "Pool", p.temp == null ? "" : p.heating && p.target != null ? tl("Water {temp}, heating to {target}", { temp: Math.round(p.temp) + "°", target: Math.round(p.target) + "°" }) : tl("Water {temp}", { temp: Math.round(p.temp) + "°" }), "#0a84ff"));
+    var grid = E("div", "cwd-grid cwd-grow", "align-content:flex-start;margin-top:36px");
+    S.body.appendChild(grid);
+    var draw = function () {
+      var keep = S.stops[S.cur] && S.stops[S.cur].el.getAttribute("data-name");
+      while (grid.firstChild) grid.removeChild(grid.firstChild);
+      S.stops = [];
+      parts.forEach(function (x) {
+        grid.appendChild(F(E("div", "cwd-toggle" + (x.on ? " on" : ""), "", [E("div", "cwd-sic", "", [ic(x.icon, 44, x.on ? "#1a1406" : "#fff", "solid")]),
+          E("div", "cwd-mid cwd-ell", "", [x.name]), E("div", "cwd-small", "", [x.word])]), function () {
+          if (demo || S.api.designer) { x.on = !x.on; x.word = x.on ? "On" : "Off"; designerSays(); draw(); return; }
+          var back = function (r) {
+            if (!S) return;
+            if (!r || !r.ok) { x.on = !x.on; x.word = x.on ? "On" : "Off"; draw(); msg(r && r.error === "throttle" ? "Your pool is busy. Try again in a minute." : "Your pool did not answer. Try again."); }
+          };
+          if (c10) {
+            if (!S.api.pool) return msg("Not on this TV yet");
+            var act = x.key === "pump" ? ["pump", x.dev, null] : x.key === "heater" ? ["heater", x.dev, x.on ? 0 : 1] : ["light", x.dev, x.on ? 0 : 2];
+            x.on = x.key === "pump" ? x.on : !x.on; x.word = x.key === "pump" ? "Changing" : x.on ? "On" : "Off"; draw();
+            msg(x.name + (x.key === "pump" ? ": next mode" : x.on ? " on" : " off"));
+            S.api.pool(act[0], act[1], act[2]).then(back);
+            return;
+          }
+          if (!S.api.ha) return msg("Home Assistant is not set up on this TV");
+          x.on = !x.on; x.word = x.on ? "On" : "Off"; draw();
+          msg(x.name + (x.on ? " on" : " off"));
+          (x.kind === "climate" ? S.api.ha(x.on ? "on" : "off", x.entity) : S.api.ha("set", x.entity, x.on ? "on" : "off")).then(back);
+        }, x.name));
+      });
+      if (p.chlor) grid.appendChild(E("div", "cwd-toggle", "", [E("div", "cwd-sic", "", [ic("humidity", 44, "#fff", "solid")]), E("div", "cwd-mid cwd-ell", "", [p.chlor.name]), E("div", "cwd-small", "", [p.chlor.text])]));
+      var again = keep ? S.stops.map(function (s) { return s.el.getAttribute("data-name"); }).indexOf(keep) : -1;
+      S.cur = again >= 0 ? again : Math.min(S.cur || 0, Math.max(0, S.stops.length - 1));
+      paint();
+    };
+    draw();
+    S.redraw = draw;
   };
 
   // Up next: the next songs on the Spotify account (to look at: Spotify itself changes the queue)

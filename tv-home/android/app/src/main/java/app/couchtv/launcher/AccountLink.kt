@@ -179,4 +179,77 @@ object AccountLink {
         answered(kv, token, r)
         return r
     }
+
+    // ---- The pool (lane C, 28 Nov 2026): AstralPool Connect 10 through the account ----
+    // POST <Studio>/v1/setup/pool with the link as a Bearer token: the server opens the pool's approval code (locked in the
+    // account), asks ConnectMyPool and answers with the readings only. Same rules as the inbox: Studio's own https address,
+    // no redirects, no cookies, at most 16 KB read. An action is {kind: pump|heater|light, dev, value}; nothing else is sent.
+    private const val POOL_MAX = 16 * 1024
+    private val POOL_KINDS = setOf("pump", "heater", "light")
+    private val POOL_ID = Regex("^[a-z0-9]{1,24}$")
+
+    /** The body sent for [arg] (the page's JSON, or "" for the readings), or null when the page asked for something else. */
+    fun poolBody(arg: String?): org.json.JSONObject? {
+        val out = org.json.JSONObject()
+        if (arg.isNullOrBlank()) return out
+        val j = try { org.json.JSONObject(arg) } catch (e: Exception) { return null }
+        val kind = j.optString("kind")
+        if (kind !in POOL_KINDS) return null
+        val dev = j.opt("dev")
+        if (dev !is Number || dev.toInt() !in 0..255) return null
+        val a = org.json.JSONObject().put("kind", kind).put("dev", dev.toInt())
+        val v = j.opt("value")
+        if (v is Number) { if (v.toInt() !in 0..5) return null; a.put("value", v.toInt()) }
+        out.put("action", a)
+        return out
+    }
+
+    /** What the page may see of an answer: the server's own object, or {ok: false, error}; an action's id echoed back. */
+    fun readPool(status: Int, body: String?, id: String?): org.json.JSONObject {
+        val out = when {
+            status == 401 -> org.json.JSONObject().put("ok", false).put("error", "unlinked")
+            status == 429 -> org.json.JSONObject().put("ok", false).put("error", "throttle")
+            status != 200 || body == null || body.length > POOL_MAX -> org.json.JSONObject().put("ok", false).put("error", "error")
+            else -> try { org.json.JSONObject(body) } catch (e: Exception) { org.json.JSONObject().put("ok", false).put("error", "error") }
+        }
+        if (id != null && POOL_ID.matches(id)) out.put("id", id)
+        return out
+    }
+
+    /** Asks once. Blocking: off the main thread. A 401 forgets the link here, the same as the inbox. */
+    fun pool(kv: Kv, arg: String?): org.json.JSONObject {
+        val id = try { if (arg.isNullOrBlank()) null else org.json.JSONObject(arg).optString("id").takeIf { it.isNotEmpty() } } catch (e: Exception) { null }
+        val sent = poolBody(arg) ?: return readPool(400, null, id)
+        val token = token(kv) ?: return readPool(401, null, id)
+        val r = try {
+            val c = java.net.URL("$STUDIO/v1/setup/pool").openConnection() as java.net.HttpURLConnection
+            try {
+                c.instanceFollowRedirects = false
+                c.connectTimeout = 10000
+                c.readTimeout = 30000
+                c.useCaches = false
+                c.requestMethod = "POST"
+                c.doOutput = true
+                c.setRequestProperty("Authorization", "Bearer $token")
+                c.setRequestProperty("Content-Type", "application/json")
+                c.setRequestProperty("Accept", "application/json")
+                c.outputStream.use { it.write(sent.toString().toByteArray()) }
+                val code = c.responseCode
+                val body = if (code == 200) c.inputStream.use { s ->
+                    val buf = java.io.ByteArrayOutputStream()
+                    val b = ByteArray(8192)
+                    while (true) {
+                        val n = s.read(b)
+                        if (n < 0) break
+                        buf.write(b, 0, n)
+                        if (buf.size() > POOL_MAX) break
+                    }
+                    if (buf.size() > POOL_MAX) null else buf.toString("UTF-8")
+                } else null
+                readPool(code, body, id)
+            } finally { c.disconnect() }
+        } catch (e: Exception) { readPool(0, null, id) }
+        if (r.optString("error") == "unlinked" && token(kv) == token) unlink(kv)
+        return r
+    }
 }

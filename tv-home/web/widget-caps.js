@@ -324,7 +324,7 @@
         vidaa: ["With a home computer that stays on: connect Spotify once on it (open the Couch TV Spotify page on it and sign in).", "With the website home and no computer: sign in to Spotify once on your own Couch TV site (setup guide, Hisense VIDAA, Spotify).", "Play music in Spotify: the next songs in your queue show here."] }),
       until: "\"Needs Spotify connected\", and where it is set up", build: "",
       ok: "Opens the next ten songs, big", platforms: plat("computer", "computer", "setup", { android: "Needs a home computer with Spotify connected. Only Spotify shares its queue.", web: "Works while the home computer is on, with Spotify connected on it.", vidaa: "Works with the home computer, or the website home with Spotify signed in." }), sizes: sz(["small", "tall", "large"], [4, 4]) },
-    speakers: { name: "Speakers", status: "setup", what: "Each speaker, what it plays and its volume", needs: [HA_NEED, "Your speakers picked on the TV"],
+    speakers: { name: "Speakers", status: "setup", what: "Each speaker, what it plays and its volume, and AirPlay speakers playing together", needs: [HA_NEED + ", or AirPlay 2 speakers and a Mac at home that stays on, running Couch TV", "Your speakers picked on the TV"],
       setup: setup("tv", haSteps("speakers (up to 6, any Home Assistant knows)", "Press Home: each speaker and its volume show here." + PICK_HERE)),
       until: "\"Needs Home Assistant\", and where it is set up", build: "",
       ok: "Opens the speakers: louder, quieter, play and pause for each", platforms: HA_PLAT(), sizes: sz(["wtile", "small", "tall"], [4, 2]) },
@@ -356,6 +356,16 @@
       setup: setup("tv", haSteps("sensors (up to 8: the pool, a rain gauge, humidity)", "Press Home: the reading shows here. Hold OK on it, then Edit on the TV, to pick the sensor.")),
       until: "\"Needs Home Assistant\", and where it is set up", build: "",
       ok: "Opens the reading big with its last 24 hours; Left and Right reach your other sensors", platforms: HA_PLAT(), sizes: sz(["tile", "wtile", "small"], [2, 2]) },
+    // the pool (lane C, 28 Nov 2026): any pool Home Assistant has, or AstralPool Connect 10 through the account (Couch TV Studio's
+    // server asks ConnectMyPool with the pool's approval code, which stays locked in the account)
+    pool: { name: "Pool", status: "setup", what: "The pool's water temperature, the pump, the heater, the lights and the chlorinator", needs: [HA_NEED + ", or an AstralPool Connect 10 approved for home automation", "Your pool's parts picked on the TV or in Couch TV Studio"],
+      setup: setup("tv", (function () {
+        var c10 = "Got an AstralPool Connect 10? In Couch TV Studio pick the widget, then Your details, and add its approval code instead.";
+        var st = haSteps("pool sensors and switches", "Press Home: the pool shows here. Hold OK on it, then Edit on the TV, to say which is the pump, the heater and the lights.");
+        return { android: [c10].concat(st.android.slice(1)), web: st.web, vidaa: st.vidaa };
+      })()),
+      until: "\"Needs Home Assistant\", and where it is set up", build: "",
+      ok: "Opens the pool: switch the pump, the heater and the lights", platforms: plat("setup", "computer", "computer", { android: "Home Assistant: set up on the TV. Connect 10: through your Couch TV account, on a TV linked to it.", web: "Home Assistant: the home computer talks to it for this TV. Connect 10 is not on these TVs yet.", vidaa: "Needs a home computer: the website home cannot reach Home Assistant." }), sizes: sz(["tile", "wtile", "small", "medium", "wide", "large"], [2, 2]) },
     // the launcher reads Android's own Bluetooth battery levels (tv-home/android Batteries.kt)
     battery: { name: "Batteries", status: "setup", what: "The remotes, game controllers and headphones paired with this TV, and the charge left in each, as rings",
       needs: ["A Google TV, Android TV or Fire TV, with Bluetooth remotes or controllers that report their charge"],
@@ -617,6 +627,14 @@
       st("now", "Show power now", "toggle", true, "The power being made or used right now, beside today's total, in a big widget.", "design", ALL, true)],
     speakers: [st("players", "Speakers", "device", [], "Which speakers show here. None picked shows every one picked in Smart home.", "tv", ON_TV, true,
       { domain: "media_player", many: true, max: 6, needs: HA, "private": true })],
+    pool: [st("via", "Your pool", "choice", "ha", "Home Assistant covers Zodiac, Davey, Halo, Viron, Hayward and Pentair. Connect 10 uses ConnectMyPool with your pool's approval code.", "design", ALL, true,
+        { options: [["ha", "Through Home Assistant"], ["connect10", "AstralPool Connect 10"]] }),
+      st("water", "Water temperature", "device", "", "Which sensor is the water. Empty finds one named for the pool or spa.", "tv", ON_TV, true, { domain: "sensor", needs: HA, "private": true }),
+      st("pump", "Pump", "device", "", "Which switch runs the filter pump.", "tv", ON_TV, true, { domain: ["switch", "fan"], needs: HA, "private": true }),
+      st("heater", "Heater", "device", "", "Which switch or thermostat heats the pool.", "tv", ON_TV, true, { domain: ["switch", "climate"], needs: HA, "private": true }),
+      st("light", "Lights", "device", "", "Which light or switch is the pool lights.", "tv", ON_TV, true, { domain: ["light", "switch"], needs: HA, "private": true }),
+      st("chlor", "Chlorinator", "device", "", "Which sensor shows the chlorinator: salt, output or chlorine.", "tv", ON_TV, true, { domain: "sensor", needs: HA, "private": true }),
+      HEADING("A heading for this widget. Empty shows Pool.")],
     scenes: [st("scenes", "Scenes", "device", [], "Which scenes show here. None picked shows every one picked in Smart home. Never one for a lock, alarm, garage door or gate. A script does what it was built to do.", "tv", ON_TV, true,
       { domain: ["scene", "script"], many: true, max: 10, needs: HA, "private": true })],
     battery: [st("low", "Red below", "number", 20, "A charge under this shows in red, so you know to charge it.", "design", ALL, true, { min: 5, max: 50, step: 5 })],
@@ -942,7 +960,7 @@
     town: ["solar", "weather", "bigtemp", "hourly", "week", "rain", "uv", "sun", "air", "surf", "date"],
     photos: ["photo", "slideshow", "mosaic", "artframe", "memory"],
     calendar: ["agenda"], spotify: ["queue"], wifi: ["wifi"], text: ["note", "list", "guide"], team: ["sports"],
-    ha: ["speakers", "aircon", "scenes", "controls", "camera", "doorbell", "energy", "sensor"]
+    ha: ["speakers", "aircon", "scenes", "controls", "camera", "doorbell", "energy", "sensor", "pool"]
   };
   var NEED_OF = {};
   Object.keys(NEED).forEach(function (n) { NEED[n].forEach(function (k) { NEED_OF[k] = n; }); });
@@ -953,7 +971,7 @@
     date: "Today's date and weather", photo: "One of your photos", artframe: "One of your photos", slideshow: "Your photos, one after another",
     mosaic: "A few of your photos", memory: "Photos from this day", agenda: "Your next events", queue: "Your Spotify queue",
     speakers: "Your speakers", aircon: "Your aircon", scenes: "Your scenes", controls: "Your lights and switches", camera: "Your camera",
-    doorbell: "Your doorbell", energy: "Your solar and power", sensor: "A reading from your home", wifi: "A code guests scan to join",
+    doorbell: "Your doorbell", energy: "Your solar and power", sensor: "A reading from your home", pool: "Your pool", wifi: "A code guests scan to join",
     note: "A note for everyone", list: "Shopping or to do", guide: "What guests need to know", sports: "Your team's games"
   };
   function setupNeed(kind) { return NEED_OF[kind] || null; }

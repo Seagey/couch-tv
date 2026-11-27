@@ -1982,11 +1982,30 @@
   function houseSafe(l) { return Array.isArray(l) ? l.filter(function (x) { return x && !x.blocked && !opensHouse(x.entity || (Array.isArray(x) ? x[2] : "")); }) : l; }
   function spkWord(s) { return s.ok === false ? "Not answering" : s.state === "off" || s.state === "standby" ? "Off" : s.muted ? "Muted" : s.volume != null ? s.volume + "%" : s.state === "playing" ? "Playing" : "On"; }
   function spkSong(s) { return s.ok === false ? "" : s.title ? s.title + (s.artist ? ", " + s.artist : "") : s.state === "playing" ? "Playing" : s.state === "paused" ? "Paused" : s.state === "off" ? "" : "Not playing"; }
+  // AirPlay 2 speakers and groups from the home computer (bridge/airplay.py, home-hub's Whole House; lane C 28 Nov 2026):
+  // names and volumes only, read by app.js (CouchAirPlayNow) from the bridge's /api/airplay. Undefined: not asked yet.
+  var DEMO_AIRPLAY = { available: true, name: "Whole House", active: true, playing: true, selected: ["Lounge", "Kitchen", "Deck"],
+    speakers: [{ name: "Lounge", available: true, selected: true, volume: 42 }, { name: "Kitchen", available: true, selected: true, volume: 30 }, { name: "Deck", available: true, selected: true, volume: 55 }], groups: [] };
+  function airplayOf(env) {
+    if (env.demo) return env.demoAirplay === true ? DEMO_AIRPLAY : null;   // the designer's picture stays the Home Assistant one unless asked
+    var a = dataOf(env).airplay;
+    if (a === undefined && window.CouchAirPlayNow) a = window.CouchAirPlayNow();
+    return a && typeof a === "object" && a.available === true && Array.isArray(a.speakers) ? a : null;
+  }
+  // an AirPlay speaker in the same shape as a Home Assistant one (its id starts airplay:, never an entity)
+  function apSpeakers(a) {
+    return (a ? a.speakers : []).slice(0, 12).map(function (s) {
+      return { entity: "airplay:" + s.name, name: s.name, ok: s.available !== false, airplay: true, state: a.active && s.selected ? "playing" : "idle", volume: s.volume, can_volume: s.volume != null };
+    });
+  }
+  function apGroupLine(a) { var sel = (a.selected || []).slice(0, 6); return sel.length ? sel.join(", ") : "Pick speakers"; }
   R.speakers = function (root, o, b, env) {
-    var ha = haOf(env), info = ha.info || {}, al = alignOf(o), W = b.w - 48;
-    if (!env.demo && !(info.speakers && info.speakers.length)) return soonFit(root, b, "speakers", "speakers");
-    var list = speakersOf(env, o), title = op(o).label || "Speakers";
-    if (!list) return haWait(root, b, o, "speakers", title, "Checking Home Assistant");
+    var ha = haOf(env), info = ha.info || {}, al = alignOf(o), W = b.w - 48, ap = airplayOf(env);
+    var haOn = env.demo ? !ap : !!(info.speakers && info.speakers.length);   // the designer shows one kind at a time
+    if (!haOn && !(ap && ap.speakers.length)) return soonFit(root, b, "speakers", "speakers");
+    var list = haOn ? speakersOf(env, o) : [], title = op(o).label || "Speakers";
+    if (haOn && !list && !ap) return haWait(root, b, o, "speakers", title, "Checking Home Assistant");
+    list = (list || []).concat(apSpeakers(ap));
     if (!list.length) return haWait(root, b, o, "speakers", title, "No speaker is answering");
     alignRoot(root, al);
     var bar = function (s) { return E("div", "cw-bar", "width:100%;margin-top:10px;height:12px;border-radius:6px", [E("b", "", "width:" + (s.ok === false || s.state === "off" ? 0 : clamp(s.volume || 0, 0, 100)) + "%")]); };
@@ -2003,10 +2022,19 @@
       var p = list.filter(function (s) { return s.state === "playing"; })[0] || list[0], song = spkSong(p);
       add(root, [head(p, false), E("div", "cw-grow"), song ? fitWords(root, song, W, 24, 1, 560, "color:var(--sub)") : null, bar(p)]);
     } else {
-      var rowH = b.h >= 520 ? 120 : 100, n = Math.max(1, Math.min(list.length, Math.floor((b.h - 90) / rowH)));
-      add(root, [fitLab(root, "speakers", title, W), E("div", "cw-col cw-grow", "width:100%;justify-content:space-between;margin-top:18px;min-height:0", list.slice(0, n).map(function (s) {
-        var song = rowH >= 120 ? spkSong(s) : "";
-        return E("div", "", "flex:none;width:100%", [head(s, true), song ? fitWords(root, song, W, 24, 1, 560, "color:var(--sub)") : null, bar(s)]);
+      // the AirPlay group first (its speakers together, in sync), in a box of its own when there is room for it
+      var grpH = ap && b.h >= 420 ? 112 : 0, grp = null;
+      if (grpH) {
+        var gw = ap.active ? (ap.playing ? "Playing" : "On") : "Ready", gpx = fitPxText(gw, W, 25, 1, 650, famOf(root)) || 23, gww = gw.length * gpx * 0.62 + 12;
+        var gname = fitWords(root, ap.name || "Whole House", W - 44 - 46 - gww, 29, 1, 680, "color:inherit");
+        grp = E("div", "cw-mod" + (ap.active ? " on" : ""), "flex:none;width:100%;margin:18px 0 0;height:" + px(grpH) + ";padding:16px 22px;border-radius:26px;align-items:flex-start;justify-content:center", [
+          E("div", "cw-row", "width:100%;justify-content:space-between", [E("div", "cw-row", "min-width:0", [ic("airplay", 34, ap.active ? "#18171c" : "#fff"), gname ? E("div", "", "margin-left:12px;min-width:0", [gname]) : null]), fitWords(root, gw, gww, gpx, 1, 650)]),
+          fitWords(root, apGroupLine(ap), W - 44, 24, 1, 560, "color:var(--sub);margin-top:4px")]);
+      }
+      var rowH = b.h >= 520 ? 120 : 100, n = Math.max(grpH ? 0 : 1, Math.min(list.length, Math.floor((b.h - 90 - (grpH ? grpH + 18 : 0)) / rowH)));
+      add(root, [fitLab(root, "speakers", title, W), grp, E("div", "cw-col cw-grow", "width:100%;justify-content:" + (grpH ? "flex-start" : "space-between") + ";margin-top:18px;min-height:0", list.slice(0, n).map(function (s, i) {
+        var song = rowH >= 120 && !s.airplay ? spkSong(s) : "";
+        return E("div", "", "flex:none;width:100%" + (grpH && i ? ";margin-top:22px" : ""), [head(s, true), song ? fitWords(root, song, W, 24, 1, 560, "color:var(--sub)") : null, bar(s)]);
       }))]);
     }
     stop(root, "detail", "speakers", title);
@@ -2371,6 +2399,113 @@
       }
     }
     stop(root, "detail", "sensor", p.name);
+  };
+  // Pool (lane C, 28 Nov 2026; coord/mockups-1128/C): the water temperature, the pump, the heater, the lights and the
+  // chlorinator, from either
+  //   Home Assistant (opts.via "ha", the default): any brand Home Assistant has (Zodiac iAquaLink, Davey Lifeguard, Halo and
+  //     Viron through a Bluetooth proxy, Hayward, Pentair), read from the same ticks as every smart home widget. Which entity is
+  //     which part: this TV's or the design's water, pump, chlor, heater and light, else the account's (Your details), else a
+  //     guess by name (pool, spa, pump, filter, heat, chlor, salt);
+  //   AstralPool Connect 10 (opts.via "connect10"): the ConnectMyPool cloud, asked by Couch TV Studio's server with the
+  //     pool's approval code locked in the account; the TV only gets the readings (app.js CouchPoolNow, from the launcher).
+  var DEMO_POOL = { ok: true, temp: 27, unit: "c", target: 29, heating: true,
+    parts: [{ key: "pump", icon: "pump", name: "Pump", on: true, word: "On" }, { key: "heater", icon: "heat", name: "Heater", on: true, word: "On" }, { key: "light", icon: "light", name: "Lights", on: false, word: "Off" }],
+    chlor: { name: "Chlorinator", text: "Salt 4200 ppm" } };
+  var C10_MODE = ["Off", "Auto", "On", "Low", "Medium", "High"];
+  var POOL_WORD = /pool|spa|swim/;
+  function poolRoles(o, env) {
+    var r = {}, keys = ["water", "pump", "chlor", "heater", "light"], acc = null;
+    try { var d = window.CouchAccountDetails ? window.CouchAccountDetails() : null; acc = d && d.smart && d.smart.roles && o && o.id ? d.smart.roles[o.id] : null; } catch (e) { acc = null; }
+    keys.forEach(function (k) { var v = setting(o, env, k); if (!v && acc && typeof acc[k] === "string") v = acc[k]; if (v) r[k] = v; });
+    return r;
+  }
+  function poolGuess(list, re, also) { return (list || []).filter(function (x) { var t = (String(x.entity || "") + " " + String(x.name || "")).toLowerCase(); return re.test(t) && (!also || also.test(t)); })[0] || null; }
+  function poolFromHa(o, env) {
+    var ha = haOf(env), r = poolRoles(o, env), sensors = ha.sensors, controls = houseSafe(ha.controls || []), rooms = env.rooms || [];
+    var info = ha.info || {};
+    if (!(info.sensors && info.sensors.length) && !(info.controls && info.controls.length) && !rooms.length) return { none: true };
+    if (!sensors && !ha.controls) return null;
+    var by = function (l, e) { return e ? (l || []).filter(function (x) { return x && x.entity === e; })[0] || null : null; };
+    var water = by(sensors, r.water) || (!r.water ? poolGuess((sensors || []).filter(function (s) { return s.cls === "temperature" || /°/.test(s.unit || ""); }), POOL_WORD) : null);
+    var pump = by(controls, r.pump) || (!r.pump ? poolGuess(controls, /pump|filter/) : null);
+    var heatC = by(controls, r.heater), heatR = by(rooms, r.heater);
+    if (!r.heater) heatC = poolGuess(controls, /heat/, POOL_WORD), heatR = heatC ? null : poolGuess(rooms, /heat|pool|spa/);
+    var light = by(controls, r.light) || (!r.light ? poolGuess(controls.filter(function (c) { return c.kind === "light" || /^light\./.test(c.entity); }), POOL_WORD) : null);
+    var chlor = by(sensors, r.chlor) || (!r.chlor ? poolGuess(sensors, /chlor|salt|orp|\bph\b|_ph/) : null);
+    var out = { ok: true, temp: null, unit: "", target: null, heating: false, parts: [], chlor: null };
+    if (water && water.ok !== false && water.num != null && isFinite(water.num)) { out.temp = sensorConv(water.num, water, env); out.unit = String(water.unit || ""); }
+    var part = function (key, icon, name, c) { if (c) out.parts.push({ key: key, icon: icon, name: name, on: c.ok !== false && !!c.on, word: ctlWord(c), entity: c.entity, kind: c.kind || "switch" }); };
+    part("pump", "pump", "Pump", pump);
+    if (heatC) part("heater", "heat", "Heater", heatC);
+    else if (heatR) { var hon = roomOn(heatR); out.parts.push({ key: "heater", icon: "heat", name: "Heater", on: hon, word: heatR.ok === false ? "Not answering" : hon ? "On" : "Off", entity: heatR.entity, kind: "climate" }); if (hon && heatR.target != null) { out.target = tconv(heatR.target, heatR, env); out.heating = true; } }
+    part("light", "light", "Lights", light);
+    if (chlor && chlor.ok !== false) { var t = sensorText(chlor, env); out.chlor = { name: chlor.name || "Chlorinator", text: t[0] + (t[1] ? " " + t[1] : "") }; }
+    if (out.temp == null && !out.parts.length && !out.chlor) return { none: true };
+    return out;
+  }
+  // Connect 10's readings as the account's server gives them (server/lib/connect10.mjs poolView)
+  function poolFromC10(env) {
+    var c = dataOf(env).pool;
+    if (c === undefined && window.CouchPoolNow) c = window.CouchPoolNow();
+    if (!c || typeof c !== "object") return null;
+    if (c.ok !== true) return { error: String(c.error || "error") };
+    var out = { ok: true, temp: isFinite(c.temp) ? +c.temp : null, unit: c.unit === "f" ? "°F" : "°C", target: null, heating: false, parts: [], chlor: null, spa: c.spa === true };
+    var mode = function (m) { return C10_MODE[m] || "Off"; };
+    if (c.pump) out.parts.push({ key: "pump", icon: "pump", name: String(c.pump.name || "Filter").slice(0, 24), on: c.pump.mode > 0, word: mode(c.pump.mode), dev: c.pump.n });
+    if (c.heater) { var hon = c.heater.mode === 1; out.parts.push({ key: "heater", icon: "heat", name: "Heater", on: hon, word: hon ? "On" : "Off", dev: c.heater.n }); if (hon && isFinite(c.heater.set)) { out.target = +c.heater.set; out.heating = true; } }
+    if (c.light) out.parts.push({ key: "light", icon: "light", name: String(c.light.name || "Lights").slice(0, 24), on: c.light.mode > 0, word: c.light.mode > 0 && c.light.colour ? String(c.light.colour).slice(0, 20) : mode(c.light.mode), dev: c.light.n });
+    return out;
+  }
+  function poolOf(env, o) {
+    if (env.demo) return DEMO_POOL;
+    return setting(o, env, "via") === "connect10" ? poolFromC10(env) : poolFromHa(o, env);
+  }
+  var POOL_WAIT = { no_key: "Add your pool's approval code in Couch TV Studio", not_allowed: "Let this TV use your pool in Couch TV Studio, My TVs",
+    unlinked: "Link this TV to your Couch TV account", offline: "Your pool is not connected to ConnectMyPool", throttle: "Checking your pool", busy: "Checking your pool",
+    no_tv: "Not on this TV yet: needs a Google TV or Android TV" };
+  function poolDeg(v, unit) { return v == null || !isFinite(v) ? "--" : Math.round(v) + "°"; }
+  function poolMod(root, p, w, h) {
+    var name = fitWords(root, p.name, w - 28, 27, 1, 680, "color:inherit"), st = fitWords(root, p.word, w - 28, 24, 1, 560, "color:var(--sub)");
+    return E("div", "cw-mod" + (p.on ? " on" : ""), "flex:none;margin:0;width:" + px(w) + ";height:" + px(h) + ";padding:14px;justify-content:center;align-items:center;text-align:center", [
+      E("div", "cw-ic", "flex:none;margin-bottom:8px", [ic(p.icon, 32, p.on ? "#1a1406" : "#fff", "solid")]), name, h >= 150 ? st : null]);
+  }
+  R.pool = function (root, o, b, env) {
+    var p = poolOf(env, o), title = op(o).label || "Pool", al = alignOf(o), W = b.w - 48, H = b.h - 48, c10 = !env.demo && setting(o, env, "via") === "connect10";
+    if (c10) root.setAttribute("data-pool", "c10");   // app.js asks the account for this pool only while one shows
+    if (p && p.none) return soonFit(root, b, "pool", "pool");
+    if (!p) return haWait(root, b, o, "pool", title, c10 ? "Checking your pool" : "Checking Home Assistant");
+    if (p.error) return p.error === "no_key" || p.error === "not_allowed" || p.error === "unlinked" || p.error === "no_tv" ? haWait(root, b, o, "pool", title, POOL_WAIT[p.error]) : haWait(root, b, o, "pool", title, POOL_WAIT[p.error] || "Your pool is not answering");
+    alignRoot(root, al);
+    var deg = poolDeg(p.temp, p.unit), pump = p.parts.filter(function (x) { return x.key === "pump"; })[0];
+    if (b.w < 300 || (b.h < 300 && b.w < 560)) {
+      // a tile: the water, and the pump
+      add(root, [fitLab(root, "pool", title, W), E("div", "cw-grow"), fitNum(root, deg, W, b.h < 300 ? 72 : 96), pump ? E("div", "cw-row", "flex:none;max-width:100%", [fitWords(root, pump.name, W * 0.6, 24, 1, 560, "color:var(--sub)"), fitWords(root, pump.word, W * 0.38, 24, 1, 650, "margin-left:10px")]) : null]);
+    } else if (b.h < 300) {
+      // a wide strip: the water on the left, each part as a chip on the right (those that fit, never cut)
+      var leftW = Math.min(W * 0.42, 340), room = W - leftW, chips = [];
+      p.parts.forEach(function (x) {
+        // the part's name and its state, each its own line (both in the TV's language)
+        var nm = wl(x.name), wd = wl(x.word), t = nm + " " + wd;
+        var tpx = fitPxText(t, 300, 25, 1, 650, famOf(root)), cw = tpx ? Math.ceil(t.length * tpx * 0.6) + 40 + 28 + 10 : 0;
+        if (!tpx || cw + 12 > room) return;
+        room -= cw + 12;
+        chips.push(E("div", "cw-row", "flex:none;height:54px;padding:0 20px;border-radius:27px;margin-left:12px;font-size:" + tpx + "px;font-weight:650;" + (x.on ? "background:#fff;color:#18171c" : "background:rgba(255,255,255,.14)"), [ic(x.icon, 28, x.on ? "#18171c" : "currentColor"), E("span", "", "margin-left:10px;white-space:nowrap", [x.name]), E("span", "", "margin-left:8px;white-space:nowrap;opacity:.72", [x.word])]));
+      });
+      add(root, E("div", "cw-row", "width:100%;height:100%;align-items:center;justify-content:space-between", [E("div", "cw-col", "flex:none;max-width:" + px(leftW) + ";align-items:flex-start", [fitLab(root, "pool", title, leftW), fitNum(root, deg, leftW, 72, "margin-top:8px")]),
+        E("div", "cw-row", "flex:none;justify-content:flex-end", chips)]));
+    } else {
+      // big: the water large, what the heater is heating to, a box for each part, the chlorinator under them
+      var bigPx = clamp(Math.min(W * 0.3, H * 0.34), 72, 150), side = W - Math.ceil(String(deg).length * bigPx * 0.58) - 22;
+      var sub1 = side > 120 ? fitWords(root, p.spa ? "Spa" : "Water", side, 29, 1, 650) : null, sub2 = side > 120 && p.heating && p.target != null ? fitWords(root, tl("Heating to {temp}", { temp: Math.round(p.target) + "°" }), side, 24, 1, 560, "color:var(--sub)") : null;
+      var top = E("div", "cw-row", "flex:none;width:100%;margin-top:14px;align-items:flex-end;" + justify(al), [fitNum(root, deg, W, bigPx), sub1 || sub2 ? E("div", "cw-col", "margin:0 0 " + px(bigPx * 0.09) + " 22px;min-width:0;align-items:flex-start", [sub1, sub2]) : null]);
+      var n = p.parts.length, gap = 20, mw = n ? Math.floor((W - gap * (n - 1)) / n) : 0, mh = clamp(Math.floor(H * 0.32), 110, 200);
+      var spare = H - 46 - 14 - bigPx * 0.92 - (p.chlor ? 50 : 0) - 20;
+      if (mh > spare) mh = Math.max(0, Math.floor(spare));
+      var mods = n && mh >= 100 && mw >= 120 ? E("div", "cw-row", "flex:none;width:100%;justify-content:space-between", p.parts.map(function (x) { return poolMod(root, x, mw, mh); })) : null;
+      var foot = p.chlor ? E("div", "cw-row", "flex:none;width:100%;margin-top:14px;justify-content:space-between", [fitWords(root, p.chlor.name, W * 0.45, 24, 1, 560, "color:var(--sub)"), fitWords(root, p.chlor.text, W * 0.53, 25, 1, 650)]) : null;
+      add(root, [fitLab(root, "pool", title, W), top, E("div", "cw-grow"), mods, foot]);
+    }
+    stop(root, "detail", "pool", title);
   };
   // the remotes, controllers and headphones paired with this TV by Bluetooth, and their charge: read from
   // Android by the launcher (Batteries.kt, TVOS.batteries), at most every 5 minutes. Only the device's
@@ -3608,7 +3743,7 @@
       athome: athome, listOf: listOf, wifiOf: wifiOf, guideOf: guideOf, guidePart: guidePart, agendaEvents: agendaEvents, memoryList: memoryList, memoryWeek: memoryWeek, mixed: mixed, guideIcon: guideIcon, qrNode: qrNode, demoEvents: demoEvents, evDay: evDay, hhmm: hhmm, EV_COL: EV_COL, yearsAgo: yearsAgo }
   };
   // the smart home and music widgets' readers, for their detail layers (widget-detail.js)
-  window.CouchWidgets.kit.ha = { haOf: haOf, controlsOf: controlsOf, ctlIcon: ctlIcon, ctlWord: ctlWord, speakersOf: speakersOf, pickedOf: pickedOf, houseSafe: houseSafe, opensHouse: opensHouse, spkWord: spkWord, spkSong: spkSong, sensorPick: sensorPick, sensorText: sensorText, spark: spark, hourBars: hourBars, kwh: kwh, ringWords: ringWords, queueOf: queueOf, coverOk: coverOk, stillWidth: stillWidth, SENSOR_ICON: SENSOR_ICON };
+  window.CouchWidgets.kit.ha = { haOf: haOf, controlsOf: controlsOf, ctlIcon: ctlIcon, ctlWord: ctlWord, speakersOf: speakersOf, airplayOf: airplayOf, apSpeakers: apSpeakers, pickedOf: pickedOf, houseSafe: houseSafe, opensHouse: opensHouse, spkWord: spkWord, spkSong: spkSong, sensorPick: sensorPick, sensorText: sensorText, poolOf: poolOf, poolRoles: poolRoles, C10_MODE: C10_MODE, spark: spark, hourBars: hourBars, kwh: kwh, ringWords: ringWords, queueOf: queueOf, coverOk: coverOk, stillWidth: stillWidth, SENSOR_ICON: SENSOR_ICON };
   // what the web widgets' detail layers share with them (widget-detail.js)
   window.CouchWidgets.webKit = { webOf: webOf, agoOf: agoOf, DEMO_NEWS: DEMO_NEWS, demoScores: demoScores, gameStatus: gameStatus, shortScore: shortScore, demoQuote: demoQuote, upDown: upDown, commuteOf: commuteOf, picksOf: picksOf, picksFor: picksFor };
 })();

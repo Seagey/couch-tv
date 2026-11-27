@@ -733,6 +733,29 @@ The older `server` and `port` keys are ignored (the bridge's Matter service list
 socket, never a network port). Locks, alarms, garage doors, gates and doors never show, as with Home
 Assistant. The fabric keys live in `bridge/data/matter/` (mode 700): back up `bridge/data/`.
 
+## AirPlay 2 speakers together (option B, a Mac at home)
+
+The Speakers widget can show AirPlay 2 speakers and play them together, in sync, through the Mac's own Music app (the same
+way as home-hub's Whole House). Off unless `config.json` has an `airplay` section, and only on a Mac:
+
+```json
+"airplay": {
+  "groups": [{ "name": "Downstairs", "speakers": ["Lounge", "Kitchen"] }],
+  "name": "Whole House"
+}
+```
+
+- `groups`: up to 6 named groups of up to 12 speakers, by the names the Music app shows for them (Music, the AirPlay button).
+  Without groups, the TV can still pick speakers one by one.
+- `name`: the Spotify Connect speaker the Mac shows when `librespot` and `ffmpeg` are installed (`brew install librespot ffmpeg`).
+  Pick it in the Spotify app and the chosen speakers play Spotify together. Without them, the group plays whatever Music plays.
+- `"enabled": false` switches it off; `"spotify": false` keeps librespot off.
+
+The first time, macOS asks on the Mac's screen whether the bridge may control Music: say OK. The TV gets the speakers' names and
+volumes only; only the TV (or a paired phone) can start, stop or change them. Nothing is sent to the speakers until someone picks
+Play together on the TV or picks the speaker in Spotify. To try it without speakers, start the bridge with `FAKE_AIRPLAY=1`: a
+pretend Music with three pretend speakers.
+
 ## Guests: names and times from a bookings calendar
 
 For a holiday let or a guest room. A couch-tv Studio design's **Welcome** widget can take the guest's

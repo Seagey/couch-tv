@@ -272,6 +272,18 @@
       });
       if (kn) o.smart = { picks: pk };
     }
+    // which picked thing is which part of a pool widget (lane C): entity ids of the right kind only
+    if (plainObj(d.smart) && plainObj(d.smart.roles)) {
+      var RR = { water: /^sensor\.[a-z0-9_]{1,64}$/, chlor: /^sensor\.[a-z0-9_]{1,64}$/, pump: /^(switch|fan)\.[a-z0-9_]{1,64}$/, heater: /^(switch|climate|water_heater)\.[a-z0-9_]{1,64}$/, light: /^(light|switch)\.[a-z0-9_]{1,64}$/ };
+      var ro = {}, rn2 = 0;
+      Object.keys(d.smart.roles).slice(0, 24).forEach(function (id) {
+        var r = d.smart.roles[id], one = {}, n1 = 0;
+        if (!WID.test(id) || !plainObj(r)) return;
+        Object.keys(RR).forEach(function (k) { if (typeof r[k] === "string" && RR[k].test(r[k])) { one[k] = r[k]; n1++; } });
+        if (n1) { ro[id] = one; rn2++; }
+      });
+      if (rn2) { o.smart = o.smart || {}; o.smart.roles = ro; }
+    }
     if (plainObj(d.card)) { var cd = typeof d.card.url === "string" && d.card.url.length <= V2.url && /^https?:\/\/[A-Za-z0-9.:-]+(\/[^\s]*)?$/.test(d.card.url.trim()) ? d.card.url.trim() : ""; if (cd) o.card = { url: cd }; }
     return o;
   }
