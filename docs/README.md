@@ -24,6 +24,8 @@ Every couch-tv guide in one place, grouped by what you want to do.
 |---|---|
 | [TV-HOME.md](TV-HOME.md) | Every feature of the TV home and the Home settings |
 | [MAKE-A-SCENE.md](MAKE-A-SCENE.md) | Make your own home scene, with its own glass clock, from any picture |
+| [EDITOR-READY.md](EDITOR-READY.md) | Designing with your own AI: the rules a design meets to be sold or kept in your account, and every widget the editor has |
+| [OWN-WIDGETS.md](OWN-WIDGETS.md) | Make a widget of your own for your TV, and submit it so it can be sold |
 | [REMOTE.md](REMOTE.md) | The phone remote: how it is hosted and how to install it |
 | [REMOTES.md](REMOTES.md) | TV remotes, game controllers and keyboards: which keys do what |
 | [ASK-PROVIDERS.md](ASK-PROVIDERS.md) | Which AI services on-TV mode can use to answer "put on Bluey", and how to set one up |
