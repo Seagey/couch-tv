@@ -128,7 +128,7 @@ def run_job(name, fn):
 
 def need_tv():
     if not S.tv:
-        raise TvError("This computer is not connected to the TV. Find the TV again.", "no_tv")
+        raise TvError(errors.ASLEEP, "no_tv")
     return S.tv
 
 
@@ -150,7 +150,7 @@ def _attach(tv, ip, route):
     S.facts = steps.facts(tv)
     S.tv_key = steps.tv_key(tv)
     S.profile = tvprofile.read(tv, S.facts)
-    _remember(ip, S.facts, route=route, key=S.tv_key)
+    _remember(ip, S.facts, route=route, key=S.tv_key, **_names(tv))
     return {"facts": S.facts, "route": route, "profile": S.profile}
 
 
@@ -161,22 +161,62 @@ def _known():
         return {}
 
 
-def _remember(ip, f=None, route=None, room=None, key=None):
-    """What the TV at this address turned out to be, so the list and the kind question know it next time: its model,
-    kind, the way in that worked ("tls" means Wireless debugging is paired with this computer) and the
-    room name the person gave it ("Living room TV"). Addresses move: when another TV answers here, the room
-    name of the one before is dropped."""
-    k = _known()
-    old = k.get(ip) or {}
-    if f and (old.get("key") != key if old.get("key") else old.get("name") != f.get("name")):
-        old = {}
-    k[ip] = {"name": (f or {}).get("name") or old.get("name"), "kind": (f or {}).get("kind") or old.get("kind"),
-             "route": route or old.get("route"), "room": room if room is not None else old.get("room"),
-             "key": key or old.get("key")}
+def _names(tv):
+    """How the TV is known again wherever its address moves: the name it announces on the Wi-Fi (Settings, About,
+    Device name, which Cast and the Android TV Remote both use) and a hash of its serial (finder.serial_id)."""
+    out = {}
+    try:
+        heard = tv.shell("settings get global device_name").strip()
+        out["heard"] = heard if heard and heard.lower() != "null" else None
+    except Exception:
+        pass
+    try:
+        out["sid"] = finder.serial_id(tv.prop("ro.serialno"))
+    except Exception:
+        pass
+    return out
+
+
+def _save_known(k):
     try:
         (paths.data() / "known-tvs.json").write_text(json.dumps(k), encoding="utf-8")
     except OSError:
         pass
+
+
+def _remember(ip, f=None, route=None, room=None, key=None, heard=None, sid=None):
+    """What the TV at this address turned out to be, so the list and the kind question know it next time: its model,
+    kind, the way in that worked ("tls" means Wireless debugging is paired with this computer), the
+    room name the person gave it ("Living room TV"), the name it announces and a hash of its serial. Addresses
+    move: when another TV answers here, the room name of the one before is dropped; when this TV (same key or
+    serial) was saved under another address, that record moves here with its room name."""
+    k = _known()
+    old = k.get(ip) or {}
+    if f and (old.get("key") != key if old.get("key") else old.get("name") != f.get("name")):
+        if old.get("key") and (old.get("room") or old.get("heard")):
+            k["?" + old["key"]] = old   # another TV had this address: keep its record until it is found again
+        old = {}
+    if not old and (key or sid):
+        for was in [a for a, r in k.items() if a != ip and isinstance(r, dict)
+                    and ((key and r.get("key") == key) or (sid and r.get("sid") == sid))]:
+            old = k.pop(was)   # the same TV on a new address: carry its room and the way in (pairing is by key)
+    k[ip] = {"name": (f or {}).get("name") or old.get("name"), "kind": (f or {}).get("kind") or old.get("kind"),
+             "route": route or old.get("route"), "room": room if room is not None else old.get("room"),
+             "key": key or old.get("key"), "heard": heard or old.get("heard"), "sid": sid or old.get("sid"),
+             "at": time.time()}
+    _save_known(k)
+
+
+def _moved(rows):
+    """TVs the scan found by name at a new address: their records move with them (finder.known_for)."""
+    moves = [(t["moved_from"], t["ip"]) for t in rows if t.get("moved_from")]
+    if not moves:
+        return
+    k = _known()
+    for was, now in moves:
+        if was in k and now not in k:
+            k[now] = dict(k.pop(was), at=time.time())
+    _save_known(k)
 
 
 def _rows():
@@ -482,10 +522,14 @@ def api(method, path, body):
                     scanlog.write(diag)
                     raise
             tvs = S.tv_seen.apply(enrich(tvs))
+            known = _known()
             if not fake:
+                _moved(tvs)
+                known = _known()
                 diag["shown"] = [{"ip": t["ip"], "status": t["status"], "stale": bool(t.get("stale"))} for t in tvs]
                 scanlog.write(diag)
-            return {"tvs": tvs, "networks": diag.get("networks", [])}
+            # TVs set up from here before that cannot be seen now: the page names them and says how to wake them
+            return {"tvs": tvs, "networks": diag.get("networks", []), "asleep": finder.asleep(tvs, known)}
         return run_job("scan", scan)
     if path == "/api/guide":
         row = body.get("row") if isinstance(body.get("row"), dict) else {}
@@ -619,6 +663,9 @@ def api(method, path, body):
             r = finder.knock(ip, 5555, 2.0)
             if r and errors.is_local_network_block(r, dest=ip):
                 raise finder.blocked(r)
+            if r and finder.went_quiet(r):
+                # no answer at all: a TV asleep in standby (or gone to a new address), not a switch left off
+                raise TvError(errors.ASLEEP, "timeout", errors.detail(r))
             if r:
                 raise TvError("The TV is not letting computers in yet. Check USB debugging (on Fire TV: ADB debugging) "
                               "is switched on, as in the steps, then try again.", "closed", errors.detail(r),

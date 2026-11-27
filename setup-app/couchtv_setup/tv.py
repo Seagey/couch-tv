@@ -106,7 +106,7 @@ class Tv:
                         last = e2
         if errors.is_local_network_block(last, dest=self.ip):
             raise TvError(errors.blocked_message(), errors.LOCAL_NETWORK_CODE, errors.detail(last))
-        raise TvError("The TV stopped answering. Check it is still on and on the same Wi-Fi, then try again.", "lost",
+        raise TvError(errors.ASLEEP, "lost",
                       errors.detail(last))
 
     def shell(self, cmd, timeout_s=60):

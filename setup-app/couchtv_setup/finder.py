@@ -5,6 +5,7 @@
 a connection to a few ports and hears what TVs announce, so nothing shows on any TV and nothing
 changes.
 """
+import hashlib
 import ipaddress
 import json
 import re
@@ -244,10 +245,13 @@ def merge(heard, knocks, dial=None, known=None, confirmed=None):
             row(ip)
     out = []
     for ip, t in rows.items():
-        k = known.get(ip) or {}
         d = dial.get(ip)
         d = d if isinstance(d, dict) else ({"name": d} if d else {})
         t["announced"] = None if t["name"] else _clean(d.get("name"))
+        # the TV is found by its name (or its serial), not by the address it had last time
+        k, was = known_for(t, known)
+        k = k or {}
+        t["moved_from"] = was if was and was != ip else None
         t["model"] = t["model"] or d.get("model")
         t["maker"] = d.get("maker")
         t["other"] = None if (t["remote"] or t["wireless_debugging"] or t["pairing_port"]) else other_platform(d)
@@ -277,6 +281,72 @@ def merge(heard, knocks, dial=None, known=None, confirmed=None):
     order = {"ready": 0, "code": 1, "pair": 2, "switch": 3, "other": 4}
     out = [t for t in out if t["android"] or t["other"]]
     return sorted(out, key=lambda t: (order[t["status"]], socket.inet_aton(t["ip"])))
+
+
+def serial_id(serial):
+    """A short hash of a TV's serial: enough to know the TV again on this computer, never the serial itself."""
+    serial = str(serial or "").strip()
+    return hashlib.sha256(f"couchtv-serial|{serial}".encode()).hexdigest()[:16] if serial else None
+
+
+def _same_name(a, b):
+    a, b = _clean(a), _clean(b)
+    return bool(a and b and a.casefold() == b.casefold())
+
+
+def known_for(t, known):
+    """(record, the address it was saved under) for a TV found now, or (None, None). Addresses change (a TV that
+    slept in standby can come back on a new one), so a TV is known again by its serial, then by the name it
+    announces on the Wi-Fi ("Spare bedroom TV"), and only then by its address. A record at this address that
+    says it is another TV is not used."""
+    known = known or {}
+    sid = serial_id(t.get("serial"))
+    names = [n for n in (t.get("name"), t.get("announced")) if n]
+
+    def agrees(k):
+        if sid and k.get("sid"):
+            return k["sid"] == sid
+        if names and k.get("heard"):
+            return any(_same_name(k["heard"], n) for n in names)
+        return True
+    here = known.get(t["ip"])
+    if here and agrees(here) and (here.get("sid") or here.get("heard") or not (sid or names)):
+        return here, t["ip"]
+    if sid:
+        m = [(ip, k) for ip, k in known.items() if k.get("sid") == sid]
+        if len(m) == 1:
+            return m[0][1], m[0][0]
+    for n in names:
+        m = [(ip, k) for ip, k in known.items() if _same_name(k.get("heard"), n)]
+        if len(m) == 1:
+            return m[0][1], m[0][0]
+    if here and agrees(here):
+        return here, t["ip"]
+    return None, None
+
+
+ASLEEP_DAYS = 30        # a TV set up from this computer in the last month is looked for by name
+ASLEEP_MAX = 3
+
+
+def asleep(rows, known, now=None):
+    """The TVs this computer set up before that no scan can see now: most often a TV asleep in standby
+    (many switch their Wi-Fi off then), so the page can say "Turn it on with the remote" by its own name.
+    Newest first, at most ASLEEP_MAX. A TV found at a new address is not asleep."""
+    now = time.time() if now is None else now
+    found = {t["ip"] for t in rows} | {t.get("moved_from") for t in rows if t.get("moved_from")}
+    out = []
+    for ip, k in (known or {}).items():
+        if ip in found or not isinstance(k, dict) or k.get("kind") in ("samsung", "lg", "roku"):
+            continue
+        at = k.get("at")
+        if not (at and now - float(at) <= ASLEEP_DAYS * 86400):
+            continue
+        label = _clean(k.get("room") or k.get("heard") or k.get("name"))
+        if label:
+            out.append({"label": label, "ip": ip, "at": at})
+    out.sort(key=lambda r: -float(r["at"]))
+    return [{"label": r["label"], "ip": r["ip"]} for r in out[:ASLEEP_MAX]]
 
 
 def friendly_name(t, known=None):
@@ -309,6 +379,13 @@ def raise_fd_limit(want=1024):
 def is_timeout(result):
     """True for a knock that got no answer in time (not for "refused" or "no route": those are answers)."""
     return isinstance(result, (socket.timeout, TimeoutError))
+
+
+def went_quiet(result):
+    """True for a knock nobody answered (timed out, or the address is not on the network now): what a TV asleep in
+    standby does. "Refused" is an answer: the TV is there with its switch off."""
+    import errno as _errno
+    return is_timeout(result) or getattr(result, "errno", None) in (_errno.EHOSTDOWN, _errno.EHOSTUNREACH, _errno.ETIMEDOUT)
 
 
 def retry_order(timed_out, hinted, own_ips=()):

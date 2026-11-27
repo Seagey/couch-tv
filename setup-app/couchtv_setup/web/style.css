@@ -412,3 +412,9 @@ section.tidy .actions button.primary { box-shadow: 0 16px 34px -14px rgba(168,43
 @keyframes lkspin { to { transform: rotate(360deg); } }
 @media (prefers-reduced-motion: reduce) { .linkstep .spin { animation: none; } }
 .linkstep .actions { margin-top: 18px; }
+
+/* a TV set up before that is asleep in standby: a dark screen, the three steps close together */
+.tv .scr.off { background: #0E0D12; }
+.tvc.asleep .howto { padding-left: 20px; }
+.tvc.asleep .howto li { margin: 4px 0; }
+#error-find { margin-top: 8px; }
