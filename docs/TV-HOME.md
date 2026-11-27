@@ -530,12 +530,12 @@ They win over `config.json` on that TV; About, Reset home settings goes back to 
 | Arabic, with full right-to-left layout | `ar` | 12 hour | Yes, since 0.13 | Not yet |
 | Romanian | `ro` | 24 hour | Yes | Not yet |
 | Simplified Chinese | `zh-CN` | 24 hour | Yes | Yes |
-| Korean | `ko` | 12 hour (오전/오후) | Yes | Not yet |
+| Korean | `ko` | 12 hour (오전/오후) | Yes | Yes |
 
 The TV home and the phone remote both speak English, Spanish (`es`, for Spain and everyone else),
 Mexican Spanish (`es-MX`: computadora, celular, presionar, clima and the rest), Italian (`it`),
 German (`de`), Turkish (`tr`), Serbian Latin (`sr-Latn-RS`), Czech (`cs`, 24 hour clock, since 0.13), Polish (`pl`, since 0.13), Brazilian Portuguese (`pt`, since 0.13), Dutch (`nl`, TV home only for now, since 0.13) and Hebrew (`he`, with full right-to-left layout and 24 hour clock, TV
-home only for now), Arabic (`ar`, with full right-to-left layout, TV home only for now, since 0.13) and Romanian (`ro`, TV home only for now), and Simplified Chinese (`zh-CN`, 24 hour clock). The TV home also speaks Korean (`ko`, TV home only for now) and French (`fr`, 24 hour clock); the phone
+home only for now), Arabic (`ar`, with full right-to-left layout, TV home only for now, since 0.13) and Romanian (`ro`, TV home only for now), and Simplified Chinese (`zh-CN`, 24 hour clock). The TV home and the phone remote also speak Korean (`ko`). The TV home also speaks French (`fr`, 24 hour clock); the phone
 remote has no French yet. Italian, German, Turkish, Serbian, Czech, Polish, Brazilian Portuguese, Dutch, Hebrew, Romanian and Simplified Chinese use a 24 hour clock by
 default unless you pick 12 hour.
 

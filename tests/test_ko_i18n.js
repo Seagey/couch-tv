@@ -51,4 +51,43 @@ assert.strictEqual(
   'tBridge returns the Korean translation when lang is ko'
 );
 
+// The phone remote (remote/src/i18n.js) is an ES module that imports react, so cut the
+// S.en and S.ko object literals out of the text and evaluate just those.
+const rsrc = fs.readFileSync(path.join(__dirname, '../remote/src/i18n.js'), 'utf8').replace(/\r\n/g, '\n');
+function literal(name) {
+  const m = rsrc.match(new RegExp('^S\\.' + name + ' = (\\{[\\s\\S]*?\\n\\});', 'm'));
+  assert(m, `the phone remote has an S.${name} block`);
+  return new Function('return ' + m[1])();
+}
+const R = { en: literal('en'), ko: literal('ko') };
+assert.deepStrictEqual(Object.keys(R.ko), Object.keys(R.en), 'the remote S.ko has the same keys as S.en, in the same order');
+Object.keys(R.en).forEach(function (key) {
+  assert.strictEqual(holes(R.ko[key]), holes(R.en[key]), `remote placeholders differ for ${key}: "${R.ko[key]}"`);
+});
+assert(rsrc.includes("{ id: 'ko', name: '한국어', locale: 'ko-KR' },\n"), 'the remote LANGS has 한국어 (ko)');
+const guessFn = rsrc.match(/function guess\(\) \{[\s\S]*?\n\}/);
+assert(guessFn && guessFn[0].includes("if (/^ko(?:-|$)/i.test(n)) return 'ko';"), 'guess() returns ko for a Korean phone');
+
+function loadRemote(language) {
+  const cleaned = rsrc
+    .replace(/^import .*?;\n/m, 'const useEffect = () => {}, useState = (v) => [v, () => {}];\n')
+    .replace(/^export /gm, '');
+  const sandbox = {
+    navigator: { language },
+    document: { documentElement: {} },
+    localStorage: { getItem: () => null, setItem: () => {} },
+    Set,
+  };
+  vm.runInNewContext(cleaned + '\nthis.__exports = { t, tBridge, setChoice, locale };', sandbox);
+  return sandbox.__exports;
+}
+const remoteKo = loadRemote('ko-KR');
+assert.strictEqual(remoteKo.locale(), 'ko-KR', 'a Korean phone starts in Korean');
+assert.strictEqual(remoteKo.t('turn_on'), 'TV 켜기');
+assert.strictEqual(remoteKo.t('min_left', { n: 12 }), '12분 남음');
+assert.strictEqual(
+  remoteKo.tBridge('err_app_not_installed', { app: 'Netflix' }, 'Netflix is not installed on the TV'),
+  'TV에 Netflix이(가) 설치되어 있지 않아요'
+);
+
 console.log('Korean i18n tests passed.');
