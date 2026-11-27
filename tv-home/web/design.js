@@ -825,7 +825,8 @@
     // sits over it (frosted panels most of all). A slow TV keeps the still picture (bg-video.js).
     if (bg.image && bg.video) out.push(["Video background", 24, "bgvideo"]);
     else if (home.scenes && home.scenes.length === 1) out.push(["One scene", 2, "scene"]);
-    else out.push(["Scenes taking turns", 6, "scenes"]);
+    // a plain colour background draws no scene behind it (Fast TV, 28 Nov 2026): nothing to charge
+    else if (!bg.colour || bg.image) out.push(["Scenes taking turns", 6, "scenes"]);
     if (bg.blur) out.push(["Blurred background", bg.blur > 8 ? 14 : 8, "blur"]);
     ["people", "quick", "keep_watching", "dock"].forEach(function (k) {
       var e = obj(E[k]);

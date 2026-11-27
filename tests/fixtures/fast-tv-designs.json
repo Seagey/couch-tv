@@ -1,0 +1,270 @@
+[
+ {
+  "id": "fast-paper",
+  "title": "Fast TV Paper",
+  "design": {
+   "v": 1,
+   "background": {
+    "colour": "#f1ede4"
+   },
+   "elements": {
+    "clock": {
+     "hidden": true
+    },
+    "date": {
+     "hidden": true
+    },
+    "weather": {
+     "hidden": true
+    },
+    "people": {
+     "hidden": true
+    },
+    "quick": {
+     "hidden": true
+    },
+    "keep_watching": {
+     "hidden": true
+    },
+    "dock": {
+     "hidden": true
+    }
+   },
+   "objects": [
+    {
+     "id": "clock",
+     "type": "widget",
+     "kind": "clock",
+     "size": "wide",
+     "x": 380,
+     "y": 60,
+     "w": 1160,
+     "h": 360,
+     "opts": {
+      "date": false,
+      "ampm": false,
+      "align": "center"
+     },
+     "style": {
+      "panel": "none",
+      "ink": "ink",
+      "font": "inter",
+      "shadow": "none"
+     }
+    },
+    {
+     "id": "date",
+     "type": "widget",
+     "kind": "date",
+     "size": "14x2",
+     "x": 280,
+     "y": 460,
+     "w": 1360,
+     "h": 160,
+     "opts": {
+      "show": "both",
+      "align": "center"
+     },
+     "style": {
+      "panel": "none",
+      "ink": "ink",
+      "font": "inter",
+      "shadow": "none"
+     }
+    },
+    {
+     "id": "apps",
+     "type": "widget",
+     "kind": "appgrid",
+     "size": "16x4",
+     "x": 180,
+     "y": 660,
+     "w": 1560,
+     "h": 360,
+     "opts": {
+      "apps": [
+       "com.netflix.ninja",
+       "com.google.android.youtube.tv",
+       "au.net.abc.iview",
+       "com.sbs.ondemand.tv",
+       "au.com.stan.and",
+       "com.disney.disneyplus",
+       "com.amazon.amazonvideo.livingroom"
+      ],
+      "names": true
+     },
+     "style": {
+      "panel": "solid",
+      "font": "inter",
+      "corners": "soft",
+      "shadow": "none"
+     },
+     "start": true
+    }
+   ],
+   "look": {
+    "ink": "#1d1b18",
+    "sub": "rgba(29, 27, 24, 0.64)",
+    "solid": "#e6e0d4",
+    "accent": "#b4410f",
+    "focus": "#1d1b18",
+    "icons": "line"
+   },
+   "home": {
+    "lighter": true,
+    "moving_tiles": false
+   }
+  }
+ },
+ {
+  "id": "fast-ink",
+  "title": "Fast TV Ink",
+  "design": {
+   "v": 1,
+   "background": {
+    "colour": "#0f1114"
+   },
+   "elements": {
+    "clock": {
+     "hidden": true
+    },
+    "date": {
+     "hidden": true
+    },
+    "weather": {
+     "hidden": true
+    },
+    "people": {
+     "hidden": true
+    },
+    "quick": {
+     "hidden": true
+    },
+    "keep_watching": {
+     "hidden": true
+    },
+    "dock": {
+     "hidden": true
+    }
+   },
+   "objects": [
+    {
+     "id": "clock",
+     "type": "widget",
+     "kind": "clock",
+     "size": "12x3",
+     "x": 80,
+     "y": 60,
+     "w": 1160,
+     "h": 260,
+     "opts": {
+      "date": false,
+      "ampm": false,
+      "align": "left"
+     },
+     "style": {
+      "panel": "none",
+      "font": "inter",
+      "shadow": "none"
+     }
+    },
+    {
+     "id": "date",
+     "type": "widget",
+     "kind": "date",
+     "size": "12x2",
+     "x": 80,
+     "y": 360,
+     "w": 1160,
+     "h": 160,
+     "opts": {
+      "show": "date",
+      "align": "left"
+     },
+     "style": {
+      "panel": "none",
+      "ink": "accent",
+      "font": "inter",
+      "shadow": "none"
+     }
+    },
+    {
+     "id": "weather",
+     "type": "widget",
+     "kind": "weather",
+     "size": "5x5",
+     "x": 1380,
+     "y": 60,
+     "w": 460,
+     "h": 460,
+     "opts": {
+      "hilo": true
+     },
+     "style": {
+      "panel": "solid",
+      "font": "inter",
+      "corners": "soft",
+      "shadow": "none"
+     }
+    },
+    {
+     "id": "keep",
+     "type": "widget",
+     "kind": "keeprow",
+     "size": "18x3",
+     "x": 80,
+     "y": 560,
+     "w": 1760,
+     "h": 260,
+     "opts": {
+      "label": "Keep watching"
+     },
+     "style": {
+      "panel": "none",
+      "font": "inter",
+      "shadow": "none"
+     }
+    },
+    {
+     "id": "apps",
+     "type": "widget",
+     "kind": "dock",
+     "size": "row12",
+     "x": 380,
+     "y": 860,
+     "w": 1160,
+     "h": 160,
+     "opts": {
+      "apps": [
+       "com.netflix.ninja",
+       "com.google.android.youtube.tv",
+       "au.net.abc.iview",
+       "com.sbs.ondemand.tv",
+       "au.com.stan.and",
+       "com.disney.disneyplus",
+       "com.amazon.amazonvideo.livingroom"
+      ]
+     },
+     "style": {
+      "panel": "none",
+      "font": "inter",
+      "shadow": "none"
+     },
+     "start": true
+    }
+   ],
+   "look": {
+    "ink": "#f5f2ec",
+    "sub": "rgba(245, 242, 236, 0.62)",
+    "solid": "#1b1e24",
+    "accent": "#f5a524",
+    "focus": "#f5a524",
+    "icons": "line"
+   },
+   "home": {
+    "lighter": true,
+    "moving_tiles": false
+   }
+  }
+ }
+]
