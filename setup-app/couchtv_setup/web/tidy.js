@@ -48,6 +48,10 @@
     sec.querySelectorAll("button, input").forEach(function (b) { b.disabled = on; });
   }
 
+  // "Check how smooth my TV runs" is hidden from view (phase 1, 27 Nov 2026). The button, the
+  // checkSpeed job and the server code stay for phase 4: set this true to bring the button back.
+  var SHOW_SPEED_CHECK = false;
+
   function build() {
     sec = el("section");
     sec.dataset.step = "tidy";
@@ -111,7 +115,7 @@
       rows.appendChild(row);
     });
     if (!state.switches.length) rows.appendChild(el("p", "small", "This TV has nothing to tidy up."));
-    sec.querySelector("#tidy-speed").hidden = !state.speed;
+    sec.querySelector("#tidy-speed").hidden = SHOW_SPEED_CHECK ? !state.speed : true;
     sec.querySelector("#tidy-undo").hidden = !state.undo;
   }
 
