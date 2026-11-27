@@ -272,6 +272,22 @@
       });
       if (kn) o.smart = { picks: pk };
     }
+    // On this day on this TV: false when the account chose other TVs for it (the server says yes or no per TV, never the list)
+    if (plainObj(d.photos) && typeof d.photos.on_this_day === "boolean") o.photos = { on_this_day: d.photos.on_this_day };
+    if (plainObj(d.show)) {
+      var shw = {}, shn = 0;
+      Object.keys(d.show).slice(0, 24).forEach(function (id) {
+        var x = d.show[id], r = {};
+        if (!WID.test(id) || !plainObj(x)) return;
+        if (Array.isArray(x.who)) { var ws2 = x.who.filter(function (p) { return typeof p === "string" && /^p_[a-z0-9]{6,12}$/.test(p); }).slice(0, 8); if (ws2.length) r.who = ws2; }
+        if (typeof x.list === "string" && oneLine(x.list, V2.listName)) r.list = oneLine(x.list, V2.listName);
+        if (Array.isArray(x.sections)) { var ss = x.sections.map(function (t) { return oneLine(t, V2.gTitle); }).filter(Boolean).slice(0, 8); if (ss.length) r.sections = ss; }
+        if (typeof x.live === "string" && oneLine(x.live, 60)) r.live = oneLine(x.live, 60);
+        if (x.calendars === "main" || x.calendars === "bookings") r.calendars = x.calendars;
+        if (Object.keys(r).length) { shw[id] = r; shn++; }
+      });
+      if (shn) o.show = shw;
+    }
     if (plainObj(d.card)) { var cd = typeof d.card.url === "string" && d.card.url.length <= V2.url && /^https?:\/\/[A-Za-z0-9.:-]+(\/[^\s]*)?$/.test(d.card.url.trim()) ? d.card.url.trim() : ""; if (cd) o.card = { url: cd }; }
     return o;
   }
@@ -376,7 +392,7 @@
         if (m && byLocal[m.id]) {
           nextMap[ph.id] = { id: m.id, day: ph.taken || m.day || "" };
           // an entry that is still a link (no file store on this TV) takes the fresh link
-          if (!byLocal[m.id].file && byLocal[m.id].url !== ph.url) plan.photos.update.push({ pid: ph.id, id: m.id, url: ph.url });
+          if (!byLocal[m.id].file && !/^idb:/.test(byLocal[m.id].url || "") && byLocal[m.id].url !== ph.url) plan.photos.update.push({ pid: ph.id, id: m.id, url: ph.url });
         } else if (room > 0) { room--; plan.photos.add.push({ pid: ph.id, url: ph.url, taken: ph.taken }); }
       });
       Object.keys(map).forEach(function (pid) { if (!wantPid[pid] && map[pid] && byLocal[map[pid].id]) plan.photos.remove.push(map[pid].id); });
@@ -388,6 +404,86 @@
   function placeOf(account, widgetId) {
     var d = account && account.details, p = d && d.places && typeof widgetId === "string" ? d.places[widgetId] : null;
     return p ? placeOk(p) : null;
+  }
+  // ---- the account's details onto each widget's own settings (Phase 2), worked out without touching anything ----
+  // list: the widgets on the design now [{ key: "<id>|<kind>", id: "<id>" or "<stack id>/<place>", kind, fields: [the setting keys the widget has] }]
+  // ws: what this TV keeps now (ST.widgets). The account's value goes in when it is new (or the TV holds nothing there, or still holds exactly
+  // what the account put there); a value changed on this TV stays until the account's value changes. account.wsApplied remembers, per widget
+  // and setting, the account value last seen (a) and what was written (s). Answers { sets: [{ key, field, value | null }], next }.
+  // "thisweek" (bins) is not a setting of its own: the app turns it into the count the bins keep, once per change in the account.
+  var WS_PLACE_KINDS = ["weather", "bigtemp", "hourly", "rain", "uv", "air", "surf", "sun", "week", "solar"], WS_WATCH_KINDS = ["keep", "keeprow", "picks", "upnext"];
+  function widgetWants(d, e) {
+    var w = {}, id = String(e.id).replace("/", "_"), has = function (f) { return !e.fields || e.fields.indexOf(f) >= 0; }, p;
+    if (!d) return w;
+    if (WS_PLACE_KINDS.indexOf(e.kind) >= 0 && d.places && (p = placeOk(d.places[id]))) {
+      var pv = { name: p.name, lat: p.lat, lon: p.lon, timezone: "auto" };
+      if (e.kind === "surf") { if (has("place")) w.place = pv; } else if (has("town")) w.town = pv;
+    }
+    if (e.kind === "commute" && d.commute) {
+      if (d.commute.from && has("from")) w.from = { name: d.commute.from.name, lat: d.commute.from.lat, lon: d.commute.from.lon, timezone: "auto" };
+      if (d.commute.to && has("to")) w.to = { name: d.commute.to.name, lat: d.commute.to.lat, lon: d.commute.to.lon, timezone: "auto" };
+    }
+    if (e.kind === "bins" && d.bins) {
+      var b = d.bins;
+      if (b.weekday !== undefined && has("weekday")) w.weekday = b.weekday === "none" ? "none" : +b.weekday;
+      if (b.alt !== undefined && has("alt")) w.alt = b.alt === true;
+      ["bin_a", "bin_b", "lid_a", "lid_b"].forEach(function (f) { if (b[f] !== undefined && has(f)) w[f] = b[f]; });
+      if (b.alt === true && b.thisweek && has("thisweek")) w.thisweek = b.thisweek;
+    }
+    if (WS_WATCH_KINDS.indexOf(e.kind) >= 0 && has("person") && d.watch && d.watch.whose) {
+      var wh = d.watch.whose[id];
+      if (wh && wh !== "all") w.person = wh;
+    }
+    // smart home: the devices the account picked for this widget (details.smart.picks, by widget id) onto the widget's own device setting
+    var pk = d.smart && d.smart.picks && Array.isArray(d.smart.picks[id]) ? d.smart.picks[id] : null;
+    if (pk && pk.length) {
+      var by = function (doms) { return pk.filter(function (x) { return typeof x === "string" && doms.indexOf(x.split(".")[0]) >= 0; }); };
+      var one = function (doms) { return by(doms)[0]; };
+      if (e.kind === "aircon" && has("entity") && one(["climate"])) w.entity = one(["climate"]);
+      else if (e.kind === "controls" && has("switches") && by(["light", "switch", "fan", "cover"]).length) w.switches = by(["light", "switch", "fan", "cover"]);
+      else if (e.kind === "camera" && has("cam") && one(["camera"])) w.cam = one(["camera"]);
+      else if (e.kind === "sensor" && has("reading") && one(["sensor"])) w.reading = one(["sensor"]);
+      else if (e.kind === "speakers" && has("players") && by(["media_player"]).length) w.players = by(["media_player"]);
+      else if (e.kind === "scenes" && has("scenes") && by(["scene", "script"]).length) w.scenes = by(["scene", "script"]);
+    }
+    // what a widget shows (details.show, by widget id): who (people), list, parts of the guide, the live number, which calendars
+    var sh = d.show && d.show[id];
+    if (sh && typeof sh === "object") {
+      if (e.kind === "people" && has("who") && Array.isArray(sh.who) && sh.who.length) w.who = sh.who;
+      if (e.kind === "list" && has("list") && typeof sh.list === "string" && sh.list) w.list = sh.list;
+      if (e.kind === "guide" && has("sections") && Array.isArray(sh.sections) && sh.sections.length) w.sections = sh.sections;
+      if (e.kind === "card" && has("live") && typeof sh.live === "string" && sh.live) w.live = sh.live;
+      if (e.kind === "agenda" && has("calendars") && (sh.calendars === "main" || sh.calendars === "bookings")) w.calendars = sh.calendars;
+    }
+    return w;
+  }
+  function planWidgets(account, list, ws) {
+    var d = account && account.details || null, applied = account && account.wsApplied && typeof account.wsApplied === "object" ? account.wsApplied : {}, now = ws && typeof ws === "object" ? ws : {};
+    var out = { sets: [], next: {} };
+    var inList = {};
+    (Array.isArray(list) ? list : []).forEach(function (e) {
+      if (!e || typeof e.key !== "string" || typeof e.id !== "string" || typeof e.kind !== "string" || inList[e.key]) return;
+      inList[e.key] = true;
+      var want = widgetWants(d, e), rec = applied[e.key] || {}, cur = now[e.key] || {}, nx = {};
+      var fields = Object.keys(want); Object.keys(rec).forEach(function (f) { if (fields.indexOf(f) < 0) fields.push(f); });
+      fields.forEach(function (f) {
+        var w = want[f], r = rec[f], c = f === "thisweek" ? undefined : cur[f];
+        if (w !== undefined) {
+          var sig = stable(w);
+          if (f === "thisweek") { if (!r || r.a !== sig) out.sets.push({ key: e.key, field: f, value: w }); nx[f] = { a: sig, s: sig }; return; }
+          var mine = c === undefined || (r && stable(c) === r.s);
+          if (!r || r.a !== sig || mine) { if (c === undefined || stable(c) !== sig) out.sets.push({ key: e.key, field: f, value: w }); nx[f] = { a: sig, s: sig }; }
+          else nx[f] = { a: sig, s: r.s };
+        } else if (r && f !== "thisweek") {
+          // the account no longer has a value: what it put there goes, a change made on this TV stays
+          if (c !== undefined && stable(c) === r.s) out.sets.push({ key: e.key, field: f, value: null });
+        }
+      });
+      if (Object.keys(nx).length) out.next[e.key] = nx;
+    });
+    // widgets not on the design now keep what was remembered (they may come back)
+    Object.keys(applied).forEach(function (k) { if (!inList[k]) out.next[k] = applied[k]; });
+    return out;
   }
   // one of the account's detail parts, or null
   function detail(account, key) { var d = account && account.details; return d && d[key] !== undefined ? d[key] : null; }
@@ -439,6 +535,8 @@
     var people = Array.isArray(now.people) ? now.people.slice() : [], place = now.place || null;
     var next = { rev: pack.rev, at: pack.at || "", people: acc && Array.isArray(acc.people) ? acc.people : [], town: acc && acc.town ? acc.town : null,
       wifi: acc && acc.wifi ? acc.wifi : null };
+    if (acc && acc.smartPending) next.smartPending = true;
+    if (acc && acc.photoPending) next.photoPending = acc.photoPending;
     var placeFromAccount = !!(place && place.src === "account");
     // the guest Wi-Fi on this TV (athome.js keeps it, with no room for a mark) is the account's while it is
     // still exactly what the account sent; changed on the TV, it is the TV's own and a clear leaves it
@@ -451,7 +549,7 @@
       var out = { people: people, place: place, account: next };
       // what the account gave beyond people, town and Wi-Fi goes too: the details it put in At home, its keys, its photos
       var wp = planV2(now, {}, true);
-      next.details = null; next.ahApplied = wp.next.ahApplied; next.keysGiven = []; next.photoMap = {};
+      next.details = null; next.ahApplied = wp.next.ahApplied; next.keysGiven = []; next.photoMap = {}; if (acc && acc.wsApplied) next.wsApplied = acc.wsApplied;
       out.ah = wp.ah; out.keys = wp.keys; out.photos = wp.photos;
       if (wifiFromAccount) out.wifi = null;
       return out;
@@ -478,7 +576,8 @@
     if (pack.details || pack.keys || pack.photos) {
       v2 = planV2(now, pack, false);
       next.details = v2.next.details; next.ahApplied = v2.next.ahApplied; next.keysGiven = v2.next.keysGiven; next.photoMap = v2.next.photoMap;
-    } else if (acc) { if (acc.details) next.details = acc.details; if (acc.ahApplied) next.ahApplied = acc.ahApplied; if (acc.keysGiven) next.keysGiven = acc.keysGiven; if (acc.photoMap) next.photoMap = acc.photoMap; }
+      if (acc && acc.wsApplied) next.wsApplied = acc.wsApplied;
+    } else if (acc) { if (acc.details) next.details = acc.details; if (acc.ahApplied) next.ahApplied = acc.ahApplied; if (acc.keysGiven) next.keysGiven = acc.keysGiven; if (acc.photoMap) next.photoMap = acc.photoMap; if (acc.wsApplied) next.wsApplied = acc.wsApplied; }
     var res = { people: people, place: place, account: next };
     if (v2) { res.ah = v2.ah; res.keys = v2.keys; res.photos = v2.photos; }
     // wifi in the answer only when it changes: an object to keep, null to take away
@@ -803,5 +902,5 @@
   window.CouchDesignCode = { base: base, readCode: readCode, checkCode: checkCode, get: get, kept: kept, forget: forget, accept: accept, lockImages: lockImages, mediaSources: mediaSources,
     openInbox: openInbox, takeInbox: takeInbox, tvReport: tvReport, fromSetup: fromSetup, linked: linked, unlink: unlink,
     readInboxAnswer: readInboxAnswer, inboxDelay: inboxDelay, INBOX_WEEK: INBOX_WEEK, INBOX_AWAY: INBOX_AWAY, snapshot: snapshot, holdUndo: holdUndo, undoHeld: undoHeld, undoFresh: undoFresh, undoNew: undoNew, dropUndo: dropUndo,
-    readHome: readHome, holdHome: holdHome, takeHome: takeHome, takeHeldKeys: takeHeldKeys, readInboxDrop: function (j) { return !!j && typeof j === "object" && j.drop_keys === true; }, mergeHome: mergeHome, planV2: planV2, placeOf: placeOf, detail: detail, fromAccount: fromAccount, photoOf: photoOf, wifiFromAccount: wifiFromAccount };
+    readHome: readHome, holdHome: holdHome, takeHome: takeHome, takeHeldKeys: takeHeldKeys, readInboxDrop: function (j) { return !!j && typeof j === "object" && j.drop_keys === true; }, mergeHome: mergeHome, stable: stable, planV2: planV2, placeOf: placeOf, detail: detail, planWidgets: planWidgets, fromAccount: fromAccount, photoOf: photoOf, wifiFromAccount: wifiFromAccount };
 })();

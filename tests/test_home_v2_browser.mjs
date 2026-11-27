@@ -60,13 +60,15 @@ const local = (page, k) => page.evaluate((key) => JSON.parse(localStorage.getIte
 const PID = "a".repeat(24);
 const LINK = "https://abc.supabase.co/storage/v1/object/sign/tvd-photos/11111111-1111-4111-8111-111111111111/" + PID + ".jpg?token=abc.def.ghi";
 const PACK2 = Object.assign({}, PACK, { rev: 9, wifi: undefined,
-  details: { note: { text: "Back at five", from: "Mum" }, guest: { name: "Sarah" }, screen: { goal: 120 }, places: { w_abc: { name: "Ballina", lat: -28.87, lon: 153.56 } } },
+  details: { note: { text: "Back at five", from: "Mum" }, guest: { name: "Sarah" }, screen: { goal: 120 }, places: { w_abc: { name: "Bega", lat: -28.87, lon: 153.56 } } },
   keys: { ha: { token: "SECRET-HA-TOKEN-123", url: "https://ha.example:8123" } },
   photos: { albums: [{ id: "alb1", name: "Beach", photos: [{ id: PID, taken: "2020-05-05", url: LINK }] }] } });
 console.log("Running pack v2 browser tests...");
 const page = await browser.newPage({ viewport: { width: 1920, height: 1080 } });
 page.errors = [];
 page.on("pageerror", (e) => page.errors.push(String(e)));
+let linkHits = 0, linkUp = true;
+await page.route("https://abc.supabase.co/**", (r) => { linkHits++; if (!linkUp) return r.abort(); r.fulfill({ status: 200, contentType: "image/jpeg", headers: { "access-control-allow-origin": "*" }, body: Buffer.from(JPEG.split(",")[1], "base64") }); });
 await page.goto(BASE + "?mock=1&offline=1&reset=1");
 await page.evaluate((p) => {
   localStorage.clear();
@@ -74,19 +76,25 @@ await page.evaluate((p) => {
   localStorage.setItem("couchtv.home.pack", JSON.stringify(p));
 }, PACK2);
 await page.goto(BASE + "?mock=1&offline=1");
-await page.waitForTimeout(2000);
+await page.waitForTimeout(3500);
 const ah = await local(page, "mock:tvhome.athome");
 ok(ah && ah.note && ah.note.text === "Back at five", "the note is in At home: " + JSON.stringify(ah));
 ok(ah.guest && ah.guest.name === "Sarah", "the guest name too");
 ok(ah.screen && ah.screen.goal === 120, "and the screen goal");
 const acct = await local(page, "mock:tvhome.home.account");
-ok(acct && acct.details && acct.details.places.w_abc.name === "Ballina", "the account record holds the details (the widget's own place)");
+ok(acct && acct.details && acct.details.places.w_abc.name === "Bega", "the account record holds the details (the widget's own place)");
 const all = await page.evaluate(() => JSON.stringify(Object.assign({}, localStorage)));
 ok(!all.includes("SECRET-HA-TOKEN"), "no key in page storage, anywhere");
 ok(!/home\.pack/.test(await page.evaluate(() => Object.keys(localStorage).join())) , "the held pack is taken");
 const st = await local(page, "mock:tvhome.settings");
 const photos = (st && st.s && st.s.photos) || [];
-ok(photos.length === 1 && photos[0].id === "acc_" + PID, "the account's photo joined the photo list: " + JSON.stringify(photos));
+ok(photos.length === 1 && photos[0].id === "acc_" + PID, "the account's photo joined the photo list: " + JSON.stringify(photos) + " hits " + linkHits + " errs " + page.errors.join("|") + " " + JSON.stringify(await page.evaluate(() => Object.keys(localStorage))));
+ok(photos[0].url === "idb:acc_" + PID, "with no launcher and no computer the picture is kept in the browser's own database, not as a link: " + JSON.stringify(photos[0]));
+const idbSize = () => page.evaluate(() => new Promise((res) => { const r = indexedDB.open("couchtv-photos", 1); r.onerror = () => res(-1); r.onsuccess = () => { const g = r.result.transaction("p").objectStore("p").get("acc_" + "a".repeat(24)); g.onsuccess = () => res(g.result ? g.result.size : 0); g.onerror = () => res(-1); }; }));
+ok((await idbSize()) > 100, "the picture itself is in IndexedDB");
+const hitsBefore = linkHits; linkUp = false;
+await page.reload(); await page.waitForTimeout(2000);
+ok((await idbSize()) > 100 && linkHits === hitsBefore, "after the link has stopped working the picture is still there and the link is not asked for again");
 ok(acct.photoMap && acct.photoMap[PID] && acct.photoMap[PID].day === "2020-05-05", "its day is kept by photo id, not by link");
 ok(!JSON.stringify(acct).includes("token=abc"), "the signed link is not kept in the account record");
 ok(!page.errors.length, "no page errors: " + page.errors.join(" | "));

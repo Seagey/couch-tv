@@ -305,6 +305,8 @@
   function weather(env, o) {
     if (env.demo) {
       var hr = now().getHours(); DEMO_WX.is_day = hr >= 6 && hr < 19; demoFull();
+      // the editor's picture once signed in: the account's town names the demo readings (app.js data previewTown)
+      var pt = dataOf(env).previewTown; DEMO_WX.place = typeof pt === "string" && pt ? pt : "Riverside";
       DEMO_WX.ahead = dayAhead(DEMO_WX, DEMO_WX.days);
       return inUnit(DEMO_WX, env, o);
     }
@@ -452,6 +454,9 @@
   function photos(env, o) {
     var own = (o && o.opts && o.opts.image) ? [o.opts.image] : [];
     if (own.length) return own;
+    // the editor's picture with the person's album photos (app.js data previewPhotos): they, not the demo pictures, in the slideshow and the rest
+    var pp = dataOf(env).previewPhotos;
+    if (env.demo && Array.isArray(pp) && pp.length) return pp.slice(0, 50);
     if (env.demo) return ["beach", "birthday", "camp", "dog", "nan", "surf", "hike"].map(demoImg);
     var every = dataOf(env).photos || [], all = every.slice(0, 50), pick = o && (o.kind === "photo" || o.kind === "artframe") ? tvSet(o, env, "photo") : undefined;
     if (pick !== undefined && pick !== "first") {
@@ -465,6 +470,11 @@
     return all;
   }
   function people(env) {
+    // the editor's picture once signed in: the account's people instead of the sample names (app.js data people, from app/home-config.js)
+    if (env.demo && dataOf(env).previewPeople && dataOf(env).previewPeople.length) {
+      var pp = dataOf(env).previewPeople, av0 = ["character-curly", "character-bun", "character-pigtails", "character-short-hair", "character-cap", "character-long-hair", "character-beard", "character-grandparent"];
+      return pp.map(function (p, i) { return [av0[i % av0.length], String(p.name || ""), i === 0 ? 1 : 0, p.id, personPhoto(p.photo)]; });
+    }
     if (env.demo) return [["character-curly", "Alex", 1, "a"], ["character-bun", "Sam", 0, "b"], ["character-pigtails", "Ruby", 0, "c"]];
     var d = dataOf(env), avs = ["character-curly", "character-bun", "character-pigtails", "character-short-hair", "character-cap", "character-long-hair", "character-beard", "character-grandparent"];
     return (d.people || []).map(function (p, i) { return [p.avatar || avs[i % avs.length], String(p.name || ""), p.id === d.who ? 1 : 0, p.id, personPhoto(p.photo)]; });
@@ -1945,7 +1955,7 @@
 
   // Speakers: each Home Assistant speaker (media_player.* named in config.json) and its volume
   function speakersOf(env, o) {
-    var ha = haOf(env), want = setting(o, env, "players");
+    var ha = haOf(env, o), want = setting(o, env, "players");
     if (Object.prototype.toString.call(want) !== "[object Array]") want = null;
     if (!ha.speakers) return ha.speakers;
     return pickedOf(ha.speakers.filter(function (s) { return s && s.entity; }), want);
@@ -1983,7 +1993,7 @@
   function spkWord(s) { return s.ok === false ? "Not answering" : s.state === "off" || s.state === "standby" ? "Off" : s.muted ? "Muted" : s.volume != null ? s.volume + "%" : s.state === "playing" ? "Playing" : "On"; }
   function spkSong(s) { return s.ok === false ? "" : s.title ? s.title + (s.artist ? ", " + s.artist : "") : s.state === "playing" ? "Playing" : s.state === "paused" ? "Paused" : s.state === "off" ? "" : "Not playing"; }
   R.speakers = function (root, o, b, env) {
-    var ha = haOf(env), info = ha.info || {}, al = alignOf(o), W = b.w - 48;
+    var ha = haOf(env, o), info = ha.info || {}, al = alignOf(o), W = b.w - 48;
     if (!env.demo && !(info.speakers && info.speakers.length)) return soonFit(root, b, "speakers", "speakers");
     var list = speakersOf(env, o), title = op(o).label || "Speakers";
     if (!list) return haWait(root, b, o, "speakers", title, "Checking Home Assistant");
@@ -2031,7 +2041,7 @@
     { entity: "climate.bed_2", name: "Bed 2", ok: true, state: "off", action: "off", target: 22, current: 25, min: 16, max: 30, step: 0.5, modes: ["off", "cool", "heat", "dry", "fan_only", "auto"], fan_modes: ["low", "medium", "high", "auto"], fan: "auto" }];
   var MODE_WORD = { off: "Off", heat: "Heat", cool: "Cool", heat_cool: "Heat and cool", auto: "Auto", dry: "Dry", fan_only: "Fan" };
   var MODE_COL = { heat: "#ff9f0a", cool: "#64d2ff", heat_cool: "#bf5af2", auto: "#30d158", dry: "#ffd60a", fan_only: "#e5e5ea" };
-  function roomsOf(env) { return env.demo ? DEMO_ROOMS : (env.rooms || []); }
+  function roomsOf(env, o) { if (env.demo) { var pk = pickedEntities(env, o, "climate"); return pk.length ? pk.map(function (e, i) { return assign2(DEMO_ROOMS[i % DEMO_ROOMS.length], { entity: e, name: entityName(e) }); }) : DEMO_ROOMS; } return env.rooms || []; }
   function roomOn(r) { return r.ok !== false && r.state !== "off"; }
   function roomMode(r) { return r.ok === false ? "Not answering" : MODE_WORD[r.state] || (r.state ? String(r.state) : "On"); }
   // a room's temperatures are in Home Assistant's own unit (a room that says so, else one whose top
@@ -2054,7 +2064,7 @@
     return (f ? Math.round(x) : Math.round(x * 10) / 10) + "°";
   }
   R.aircon = function (root, o, b, env) {
-    var rooms = roomsOf(env);
+    var rooms = roomsOf(env, o);
     if (!rooms.length) return noHa(root, b, "aircon", "aircon");
     // the room picked for this widget on this TV (or in its design), else the first
     var ent = setting(o, env, "entity"), r = rooms.filter(function (x) { return ent && x.entity === ent; })[0] || rooms[0];
@@ -2088,7 +2098,7 @@
   };
   var SCENE_DEMO = [["movie", "Movie night", "scene.movie_night"], ["bedtime", "Goodnight", "scene.goodnight"], ["morning", "Morning", "script.morning"], ["away", "Away", "scene.away"], ["party", "Party", "scene.party"], ["dinner", "Dinner", "scene.dinner"]];
   function scenesOf(env, o) {
-    if (env.demo) return SCENE_DEMO;
+    if (env.demo) { var ps = pickedEntities(env, o, "scene").concat(pickedEntities(env, o, "script")); return ps.length ? ps.map(function (e, i) { return [["movie", "bedtime", "morning", "away", "party"][i % 5], entityName(e), e]; }) : SCENE_DEMO; }
     var l = houseSafe((dataOf(env).scenes || []).map(function (s) { return [/^script\./.test(s.entity || "") ? "play" : "favourite", String(s.name || s.entity || ""), String(s.entity || "")]; }).filter(function (s) { return s[2]; }));
     // the scenes picked for this widget on this TV (none picked: every one set up in Smart home)
     return pickedOf(l, o ? setting(o, env, "scenes") : null);
@@ -2134,8 +2144,31 @@
     bell: { ok: true, name: "Front door", at: new Date(TODAY.getFullYear(), TODAY.getMonth(), TODAY.getDate(), 14, 14).getTime(), ringing: false, camera: true, kept: true },
     stills: {}
   };
-  function haOf(env) {
-    if (env.demo) return DEMO_HA;
+  // Phase 2, the editor's picture only: the smart home picks the account holds for a widget (env.data.previewPicks, by the widget's id; a
+  // stack's widget is "<stack id>_<place>"), drawn as the same widget with those devices and SAMPLE states. Never a TV's, never a design's.
+  function assign2(a, b) { var o = {}, k; for (k in a) o[k] = a[k]; for (k in b) o[k] = b[k]; return o; }
+  function entityName(e) { var w = String(e).split(".").slice(1).join(" ").replace(/_/g, " ").trim(); return w ? w.charAt(0).toUpperCase() + w.slice(1) : String(e); }
+  function pickedEntities(env, o, domain) {
+    var pp = dataOf(env).previewPicks, l = pp && o && o.id !== undefined ? pp[String(o.id).replace("/", "_")] : null;
+    return Array.isArray(l) ? l.filter(function (e) { return typeof e === "string" && e.split(".")[0] === domain; }) : [];
+  }
+  function previewHa(env, o) {
+    var d = DEMO_HA, any = false, out = assign2(d, {}), info = assign2(d.info, {});
+    var ctl = [], doms = { light: 1, "switch": 1, fan: 1, cover: 1 };
+    ["light", "switch", "fan", "cover"].forEach(function (dm) { pickedEntities(env, o, dm).forEach(function (e) { var i = ctl.length, on = i % 2 === 0; ctl.push({ entity: e, name: entityName(e), ok: true, kind: dm, on: on, level: dm === "light" && on ? 80 : undefined, state: dm === "cover" ? (on ? "open" : "closed") : undefined }); }); });
+    if (ctl.length) { out.controls = ctl; any = true; }
+    var sn = pickedEntities(env, o, "sensor");
+    if (sn.length) { out.sensors = sn.map(function (e) { return { entity: e, name: entityName(e), ok: true, value: "23.4", num: 23.4, unit: "°C", cls: "temperature" }; }); info.sensors = sn.map(function (e) { return { entity: e, name: entityName(e) }; }); out.hist = {}; sn.forEach(function (e) { out.hist[e] = d.hist["sensor.pool"]; }); any = true; }
+    var cm = pickedEntities(env, o, "camera");
+    if (cm.length) { info.cameras = cm.map(function (e) { return { entity: e, name: entityName(e) }; }); any = true; }
+    var sp = pickedEntities(env, o, "media_player");
+    if (sp.length) { out.speakers = sp.map(function (e, i) { return { entity: e, name: entityName(e), ok: true, state: i === 0 ? "playing" : "idle", volume: 40 - i * 5, title: i === 0 ? "Low Tide" : undefined, artist: i === 0 ? "Saltwater Radio" : undefined, can_volume: true, can_pause: true }; }); any = true; }
+    void doms;
+    out.info = info;
+    return any ? out : d;
+  }
+  function haOf(env, o) {
+    if (env.demo) return o ? previewHa(env, o) : DEMO_HA;
     var d = dataOf(env).ha;
     if (d && typeof d === "object") return d;
     var sh = window.smartHome;
@@ -2151,8 +2184,8 @@
     return c.on ? "On" + (c.level != null && c.level < 100 ? " " + c.level + "%" : "") : "Off";
   }
   function controlsOf(env, o) {
-    var ha = haOf(env), q = op(o);
-    if (env.demo && q.controls && q.controls.length) {
+    var ha = haOf(env, o), q = op(o);
+    if (env.demo && q.controls && q.controls.length && ha === DEMO_HA) {
       // the designer: the design's own icons and names over the demo readings
       return q.controls.map(function (c, i) { var d = DEMO_HA.controls[i % DEMO_HA.controls.length]; return { entity: "demo." + i, name: c.name || d.name, ok: true, kind: d.kind, on: i % 2 === 0, icon: c.icon }; });
     }
@@ -2175,7 +2208,7 @@
       tall ? [icon, name, st] : [icon, E("div", "cw-col", "min-width:0;align-items:" + (al === "right" ? "flex-end" : "flex-start") + ";text-align:" + (al === "right" ? "right" : "left"), [name, st])]);
   }
   R.controls = function (root, o, b, env) {
-    var ha = haOf(env), info = ha.info || {}, q = op(o), title = q.label || "Control Centre", al = alignOf(o), W = b.w - 48, H = b.h - 48;
+    var ha = haOf(env, o), info = ha.info || {}, q = op(o), title = q.label || "Control Centre", al = alignOf(o), W = b.w - 48, H = b.h - 48;
     if (!env.demo && !(info.controls && info.controls.length)) return soonFit(root, b, "light", "controls");
     var items = controlsOf(env, o);
     if (!items) return haWait(root, b, o, "home", title, "Checking Home Assistant");
@@ -2218,7 +2251,7 @@
     });
   }
   R.camera = function (root, o, b, env) {
-    var ha = haOf(env), info = ha.info || {}, q = op(o), cams = info.cameras || [], al = alignOf(o), W = b.w - 48;
+    var ha = haOf(env, o), info = ha.info || {}, q = op(o), cams = info.cameras || [], al = alignOf(o), W = b.w - 48;
     if (!env.demo && !cams.length) return soonFit(root, b, "camera", "camera");
     var want = setting(o, env, "cam"), cam = cams.filter(function (c) { return c.entity === want; })[0] || cams[0], name = devName(o, env, cam.entity === want ? "cam" : null, cam.name, "Camera");
     var src = env.demo ? demoImg("dog") : (ha.stills || {})[cam.entity];
@@ -2335,7 +2368,7 @@
     return g;
   }
   function sensorPick(env, o) {
-    var ha = haOf(env), names = (ha.info && ha.info.sensors) || [], want = setting(o, env, "reading");
+    var ha = haOf(env, o), names = (ha.info && ha.info.sensors) || [], want = setting(o, env, "reading");
     var n = names.filter(function (s) { return s.entity === want; })[0] || names[0];
     if (!n) return null;
     var s = (ha.sensors || []).filter(function (x) { return x.entity === n.entity; })[0];

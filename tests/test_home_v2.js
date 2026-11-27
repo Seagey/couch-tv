@@ -26,7 +26,7 @@ const pack = (o) => Object.assign({ v: 1, rev: 5, at: "2026-11-27T01:00:00.000Z"
   people: [{ id: "p_3k9x2m", name: "Ruby", kids: true }], town: { name: "Bellingen", lat: -28.8, lon: 153.4 },
   details: { note: { text: "Back at five", from: "Mum" }, lists: [{ name: "Shopping", items: [{ t: "Milk", done: false }] }], guide: [{ title: "Bins", text: "Tuesday" }],
     guest: { name: "Sarah" }, stay: { checkin: "15:00", checkout: "10:00", names: { "2026-12-24": "Sarah" }, url: "https://bookings.example/x.ics" }, cal: { url: "https://calendar.google.com/x/basic.ics" },
-    screen: { goal: 120 }, places: { w_abc: { name: "Ballina", lat: -28.87, lon: 153.56 } }, commute: { to: { name: "Lismore", lat: -28.81, lon: 153.27 } },
+    screen: { goal: 120 }, places: { w_abc: { name: "Bega", lat: -28.87, lon: 153.56 } }, commute: { to: { name: "Orange", lat: -28.81, lon: 153.27 } },
     watch: { whose: { w_k: "p_3k9x2m" } }, smart: { picks: { w_air: ["climate.guest"] } }, bins: { weekday: "2", bin_a: "Recycling", lid_a: "#FFD60A" }, card: { url: "http://hub/n.json" } },
   keys: { ha: { token: "SECRET-HA-TOKEN", url: "http://homeassistant.local:8123" }, ai: { key: "sk-test-abcdefgh", provider: "openai" } },
   photos: { albums: [{ id: "alb1", name: "Beach", photos: [{ id: PID, taken: "2020-05-05", url: url(PID) }] }] } }, o || {});
@@ -40,7 +40,7 @@ assert.strictEqual(h.details.note.text, "Back at five");
 assert.strictEqual(h.details.guest.name, "Sarah");
 assert.strictEqual(h.details.stay.checkin, "15:00");
 assert.strictEqual(h.details.cal.url, "https://calendar.google.com/x/basic.ics");
-assert.strictEqual(h.details.places.w_abc.name, "Ballina");
+assert.strictEqual(h.details.places.w_abc.name, "Bega");
 assert.deepStrictEqual(h.details.smart.picks.w_air, ["climate.guest"]);
 assert.strictEqual(h.details.bins.lid_a, "#ffd60a");
 assert.deepStrictEqual(Object.keys(h.keys), ["ha", "ai"]);
@@ -89,9 +89,9 @@ assert.strictEqual(r.ah.stay.url, "https://bookings.example/x.ics");
 assert.strictEqual(r.keys.ha.token, "SECRET-HA-TOKEN");
 assert.deepStrictEqual(r.photos.add.map((a) => a.pid), [PID]);
 assert.strictEqual(r.photos.add[0].taken, "2020-05-05", "the day travels by photo id");
-assert.strictEqual(C.placeOf(r.account, "w_abc").name, "Ballina");
+assert.strictEqual(C.placeOf(r.account, "w_abc").name, "Bega");
 assert.strictEqual(C.placeOf(r.account, "nope"), null);
-assert.strictEqual(C.detail(r.account, "commute").to.name, "Lismore");
+assert.strictEqual(C.detail(r.account, "commute").to.name, "Orange");
 assert.deepStrictEqual(r.account.keysGiven, ["ha", "ai"]);
 assert.ok(!JSON.stringify(r.account).includes("SECRET-HA-TOKEN"), "keys are not kept in the account record");
 assert.ok(!JSON.stringify(r.account).includes("sk-test"), "no secret in the record, only which kinds");
@@ -147,7 +147,7 @@ assert.deepStrictEqual(next.photos.update, [{ pid: PID, id: "acc_" + PID, url: u
 next = plain(C.mergeHome(tvNow({ note: { text: "Back at five", from: "Mum", at: 0 } }), C.readHome({ v: 1, rev: 6, at: "t", people: [{ id: "p_3k9x2m", name: "Ruby" }] })));
 assert.strictEqual(next.ah, undefined);
 assert.deepStrictEqual(next.account.keysGiven, ["ha", "ai"]);
-assert.strictEqual(C.placeOf(next.account, "w_abc").name, "Ballina");
+assert.strictEqual(C.placeOf(next.account, "w_abc").name, "Bega");
 next = plain(C.mergeHome(tvNow({ note: { text: "Back at five", from: "Mum", at: 0 }, lists: [{ name: "Mine", items: [] }] }), { v: 1, rev: 9, wipe: true }));
 assert.strictEqual(next.ah.note, null, "the account's note goes");
 assert.strictEqual(next.ah.lists, undefined, "the TV's own list stays");
@@ -182,6 +182,89 @@ assert.strictEqual(C.mergeHome({ people: [], place: null, ah: {}, photos: [], ac
     assert.deepStrictEqual(plain(C3.takeHeldKeys()), {}, "taken once");
   }
   void read;
+}
+
+// ---- planWidgets: the account's details onto each widget on the design (own places, commute, bins, whose shows) ----
+{
+  const P = (n, t) => ({ name: n, lat: -28.8, lon: 153.4, timezone: "auto" });
+  const list = [
+    { key: "wk1|week", id: "wk1", kind: "week", fields: ["town"] }, { key: "sf1|surf", id: "sf1", kind: "surf", fields: ["place"] },
+    { key: "st1/0|hourly", id: "st1/0", kind: "hourly", fields: ["town"] }, { key: "cm1|commute", id: "cm1", kind: "commute", fields: ["to", "from"] },
+    { key: "bn1|bins", id: "bn1", kind: "bins", fields: ["weekday", "alt", "thisweek", "bin_a", "bin_b", "lid_a", "lid_b"] },
+    { key: "kp1|keeprow", id: "kp1", kind: "keeprow", fields: ["person"] }, { key: "up1|upnext", id: "up1", kind: "upnext", fields: [] }];
+  const det = { places: { wk1: { name: "Bega", lat: -28.87, lon: 153.56 }, sf1: { name: "Narooma", lat: -28.79, lon: 153.59 }, st1_0: { name: "Cooma", lat: -28.87, lon: 153.05 } },
+    commute: { to: { name: "Orange", lat: -28.81, lon: 153.28 } }, bins: { weekday: "2", alt: true, thisweek: "b", bin_a: "Paper" }, watch: { whose: { kp1: "p_3k9x2m", up1: "p_3k9x2m" } } };
+  const r1 = plain(C.planWidgets({ details: det }, list, {}));
+  const get = (k, f) => (r1.sets.filter((x) => x.key === k && x.field === f)[0] || {}).value;
+  assert.strictEqual(get("wk1|week", "town").name, "Bega", "the week widget's own place");
+  assert.strictEqual(get("sf1|surf", "place").name, "Narooma", "surf: its beach is 'place'");
+  assert.strictEqual(get("st1/0|hourly", "town").name, "Cooma", "a stack's widget: '<stack id>_<place>' maps to the TV's '<stack id>/<place>'");
+  assert.strictEqual(get("cm1|commute", "to").name, "Orange");
+  assert.strictEqual(get("cm1|commute", "from"), undefined, "no from: the widget keeps the home's town");
+  assert.strictEqual(get("bn1|bins", "weekday"), 2); assert.strictEqual(get("bn1|bins", "alt"), true); assert.strictEqual(get("bn1|bins", "bin_a"), "Paper");
+  assert.strictEqual(get("bn1|bins", "thisweek"), "b");
+  assert.strictEqual(get("kp1|keeprow", "person"), "p_3k9x2m");
+  assert.ok(!r1.sets.some((x) => x.key === "up1|upnext"), "a widget with no such setting gets nothing");
+  // applied: the same pack again changes nothing
+  const acc1 = { details: det, wsApplied: r1.next };
+  const ws1 = { "wk1|week": { town: P("Bega") } };
+  const same = plain(C.planWidgets(acc1, list, { "wk1|week": { town: get("wk1|week", "town") }, "sf1|surf": { place: get("sf1|surf", "place") }, "st1/0|hourly": { town: get("st1/0|hourly", "town") },
+    "cm1|commute": { to: get("cm1|commute", "to") }, "bn1|bins": { weekday: 2, alt: true, bin_a: "Paper" }, "kp1|keeprow": { person: "p_3k9x2m" } }));
+  assert.deepStrictEqual(same.sets, [], "nothing to change when the TV already holds what the account gave");
+  // a change made on this TV stays until the account's value changes
+  const tvOwn = { "wk1|week": { town: { name: "Tamworth", lat: 1, lon: 2, timezone: "auto" } } };
+  assert.deepStrictEqual(plain(C.planWidgets(acc1, list, tvOwn)).sets.filter((x) => x.key === "wk1|week"), [], "the TV's own place stays");
+  const det2 = JSON.parse(JSON.stringify(det)); det2.places.wk1 = { name: "Merimbula", lat: -29.1, lon: 153.4 };
+  assert.strictEqual(plain(C.planWidgets({ details: det2, wsApplied: r1.next }, list, tvOwn)).sets.filter((x) => x.key === "wk1|week")[0].value.name, "Merimbula", "the account changed it: it wins again");
+  // the account takes a value away: what it put there goes, the TV's own stays
+  const det3 = JSON.parse(JSON.stringify(det)); delete det3.places.sf1;
+  const gone = plain(C.planWidgets({ details: det3, wsApplied: r1.next }, list, { "sf1|surf": { place: get("sf1|surf", "place") }, "wk1|week": tvOwn["wk1|week"] }));
+  assert.deepStrictEqual(gone.sets.filter((x) => x.key === "sf1|surf"), [{ key: "sf1|surf", field: "place", value: null }]);
+  const goneOwn = plain(C.planWidgets({ details: det3, wsApplied: r1.next }, list, { "sf1|surf": { place: { name: "Mine", lat: 3, lon: 4, timezone: "auto" } } }));
+  assert.deepStrictEqual(goneOwn.sets.filter((x) => x.key === "sf1|surf"), [], "a beach typed on the TV is not taken away");
+  // widgets that are not on the design now keep what was remembered
+  assert.ok(plain(C.planWidgets({ details: det, wsApplied: r1.next }, [], {})).next["wk1|week"], "remembered while the widget is off the design");
+  // mergeHome carries the record on
+  const mh = plain(C.mergeHome({ people: [], account: { rev: 1, wsApplied: r1.next, details: det } }, { v: 1, rev: 2, people: [] }));
+  assert.ok(mh.account.wsApplied && mh.account.wsApplied["wk1|week"], "mergeHome keeps wsApplied");
+  const wipe = plain(C.mergeHome({ people: [], account: { rev: 1, wsApplied: r1.next, details: det } }, { v: 1, rev: 2, wipe: true }));
+  assert.strictEqual(wipe.account.details, null);
+  // On this day for this TV
+  assert.deepStrictEqual(plain(C.readHome(pack({ details: { photos: { on_this_day: false }, note: { text: "x" } } })).details.photos), { on_this_day: false });
+  assert.strictEqual(C.readHome(pack({ details: { photos: { on_this_day: "no" } } })).details.photos, undefined, "only a yes or no is read");
+  void ws1;
+}
+
+// ---- planWidgets, round 2: smart home picks onto each widget's own device setting, details.show, and solar's own place ----
+{
+  const list = [
+    { key: "ac1|aircon", id: "ac1", kind: "aircon", fields: ["entity"] }, { key: "ct1|controls", id: "ct1", kind: "controls", fields: ["switches"] },
+    { key: "cam1|camera", id: "cam1", kind: "camera", fields: ["cam"] }, { key: "se1|sensor", id: "se1", kind: "sensor", fields: ["reading"] },
+    { key: "sp1|speakers", id: "sp1", kind: "speakers", fields: ["players"] }, { key: "sc1|scenes", id: "sc1", kind: "scenes", fields: ["scenes"] },
+    { key: "en1|energy", id: "en1", kind: "energy", fields: [] }, { key: "st1/1|controls", id: "st1/1", kind: "controls", fields: ["switches"] },
+    { key: "pe1|people", id: "pe1", kind: "people", fields: ["who"] }, { key: "li1|list", id: "li1", kind: "list", fields: ["list"] },
+    { key: "gu1|guide", id: "gu1", kind: "guide", fields: ["sections"] }, { key: "cd1|card", id: "cd1", kind: "card", fields: ["live"] },
+    { key: "ag1|agenda", id: "ag1", kind: "agenda", fields: ["calendars"] }, { key: "so1|solar", id: "so1", kind: "solar", fields: ["town"] }];
+  const det = { smart: { picks: { ac1: ["climate.lounge", "climate.guest"], ct1: ["light.hall", "switch.deck", "camera.x"], cam1: ["camera.front", "camera.back"], se1: ["sensor.pool"],
+      sp1: ["media_player.living", "media_player.deck"], sc1: ["scene.movie", "script.goodnight"], en1: ["sensor.solar"], st1_1: ["fan.ceiling"] } },
+    show: { pe1: { who: ["p_3k9x2m"] }, li1: { list: "Shopping" }, gu1: { sections: ["Bins", "Wi-Fi"] }, cd1: { live: "turns" }, ag1: { calendars: "bookings" } },
+    places: { so1: { name: "Bega", lat: -28.87, lon: 153.56 } } };
+  const r = plain(C.planWidgets({ details: det }, list, {}));
+  const g = (k, f) => (r.sets.filter((x) => x.key === k && x.field === f)[0] || {}).value;
+  assert.strictEqual(g("ac1|aircon", "entity"), "climate.lounge", "aircon: the first climate pick");
+  assert.deepStrictEqual(g("ct1|controls", "switches"), ["light.hall", "switch.deck"], "controls: lights and switches only");
+  assert.strictEqual(g("cam1|camera", "cam"), "camera.front");
+  assert.strictEqual(g("se1|sensor", "reading"), "sensor.pool");
+  assert.deepStrictEqual(g("sp1|speakers", "players"), ["media_player.living", "media_player.deck"]);
+  assert.deepStrictEqual(g("sc1|scenes", "scenes"), ["scene.movie", "script.goodnight"]);
+  assert.deepStrictEqual(g("st1/1|controls", "switches"), ["fan.ceiling"], "a stack's widget: '<stack id>_<place>' picks");
+  assert.ok(!r.sets.some((x) => x.key === "en1|energy"), "energy has no device setting");
+  assert.deepStrictEqual(g("pe1|people", "who"), ["p_3k9x2m"]); assert.strictEqual(g("li1|list", "list"), "Shopping");
+  assert.deepStrictEqual(g("gu1|guide", "sections"), ["Bins", "Wi-Fi"]); assert.strictEqual(g("cd1|card", "live"), "turns"); assert.strictEqual(g("ag1|agenda", "calendars"), "bookings");
+  assert.strictEqual(g("so1|solar", "town").name, "Bega", "solar has its own place");
+  // read from the pack: show is checked
+  const rd = plain(C.readHome(pack({ details: { show: { pe1: { who: ["p_3k9x2m", "bad id"], list: "x<b>" }, "bad id": { list: "y" }, ag1: { calendars: "nope" } } } })).details.show);
+  assert.deepStrictEqual(rd, { pe1: { who: ["p_3k9x2m"], list: "x b" } }, "only what passes the checks is read");
 }
 
 console.log("Pack v2: all checks passed");
