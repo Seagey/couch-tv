@@ -186,6 +186,8 @@
   "use strict";
   var S = window.COUCH_TIZEN || {};
   var MAP = window.COUCH_TIZEN_APPS || {};
+  var OWN_LOGOS = {};   // samsung/my-logos/<id or name>.png, for apps with no entry in MAP
+  (window.COUCH_TIZEN_OWN_LOGOS || []).forEach(function (n) { OWN_LOGOS[n] = true; });
   var SELF = "CouchTVApp.Home";
   var BRIDGE = ((location.search.match(/[?&]api=([^&]+)/) || [])[1] || "");
   BRIDGE = decodeURIComponent(BRIDGE);
@@ -258,7 +260,8 @@
         shown.push({ package: pkg, label: MAP[pkg].name || a.name });
       } else if (!pkg && a.show && STORE.test(a.packageId || "") && !HIDE.test(a.name || "") && !byPkg[a.id]) {
         byPkg[a.id] = a;
-        shown.push({ package: a.id, label: a.name });
+        // a store tagline is left off the tile ("ZEE5 - Movies, Shows, LiveTV, ..." is "ZEE5")
+        shown.push({ package: a.id, label: String(a.name || "").split(/\s+[-–—|:]\s+|:\s+/)[0] || a.name });
       }
     });
     if (SKY_PORT) shown.unshift({ package: SKY, label: "Sky" });
@@ -438,6 +441,17 @@
     var m = MAP[pkg];
     if (m && m.logo) return "logos/" + pkg + ".png";
     var a = byPkg[pkg];
+    var own = [pkg].concat(a ? [a.id, a.packageId, a.name] : []).filter(function (n) { return n && OWN_LOGOS[n]; })[0];
+    if (own) return "logos/" + own + ".png";
+    // the TV hands couch-tv no other app's icon file (a QN90F, Tizen 9.0): the bridge finds the app's
+    // icon by its name (bridge/appicons.py). A picture that fails shows the app's name instead.
+    var name = (a && a.name) || (m && m.name);
+    if (BRIDGE && name) {
+      var q = ["name=" + encodeURIComponent(name)];
+      if (TV_ID) q.push("tv=" + TV_ID);
+      if (S.key) q.push("key=" + encodeURIComponent(S.key));
+      return BRIDGE + "/api/tizen/icon?" + q.join("&");
+    }
     if (a && a.iconPath) return /^[a-z]+:/.test(a.iconPath) ? a.iconPath : "file://" + a.iconPath;
     return null;
   }
