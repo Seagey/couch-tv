@@ -134,12 +134,12 @@ TV on the computer:
 |---|---|
 | couch-tv home as an app, apps in your order, the remote's arrows, OK and Back | Yes |
 | Opens by itself when the TV is switched on | Yes, with the bridge running |
-| Samsung's own Home button | Still opens Samsung's menu. Press Back or open couch-tv from the app row |
+| Samsung's own Home button | Opens Samsung's menu. With `"home_button": true` couch-tv comes straight back instead (below); otherwise press Back or open couch-tv from the app row |
 | Phone remote: keys, volume, mute, open an app | Yes (the TV asks to Allow the remote once). Mute goes over UPnP |
 | More than one TV on one phone remote | Yes: one bridge runs Google TVs and Samsungs together (several entries in `config.json`), the remote's TV menu switches between them |
 | "Put on Bluey" (find and play) | Netflix: opens the show and presses Play (tested). YouTube: opens the video. Prime Video, Stan, Binge, Paramount+, Apple TV: the couch-tv app hands them the title, then Play is pressed by timing (Prime seen opening, the title page not yet confirmed). Disney+ and others: open on their home page and the reply says to pick the show there |
 | "Who's watching?" in an app | OK is pressed, which takes the highlighted profile (usually the first). It cannot pick yours by name: Samsung gives no way to read the screen |
-| Typing into the TV from the phone | Only while the TV shows its own keyboard |
+| Typing into the TV from the phone | Only while the TV shows its own keyboard. Netflix and Prime Video draw their own letter grid, which the phone cannot type into (tried on a QN90F) |
 | Turning the TV on from the phone | Only if the TV allows it over the network (see "Turning it on") |
 | What is playing, a progress bar, screenshots, the Claude ask's "look at the screen" | No. Samsung gives none of these to the network remote |
 | Keep watching | From couch-tv's own history only (what you started through couch-tv) |
@@ -371,6 +371,47 @@ the TV off and on comes back to couch-tv when Autorun Last App is on, because co
 last app. Without `sky_hdmi` there is no tile. Tested on a 2023 CU8500 (Tizen 9.0) with a Sky Q Mini
 on HDMI 2, reported by philehaynes.
 
+## Live TV: Samsung TV Plus channels inside couch-tv
+
+Samsung's own TV Plus app keeps couch-tv frozen behind it, so Samsung's Home button cannot bring
+couch-tv back from there (a 2025 QN90F, Tizen 9.0). A Live TV tile plays the same free channels
+inside couch-tv instead, so couch-tv stays in front and Home keeps working. In the TV's entry:
+
+```json
+{ "id": "lounge", "name": "Lounge", "kind": "samsung", "ip": "<tv address>", "live_tv": true }
+```
+
+Then rebuild and reinstall the app. It opens on the last channel watched; Home settings, Samsung
+behaviour, **Live TV opens on** picks a country instead (this country's channels, or one ticked under
+Live TV: more countries), and Live TV then opens on that country's first channel, or on the last one
+watched if it was one of that country's. Up and Down change channel within the category, OK shows the channel list, Left and Right
+change the category (all channels, then Samsung's own groups: Hindi News, Entertainment, Movies,
+Sports and so on), Back returns to the home. The category is kept for next time. Home settings,
+Samsung behaviour, **Live TV arrows** swaps them: Left and Right change channel, Up and Down bring up
+the channel list (Up and Down move in it, Left and Right change the category, OK plays, Back closes).
+A short tour of the buttons shows the first time Live TV opens, and again after the arrows are swapped.
+`"live_tv": {"groups": ["Hindi News", "English News"]}` keeps only those groups.
+
+**Other countries.** Home settings, Samsung behaviour, **Live TV: more countries** lists every other
+country Samsung TV Plus is in, with its channel count, its sports channels by name and how many of
+three of them played from this home just now (the bridge tries them when the page opens, at most
+every 6 hours per country; about 10 seconds). Countries whose sports channels played come first,
+and the page names them for sport. Ticked countries (up to 8) come into Live TV by group ("USA ·
+Sports"), after this country's. The bridge keeps the choice in `data/samsung-<tv id>-behaviour.json`.
+Some channels play only in their own country (the player says the channel did not play), and
+Samsung's terms are for your own country's channels.
+
+The bridge reads the channel list from `i.mjh.nz` every 6 hours (`/api/livetv/channels`, the region
+from `"country"` in `config.json`) and leaves out the channels with DRM, which only Samsung's own app
+can play. Streams offer several pictures (a Hindi news channel: 320x180 up to 1920x1080 at 2.5 Mbit/s) and a
+player starts on a low one and climbs, so the picture was soft for the first minute. The TV therefore
+plays `/api/livetv/play/<channel id>.m3u8` first: the bridge reads the stream's playlist and hands
+the TV only its sharpest picture. If that fails it plays `https://jmp2.uk/stvp-<channel id>` itself,
+so a DNS filter must let the TV and the bridge reach `jmp2.uk`, `*.samsungtv.plus` and CloudFront.
+Two seconds after a channel starts, the player checks how far it is behind the newest picture and,
+past 25 seconds, jumps to 18 seconds behind (normal for HLS; Samsung's own app gets the same stream,
+piece for piece). The tile shows couch-tv's own Live TV picture.
+
 ## Your own name for an app
 
 `"app_names"` in the TV's entry renames an app's tile, for a household that knows it by another
@@ -378,10 +419,11 @@ name. Then rebuild and reinstall the app:
 
 ```json
 { "id": "lounge", "name": "Lounge", "kind": "samsung", "ip": "<tv address>",
-  "app_names": { "com.netflix.ninja": "Movies" } }
+  "app_names": { "local.livetv": "News" } }
 ```
 
-The key is the app's package in `bridge/apps.py`.
+The key is the app's package in `bridge/apps.py`, or `local.livetv` for the Live TV tile.
+
 ## App pictures
 
 The TV hands couch-tv no other app's icon file, and a 2025 QN90F (Tizen 9.0) answers neither the
@@ -395,8 +437,85 @@ Shows, ..."; the tile shows that shorter name too), and keeps the picture in `da
 name not found is asked again after a week, and its tile shows the app's name. For an app the
 look-up can't find (Samsung's own Workspace is on no app store), put a picture of your own in
 `samsung/my-logos/` named after the app's name as the TV shows it (`Workspace.png`), its Tizen app id
-or package id, then rebuild and reinstall the app. Without a bridge the tile tries the TV's own icon
-file.
+or package id, then rebuild and reinstall the app.
+
+An app installed later goes behind More apps with a New dot, not onto the dock: the dock stays as it
+was arranged. Hold OK on it there to bring it forward.
+
+## Samsung behaviour, in Home settings
+
+On a Samsung build, Home settings has a **Samsung behaviour** section, and leaves out what only an
+Android TV, Google TV, Fire TV or LG can do (Google's screensaver albums, the paused-video timer,
+screen time, the ADB music session, and the quick buttons for picture modes, Bluetooth, the
+screensaver, the Network and Bluetooth screens and LG's Developer Mode). The dock's gear menu keeps
+to two entries on a Samsung: **Home settings** and **Samsung behaviour**, which opens this section.
+
+- **Samsung Home**, **TV settings**, **Apps** (Samsung's app store), **Look for new apps** and
+  **Screen off**: what the gear menu has on other TVs.
+- **Open Couch TV when the TV turns on**: the bridge's `open_on_power_on`, restarts included.
+  Changed here, it is kept by the bridge in `data/samsung-<id>-behaviour.json` and wins over
+  `config.json`.
+- **Live TV arrows** and **Live TV opens on** (with `live_tv`, above). With `live_tv` on, Samsung TV
+  Plus's own app is left out of the home: it freezes couch-tv behind it, so Home could not bring
+  couch-tv back from there.
+- **Samsung Home shortcut**: what Home twice does (with `home_button`).
+
+## Samsung's Home button opens couch-tv
+
+No app can take a Samsung's Home key, and the TV's REST API reports no system app (every one answers
+404). What the TV does show, to an app on it: Samsung's home starts a small part,
+`com.samsung.tv.homeupdateview`, for a few seconds each time it opens. So with this in the TV's entry
+in `config.json`, then a rebuild and reinstall of the app:
+
+```json
+{ "id": "lounge", "name": "Lounge", "kind": "samsung", "ip": "<tv address>", "home_button": true }
+```
+
+couch-tv keeps running when it is not on screen (the build turns Tizen's `background-support` on for
+this TV only), looks at the TV's running apps four times a second, and opens itself again when that
+part starts as couch-tv goes out of sight or while it is hidden (`tizen.js`). The marker watch can
+work without the bridge.
+
+- **Home**, from couch-tv or from inside an app: Samsung's menu flashes up, then couch-tv comes back
+  to the front. It asks Tizen with its own app-control (`config.xml`, `reload="disable"`), so the
+  page already up is shown again rather than loaded from the start; a TV that refuses it gets a
+  plain launch, which reloads.
+- **Home over couch-tv's own Live TV**: Samsung's menu opens over the playing picture without hiding
+  couch-tv, so the watch closes the player and brings couch-tv back to its home. Source starts the
+  same part, so Source inside Live TV also goes back to the home; press Source again there.
+- **Home twice** (again within 5 seconds of couch-tv coming back): Samsung's menu stays, and Home
+  leaves it alone for 2 minutes, or until couch-tv is on screen again, whichever comes first. Home
+  pressed while Samsung's menu is already up starts nothing an app can see (a QN90F, 28 Nov 2026), so
+  no number of presses there brings couch-tv back: open it from Samsung's app row or the phone
+  remote. The bridge can't see presses on the TV's own remote either. In Home settings, **Samsung
+  Home shortcut** switches between the default and **Only Samsung Home here in Samsung behaviour**.
+  A long press of Home isn't available to Tizen apps.
+- **Samsung Home** in Home settings, Samsung behaviour, and **Smart Hub** in the phone remote's More
+  menu use the bridge to open Samsung Home and leave it alone for 2 minutes. **TV settings** there
+  sends Samsung's Settings key through the bridge rather than launching an Android package.
+- If Tizen terminates the launcher in the background, the bridge can recover it after a known,
+  REST-visible store app loses visibility. It won't guess from an already-dead launcher alone:
+  models or apps that never report visibility need the phone remote's couch-tv Home button. This
+  costs about one more request a second while another app is in front (couch-tv's own state), so
+  it is part of `home_button` only: on a model that blips its sound with many requests (#53), leave
+  `home_button` off.
+- **A restart** (holding Power, a software update) takes the TV off the network for well under the
+  two minutes that count as off, and never says standby. The bridge counts it as a restart when
+  couch-tv was running before the gap and is stopped after it (then it puts couch-tv in front at
+  once), or when couch-tv's page started again during the gap (the TV starts it while booting; then
+  it waits up to 12 seconds to tell that from a Wi-Fi dropout, which leaves apps running). It puts
+  couch-tv in front over Live TV or Samsung's home if the TV put them up by itself, and couch-tv
+  itself goes back in front if the TV covers it while starting.
+- **Settings** and **Source** pressed on couch-tv open over it, and are left alone, as is the input
+  picked from Source.
+- **Source from inside another app** starts the same part as Home, so couch-tv comes back then too.
+  Press Source on couch-tv, or Home twice first, to change input.
+- An app opened from couch-tv never counts as Home.
+
+Seen on a 2025 QN90F (QA65QN90FAULXL, Tizen 9.0). Another firmware may start a different part: list
+what to watch for with `"home_button": {"markers": ["<app id>", ...]}`. To find it, build the app
+with `--log-url` pointing at a small HTTP listener: it logs every change in the TV's running apps
+(`tizen.application.getAppsContext`) and each time couch-tv is hidden or shown.
 
 ## Turning it on
 

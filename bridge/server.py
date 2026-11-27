@@ -57,6 +57,7 @@ import direct
 import matter
 import say
 import phonepage
+import livetv
 import appicons
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -1239,6 +1240,62 @@ async def play(title, season=None, episode=None, service=None, who=None, resume=
     return result
 
 
+async def h_tizen_next(request):
+    """The couch-tv app on a Samsung TV asks here (long poll) for jobs only it can do."""
+    if tv.kind != "samsung":
+        raise ApiError(400, "only for Samsung TVs", key="err_only_samsung")
+    return ok(job=await tv.tizen_next())
+
+
+async def h_tizen_home(request):
+    """Share the installed app IDs and intentional Samsung Home window with the launcher."""
+    if tv.kind != "samsung":
+        raise ApiError(400, "only for Samsung TVs", key="err_only_samsung")
+    if request.method == "POST":
+        data = await body(request)
+        ids = data.get("apps")
+        if isinstance(ids, list):
+            tv.home_apps = list(dict.fromkeys(
+                app for app in ids[:100] if isinstance(app, str) and re.fullmatch(r"[\w.-]{1,120}", app)))
+        if data.get("quiet") is True:
+            tv.home_quiet_until = time.monotonic() + 120
+        elif data.get("quiet") is False:   # couch-tv is on screen again: Samsung's home is done with
+            tv.home_quiet_until = 0.0
+        if data.get("started") is True:    # a new page: after a restart, never after a Wi-Fi dropout
+            tv.page_started_at = time.monotonic()
+        if data.get("opened") is True:     # couch-tv opened an app: someone chose what to watch
+            tv.quiet_until = max(tv.quiet_until, time.monotonic() + 30)
+    now = time.monotonic()
+    # booting: the TV is on (its couch-tv asks) but not answering the bridge yet, or only just again
+    booting = tv.open_on_power_on and (not tv.connected or now - tv.back_at < 30)
+    # front=1 (tizen.js, couch-tv covered while the TV starts): an app someone chose, or cast to the TV,
+    # is on screen, so couch-tv stays behind it. Only then: it is one request per installed app.
+    front = None
+    if booting and tv.connected and request.method == "GET" and request.query.get("front") == "1":
+        front = tv._picked(await tv._front())
+    return ok(quiet=now < tv.home_quiet_until, reopened=now - tv.home_reopened_at < 5, booting=booting, front=front)
+
+
+async def h_tizen_behaviour(request):
+    """Home settings, Samsung behaviour: whether the bridge opens couch-tv when the TV comes on, and
+    the other countries whose Live TV channels the TV shows (two-letter codes, up to 8)."""
+    if tv.kind != "samsung":
+        raise ApiError(400, "only for Samsung TVs", key="err_only_samsung")
+    if request.method == "POST":
+        data = await body(request)
+        power, regions = data.get("open_on_power_on"), data.get("live_regions")
+        if power is not None and not isinstance(power, bool):
+            raise ApiError(400, "open_on_power_on must be true or false", key="err_something_wrong")
+        if regions is not None and not (isinstance(regions, list) and len(regions) <= 8 and all(
+                isinstance(r, str) and re.fullmatch(r"[a-z]{2}", r) for r in regions)):
+            raise ApiError(400, "live_regions must be up to 8 two-letter codes", key="err_something_wrong")
+        if power is None and regions is None:
+            raise ApiError(400, "nothing to change", key="err_something_wrong")
+        tv.set_behaviour(open_on_power_on=power, live_regions=list(dict.fromkeys(regions)) if regions is not None else None)
+    # "country": this home's Live TV channels, for Home settings' Live TV opens on
+    return ok(open_on_power_on=tv.open_on_power_on, live_regions=tv.live_regions, country=config.COUNTRY.lower())
+
+
 async def h_tizen_icon(request):
     """A Samsung app's icon, looked up by its name (bridge/appicons.py): the TV hands couch-tv no
     other app's icon."""
@@ -1248,11 +1305,43 @@ async def h_tizen_icon(request):
     return web.Response(body=data, content_type="image/png", headers={"Cache-Control": "max-age=604800"})
 
 
-async def h_tizen_next(request):
-    """The couch-tv app on a Samsung TV asks here (long poll) for jobs only it can do."""
-    if tv.kind != "samsung":
-        raise ApiError(400, "only for Samsung TVs", key="err_only_samsung")
-    return ok(job=await tv.tizen_next())
+async def h_livetv_channels(request):
+    """Samsung TV Plus's channels for the Live TV tile on a Samsung (samsung/app/livetv.js, bridge/livetv.py):
+    this home's country, then the other countries picked in Home settings, Samsung behaviour."""
+    more = getattr(tv, "live_regions", []) if getattr(tv, "kind", None) == "samsung" else []
+    try:
+        chans = await livetv.channels(request.query.get("region"), more)
+    except Exception as e:
+        log.warning("live tv channels: %s", e)
+        raise ApiError(503, "No Samsung TV Plus channel list right now.", key="err_something_wrong")
+    return ok(channels=chans)
+
+
+async def h_livetv_regions(request):
+    """Home settings, Samsung behaviour, Live TV countries: every other country's channels, what is
+    in them (sports first), and whether a few of them played from this home just now."""
+    try:
+        regions = await livetv.regions()
+    except Exception as e:
+        log.warning("live tv regions: %s", e)
+        raise ApiError(503, "No Samsung TV Plus channel list right now.", key="err_something_wrong")
+    return ok(regions=regions)
+
+
+async def h_livetv_play(request):
+    """The Live TV player's stream: the channel's playlist with only its sharpest picture
+    (bridge/livetv.py, best_master). The stream itself when that cannot be made."""
+    cid = request.match_info["id"]
+    if not livetv.CHANNEL_ID.fullmatch(cid):
+        raise ApiError(400, "no such channel", key="err_something_wrong")
+    try:
+        text = await livetv.sharp(cid)
+    except Exception as e:
+        log.warning("live tv %s: %s", cid, e)
+        text = None
+    if not text:
+        raise web.HTTPFound(livetv.STREAM + cid)
+    return web.Response(text=text, content_type="application/vnd.apple.mpegurl", headers={"Cache-Control": "no-store"})
 
 
 async def h_webos_apps(request):
@@ -5974,7 +6063,14 @@ def make_app():
     r.add_post("/api/say/scene", h_say_scene)
     r.add_get("/api/tizen/next", h_tizen_next)
     r.add_post("/api/tizen/answer", h_tizen_answer)
+    r.add_get("/api/tizen/home", h_tizen_home)
+    r.add_post("/api/tizen/home", h_tizen_home)
+    r.add_get("/api/tizen/behaviour", h_tizen_behaviour)
+    r.add_post("/api/tizen/behaviour", h_tizen_behaviour)
     r.add_get("/api/tizen/icon", h_tizen_icon)
+    r.add_get("/api/livetv/channels", h_livetv_channels)
+    r.add_get("/api/livetv/regions", h_livetv_regions)
+    r.add_get("/api/livetv/play/{id}.m3u8", h_livetv_play)
     r.add_get("/api/webos/apps", h_webos_apps)
     r.add_get("/api/webos/icon/{id}", h_webos_icon)
     r.add_get("/api/roku/apps", h_roku_apps)

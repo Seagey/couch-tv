@@ -207,7 +207,8 @@ function updater(version, mem, xhr) {
 // ---- tizen.js: the icon of an app couch-tv has no logo for ----
 {
   const apps = [
-    { id: "AbCdEfGhIj.Other", packageId: "AbCdEfGhIj", name: "Other - Movies and Shows", show: true, iconPath: "/opt/usr/apps/AbCdEfGhIj/icon.png" },
+    { id: "fiZNCxMH9Y.Hotstar", packageId: "fiZNCxMH9Y", name: "JioHotstar", show: true, iconPath: "/opt/usr/apps/fiZNCxMH9Y/icon.png" },
+    { id: "AbCdEfGhIj.Other", packageId: "AbCdEfGhIj", name: "Other", show: true, iconPath: "/opt/usr/apps/AbCdEfGhIj/icon.png" },
     { id: "WSRedi0001.WorkspaceRedi", packageId: "WSRedi0001", name: "Workspace", show: true, iconPath: "/opt/usr/apps/WSRedi0001/icon.png" }
   ];
   const s = {
@@ -221,16 +222,319 @@ function updater(version, mem, xhr) {
   s.window = s;
   run("tizen.js", s);
   assert.strictEqual(s.TVOS.iconUrl("AbCdEfGhIj.Other"), "file:///opt/usr/apps/AbCdEfGhIj/icon.png", "the TV's icon without a bridge");
-  assert.strictEqual(JSON.parse(s.TVOS.apps())[0].label, "Other", "the tile leaves off a store tagline");
 
   // with a bridge: the bridge finds the icon by the app's name (the TV hands over no other app's icon)
   const b = Object.assign({}, s, { location: { search: "?api=http%3A%2F%2Fpi%3A5400&tv=lounge" }, COUCH_TIZEN: { key: "k y" },
     XMLHttpRequest: function () { this.open = () => {}; this.setRequestHeader = () => {}; this.send = () => {}; } });
   b.window = b;
   run("tizen.js", b);
-  assert.strictEqual(b.TVOS.iconUrl("AbCdEfGhIj.Other"),
-    "http://pi:5400/api/tizen/icon?name=Other%20-%20Movies%20and%20Shows&tv=lounge&key=k%20y");
+  assert.strictEqual(b.TVOS.iconUrl("AbCdEfGhIj.Other"), "http://pi:5400/api/tizen/icon?name=Other&tv=lounge&key=k%20y");
+  assert.strictEqual(b.TVOS.iconUrl("fiZNCxMH9Y.Hotstar"), "http://pi:5400/api/tizen/icon?name=JioHotstar&tv=lounge&key=k%20y");
   assert.strictEqual(b.TVOS.iconUrl("WSRedi0001.WorkspaceRedi"), "logos/Workspace.png", "an own logo, by the TV's app name, before the look-up");
+}
+
+// ---- tizen.js: Samsung's Home brings couch-tv back ("home_button") ----
+{
+  const HOMEPART = "com.samsung.tv.homeupdateview";
+  // One couch-tv page on a TV whose running apps are t.running (as at the page's start: `running`).
+  function tv(homeButton, opts) {
+    opts = opts || {};
+    const t = { clock: opts.clock || 100000, running: opts.running || [], opened: [], vis: [], ticks: [], mem: opts.mem || {} };
+    const s = {
+      location: { search: "" }, COUCH_TIZEN: { home_button: homeButton }, COUCH_TIZEN_APPS: {}, localStorage: storage(t.mem),
+      setTimeout() { return 0; }, clearTimeout() {}, JSON,
+      setInterval: (f) => { t.ticks.push(f); return t.ticks.length; }, clearInterval() {},
+      Date: { now: () => t.clock },
+      tizen: { application: {
+        getAppsInfo() {}, launch: (id) => t.opened.push(id),
+        getAppsContext: (ok) => ok(t.running.map((appId) => ({ appId })))
+      }, tvinputdevice: { registerKey() { throw new Error("no"); } } },
+      document: { hidden: false, addEventListener: (k, f) => { if (k === "visibilitychange") t.vis.push(f); } },
+      addEventListener() {}
+    };
+    s.window = s;
+    run("tizen.js", s);
+    t.s = s;
+    t.hide = (hidden) => { s.document.hidden = hidden; t.vis.forEach((f) => f()); };
+    t.tick = () => t.ticks.slice().forEach((f) => f());
+    t.later = (ms) => { t.clock += ms; };
+    t.next = () => tv(homeButton, { mem: t.mem, clock: t.clock, running: t.running });   // couch-tv reopened: a new page
+    return t;
+  }
+  const back = (t) => t.opened.filter((id) => id === "CouchTVApp.Home").length;
+
+  // Home from couch-tv: hidden, then Samsung's home part starts a moment later
+  let t = tv({});
+  t.hide(true);
+  assert.strictEqual(back(t), 0, "nothing yet");
+  t.running = [HOMEPART]; t.later(500); t.tick();
+  assert.strictEqual(back(t), 1, "Home brings couch-tv back");
+
+  // the part started just before couch-tv went out of sight: still Home
+  t = tv({});
+  t.running = [HOMEPART]; t.tick(); t.later(400);
+  t.hide(true);
+  assert.strictEqual(back(t), 1, "started a moment before counts too");
+
+  // Home again within 5 seconds of coming back (a new page, the same storage): Samsung's home stays,
+  // for 2 minutes, and then it is back to normal
+  t = t.next(); t.later(2000);
+  t.hide(true);
+  assert.strictEqual(back(t), 0, "pressed twice: left alone");
+  t.running = []; t.tick(); t.running = [HOMEPART]; t.later(500); t.tick();
+  assert.strictEqual(back(t), 0, "and the part starting changes nothing");
+  t.later(60000); t.running = []; t.tick(); t.running = [HOMEPART]; t.tick();
+  assert.strictEqual(back(t), 0, "still quiet inside 2 minutes");
+  t.later(120000); t.running = []; t.tick(); t.running = [HOMEPART]; t.tick();
+  assert.strictEqual(back(t), 1, "back to normal after");
+
+  // Home twice, then couch-tv is on screen again (opened by hand, or after a restart): Home brings it
+  // back at once, not 2 minutes later (26 Nov 2026: the power menu of a hold-Power restart read as
+  // the second press, and Home did nothing once the TV was back)
+  t = tv({});
+  t.hide(true); t.running = [HOMEPART]; t.later(500); t.tick();
+  t = t.next(); t.later(2000); t.hide(true);
+  assert.strictEqual(back(t), 0, "pressed twice: left alone");
+  t.later(10000); t.hide(false);
+  t.hide(true); t.running = []; t.tick(); t.running = [HOMEPART]; t.later(500); t.tick();
+  assert.strictEqual(back(t), 1, "shown again ends the quiet");
+  t.later(10000); t.running = [];   // the same, with a fresh page after a restart
+  t.mem["couch.home.quiet"] = String(t.clock + 60000);
+  t = t.next();
+  t.hide(true); t.running = [HOMEPART]; t.later(500); t.tick();
+  assert.strictEqual(back(t), 1, "a page that starts on screen ends the quiet");
+
+  // The tile-only preset persists across page reloads and does not interpret a second Home as escape.
+  t = tv({});
+  t.s.TVOS.toggleSamsungHomeShortcut();
+  t.hide(true); t.running = [HOMEPART]; t.tick();
+  assert.strictEqual(back(t), 1);
+  t = t.next(); t.later(2000); t.hide(true);
+  t.running = []; t.tick(); t.running = [HOMEPART]; t.tick();
+  assert.strictEqual(back(t), 1, "tile-only still bounces a second Home press");
+
+  // Source with couch-tv in front (an overlay: it stays shown), then an HDMI input a few seconds later
+  t = tv({});
+  t.running = [HOMEPART]; t.tick();
+  t.later(3000); t.hide(true); t.tick();
+  assert.strictEqual(back(t), 0, "the input is left on screen");
+
+  // an app couch-tv opened, then Home from inside it
+  t = tv({});
+  t.s.TVOS.launch("9Ur5IzDKqV.TizenYouTube");
+  t.hide(true); t.running = ["9Ur5IzDKqV.TizenYouTube"]; t.tick();
+  assert.strictEqual(back(t), 0, "an app couch-tv opened is not Home");
+  t.later(30000); t.running = ["9Ur5IzDKqV.TizenYouTube", HOMEPART]; t.tick();
+  assert.strictEqual(back(t), 1, "Home from inside the app brings couch-tv back");
+
+  // an app couch-tv opened just after coming back is not a second Home press
+  t = t.next(); t.later(2000);
+  t.s.TVOS.launch("9Ur5IzDKqV.TizenYouTube");
+  t.hide(true);
+  t.later(30000); t.running = ["9Ur5IzDKqV.TizenYouTube"]; t.tick(); t.running.push(HOMEPART); t.tick();
+  assert.strictEqual(back(t), 1, "Home from that app still works");
+
+  // own markers, and off unless asked for
+  t = tv({ markers: ["x.home"] });
+  t.hide(true); t.running = [HOMEPART]; t.tick();
+  assert.strictEqual(back(t), 0, "only the configured part counts");
+  t.running = [HOMEPART, "x.home"]; t.tick();
+  assert.strictEqual(back(t), 1);
+  t = tv(null);
+  t.hide(true); t.running = [HOMEPART]; t.tick();
+  assert.strictEqual(back(t), 0, "no home_button: never");
+  assert.strictEqual(t.ticks.length, 0, "and no watching");
+}
+
+// ---- livetv.js: a Live TV tile ("live_tv") plays Samsung TV Plus inside couch-tv; Back returns ----
+{
+  function node(tag) {
+    const n = {
+      tagName: tag.toUpperCase(), style: {}, children: [], attrs: {}, parentNode: null, on: {}, className: "",
+      appendChild(c) { c.parentNode = n; n.children.push(c); return c; },
+      insertBefore(c) { c.parentNode = n; n.children.unshift(c); return c; },
+      removeChild(c) { n.children.splice(n.children.indexOf(c), 1); c.parentNode = null; return c; },
+      setAttribute(k, v) { n.attrs[k] = String(v); },
+      removeAttribute(k) { delete n.attrs[k]; },
+      addEventListener(k, f) { n.on[k] = f; },
+      play() { n.paused = false; }, pause() { n.paused = true; }, load() { n.loads = (n.loads || 0) + 1; }
+    };
+    let text = "";
+    Object.defineProperty(n, "textContent", {
+      get: () => text + n.children.map((c) => c.textContent).join(" "),
+      set: (v) => { text = String(v); n.children = []; }
+    });
+    return n;
+  }
+  const chans = [
+    { id: "IN1", name: "News One HD", chno: 1007, group: "Hindi News", now: "Halla Bol" },
+    { id: "IN2", name: "ABP News", chno: 1004, group: "Hindi News", now: "" },
+    { id: "MOV", name: "Movie Club", chno: 1002, group: "Movies", now: "" },
+    { id: "IN3", name: "NDTV 24x7", chno: 1500, group: "English News", now: "" }
+  ];
+  function page(live, mem) {
+    const listeners = { keydown: [], visibilitychange: [] }, calls = [];
+    const s = {
+      location: { search: "" }, COUCH_TIZEN: { live_tv: live }, COUCH_TIZEN_APPS: {}, JSON,
+      localStorage: storage(mem), setTimeout() { return 0; }, clearTimeout() {},
+      tizen: { application: { getAppsInfo() {} }, tvinputdevice: { registerKey() { throw new Error("no"); } } },
+      document: { hidden: false, body: node("body"), createElement: node,
+        addEventListener: (t, f) => { (listeners[t] = listeners[t] || []).push(f); } },
+      tv: { pause: () => calls.push("pause"), resume: () => calls.push("resume") },
+      addEventListener() {}
+    };
+    s.window = s;
+    run("tizen.js", s);
+    run("livetv.js", s);
+    s.key = (keyCode) => {
+      const ev = { keyCode, stopped: false, preventDefault() {}, stopImmediatePropagation() { ev.stopped = true; } };
+      for (const f of listeners.keydown) { f(ev); if (ev.stopped) break; }
+      return ev.stopped;
+    };
+    s.hide = () => { s.document.hidden = true; listeners.visibilitychange.forEach((f) => f()); };
+    s.box = () => s.document.body.children.find((c) => c.id === "livetv");
+    s.video = () => s.box().children.find((c) => c.tagName === "VIDEO");
+    s.part = (cls) => s.box().children.find((c) => c.className === cls);
+    s.calls = calls;
+    return s;
+  }
+  const mem = { "couch.livetv.channels": JSON.stringify(chans) };
+  // no "live_tv": no tile
+  assert.ok(!JSON.parse(page(null, {}).TVOS.apps()).some((a) => a.package === "local.livetv"));
+
+  const s = page({ groups: ["Hindi News", "English News"], name: "News" }, mem);
+  assert.deepStrictEqual(JSON.parse(s.TVOS.apps())[0], { package: "local.livetv", label: "News" }, "the tile comes first");
+  assert.strictEqual(s.TVOS.launch("local.livetv"), true);
+  assert.strictEqual(s.video().attrs.src, "https://jmp2.uk/stvp-IN1", "opens on the first channel");
+  assert.deepStrictEqual(s.calls, ["pause"], "the home rests behind the picture");
+  assert.ok(/1007 News One HD Halla Bol/.test(s.part("lt-banner").textContent), "a banner with the channel");
+
+  // Up and Down go through the chosen groups only (no Movie Club), round the end
+  assert.ok(s.key(40));
+  assert.strictEqual(s.video().attrs.src, "https://jmp2.uk/stvp-IN2");
+  s.key(40);
+  assert.strictEqual(s.video().attrs.src, "https://jmp2.uk/stvp-IN3", "Movies is skipped");
+  s.key(40);
+  assert.strictEqual(s.video().attrs.src, "https://jmp2.uk/stvp-IN1", "round the end");
+  s.key(38);
+  assert.strictEqual(s.video().attrs.src, "https://jmp2.uk/stvp-IN3");
+  assert.strictEqual(mem["couch.livetv.last"], "IN3");
+
+  // OK: the channel list; Back closes the list first, then the player
+  s.key(13);
+  assert.strictEqual(s.part("lt-menu").style.display, "", "the list is up");
+  assert.strictEqual(s.part("lt-menu").children.length, 3);
+  s.key(10009);
+  assert.strictEqual(s.part("lt-menu").style.display, "none");
+  assert.ok(s.CouchLiveTV.isOpen(), "the first Back only closes the list");
+  const video = s.video();
+  assert.ok(s.key(10009));
+  assert.ok(!s.CouchLiveTV.isOpen());
+  assert.strictEqual(s.box(), undefined, "the player is gone");
+  assert.ok(video.paused && !("src" in video.attrs) && video.loads >= 1, "and the stream let go of");
+  assert.deepStrictEqual(s.calls, ["pause", "resume"]);
+  assert.strictEqual(s.key(40), false, "keys are the home's again");
+
+  // opened again: the last channel watched; Samsung's Home (hidden) stops it too
+  s.TVOS.launch("local.livetv");
+  assert.strictEqual(s.video().attrs.src, "https://jmp2.uk/stvp-IN3");
+  const v2 = s.video();
+  s.hide();
+  assert.ok(!s.CouchLiveTV.isOpen() && v2.paused && !("src" in v2.attrs));
+
+  // Left and Right: the categories (every channel, then each group); Up and Down stay in the one picked
+  const m2 = { "couch.livetv.channels": JSON.stringify(chans) };
+  const c = page({ groups: [], name: "Live TV" }, m2);
+  c.TVOS.launch("local.livetv");
+  c.key(39);
+  assert.strictEqual(c.part("lt-menu").style.display, "", "Right opens the list");
+  assert.ok(/Hindi News/.test(c.part("lt-cats").textContent), "on the first group");
+  assert.strictEqual(c.part("lt-menu").children.length, 2, "only that group's channels");
+  c.key(39);
+  assert.ok(/Movies/.test(c.part("lt-cats").textContent));
+  c.key(13);
+  assert.strictEqual(c.video().attrs.src, "https://jmp2.uk/stvp-MOV", "OK plays the one picked");
+  c.key(40);
+  assert.strictEqual(c.video().attrs.src, "https://jmp2.uk/stvp-MOV", "Down stays in Movies, its only channel");
+  assert.strictEqual(m2["couch.livetv.category"], "Movies", "the category is kept");
+  c.key(37); c.key(37);
+  assert.ok(/All channels  \(4\)/.test(c.part("lt-cats").textContent), "Left goes round to every channel");
+  c.key(10009); c.key(10009);
+
+  // the tour: once per arrow layout, and any key puts it away (still doing its job)
+  const tm = { "couch.livetv.channels": JSON.stringify(chans) };
+  const w = page({ groups: [], name: "Live TV" }, tm);
+  w.TVOS.launch("local.livetv");
+  assert.ok(/Change channel/.test(w.part("lt-tour").textContent), "the tour shows the first time");
+  w.key(40);
+  assert.strictEqual(w.part("lt-tour"), undefined, "a key puts it away");
+  assert.strictEqual(w.video().attrs.src, "https://jmp2.uk/stvp-IN2", "and still changes channel");
+  w.key(10009);
+  w.TVOS.launch("local.livetv");
+  assert.strictEqual(w.part("lt-tour"), undefined, "not again for the same arrows");
+  w.key(10009);
+
+  // Live TV arrows swapped (Home settings, Samsung behaviour): Left and Right change channel,
+  // Up and Down bring up the list, and the tour shows again for the new arrows
+  assert.strictEqual(w.TVOS.liveTvKeys(), "updown");
+  w.TVOS.toggleLiveTvKeys();
+  assert.strictEqual(w.TVOS.liveTvKeys(), "leftright");
+  w.TVOS.launch("local.livetv");
+  assert.ok(/Left|\u25C0/.test(w.part("lt-tour").textContent), "the tour again, for the swapped arrows");
+  w.key(39);
+  assert.strictEqual(w.video().attrs.src, "https://jmp2.uk/stvp-MOV", "Right: the next channel");
+  assert.strictEqual(w.part("lt-menu").style.display, "none", "no list");
+  w.key(37);
+  assert.strictEqual(w.video().attrs.src, "https://jmp2.uk/stvp-IN2", "Left: the one before");
+  w.key(38);
+  assert.strictEqual(w.part("lt-menu").style.display, "", "Up brings up the list");
+  w.key(40);
+  w.key(13);
+  assert.strictEqual(w.video().attrs.src, "https://jmp2.uk/stvp-MOV", "Down then OK plays the one picked");
+  assert.strictEqual(w.part("lt-menu").style.display, "none");
+  w.key(10009);
+
+  // with the bridge and AVPlay: the bridge's sharp playlist first, then the stream itself
+  const opened = [];
+  const p = page({ groups: [], name: "Live TV" }, { "couch.livetv.channels": JSON.stringify(chans) });
+  let listener = null, prep = null;
+  p.webapis = { avplay: { open: (u) => opened.push(u), setDisplayRect() {}, setStreamingProperty() {}, setBufferingParam() {},
+    setListener: (l) => { listener = l; }, prepareAsync: (ok, err) => { prep = { ok, err }; }, play() {}, getState() { return "IDLE"; },
+    stop() {}, close() {} } };
+  p.XMLHttpRequest = function () { this.open = () => {}; this.setRequestHeader = () => {}; this.send = () => {}; };
+  p.CouchLiveTV.open({ bridge: "http://pi:5400", key: "k y" });
+  assert.deepStrictEqual(opened, ["http://pi:5400/api/livetv/play/IN1.m3u8?key=k%20y"]);
+  prep.err("PLAYER_ERROR_CONNECTION_FAILED");
+  assert.deepStrictEqual(opened.slice(1), ["https://jmp2.uk/stvp-IN1"], "then the stream itself");
+  assert.strictEqual(listener && listener.onerror, undefined, "no listener before this stream is prepared");
+  prep.ok();
+  listener.onerror("again");
+  assert.strictEqual(p.video().attrs.src, "https://jmp2.uk/stvp-IN1", "a <video> last");
+
+  // Live TV opens on (Home settings, Samsung behaviour): a country's first channel, or the last one
+  // watched if it is that country's
+  const abroad = chans.concat([{ id: "GB1", name: "Premier Football", group: "United Kingdom · Sports", region: "gb" },
+                               { id: "GB2", name: "UK News", group: "United Kingdom · News", region: "gb" }]);
+  const sm = { "couch.livetv.channels": JSON.stringify(abroad), "couch.livetv.last": "IN2", "couch.livetv.category": "Hindi News" };
+  const r = page({ groups: [], name: "Live TV" }, sm);
+  assert.strictEqual(r.TVOS.liveTvStart(), "", "the last channel by default");
+  r.TVOS.launch("local.livetv");
+  assert.strictEqual(r.video().attrs.src, "https://jmp2.uk/stvp-IN2");
+  r.key(10009); r.key(10009);
+  r.TVOS.setLiveTvStart("gb");
+  r.TVOS.launch("local.livetv");
+  assert.strictEqual(r.video().attrs.src, "https://jmp2.uk/stvp-GB1", "that country's first channel");
+  assert.strictEqual(sm["couch.livetv.category"], "United Kingdom · Sports", "in its category");
+  r.key(40);
+  assert.strictEqual(r.video().attrs.src, "https://jmp2.uk/stvp-GB1", "Down stays in that category");
+  r.key(10009); r.key(10009);
+  sm["couch.livetv.last"] = "GB2";
+  r.TVOS.launch("local.livetv");
+  assert.strictEqual(r.video().attrs.src, "https://jmp2.uk/stvp-GB2", "the last one watched, when it is that country's");
+  r.key(10009); r.key(10009);
+  r.TVOS.setLiveTvStart("home");
+  r.TVOS.launch("local.livetv");
+  assert.strictEqual(r.video().attrs.src, "https://jmp2.uk/stvp-IN1", "this country's channels");
 }
 
 console.log("Samsung app tests passed.");

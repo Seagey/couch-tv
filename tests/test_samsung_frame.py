@@ -9,6 +9,7 @@ old check was written for, and the samsung/build.py release package.
 Run: python3 -m unittest tests/test_samsung_frame.py
 """
 import asyncio
+import json
 import os
 import subprocess
 import sys
@@ -63,6 +64,50 @@ def make(stand, data, **cfg):
     tv._front = front
     tv._launch_tizen = launch
     return tv
+
+
+class HomeRecoveryTests(unittest.IsolatedAsyncioTestCase):
+    async def test_dead_launcher_recovers_only_after_observed_app_leaves(self):
+        stand = StandIn(["on"])
+        with tempfile.TemporaryDirectory() as data:
+            tv = make(stand, data, home_button=True)
+            tv.connected, tv.power = True, "on"
+            tv.home_apps = ["example.Streaming"]
+            foreground = False
+
+            async def app_state(app):
+                if app == tv.app_id:
+                    return {"running": False, "visible": False}
+                return {"running": True, "visible": foreground}
+
+            tv._app_state = app_state
+            await tv._recover_home(True)
+            self.assertEqual(stand.launched, [], "no positive visibility signal")
+            tv._home_scan_at = 0
+            foreground = True
+            await tv._recover_home(True)
+            await tv._recover_home(True)
+            self.assertEqual(stand.launched, [], "do not replace the app being watched")
+            foreground = False
+            await tv._recover_home(True)
+            self.assertEqual(stand.launched, [tv.app_id])
+
+    async def test_intentional_smart_hub_sends_home_and_suppresses_recovery(self):
+        stand = StandIn(["on"])
+        with tempfile.TemporaryDirectory() as data:
+            tv = make(stand, data, home_button=True)
+            keys = []
+
+            async def send_key(key):
+                keys.append(key)
+
+            tv._key = send_key
+            tv._home_front = "example.Streaming"
+            await tv.key("smart_hub")
+            await tv._recover_home(True)
+            self.assertEqual(keys, ["KEY_HOME"])
+            self.assertEqual(stand.launched, [])
+            self.assertIsNone(tv._home_front)
 
 
 class HookTests(unittest.TestCase):
@@ -153,6 +198,46 @@ class HookTests(unittest.TestCase):
         tv = make(stand, self.data, open_on_power_on=False)
         asyncio.run(tv._hook())
         self.assertEqual(stand.launched, [])
+
+    def test_a_restart_brings_couch_tv_back_and_a_wifi_dropout_does_not(self):
+        # 26 Nov 2026, a QN90F with home_button: a hold-Power restart was off the network for well
+        # under GONE_MEANS_OFF and never said "standby". Once couch-tv was closed by it; once the TV
+        # started couch-tv itself and put Live TV over it. A Wi-Fi dropout looks the same from
+        # outside, except that couch-tv keeps running and its page does not start again (#53).
+        for case, opened in (("closed", ["CouchTVApp.Home"]), ("live-tv", ["CouchTVApp.Home"]), ("dropout", [])):
+            stand = StandIn(["on", "on", None, None, "on"])
+            tv = make(stand, self.data, home_button=True)
+            gone = []
+            read = stand.get_json
+
+            async def get_json(path, timeout=3):
+                try:
+                    return await read(path, timeout)
+                except OSError:
+                    gone.append(path)
+                    if case == "live-tv":
+                        tv.page_started_at = time.monotonic()   # the booting TV started couch-tv
+                    raise
+
+            async def app_state(app):
+                if app != tv.app_id:
+                    return {"running": False, "visible": False}
+                running = bool(stand.launched) or not (case == "closed" and gone)
+                return {"running": running, "visible": bool(stand.launched)}
+
+            async def nothing():
+                return None
+            tv._get_json, tv._app_state, tv._art_loop = get_json, app_state, nothing
+            tv._volume_soon = lambda: None
+
+            async def run():
+                watch = asyncio.create_task(tv._watch())
+                await self.sleep(0.8)
+                watch.cancel()
+            with patch.object(samsung_frame.samsung, "RESTART_GAP", 0), patch.object(samsung_frame.samsung, "BOOT_SETTLE", 0):
+                asyncio.run(run())
+            self.assertTrue(gone, "the stand-in TV left the network")
+            self.assertEqual(stand.launched, opened, case)
 
 
 class WakeTests(unittest.TestCase):
@@ -282,6 +367,35 @@ class ReleaseBuildTests(unittest.TestCase):
         out = subprocess.run([sys.executable, os.path.join(ROOT, "samsung", "build.py"), "--release", "--bridge", "http://192.0.2.1:5400"],
                              capture_output=True, text=True, cwd=ROOT)
         self.assertNotEqual(out.returncode, 0)
+
+    def test_home_button_keeps_the_app_running_for_that_tv_only(self):
+        # tizen.js can only see Samsung's home while couch-tv is hidden if Tizen lets it keep running
+        def build(tv, release=False):
+            cfg = os.path.join(tempfile.mkdtemp(), "config.json")
+            with open(cfg, "w") as f:
+                json.dump({"default_tv": "lounge", "tvs": [dict({"id": "lounge", "name": "Lounge", "kind": "samsung", "ip": "192.0.2.5"}, **tv)]}, f)
+            args = ["--release"] if release else ["--bridge", "http://192.0.2.1:5400"]
+            out = subprocess.run([sys.executable, os.path.join(ROOT, "samsung", "build.py")] + args, capture_output=True,
+                                 text=True, cwd=ROOT, env=dict(os.environ, COUCH_CONFIG=cfg))
+            if out.returncode:
+                return out, None, None
+            name = "couch-tv-samsung.wgt" if release else "CouchTV.wgt"
+            with zipfile.ZipFile(os.path.join(ROOT, "build", "samsung", name)) as z:
+                return out, z.read("config.xml").decode(), z.read("settings.js").decode()
+        out, xml, settings = build({"home_button": True})
+        self.assertEqual(out.returncode, 0, out.stderr)
+        self.assertIn('background-support="enable"', xml)
+        self.assertIn('"home_button": {}', settings)
+        _, xml, settings = build({"home_button": {"markers": ["x.home"]}})
+        self.assertIn('"home_button": {"markers": ["x.home"]}', settings)
+        _, xml, settings = build({})
+        self.assertIn('background-support="disable"', xml)
+        self.assertIn('"home_button": null', settings)
+        _, xml, settings = build({"home_button": True}, release=True)
+        self.assertIn('background-support="disable"', xml, "the release package is the same for everyone")
+        for bad in ("yes", {"markers": []}, {"markers": "x.home"}):
+            out, _, _ = build({"home_button": bad})
+            self.assertNotEqual(out.returncode, 0, bad)
 
     def test_installers_pin_and_check_the_tool(self):
         for name in ("Install on Mac.command", "install-windows.ps1"):

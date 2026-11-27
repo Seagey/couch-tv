@@ -10,3 +10,41 @@
    tile scales or fades, so the logo shows square for about a second. Rounding the picture and the
    glint themselves keeps the corners; a mask on the face would also cut its shadow. */
 .face img, .face::after { border-radius: inherit; }
+
+/* Live TV (livetv.js): the channel full screen in front of the home, with big words for the couch */
+#livetv { position: fixed; left: 0; top: 0; right: 0; bottom: 0; z-index: 99998; overflow: hidden;
+  background: #000; color: #f5f5f7; font-family: sans-serif; }
+#livetv video { position: absolute; left: 0; top: 0; width: 100%; height: 100%; background: #000; }
+/* AVPlay draws under the page: nothing may be painted over its picture, the home behind included */
+#livetv .lt-av { position: absolute; left: 0; top: 0; width: 100%; height: 100%; }
+html.lt-av, html.lt-av body, #livetv.av { background: transparent !important; }
+html.lt-av body > :not(#livetv) { visibility: hidden !important; }
+#livetv .lt-banner { position: absolute; left: 64px; right: 64px; bottom: 56px; display: flex; align-items: center;
+  padding: 24px 36px; border-radius: 18px; background: rgba(10, 8, 12, 0.86); }
+#livetv .lt-logo { flex: none; width: 128px; height: 96px; margin-right: 28px; object-fit: contain; }
+#livetv .lt-no { flex: none; min-width: 96px; margin-right: 24px; font-size: 40px; font-weight: 700; color: #9ec9ff; }
+#livetv .lt-words { flex: 1; min-width: 0; }
+#livetv .lt-name { font-size: 46px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#livetv .lt-now { margin-top: 6px; font-size: 32px; opacity: 0.8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#livetv .lt-note { position: absolute; left: 64px; right: 64px; top: 56px; padding: 22px 32px; border-radius: 14px;
+  background: rgba(10, 8, 12, 0.9); font-size: 36px; }
+#livetv .lt-cats { position: absolute; left: 0; top: 0; width: 900px; height: 132px; display: flex; align-items: center;
+  padding: 0 36px; box-sizing: border-box; background: rgba(10, 8, 12, 0.94); border-bottom: 2px solid rgba(245, 245, 247, 0.18); }
+#livetv .lt-cat { flex: 1; text-align: center; font-size: 42px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#livetv .lt-arrow { flex: none; width: 56px; text-align: center; font-size: 34px; opacity: 0.7; }
+#livetv .lt-menu { position: absolute; left: 0; top: 132px; bottom: 0; width: 900px; padding: 36px 0 0;
+  box-sizing: border-box; background: rgba(10, 8, 12, 0.94); }
+#livetv .lt-row { display: flex; align-items: center; height: 108px; padding: 0 36px; }
+#livetv .lt-row .lt-logo { width: 104px; height: 78px; }
+#livetv .lt-row .lt-name { font-size: 38px; }
+#livetv .lt-row .lt-now { font-size: 26px; }
+#livetv .lt-row.on { background: #f5f5f7; color: #111; }
+#livetv .lt-row.on .lt-no { color: #1a4f8f; }
+/* the buttons tour, the first time Live TV opens (and after the arrows are swapped) */
+#livetv .lt-tour { position: absolute; right: 64px; top: 56px; width: 760px; padding: 30px 40px; border-radius: 18px;
+  box-sizing: border-box; background: rgba(10, 8, 12, 0.92); }
+#livetv .lt-tour-head { font-size: 40px; font-weight: 700; margin-bottom: 18px; }
+#livetv .lt-tour-row { display: flex; align-items: center; margin: 12px 0; font-size: 32px; }
+#livetv .lt-tour-key { flex: none; min-width: 150px; margin-right: 24px; padding: 6px 14px; border-radius: 10px;
+  text-align: center; font-weight: 700; background: rgba(245, 245, 247, 0.16); color: #9ec9ff; }
+#livetv .lt-tour-foot { margin-top: 18px; font-size: 26px; opacity: 0.75; }

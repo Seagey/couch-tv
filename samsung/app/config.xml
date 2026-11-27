@@ -13,7 +13,15 @@
   <tizen:privilege name="http://tizen.org/privilege/application.info"/>
   <tizen:privilege name="http://tizen.org/privilege/tv.inputdevice"/>
   <tizen:privilege name="http://tizen.org/privilege/tv.window"/>
+  <!-- Samsung's own player (AVPlay) for Live TV (livetv.js); Samsung's AVPlay samples ask for it -->
+  <tizen:privilege name="http://developer.samsung.com/privilege/avplay"/>
   <tizen:profile name="tv-samsung"/>
   <tizen:setting screen-orientation="landscape" context-menu="disable" background-support="disable"
                  encryption="disable" install-location="auto" hwkey-event="enable"/>
+  <!-- tizen.js brings couch-tv back after Samsung's Home with this operation: the page that is
+       already up gets an appcontrol event instead of loading again -->
+  <tizen:app-control>
+    <tizen:src name="index.html" reload="disable"/>
+    <tizen:operation name="http://couch-tv.app/appcontrol/operation/front"/>
+  </tizen:app-control>
 </widget>
