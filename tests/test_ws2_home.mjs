@@ -356,7 +356,7 @@ async function holdOn(id) {
 }
 {
   const rows = (await homeSettingsWidgets()).join(" | ");
-  W14.forEach((x) => ok(rows.indexOf(NAMES[x[0]] + ", ") >= 0, x[0] + ": in Home settings, Designs, Widgets on this home (" + NAMES[x[0]] + "): " + rows.slice(0, 400)));
+  W14.forEach((x) => ok(rows.indexOf(NAMES[x[0]] + ", ") >= 0, x[0] + ": in Settings, More, Designs, Widgets on this home (" + NAMES[x[0]] + "): " + rows.slice(0, 400)));
   for (const x of W14) {
     const items = await holdOn(idOf(x[0]));
     ok(items[0] === "Settings" && items[1] === "Edit on the TV", x[0] + ": Hold OK offers Edit on the TV (" + items.join(", ") + ")");

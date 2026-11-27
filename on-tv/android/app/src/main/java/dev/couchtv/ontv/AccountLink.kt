@@ -97,7 +97,7 @@ object AccountLink {
 
     fun codeDone(kv: Kv) { kv.put(K_CODE, null); kv.put(K_CODE_AT, null) }
 
-    /** Home settings, Designs, Unlink this TV: the link and anything waiting with it go. */
+    /** Settings, More, Designs, Unlink this TV: the link and anything waiting with it go. */
     fun unlink(kv: Kv) { kv.put(K_LINK, null); codeDone(kv) }
 
     // ---- The TV inbox (DREAM-SETUP-BUILD.md, "TV inbox"): sends made for this TV, no code typed ----

@@ -260,17 +260,17 @@ class NeverADeadEnd(unittest.TestCase):
     def test_the_fixes_say_what_the_owner_asked(self):
         p = html.unescape(re.sub(r"<[^>]+>", "", self.page))
         p = re.sub(r"\s+", " ", p)
-        self.assertIn("Press Home on the TV remote so the TV shows its home screen, and wait 10 seconds", p)
+        self.assertIn("Press Home on the TV remote. Wait 10 seconds.", p)
         self.assertIn("Switch USB debugging off, then on again", p)
         self.assertIn("Revoke USB debugging authorisations", p)
-        self.assertIn("ask again the next time it connects", p)
+        self.assertIn("Other computers the TV allowed before will ask once more", p)
         self.assertIn("Hold the Power button on the remote until the TV restarts", p)
-        self.assertIn("unplug the TV at the wall for 10 seconds", p)
+        self.assertIn("Unplug the TV at the wall for 10 seconds", p)
 
     def test_phone_route_is_complete(self):
         m = re.search(r'<section data-step="phone-route"[^>]*>(.*?)</section>', self.page, re.S).group(1)
         words = re.sub(r"\s+", " ", re.sub(r"<[^>]+>", "", m))
-        self.assertIn("This TV will not let a computer in over Wi-Fi. You can still put Couch TV on it with just your phone", words)
+        self.assertIn("This TV will not let a computer in over Wi-Fi. Your phone can put Couch TV on it instead", words)
         self.assertIn("Downloader", words)
         self.assertIn("8180170", words)
         self.assertIn("open that address and type the code", words)

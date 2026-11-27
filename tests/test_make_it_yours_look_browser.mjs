@@ -125,7 +125,7 @@ try {
   await page.evaluate(() => window.tv.settingsKey()); await run(300); await press("Enter", 500);
   for (let i = 0; i < 16 && !(await page.evaluate(() => /Designs/.test((document.querySelector(".ssec.focus") || {}).textContent || ""))); i++) await press("ArrowDown", 150);
   await press("ArrowRight", 500);
-  ok(await toRow(/Make it yours/), "Make it yours can be reached in Home settings, Designs");
+  ok(await toRow(/Make it yours/), "Make it yours can be reached in Settings, More, Designs");
   const b2 = await asks();
   await press("Enter", 600);
   ok(await cardUp(), "OK shows the same card");

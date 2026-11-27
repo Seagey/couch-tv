@@ -7,7 +7,7 @@
 //  3. Never: on an update (welcome "set", or answered Couch Original by an older version), once a design or home
 //     pack is here, in a guest's profile, while the TV is away at an app or the screen is off, if dismissed.
 //  4. The remote is never held: Back, OK, Home and the Settings key all close it; the arrows do nothing.
-//  5. Home settings, Designs, Make it yours brings the same card back.
+//  5. Settings, More, Designs, Make it yours brings the same card back.
 //  6. Light on a weak TV: not in the page until shown, out of the page when closed, no blur, no animation.
 //  7. 1280x720, 1920x1080 and 3840x2160 lay it out the same (rem follows the screen width); a 1920x1080 screenshot
 //     goes to $MAKEIT_SHOTS when it is set.
@@ -248,10 +248,10 @@ try {
   await show(); await page.mouse.click(960, 540); await wait(300);
   ok(!(await cardUp()), "a pointer click closes it too");
 
-  // 5. Home settings, Designs, Make it yours
+  // 5. Settings, More, Designs, Make it yours
   await freshTv(); await press("Enter", 500); await press("Escape", 400);   // Back out of the code box: Designs rows
   const rows = await page.evaluate(() => document.getElementById("set-rows").textContent);
-  ok(/Make it yours/.test(rows), "Home settings, Designs has a Make it yours row (" + rows.slice(0, 160) + ")");
+  ok(/Make it yours/.test(rows), "Settings, More, Designs has a Make it yours row (" + rows.slice(0, 160) + ")");
   const at = await page.evaluate(() => Array.from(document.querySelectorAll("#set-rows .srow")).findIndex((r) => /Make it yours/.test(r.textContent)));
   const cur = await page.evaluate(() => Array.from(document.querySelectorAll("#set-rows .srow")).findIndex((r) => r.classList.contains("focus")));
   ok(at > cur && cur >= 0, "right under Get a design from your phone, below the rows the pictured steps use");

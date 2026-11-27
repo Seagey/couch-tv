@@ -503,7 +503,7 @@ def api(method, path, body):
 
             def early(rows):
                 # the TVs' own announcements are in: show them while the knocking goes on
-                S.job["partial"] = {"tvs": S.tv_seen.apply(enrich(rows))}
+                S.job["partial"] = {"tvs": S.tv_seen.apply(enrich(rows), partial=True)}
             diag = {}
             if fake:
                 # development and screenshots: recorded answers ({"heard", "knocks", "dial", "confirmed"}),

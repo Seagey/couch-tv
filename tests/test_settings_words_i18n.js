@@ -33,4 +33,10 @@ assert(!/"Picture and sound"|"Remote and buttons"|"\(Updates, help, reset\)"/.te
 assert(/t\("set_more_hint"\)/.test(app), 'the More hint is translated');
 I18N.set('de');
 assert.strictEqual(I18N.t('sec_picture'), 'Bild und Ton');
+// Designs sits under More since 0.13.16: no step anywhere on the TV says the old way there
+const old = /Home settings, Designs/;
+['app.js', 'widgets.js', 'design.js', 'widget-caps.js', 'caps-words.js', 'widget-lines.js', 'designer-gate.js', 'index.html'].forEach(function (f) {
+  assert(!old.test(fs.readFileSync(path.join(__dirname, '../tv-home/web', f), 'utf8')), f + ' still says Home settings, Designs');
+});
+Object.keys(S.en).forEach(function (k) { assert(!old.test(S.en[k]), k + ' still says Home settings, Designs'); });
 console.log('Settings words i18n tests passed.');

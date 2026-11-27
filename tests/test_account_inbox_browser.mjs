@@ -5,7 +5,7 @@
 //     version, memory and profile (the five keys only).
 //  2. The design goes on with no "Use this design?" question: app.js records the yes with CouchDesign.hashOf, and
 //     design.js, starting again, makes the same hash (the hashOf no-question path).
-//  3. "New design from your account: <title>" once; Home settings, Designs has Undo and Unlink.
+//  3. "New design from your account: <title>" once; Settings, More, Designs has Undo and Unlink.
 //  4. Undo puts back the home this TV had. Unlink asks once, then forgets the link and stops the inbox.
 //  5. The link itself never reaches the page, its storage or any request.
 //  6. When the TV looks by itself: the first open, waking or coming back after 30 minutes away, once a week.
@@ -150,7 +150,7 @@ try {
 
   // 3. said once
   const said = toasts.filter((t) => /New design from your account/.test(t));
-  ok(said.length === 1 && said[0].indexOf(TITLE) > 0 && /Home settings, Designs/.test(said[0]), "\"New design from your account: " + TITLE + "\" once, with where Undo is (" + JSON.stringify(said) + ")");
+  ok(said.length === 1 && said[0].indexOf(TITLE) > 0 && /Settings, More, Designs/.test(said[0]), "\"New design from your account: " + TITLE + "\" once, with where Undo is (" + JSON.stringify(said) + ")");
   ok(!(await page.evaluate(() => JSON.parse(localStorage.getItem("couchtv.design.undo") || "{}").fresh)), "the notice is not said again");
 
   // Designs: Undo and Unlink rows

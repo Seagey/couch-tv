@@ -104,7 +104,7 @@
   // the way into Home settings on every home: a design's Settings button (top right), the Hold OK menu, or
   // the classic home's gear. The remote's own Settings button often opens the TV's menu instead, so say so.
   var OPEN = "Hold OK and pick Settings (or OK on the gear at the screen edge), then Home settings. The remote's Settings button opens the TV's menu.";
-  var SEND = "Tap Send to my TV, then on the TV: Home settings, Designs, Get a design, and type the code.";
+  var SEND = "Tap Send to my TV, then on the TV: Settings, More, Designs, Get a design, and type the code.";
   function inStudio(what) { return ["Open your design in Couch TV Studio on your phone.", "Tap the widget, then " + what + ".", SEND]; }
   var TOWN = [OPEN, "Go down to Location and press OK.", "Pick Search for a town or city, type your town, then press OK.", "Pick your town in the list. The weather shows within a minute."];
   // a weather widget can also have a place of its own (its Place setting, Hold OK on the widget)
@@ -126,7 +126,7 @@
     web: ["Keep the home computer on: it runs Couch TV for this TV.", "Start a show from Couch TV's home (Netflix, YouTube and some others).", "Come back to the home: the show is waiting here."],
     vidaa: ["Needs a home computer that stays on, running Couch TV. The website home cannot do this.", "Start a show from Couch TV's home.", "Come back to the home: the show is waiting here."]
   };
-  // smart home is set up on the TV itself (Home settings, Designs, Smart home): the launcher
+  // smart home is set up on the TV itself (Settings, More, Designs, Smart home): the launcher
   // talks to Home Assistant on a Google TV, Android TV or Fire TV; on a TV whose home a computer runs,
   // that computer does (bridge/smarthome.py)
   var SH_CONNECT = "Go down to Designs, then Smart home. Type Home Assistant's address, then paste its access key with the phone remote's Type on the TV (the steps are on the screen).";
@@ -143,7 +143,7 @@
   var PICK_HERE = " Hold OK on the widget, then Edit on the TV, to pick which show here.";
   var APPS_ORDER = [OPEN, "Go down to Apps and press OK.", "OK moves an app between the home, More apps and hidden. Hold OK on an app to move it along."];
 
-  // things typed at home: Home settings, Designs, At home (athome.js), kept on the TV only
+  // things typed at home: Settings, More, Designs, At home (athome.js), kept on the TV only
   var AT_HOME = "Go down to Designs, then pick At home.";
   var TYPE_PHONE = "Typing is quicker with the phone remote: Type on the TV puts the words in the box.";
   var TYPE_TV = "Type with the TV remote's keyboard, then press OK.";
@@ -165,9 +165,9 @@
   var PHOTOS_NEED = "Your photos on the TV, or one photo put in the widget";
   var WATCH_NEED = "The Couch TV app on this TV or a home computer that stays on";
   var HA_NEED = "Home Assistant (a smart home app) running at home";
-  // the smart home widgets (group C): set up on the TV (Home settings, Designs, Smart home)
+  // the smart home widgets (group C): set up on the TV (Settings, More, Designs, Smart home)
   function haSteps(what) { return shSteps(what, [].slice.call(arguments, 1)); }
-  var HA_PLAT = function () { return plat("setup", "computer", "computer", { android: "Set up on the TV: Home settings, Designs, Smart home. No computer needed.", web: "The home computer talks to Home Assistant for this TV.", vidaa: "Needs a home computer: the website home cannot reach Home Assistant." }); };
+  var HA_PLAT = function () { return plat("setup", "computer", "computer", { android: "Set up on the TV: Settings, More, Designs, Smart home. No computer needed.", web: "The home computer talks to Home Assistant for this TV.", vidaa: "Needs a home computer: the website home cannot reach Home Assistant." }); };
   // the Up next queue: Spotify's queue, read with the person's own Spotify sign in
   var QUEUE_NEED = "Spotify connected on the home computer, or on the website home on a Hisense";
   var SPOTIFY_ON = "On that computer, connect Spotify once: open the Couch TV Spotify page on it and sign in (setup guide, Spotify Now playing).";
@@ -450,10 +450,10 @@
     welcome: { name: "Welcome words", status: "works", what: "A greeting in your own words, or each guest by name with their check in or check out time from your bookings calendar", needs: ["The words, typed in Couch TV Studio, or on the TV (hold OK on the widget, Edit on the TV) or the phone", "For guest names: your Airbnb, Booking.com or VRBO calendar link, typed on the TV"],
       setup: setup("designer", {
         android: inStudio("type the words (no numbers or web addresses). For guest names, pick Guest name from: Bookings calendar").concat([
-          "On the TV: Home settings, Designs, At home, Guests. Paste your Airbnb, Booking.com or VRBO calendar link with the phone remote's Type on the TV.",
+          "On the TV: Settings, More, Designs, At home, Guests. Paste your Airbnb, Booking.com or VRBO calendar link with the phone remote's Type on the TV.",
           "Set Check in from and Check out by. Airbnb's link has no names: type each guest's first name once under Next guest."]),
         web: inStudio("type the words (no numbers or web addresses). For guest names, pick Guest name from: Bookings calendar").concat([
-          "On the TV: Home settings, Designs, At home, Guests, and type your bookings calendar link. The home computer reads it, so keep it on.",
+          "On the TV: Settings, More, Designs, At home, Guests, and type your bookings calendar link. The home computer reads it, so keep it on.",
           "Set Check in from and Check out by. Airbnb's link has no names: type each guest's first name once under Next guest."]),
         vidaa: inStudio("type the words (no numbers or web addresses)").concat(["Guest names from a bookings calendar need a home computer that stays on, running Couch TV. The website home cannot read a calendar."]) }),
       until: "Always shows the words. With guest names on and no bookings link yet: \"Add your bookings calendar\", and where", build: "",
@@ -788,16 +788,16 @@
         { options: [["day", "This day only"], ["week", "This week"]] }),
       st("ago", "Show how long ago", "toggle", true, "Off shows the year the photo was taken.", "design", ALL, true)],
     agenda: [
-      st("calendars", "Calendars", "tvlist", "all", "Which of this TV's calendars show here. Add them in Home settings, Designs, At home.", "tv", ON_TV, true, { from: "calendars", "private": true }),
+      st("calendars", "Calendars", "tvlist", "all", "Which of this TV's calendars show here. Add them in Settings, More, Designs, At home.", "tv", ON_TV, true, { from: "calendars", "private": true }),
       st("days", "Days", "choice", "two", "Today and tomorrow shows tomorrow once today is clear.", "design", ALL, true, { options: [["today", "Today"], ["two", "Today and tomorrow"], ["week", "This week"]] })],
     people: [
       st("who", "Who shows", "tvlist", [], "None picked shows everyone. Add people in Home settings, People.", "tv", ON_TV, true, { from: "people", many: true, max: 8, "private": true }),
       st("names", "Show names", "toggle", true, "Off shows only each person's picture.", "design", ALL, true)],
     note: [st("byline", "Show who it is from", "toggle", true, "The name typed under From with the note. On a tile, only the name shows.", "design", ALL, true)],
     // the list always draws its own name, so it has no heading of its own
-    list: [st("list", "List", "tvlist", "first", "Which of this TV's lists shows here. Add lists in Home settings, Designs, At home.", "tv", ON_TV, true, { from: "lists", "private": true }),
+    list: [st("list", "List", "tvlist", "first", "Which of this TV's lists shows here. Add lists in Settings, More, Designs, At home.", "tv", ON_TV, true, { from: "lists", "private": true }),
       st("done", "Show ticked items", "toggle", true, "Off hides what is already ticked.", "design", ALL, true)],
-    guide: [st("sections", "Parts of the guide", "tvlist", [], "Which parts show here. None picked shows them all. Write the guide in Home settings, Designs, At home.", "tv", ON_TV, true,
+    guide: [st("sections", "Parts of the guide", "tvlist", [], "Which parts show here. None picked shows them all. Write the guide in Settings, More, Designs, At home.", "tv", ON_TV, true,
       { from: "guide", many: true, max: 8, "private": true })],
     wifi: [st("hidepass", "Hide the password", "toggle", false, "On shows only the code to scan.", "design", ALL, true)],
     screentime: [st("appcount", "Apps shown", "choice", "auto", "Apps show beside the total on a Medium widget or bigger.", "design", ALL, true,
@@ -874,11 +874,11 @@
   SHORT[TOWN_NEED] = ["Set your town", "Home settings, Location", "Set your town"];
   SHORT[PHOTOS_NEED] = ["Add your photos", "Home settings, Look and scenes, Your photos", "Add photos"];
   SHORT[WATCH_NEED] = ["Needs the Couch TV app on this TV or a home computer", "OK here shows how", "Needs setting up"];
-  SHORT[HA_NEED] = ["Needs Home Assistant", "Home settings, Designs, Smart home", "Needs Home Assistant"];
+  SHORT[HA_NEED] = ["Needs Home Assistant", "Settings, More, Designs, Smart home", "Needs Home Assistant"];
   SHORT[QUEUE_NEED] = ["Needs Spotify connected", "On the home computer. OK here shows how", "Needs Spotify"];
   SHORT[C.card.needs[0]] = ["Type your words in Couch TV Studio", "Or a live number from the home computer. OK here shows how", "Type your words"];
   SHORT[C.surf.needs[0]] = ["Set your town by the beach", "Home settings, Location", "Set your town"];
-  var AT = "Settings (hold OK), Home settings, Designs, At home";
+  var AT = "Settings (hold OK), Settings, More, Designs, At home";
   SHORT[NOTE_NEED] = ["Write a note", AT, "Write a note"];
   SHORT[LIST_NEED] = ["Add a list", AT, "Add a list"];
   SHORT[WIFI_NEED] = ["Add your guest Wi-Fi", AT, "Add Wi-Fi"];

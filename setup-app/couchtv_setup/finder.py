@@ -160,9 +160,45 @@ def _handshake_once(ip, port, timeout):
                 got += part
             if not got:
                 return "eof"
-            return "adb" if is_adb_answer(got) else "other"
+            if not is_adb_answer(got):
+                return "other"
+            _read_banner(s, ip, got)
+            return "adb"
     except OSError:
         return "silent"
+
+
+BANNERS = {}   # {ip: "Brand Model"} from a TV that let us in at once (CNXN): its own getprop words
+
+
+def banner_name(payload):
+    """The TV's brand and model from an ADB CONNECT banner ("device::ro.product.name=...;ro.product.model=...;"),
+    or None. Only what the TV says about itself; nothing is asked."""
+    text = payload.decode("utf-8", "replace") if isinstance(payload, bytes) else str(payload or "")
+    props = dict(kv.split("=", 1) for kv in text.split("::", 1)[-1].split(";") if "=" in kv)
+    model, brand = _clean(props.get("ro.product.model")), _clean(props.get("ro.product.brand") or props.get("ro.product.manufacturer"))
+    if not model:
+        return None
+    return model if not brand or brand.lower() in model.lower() else _clean(brand.capitalize() + " " + model)
+
+
+def _read_banner(sock, ip, header):
+    import struct as _s
+    try:
+        cmd, _, _, length, _, _ = _s.unpack("<6I", header[:24])
+        if cmd != A_CNXN or not 0 < length <= 4096:
+            return
+        data = b""
+        while len(data) < length:
+            part = sock.recv(length - len(data))
+            if not part:
+                break
+            data += part
+        name = banner_name(data)
+        if name:
+            BANNERS[str(ip)] = name
+    except Exception:
+        pass
 
 
 HANDSHAKE_TRIES = ((1.5, 0.0), (3.0, 0.4))   # (timeout, pause before it): a TV that was slow gets a second go
@@ -356,7 +392,8 @@ def friendly_name(t, known=None):
     for v in (k.get("room"), t.get("name"), t.get("announced"), k.get("name"), t.get("model")):
         if v:
             return _clean(v)
-    return "TV with debugging on" if t.get("adb_5555") else "Android TV"
+    # never "TV with debugging on" (28 Nov 2026): the TV's own brand and model when it said them, else plain words
+    return _clean(BANNERS.get(t.get("ip"))) or "Your TV"
 
 
 KNOCK_WORKERS = 128     # sockets open at once while knocking; far under macOS's default of 256 open files
@@ -507,27 +544,51 @@ def stale_copy(row):
 STATUS_ORDER = {"ready": 0, "code": 1, "pair": 2, "switch": 3, "other": 4}
 
 
-class Seen:
-    """TVs recent scans found, kept SEEN_TTL seconds after a scan misses them, so one unlucky scan does
-    not make a TV vanish and come back. A kept TV is marked stale and is never Ready."""
+SEEN_GRACE = 25.0       # a TV a scan missed keeps its last state this long (about two looks) before "Looking again"
 
-    def __init__(self, ttl=SEEN_TTL, clock=time.monotonic):
-        self.ttl, self.clock, self.rows = ttl, clock, {}
+
+class Seen:
+    """TVs recent scans found, so the list stays still while a beginner reads it (the emulator test of 28 Nov
+    2026 saw a TV flick between Ready and Looking again and swap places with a real TV, which makes it easy to
+    set up the wrong one):
+    - a TV keeps the place it first had: new TVs join at the end, nothing reorders;
+    - a TV one scan missed keeps its last state for SEEN_GRACE seconds; after that it is shown as stale (never
+      Ready, "Looking for it again") until SEEN_TTL, then it goes;
+    - the early part of a scan (the announcements alone) never makes a TV look worse than the last full scan."""
+
+    def __init__(self, ttl=SEEN_TTL * 2, clock=time.monotonic, grace=SEEN_GRACE):
+        self.ttl, self.clock, self.grace, self.rows = ttl, clock, grace, {}
+        self.place = {}
 
     def ips(self):
         now = self.clock()
         return [ip for ip, (at, _) in self.rows.items() if now - at <= self.ttl]
 
-    def apply(self, tvs):
-        """Notes the TVs found now and returns them plus the ones seen within the last SEEN_TTL seconds."""
+    def _order(self, rows):
+        for t in rows:
+            self.place.setdefault(t["ip"], len(self.place))
+        return sorted(rows, key=lambda t: self.place[t["ip"]])
+
+    def apply(self, tvs, partial=False):
+        """Notes the TVs found now and returns them plus the ones seen within the last ttl seconds."""
         now = self.clock()
-        fresh = {t["ip"]: t for t in tvs}
-        for ip, t in fresh.items():
-            self.rows[ip] = (now, t)
+        fresh = {}
+        for t in tvs:
+            old = self.rows.get(t["ip"])
+            if partial and old and STATUS_ORDER.get(old[1]["status"], 3) < STATUS_ORDER.get(t["status"], 3):
+                fresh[t["ip"]] = old[1]   # the announcements alone know less than the last full look
+                continue
+            fresh[t["ip"]] = t
+            if not partial or not old:
+                self.rows[t["ip"]] = (now, t)
         for ip in [ip for ip, (at, _) in self.rows.items() if now - at > self.ttl]:
             del self.rows[ip]
-        out = list(tvs) + [stale_copy(r) for ip, (_, r) in self.rows.items() if ip not in fresh]
-        return sorted(out, key=lambda t: (STATUS_ORDER.get(t["status"], 3), socket.inet_aton(t["ip"])))
+        out = list(fresh.values())
+        for ip, (at, r) in self.rows.items():
+            if ip in fresh:
+                continue
+            out.append(dict(r, held=True) if partial or now - at <= self.grace else stale_copy(r))
+        return self._order(out)
 
 
 DIAL_ST = "urn:dial-multiscreen-org:service:dial:1"

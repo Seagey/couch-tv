@@ -292,7 +292,7 @@
     S.body.appendChild(E("div", "cwd-row cwd-grow", "align-items:flex-start;margin-top:36px", [todayCol, right]));
   }
 
-  // things typed at home (Home settings, Designs, At home), kept on this TV
+  // things typed at home (Settings, More, Designs, At home), kept on this TV
   // Batteries (Batteries.kt through TVOS.batteries): every paired device that reports its charge, and on
   // Android 12 and newer the one question Android asks first ("Nearby devices")
   B.batteries = function (o, env) {
@@ -346,7 +346,7 @@
   B.note = function (o, env) {
     var n = env.demo ? { text: "Dinner at 6. Feed Max!", from: "Mum" } : (kit().athome(env) || {}).note;
     if (!n || !n.text) return B.setup(o, env);
-    S.body.appendChild(head("edit", "Family note", n.from ? tl("From {name}", { name: n.from }) : "Change it in Home settings, Designs, At home", "#c79a00"));
+    S.body.appendChild(head("edit", "Family note", n.from ? tl("From {name}", { name: n.from }) : "Change it in Settings, More, Designs, At home", "#c79a00"));
     var fs = clamp(Math.sqrt(1500 * 640 / Math.max(10, n.text.length) / 1.6), 44, 120);
     S.body.appendChild(E("div", "cwd-col cwd-grow cwd-center", "", [E("div", "cwd-note", "font-size:" + px(fs), [n.text])]));
   };
@@ -357,7 +357,7 @@
     S.body.appendChild(head("check", l.name, "", l.todo ? "#0a84ff" : "#30d158"));
     var sub = function () { S.subEl.textContent = (left() ? left() + " to do" : l.items.length ? "All done" : "Nothing on it yet") + (l.items.length ? ". OK ticks an item." : ""); };
     sub();
-    if (!l.items.length) { S.body.appendChild(E("div", "cwd-text", "margin-top:40px", ["Add to this list in Home settings, Designs, At home, or with Type on the TV in the phone remote."])); return; }
+    if (!l.items.length) { S.body.appendChild(E("div", "cwd-text", "margin-top:40px", ["Add to this list in Settings, More, Designs, At home, or with Type on the TV in the phone remote."])); return; }
     var grid = E("div", "cwd-grid", "align-content:flex-start;margin-top:30px");
     l.items.forEach(function (it, i) {
       var row = E("div", "cwd-item" + (it.done ? " done" : ""), "", [E("i", "cwd-box"), E("span", "cwd-ell", "", [it.t])]);
@@ -397,7 +397,7 @@
     S.body.appendChild(head("timer", "Screen time today", goal && CA ? CA.goalLine(s.minutes, goal) : "Time in apps on this TV today", "#5e5ce6"));
     var max = Math.max(1, (s.apps[0] || {}).minutes || 1);
     var left = E("div", "cwd-col", "width:560px", [E("div", "cwd-huge", "font-size:180px", [hm(s.minutes)]), goal ? E("div", "cwd-bar", "margin-top:30px", [E("b", "", "width:" + Math.round(clamp(s.minutes / goal, 0, 1) * 100) + "%;background:" + (s.minutes > goal ? "#ffd60a" : "#fff"))]) : null,
-      E("div", "cwd-small", "margin-top:20px", [goal ? tl("Daily goal {time}, set in Home settings", { time: hm(goal) }) : "Set a daily goal in Home settings, Designs, At home"])]);
+      E("div", "cwd-small", "margin-top:20px", [goal ? tl("Daily goal {time}, set in Home settings", { time: hm(goal) }) : "Set a daily goal in Settings, More, Designs, At home"])]);
     var right = E("div", "cwd-col", "margin-left:80px;flex:1;min-width:0", [label("By app")].concat(s.apps.length ? s.apps.slice(0, 7).map(function (a) {
       return F(E("div", "cwd-app-time", "", [E("span", "cwd-ell", "", [a.name || a.package || ""]), E("div", "cwd-bar", "", [E("b", "", "width:" + Math.round(a.minutes / max * 100) + "%")]), E("b", "", "", [hm(a.minutes)])]), null, a.name || a.package);
     }) : [E("div", "cwd-text", "", ["No apps yet today."])]));

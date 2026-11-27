@@ -329,7 +329,7 @@
   function useDesign(code, who) {
     var C = W.CouchDesignCode, by = who === "phone" ? "your phone" : "your AI";
     if (!C || !C.get || !C.readCode(code)) { banner({ from: "Couch TV", text: "A design was sent, but this TV cannot get designs. Update Couch TV.", seconds: 15 }); return; }
-    if (studioOff()) { banner({ from: "Couch TV", text: "A design came from " + by + ". Designs are switched off on this TV, so it was not used. To use designs, turn them on in Home settings, Designs.", seconds: 20 }); return; }
+    if (studioOff()) { banner({ from: "Couch TV", text: "A design came from " + by + ". Designs are switched off on this TV, so it was not used. To use designs, turn them on in Settings, More, Designs.", seconds: 20 }); return; }
     banner({ from: "Couch TV", text: "Getting the design from " + by + "...", seconds: 20 });
     C.get(code).then(function () {
       // "Use this design?" comes first, as for a code typed at the TV; this TV's on or off choice is left as it is

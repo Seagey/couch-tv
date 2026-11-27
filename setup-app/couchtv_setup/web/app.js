@@ -90,6 +90,9 @@
     var locked = step === "work";
     var back = $("back");
     back.disabled = locked || step === "welcome" || step === "closed";
+    // Setup has stopped: nothing left to sign out of or close (0.13.15 gate polish)
+    if ($("close-top")) $("close-top").hidden = step === "closed";
+    if (step === "closed" && $("acct-out")) $("acct-out").hidden = true;
     back.classList.toggle("locked", locked);
     $("back-note").hidden = !locked;
     if (locked) text("back-note", workKind === "setup" ? "Back is off while Couch TV installs." : "Back is off while this runs.");
@@ -597,7 +600,7 @@
     $("allow-retry").hidden = true;
     var left = wait;
     var say = function () {
-      text("allow-status", "Tick Always allow from this computer, then press Allow on the TV. Waiting " + left + " more seconds…");
+      text("allow-status", "Tick Always allow from this computer, then press Allow on the TV, not Cancel. Waiting " + left + " more seconds…");
     };
     say();
     clearInterval(countdown);
@@ -744,7 +747,7 @@
     if (r.watch_bound === false) {
       w.push(state.facts && state.facts.fire ?
         "The Home button watch is switched on, but Fire TV has not started it yet. Fire TV sometimes needs one restart for that: " +
-        "Settings, My Fire TV, Restart. When the TV is back on its home, press Check it again." :
+        "Settings, My Fire TV, Restart. When the TV is back on its home, press Check the TV again." :
         "The Home button watch is switched on, but the TV has not started it yet. Restart the TV once. If Home still opens " +
         "the TV's own home after that, open this app again and set it up again.");
     } else if (!r.ok && r.other_front === "ontv") {
@@ -920,7 +923,7 @@
         cta.href = state.studio + "/design/"; cta.hidden = false;
         text("fin-cap", "Opens the editor with " + name + " already linked."); $("fin-cap").hidden = false;
       }
-      finish.className = "q"; text("finish-text", "Keep this one");
+      finish.className = "q"; text("finish-text", "Finish");
     } else {
       badge.className = "pill warn";
       $("fin-badge-tick").hidden = true; $("fin-badge-dot").hidden = false;

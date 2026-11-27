@@ -2,7 +2,7 @@
 //  1. A Welcome widget whose design says the name comes from the calendar greets the guest booked now
 //     ("Welcome, Sarah") with their check out, from the bookings link kept on this TV; before any link
 //     it says where to add one. A name typed in At home wins.
-//  2. Home settings, Designs, Smart home: the address and a pasted token are checked, what
+//  2. Settings, More, Designs, Smart home: the address and a pasted token are checked, what
 //     Home Assistant has is listed, ticks are saved the way the launcher keeps them, the guide for a
 //     device we don't list is there, and the token is never kept in the page's storage or address.
 // Needs Playwright (Chromium). Without it the test says so and passes:
@@ -98,7 +98,7 @@ console.log("Running integrations browser tests...");
   await press(page, "ArrowRight");
   const toRow = async (re) => { for (let i = 0; i < 60; i++) { const t = await page.evaluate(() => (document.querySelector(".srow.focus") || {}).textContent || ""); if (re.test(t)) return true; await press(page, "ArrowDown", 100); } return false; };
   const type = async (words) => { await press(page, "Enter", 250); await page.fill("#set-input", words); await press(page, "Enter", 500); };
-  ok(await toRow(/^Smart home/), "Home settings, Designs has Smart home");
+  ok(await toRow(/^Smart home/), "Settings, More, Designs has Smart home");
   await press(page, "Enter", 300);
   const rowsText = () => page.evaluate(() => document.getElementById("set-rows").textContent);
   ok(/Long-lived access tokens/.test(await rowsText()), "the steps to make a token are on the screen");
@@ -139,7 +139,7 @@ console.log("Running integrations browser tests...");
   for (let i = 0; i < 14 && !(await page.evaluate(() => /Designs/.test((document.querySelector(".ssec.focus") || {}).textContent || ""))); i++) await press(page, "ArrowDown");
   await press(page, "ArrowRight");
   const toRow = async (re) => { for (let i = 0; i < 60; i++) { const t = await page.evaluate(() => (document.querySelector(".srow.focus") || {}).textContent || ""); if (re.test(t)) return true; await press(page, "ArrowDown", 100); } return false; };
-  ok(await toRow(/^Smart home/), "Home settings, Designs has Smart home");
+  ok(await toRow(/^Smart home/), "Settings, More, Designs has Smart home");
   ok(/Connect Home Assistant from your phone/.test(await page.evaluate(() => (document.querySelector(".srow.focus") || {}).textContent)), "its row says it is done from a phone");
   await press(page, "Enter", 800);
   const shot = () => page.evaluate(() => ({ qr: document.querySelectorAll("#set-rows .sqr").length, svg: !!document.querySelector("#set-rows .sqr svg"),

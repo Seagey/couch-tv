@@ -2,7 +2,7 @@
 // never set up opens on one full screen question instead of the classic home, answered with the remote.
 //  1. A fresh TV (the on-TV app, nothing kept) shows it, with the focus on "I have a design code";
 //     Left, Right, Up and Down move between the two choices.
-//  2. "I have a design code" opens the same Get a design typing box as Home settings, Designs, and a
+//  2. "I have a design code" opens the same Get a design typing box as Settings, More, Designs, and a
 //     code typed there is got as always. The welcome never comes back.
 //  3. "Use Couch Original" (and Back) shows the classic home, and the welcome never comes back after a
 //     reload. Lighter home and 1280x720 lay it out the same.

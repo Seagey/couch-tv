@@ -192,7 +192,7 @@ try {
       await tv.waitForFunction(() => window.tv && document.getElementById("settings") && window.CouchDesign && window.CouchDesign.on(), null, { timeout: 20000 });
       await tv.waitForTimeout(1500);
       const phone = await tv.evaluate(() => { const v = window.tv.atHomeRead(); return ((v && v.design && v.design.widgets) || []).map((w) => w.kind); });
-      // Home settings, Designs: the widgets on this home
+      // Settings, More, Designs: the widgets on this home
       await tv.evaluate(() => window.tv.settingsKey()); await tv.waitForTimeout(250); await press("Enter", 500);
       const secs = await tv.evaluate(() => { window.tv.settingsMore(); return [...document.querySelectorAll("#set-secs .ssec")].map((e) => e.textContent.trim()); });
       const i = secs.indexOf("Designs");

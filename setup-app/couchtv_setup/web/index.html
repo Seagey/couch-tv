@@ -249,82 +249,95 @@
   <!-- the Allow prompt -->
   <section data-step="allow" class="sheet">
     <h1>Look at your TV</h1>
-    <div class="tvcard"><div class="tvprompt">Allow USB debugging?<small>☑ Always allow from this computer</small><span>Allow</span></div></div>
-    <p class="lead" id="allow-status">Tick <b>Always allow from this computer</b>, then press <b>Allow</b>.</p>
+    <div class="tvcard"><div class="tvprompt">Allow USB debugging?<small>☑ Always allow from this computer</small><div class="tvbtns"><span class="lit">Allow</span><span class="off">Cancel</span></div></div></div>
+    <ol class="howto tight" id="allow-how">
+      <li>Press OK to tick <b>Always allow from this computer</b>.</li>
+      <li>Press Down, then Left, so <b>Allow</b> is lit. Down alone lands on <b>Cancel</b>.</li>
+      <li>Press OK.</li>
+    </ol>
+    <p class="lead" id="allow-status">Tick <b>Always allow from this computer</b>, then press <b>Allow</b>, not Cancel.</p>
     <div class="actions"><button id="allow-retry" class="primary" type="button" hidden>Try again</button></div>
   </section>
 
-  <!-- no Allow prompt: the real fixes, one screen each, then the phone route. Never a dead end. -->
+  <!-- no Allow prompt: the real fixes, one screen each, then the phone route. Never a dead end.
+       Short lines, 14 words or fewer each (0.13.15 gate polish, done 28 Nov 2026). -->
   <section data-step="fix-home" class="sheet">
     <h1>The TV did not ask yet</h1>
-    <p class="lead">"Allow USB debugging?" can hide behind an app. Press <b>Home</b> on the TV remote so the TV shows its
-      home screen, and wait 10 seconds.</p>
-    <p>Then press <b>Try again</b> here and watch the TV.</p>
+    <p class="lead">"Allow USB debugging?" can hide behind an app.</p>
+    <ol class="howto tight">
+      <li>Press <b>Home</b> on the TV remote.</li>
+      <li>Wait 10 seconds.</li>
+      <li>Press <b>Try again</b> here and watch the TV.</li>
+    </ol>
     <div class="actions"><button class="primary fix-try" type="button">Try again</button></div>
   </section>
 
   <section data-step="fix-toggle" class="sheet">
     <h1>Switch it off and on again</h1>
-    <p class="lead" data-tvkind="tv">On the TV, open <b>Settings, System, Developer options</b> (on some TVs <b>Settings,
-      Device Preferences, Developer options</b>). Switch <b>USB debugging</b> off, then on again. If there is a
-      <b>Network debugging</b> switch, make sure it is on too.</p>
-    <p class="lead" data-tvkind="fire">On the Fire TV, open <b>Settings, My Fire TV, Developer options</b>. Switch
-      <b>ADB debugging</b> off, then on again.</p>
-    <p>Go back to the TV's home screen, then press <b>Try again</b> here and watch the TV.</p>
+    <ol class="howto tight" data-tvkind="tv">
+      <li>On the TV, open <b>Settings, System, Developer options</b>.</li>
+      <li>Not there? Try <b>Settings, Device Preferences, Developer options</b>.</li>
+      <li>Switch <b>USB debugging</b> off, then on again.</li>
+      <li>See a <b>Network debugging</b> switch? Make sure it is on.</li>
+    </ol>
+    <ol class="howto tight" data-tvkind="fire">
+      <li>On the Fire TV, open <b>Settings, My Fire TV, Developer options</b>.</li>
+      <li>Switch <b>ADB debugging</b> off, then on again.</li>
+    </ol>
+    <p>Go back to the TV's home screen. Press <b>Try again</b> and watch the TV.</p>
     <div class="actions"><button class="primary fix-try" type="button">Try again</button></div>
   </section>
 
   <section data-step="fix-revoke" class="sheet">
     <h1>Clear the computers the TV remembers</h1>
-    <p class="lead">In the same menu, <b>Developer options</b>, choose <b>Revoke USB debugging authorisations</b> and
-      press OK.</p>
-    <p>This only helps because this computer has never been allowed on this TV. It makes every other computer that was
-      allowed before ask again the next time it connects (for example a computer that runs Couch TV for you): someone
-      presses Allow once more for it.</p>
-    <p>Go back to the TV's home screen, then press <b>Try again</b> here and watch the TV.</p>
+    <ol class="howto tight">
+      <li>In <b>Developer options</b>, choose <b>Revoke USB debugging authorisations</b>.</li>
+      <li>Press OK.</li>
+      <li>Go back to the TV's home screen.</li>
+      <li>Press <b>Try again</b> here and watch the TV.</li>
+    </ol>
+    <p class="small">This computer was never allowed on this TV, so this can help.</p>
+    <p class="small">Other computers the TV allowed before will ask once more.</p>
     <div class="actions"><button class="primary fix-try" type="button">Try again</button></div>
   </section>
 
   <section data-step="fix-restart" class="sheet">
     <h1>Restart the TV</h1>
-    <p class="lead" data-tvkind="tv">Hold the <b>Power</b> button on the remote until the TV restarts. If it only goes
-      to sleep, unplug the TV at the wall for 10 seconds and plug it back in.</p>
-    <p class="lead" data-tvkind="fire">On the Fire TV, open <b>Settings, My Fire TV, Restart</b>.</p>
-    <p data-tvkind="tv">When it is back on its home screen, open <b>Developer options</b> again and check <b>USB
-      debugging</b> is still on. Switch it on again if it went off.</p>
-    <p data-tvkind="fire">When it is back, open <b>Settings, My Fire TV, Developer options</b> and check <b>ADB
-      debugging</b> is still on.</p>
+    <ol class="howto tight" data-tvkind="tv">
+      <li>Hold the <b>Power</b> button on the remote until the TV restarts.</li>
+      <li>Only went to sleep? Unplug the TV at the wall for 10 seconds.</li>
+      <li>Back on its home screen? Open <b>Developer options</b> again.</li>
+      <li>Check <b>USB debugging</b> is still on.</li>
+    </ol>
+    <ol class="howto tight" data-tvkind="fire">
+      <li>On the Fire TV, open <b>Settings, My Fire TV, Restart</b>.</li>
+      <li>When it is back, open <b>Settings, My Fire TV, Developer options</b>.</li>
+      <li>Check <b>ADB debugging</b> is still on.</li>
+    </ol>
     <p>Then press <b>Try again</b> here and watch the TV.</p>
     <div class="actions"><button class="primary fix-try" type="button">Try again</button></div>
   </section>
 
   <section data-step="phone-route" class="sheet">
     <h1>Use your phone instead</h1>
-    <p class="lead">This TV will not let a computer in over Wi-Fi. You can still put Couch TV on it with just your
-      phone. Nothing was changed on the TV.</p>
+    <p class="lead">This TV will not let a computer in over Wi-Fi.</p>
+    <p class="lead">Your phone can put Couch TV on it instead. Nothing was changed on the TV.</p>
     <ol class="howto">
-      <li data-tvkind="tv">On the TV, open <b>Apps</b>, then <b>Search for apps</b>. Type <b>Downloader</b>, pick
-        <b>Downloader by AFTVnews</b> (the first result) and install it.</li>
-      <li data-tvkind="fire">On the Fire TV, open <b>Find</b> (the magnifying glass), type <b>Downloader</b>, pick
-        <b>Downloader by AFTVnews</b> and press <b>Get</b>.</li>
-      <li>Open Downloader. It may open on a news website with adverts: that is Downloader's own start page, ignore it.
-        Press <b>Back</b> until the bar at the top is highlighted, go right to the <b>#</b> button and press OK. Type
-        <b>8180170</b> and press <b>Load</b> (some versions say <b>Go</b>).</li>
-      <li>The TV may say it is not allowed to install unknown apps from this source, with <b>CANCEL</b> and
-        <b>SETTINGS</b>. Go right to <b>SETTINGS</b> (not CANCEL) and press OK. A list of apps opens with a warning
-        that you are responsible for what you install: that is normal. Find <b>Downloader</b>, switch it on and
-        press Back. If Downloader closes, open it and type the code again.</li>
-      <li>Press <b>Install</b>. When it is done, press <b>Open</b>. That is the Couch TV app, <b>Couch TV</b>.</li>
-      <li data-tvkind="tv">If Google Play Protect says <b>App blocked to protect your device</b>: Play Protect checks
-        apps that do not come from the Play Store, and it blocks Couch TV because Couch TV asks for strong
-        permissions (it becomes your home screen and lets your phone work the TV). If the box has <b>More
-        details</b>, open it and choose <b>Install anyway</b>. If it only has <b>OK</b>, this TV will not install
-        Couch TV until Play Protect's app scan is paused: in the <b>Play Store</b> app on the TV, open your profile
-        picture (or <b>Settings</b>), then <b>Play Protect</b>, and switch off <b>Scan apps with Play Protect</b>.
-        Install again, then switch the scan back on. If you would rather not, press <b>Try the computer once
-        more</b> below.</li>
-      <li>Couch TV shows an address and a code on the TV. On your phone, on the same Wi-Fi, open that address and
-        type the code. Your phone is now the remote, and it sets up the rest from there.</li>
+      <li data-tvkind="tv">On the TV, open <b>Apps</b>, then <b>Search for apps</b>.<br>Type <b>Downloader</b> and install
+        <b>Downloader by AFTVnews</b>.</li>
+      <li data-tvkind="fire">On the Fire TV, open <b>Find</b> and type <b>Downloader</b>.<br>Pick <b>Downloader by
+        AFTVnews</b> and press <b>Get</b>.</li>
+      <li>Open Downloader. A news page with adverts may show first: ignore it.<br>Press <b>Back</b> until the top bar
+        is lit, go right to the <b>#</b> button and press OK.<br>Type <b>8180170</b> and press <b>Load</b> (or <b>Go</b>).</li>
+      <li>Asked about unknown apps? Go right to <b>SETTINGS</b> (not CANCEL) and press OK.<br>Switch <b>Downloader</b> on and press
+        Back. The warning is normal.<br>If Downloader closes, open it and type the code again.</li>
+      <li>Press <b>Install</b>, then <b>Open</b>. That is the <b>Couch TV</b> app.</li>
+      <li data-tvkind="tv">Play Protect says <b>App blocked to protect your device</b>?<br>Choose <b>More details</b>,
+        then <b>Install anyway</b>.<br>Only an <b>OK</b> button? In the TV's <b>Play Store</b>, open <b>Play
+        Protect</b>.<br>Switch off <b>Scan apps with Play Protect</b> and install again.<br>Then switch the scan back on.<br>It
+        blocks Couch TV because Couch TV can become your home screen.</li>
+      <li>Couch TV shows an address and a code on the TV.<br>On your phone, on the same Wi-Fi, open that address and
+        type the code.<br>Your phone is now the remote, and it sets up the rest.</li>
     </ol>
     <div class="actions">
       <button id="fix-again" type="button">Try the computer once more</button>
@@ -344,7 +357,7 @@
   <!-- the plan, and the yes -->
   <!-- link this TV to the account: the website says "Is this your TV?" and Setup moves on (no codes) -->
   <section data-step="link" class="sheet linkstep">
-    <p class="kicker">Step 3 of 4</p>
+    <p class="kicker">Step 2 of 3: Set up your TV</p>
     <h1>Link this TV to your account</h1>
     <p class="lede">Your designs, people, photos and town then arrive on this TV finished.</p>
     <div class="tvrow"><span class="tvico" aria-hidden="true"></span><div><b id="lk-name">Your TV</b><span class="small">Found on your Wi-Fi</span></div></div>
@@ -428,9 +441,9 @@
         <div class="actions" id="link-fix" hidden><button class="btn ghost" id="link-fix-go" type="button">Find the TV</button></div>
         <div class="row2">
           <button class="btn ghost" id="another-go" type="button">Set up another TV</button>
-          <button class="q" id="finish-go" type="button"><span id="finish-text">Keep this one</span></button>
+          <button class="q" id="finish-go" type="button"><span id="finish-text">Finish</span></button>
         </div>
-        <p><button class="link" id="check-go" type="button">Check it again</button></p>
+        <p><button class="link" id="check-go" type="button">Check the TV again</button></p>
       </div>
       <div class="fin-art">
         <div class="tv stand"><span class="designtag" id="design-tag" hidden></span><img src="img/tv-home.webp" width="1200" height="675" alt="Your Couch TV home screen"></div>
@@ -536,7 +549,8 @@
   <section data-step="undo" class="sheet">
     <h1>Take Couch TV off this TV</h1>
     <p class="lead">This puts the TV's own home back and removes the Couch TV apps. Your other apps, logins and settings stay as they are.</p>
-    <p class="small">If a computer at home runs Couch TV for you (the bridge), stop it first, or it switches things back: see docs/UNINSTALL.md on GitHub.</p>
+    <p class="small">A computer at home runs Couch TV for you (the bridge)? Stop it first.</p>
+    <p class="small">Otherwise it switches things back. See docs/UNINSTALL.md on GitHub.</p>
     <ul id="undo-list" class="plan"></ul>
     <p class="small" id="undo-details"></p>
     <label class="tick"><input type="checkbox" id="undo-debug"> Also switch debugging off afterwards</label>

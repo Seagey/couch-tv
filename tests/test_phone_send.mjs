@@ -57,7 +57,7 @@ eq(sentWords({ ok: true, listening: false }), "Sent. Open the Couch TV home on t
 eq(sentWords({ ok: true, listening: true }), WORDS.sent);
 eq(sentWords({ ok: true }), WORDS.sent, "an older home computer that does not say: Sent");
 ok(!canSend("roku") && !canSend("appletv") && canSend("samsung") && canSend("android") && canSend(undefined), "no Send a design on a Roku or an Apple TV");
-eq(WORDS.cannot, "This TV can't take a design from the phone: type the code on the TV, in Home settings, Designs, Get a design.");
+eq(WORDS.cannot, "This TV can't take a design from the phone: type the code on the TV, in Settings, More, Designs, Get a design.");
 const sheets = fs.readFileSync(path.join(root, "remote/src/Sheets.jsx"), "utf8");
 ok(/if \(r\.ok\) setCode\(''\)/.test(sheets), "on a failure the code stays in the box");
 const api = fs.readFileSync(path.join(root, "remote/src/api.js"), "utf8");
@@ -202,7 +202,7 @@ const ID = "AbCdEfGhIjKlMnOpQrStUv";
   eq(calls.length, 0);
 }
 const appjs = fs.readFileSync(path.join(root, "tv-home/web/app.js"), "utf8");
-ok(appjs.includes('label: "Get a design from your phone"'), "the row is in Home settings, Designs");
+ok(appjs.includes('label: "Get a design from your phone"'), "the row is in Settings, More, Designs");
 ok(/function lookInInbox[\s\S]{0,200}!inboxShown\(\)/.test(appjs), "it asks only while its screen is open");
 ok(/function closeSettings\(\) \{\s*stopInbox\(\);/.test(appjs), "closing Home settings stops it");
 ok(/takeInbox\(mine\.id\)[\s\S]{0,400}getDesignByCode\(code\)/.test(appjs), "a code from the inbox goes through Use this design? like a typed one");

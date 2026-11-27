@@ -94,7 +94,7 @@ try {
   whole.forEach((p, i) => ok(p[0] === p[1], "whole line " + i + ": " + JSON.stringify(p[0]) + " is " + JSON.stringify(p[1])));
   // the banner after Back is held, and the "Use this design?" card's own words, but never the design's words in its preview
   const banner = await page.evaluate(async () => {
-    const b = document.createElement("div"); b.className = "cd-escaped"; b.textContent = "Design switched off. This is the normal home. Turn it back on in Home settings, Designs.";
+    const b = document.createElement("div"); b.className = "cd-escaped"; b.textContent = "Design switched off. This is the normal home. Turn it back on in Settings, More, Designs.";
     const a = document.createElement("div"); a.className = "cd-ask"; a.innerHTML = '<div>Keep my home</div><div class="cd-o"><div>Keep my home</div></div><div class="sv">Kept on this TV</div>';
     document.body.appendChild(b); document.body.appendChild(a); await new Promise((r) => setTimeout(r, 60));
     const out = [b.textContent, a.children[0].textContent, a.children[1].textContent, a.children[2].textContent]; b.remove(); a.remove(); return out;

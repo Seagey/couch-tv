@@ -395,11 +395,11 @@ group = "on the TV";
   ok(!/Fairy lights|Ceiling fan.*Porch|Saltwater Radio.*Deck.*Living/.test(all), "the TV draws no demo smart home readings");
   ok(/Living room/.test((await onScreen(tv, idOf("aircon"))).text), "the aircon on screen is the pretend Home Assistant's first room: " + (await onScreen(tv, idOf("aircon"))).text);
 
-  // B1. Home settings, Designs, Widgets on this home: one row for each of the eleven
+  // B1. Settings, More, Designs, Widgets on this home: one row for each of the eleven
   await openSettings(tv);
   await goSec(tv, "Designs");
   const rows = (await rowsText(tv)).join(" | ");
-  ok(/Widgets on this home/.test(await tv.textContent("#set-rows")), "Home settings, Designs, has Widgets on this home: " + rows.slice(0, 300));
+  ok(/Widgets on this home/.test(await tv.textContent("#set-rows")), "Settings, More, Designs, has Widgets on this home: " + rows.slice(0, 300));
   KINDS.forEach((k) => ok(rows.indexOf(NAMES[k] + ",") >= 0, "Widgets on this home lists " + NAMES[k] + " while it is on the design"));
   ok(/Aircon, [^|]*Room: The first one in Smart home/.test(rows), "the aircon's row says its room is the first one in Smart home: " + rows.slice(0, 400));
   await closeSettings(tv);

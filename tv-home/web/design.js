@@ -466,7 +466,7 @@
   OPT.reading = haId(/^sensor\.[a-z0-9_]{1,64}$/);
   OPT.players = function (v) { return SAN.list(v, 6, haId(/^media_player\.[a-z0-9_]{1,64}$/)); };
   // the Welcome widget: where the guest's name comes from. "calendar" means this TV's own bookings
-  // calendar (Home settings, Designs, At home, Guests); the design never carries a name, a
+  // calendar (Settings, More, Designs, At home, Guests); the design never carries a name, a
   // link or a time. times: false hides the check in and check out line.
   OPT.source = function (v) { return SAN.pick(v, ["typed", "calendar"]); };
   // the smart home widgets' own settings Studio can set (widget-caps.js, store "design"): the aircon's
@@ -2031,7 +2031,7 @@
       memory: Number(nav.deviceMemory) || 0, screenPx: ((window.screen && window.screen.width) || innerWidth) * (window.devicePixelRatio || 1),
       slow: !DESIGNER && window.CouchVideo.slowMarked(), stillChosen: !DESIGNER && store(STILL_KEY) === "1" };
   }
-  // Home settings, Designs: why the video shows only its still picture, or, on a 1 GB TV, that it plays
+  // Settings, More, Designs: why the video shows only its still picture, or, on a 1 GB TV, that it plays
   // the smaller copy and how to get the still picture instead ("" otherwise)
   function videoNote() {
     var vs = VP ? VP.state() : null;
@@ -2196,7 +2196,7 @@
     clear();
     var t = document.createElement("div");
     t.className = "cd-escaped";
-    t.textContent = "Design switched off. This is the normal home. Turn it back on in Home settings, Designs.";
+    t.textContent = "Design switched off. This is the normal home. Turn it back on in Settings, More, Designs.";
     t.setAttribute("style", "position:fixed;left:50%;top:2rem;transform:translateX(-50%);z-index:60;padding:0.875rem 1.5rem;border-radius:2rem;background:rgba(16,16,20,0.9);color:#fff;font-size:1.4375rem;font-weight:600");
     document.body.appendChild(t);
     setTimeout(function () { t.remove(); }, 6000);
@@ -3369,13 +3369,13 @@
     cost: function (design, raw) { return cost(raw ? obj(design) : sanitize(design)); },
     // Home settings, Look: the row that turns designs back on after Back switched them off
     off: function () { return offNow(); },
-    // Home settings, Designs (app.js designerRows): the design is held back on this TV, switched off with
+    // Settings, More, Designs (app.js designerRows): the design is held back on this TV, switched off with
     // Back held or answered Keep my home; resume() brings it back (the same as Your design On did)
     held: function () { return offNow() || !!(PENDING && store("couchtv.design.no") === hashOf(PENDING)); },
     resume: function () { setOff(false); if (PENDING && store("couchtv.design.no") === hashOf(PENDING)) { store("couchtv.design.ok", hashOf(PENDING)); store("couchtv.design.no", null); } },
     // an honest line when the design's video shows only its still picture, and why ("" when it plays)
     videoNote: videoNote,
-    // Home settings, Designs, Show the still picture instead: kept on this TV (on: true or false), and
+    // Settings, More, Designs, Show the still picture instead: kept on this TV (on: true or false), and
     // whether the design has a video background at all
     videoStill: function (on) { if (on === undefined) return store(STILL_KEY) === "1"; store(STILL_KEY, on ? "1" : null); if (VP) VP.update(); return !!on; },
     hasVideo: function () { return !!(VP && VP.state().ref); },
