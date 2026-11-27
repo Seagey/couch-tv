@@ -179,6 +179,7 @@
              forward and reads no screen content. -->
         <service
             android:name=".FireWatch"
+            android:directBootAware="true"
             android:exported="false"
             android:label="Home button watch"
             android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE">

@@ -60,7 +60,7 @@ class FireWatch : AccessibilityService() {
 
     /** Xiaomi TVs (issue #54) and KTC/JVC TVs (a double press of Home left the Google home up): every other TV's Home key is left exactly as before. */
     override fun onKeyEvent(event: KeyEvent): Boolean {
-        if (!catchesHomeKey()) return false
+        if (!catchesHomeKey() || !unlocked()) return false
         val homeKey = event.keyCode == KeyEvent.KEYCODE_HOME ||
             (event.keyCode == KeyEvent.KEYCODE_BUTTON_5 && event.scanCode == XIAOMI_MI_SCAN)
         if (!homeKey || CrashGuard.standingAside(this)) return false
@@ -77,15 +77,36 @@ class FireWatch : AccessibilityService() {
      */
     override fun onCreate() {
         super.onCreate()
-        if (TclPlaceholderInput.isTcl() && SystemClock.elapsedRealtime() < BOOT_WINDOW_MS && !CrashGuard.standingAside(this)) {
-            Log.i("couchtv.firewatch", "created just after a restart: putting couch-tv in front")
-            runCatching { startActivity(Intent(this, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
-                .onFailure { Log.w("couchtv.firewatch", "could not open couch-tv yet: $it") }
-        }
+        if (!(TclPlaceholderInput.isTcl() && SystemClock.elapsedRealtime() < BOOT_WINDOW_MS)) return
+        // Created before the TV has unlocked (this service is directBootAware): couch-tv cannot open
+        // yet, but it goes in front the moment the TV unlocks, before TCL's boot controller opens
+        // the Google home (about half a second later).
+        if (App.locked(this)) {
+            Log.i("couchtv.firewatch", "created before the TV unlocked: couch-tv goes in front as it does")
+            App.whenUnlocked(this) { openAtBoot("unlocked") }
+        } else openAtBoot("created")
     }
+
+    private fun openAtBoot(why: String) {
+        if (CrashGuard.standingAside(this)) return
+        Log.i("couchtv.firewatch", "$why just after a restart: putting couch-tv in front")
+        runCatching { startActivity(Intent(this, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
+            .onFailure { Log.w("couchtv.firewatch", "could not open couch-tv yet: $it") }
+    }
+
+    /** True once the TV has unlocked (it never locks again until the next restart). */
+    private var unlocked = false
+    private fun unlocked(): Boolean { if (!unlocked && !App.locked(this)) unlocked = true; return unlocked }
 
     override fun onServiceConnected() {
         connected = true
+        // Bound before the TV unlocked (directBootAware): the other homes and couch-tv's own screen
+        // cannot be seen or opened yet, so the rest waits for the unlock.
+        if (!unlocked()) { App.whenUnlocked(this) { if (connected) connectedUnlocked() }; return }
+        connectedUnlocked()
+    }
+
+    private fun connectedUnlocked() {
         // Key filtering is switched on at run time and only on Xiaomi and KTC/JVC, so no other TV sees key presses here.
         if (catchesHomeKey()) runCatching {
             serviceInfo = serviceInfo.also { it.flags = it.flags or AccessibilityServiceInfo.FLAG_REQUEST_FILTER_KEY_EVENTS }
@@ -126,6 +147,7 @@ class FireWatch : AccessibilityService() {
     }
 
     override fun onAccessibilityEvent(e: AccessibilityEvent) {
+        if (!unlocked()) return
         if (e.eventType != AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) return
         val pkg = e.packageName?.toString()
         // Fibe opened from couch-tv's own tile stays open (see [fibeOpenedNow]). Once any other window

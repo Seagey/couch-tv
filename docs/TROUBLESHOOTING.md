@@ -91,6 +91,21 @@ app.couchtv.launcher/.MainActivity`, start the app, `appops set app.couchtv.laun
 allow`, then write `enabled_accessibility_services` and `accessibility_enabled 1` again. On that TCL
 a real double press of Home also stays on Google TV; Back twice escapes.
 
+**After a full restart.** Measured on a TCL Smart TV Pro (Android 12) across several restarts. Before
+the change, TCL's boot controller opened the Google TV home at about 23 s of uptime. The Home button watch
+was only told it was connected about 4-5 s later, because the system was busy with TCL's and MediaTek's own
+start-up work. So Google TV stayed up until about 29 s, then couch-tv's app grid showed until the page
+arrived at about 36 s. Now:
+- The Home button watch can start before the TV unlocks its storage (`directBootAware`). The rest of
+  the app waits for the unlock.
+- Once the TV unlocks, couch-tv goes in front within about 50 ms, before the system's start-up screen
+  closes. TCL then has nothing to replace, and does not open the Google home.
+- In the first two minutes after a restart, the page gets 20 s before the app grid shows. Once the
+  page has drawn, the grid no longer covers it.
+
+The screen now goes from the start-up screen to couch-tv's own dark background at about 22 s, then to
+the page once Wi-Fi is up (about 26 s on that TV).
+
 **A brief black screen when waking from standby.** On a TCL with the Google TV launcher installed and
 couch-tv set as the default home, the Home button watch puts up a black overlay when the screen turns
 off, if couch-tv or the Google TV home was in front (a TV that sleeps on HDMI or live TV is not covered). After the screen-on broadcast or the display turning on, the overlay waits at least 1.5 seconds
