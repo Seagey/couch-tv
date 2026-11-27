@@ -74,12 +74,12 @@ class MainActivity : Activity() {
     private var web: WebView? = null
     private var fallback: View? = null
     private var pageReady = false
-    /** The live page has drawn its first frame (onPageCommitVisible), before its scripts and pictures have all loaded. */
-    private var pageDrawn = false
         set(value) {
             field = value
             if (!value) wakeFrame = null
         }
+    /** The live page has drawn its first frame (onPageCommitVisible), before its scripts and pictures have all loaded. */
+    private var pageDrawn = false
     private var loadFailed = false
     private var probing = false
     private var offline = false   // showing the saved copy because the computer is off
@@ -625,9 +625,14 @@ class MainActivity : Activity() {
         // Never a blank screen: if the page is slow, show the app grid until it arrives. In the first
         // minutes after a restart the page is slow only because the WebView and the network are still
         // starting, so the grid would flash up for a few seconds just before the page: wait longer then.
-        // The page counts as arrived then once it has drawn (its scripts and photos can take a while longer).
-        val boot = android.os.SystemClock.elapsedRealtime() < BOOT_SLOW_WINDOW_MS
-        main.postDelayed({ if (!pageReady && !(boot && pageDrawn)) showFallback() }, if (boot) BOOT_SLOW_MS else SLOW_MS)
+        // Once it has drawn, it gets a while longer for its scripts and photos. TCL only (issue #94),
+        // where this was measured: other TVs keep the 2.5 s.
+        val boot = TclPlaceholderInput.isTcl() && android.os.SystemClock.elapsedRealtime() < BOOT_SLOW_WINDOW_MS
+        if (!boot) { main.postDelayed({ if (!pageReady) showFallback() }, SLOW_MS); return }
+        main.postDelayed({
+            if (pageReady) return@postDelayed
+            if (!pageDrawn) showFallback() else main.postDelayed({ if (!pageReady && web === w) showFallback() }, BOOT_DRAWN_MS)
+        }, BOOT_SLOW_MS)
     }
 
     private fun makeWebView(): WebView = WebView(this).apply {
@@ -2317,6 +2322,8 @@ class MainActivity : Activity() {
         /** Right after a restart (the first [BOOT_SLOW_WINDOW_MS] of uptime) the page gets this long before the app grid shows. */
         private const val BOOT_SLOW_MS = 20_000L
         private const val BOOT_SLOW_WINDOW_MS = 2 * 60_000L
+        /** ...and once it has drawn, this much longer still to finish loading before the grid shows. */
+        private const val BOOT_DRAWN_MS = 25_000L
         private const val NET_WAIT_MS = 15_000L   // at power-on, how long the first load waits for Wi-Fi
         private const val PICK_PHOTOS = 41
         private const val LISTEN = 43   // reminders: Android's speech screen

@@ -37,8 +37,11 @@ class App : Application() {
         fun locked(c: Context): Boolean =
             Build.VERSION.SDK_INT >= 24 && c.getSystemService(UserManager::class.java)?.isUserUnlocked == false
 
-        /** Runs [then] once, on the main thread, as soon as the storage is unlocked (straight away if it already is). */
-        fun whenUnlocked(c: Context, then: () -> Unit) {
+        /**
+         * Runs [then] once, on the main thread, as soon as the storage is unlocked (straight away if it
+         * already is). The returned function cancels the wait.
+         */
+        fun whenUnlocked(c: Context, then: () -> Unit): () -> Unit {
             val app = c.applicationContext
             var done = false
             val main = Handler(Looper.getMainLooper())
@@ -58,6 +61,7 @@ class App : Application() {
                 }
             }
             main.post(look)
+            return { main.post { if (!done) { done = true; main.removeCallbacks(look); runCatching { app.unregisterReceiver(r) } } } }
         }
     }
 }

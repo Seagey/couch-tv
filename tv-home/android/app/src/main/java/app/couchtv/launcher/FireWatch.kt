@@ -83,7 +83,7 @@ class FireWatch : AccessibilityService() {
         // the Google home (about half a second later).
         if (App.locked(this)) {
             Log.i("couchtv.firewatch", "created before the TV unlocked: couch-tv goes in front as it does")
-            App.whenUnlocked(this) { openAtBoot("unlocked") }
+            waits += App.whenUnlocked(this) { openAtBoot("unlocked") }
         } else openAtBoot("created")
     }
 
@@ -91,18 +91,25 @@ class FireWatch : AccessibilityService() {
         if (CrashGuard.standingAside(this)) return
         Log.i("couchtv.firewatch", "$why just after a restart: putting couch-tv in front")
         runCatching { startActivity(Intent(this, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
+            .onSuccess { openedAtBoot = true }
             .onFailure { Log.w("couchtv.firewatch", "could not open couch-tv yet: $it") }
     }
 
     /** True once the TV has unlocked (it never locks again until the next restart). */
     private var unlocked = false
     private fun unlocked(): Boolean { if (!unlocked && !App.locked(this)) unlocked = true; return unlocked }
+    /** Waits for the unlock still running for this instance (cancelled when it is unbound or destroyed). */
+    private val waits = mutableListOf<() -> Unit>()
+    /** Bound before the unlock: [connectedUnlocked] still to run. */
+    private var connectPending = false
+    private fun connectIfPending() { if (connectPending) { connectPending = false; connectedUnlocked() } }
+    private fun cancelWaits() { waits.forEach { it() }; waits.clear(); connectPending = false }
 
     override fun onServiceConnected() {
         connected = true
         // Bound before the TV unlocked (directBootAware): the other homes and couch-tv's own screen
-        // cannot be seen or opened yet, so the rest waits for the unlock.
-        if (!unlocked()) { App.whenUnlocked(this) { if (connected) connectedUnlocked() }; return }
+        // cannot be seen or opened yet, so the rest waits for the unlock (or the first event after it).
+        if (!unlocked()) { connectPending = true; waits += App.whenUnlocked(this) { connectIfPending() }; return }
         connectedUnlocked()
     }
 
@@ -125,8 +132,8 @@ class FireWatch : AccessibilityService() {
         if ((android.os.Build.MANUFACTURER.equals("Amazon", ignoreCase = true) || TclPlaceholderInput.isTcl()) &&
             SystemClock.elapsedRealtime() < BOOT_WINDOW_MS && !CrashGuard.standingAside(this)) {
             Log.i("couchtv.firewatch", "bound just after a restart: putting couch-tv in front")
-            // TCL: usually already opened from onCreate, 4-5 s earlier (see there); only again if it is not in front
-            if (!MainActivity.isInFront()) runCatching { startActivity(Intent(this, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
+            // TCL: already opened from onCreate or at the unlock (see there): not a second time
+            if (!openedAtBoot) runCatching { startActivity(Intent(this, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
         }
         wakeMask?.close()
         wakeMask = WakeMask.start(this, handler)
@@ -134,6 +141,7 @@ class FireWatch : AccessibilityService() {
 
     override fun onUnbind(intent: Intent?): Boolean {
         connected = false
+        cancelWaits()
         handler.removeCallbacks(recheck)
         recheckPending = false
         wakeMask?.close()
@@ -142,12 +150,14 @@ class FireWatch : AccessibilityService() {
     }
 
     override fun onDestroy() {
+        cancelWaits()
         wakeMask?.close()
         super.onDestroy()
     }
 
     override fun onAccessibilityEvent(e: AccessibilityEvent) {
         if (!unlocked()) return
+        connectIfPending()   // the first event after the unlock can come before the unlock wait runs
         if (e.eventType != AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) return
         val pkg = e.packageName?.toString()
         // Fibe opened from couch-tv's own tile stays open (see [fibeOpenedNow]). Once any other window
@@ -240,6 +250,8 @@ class FireWatch : AccessibilityService() {
     companion object {
         /** Set while Android has this service bound. */
         @Volatile var connected = false
+        /** couch-tv was put in front at this boot from onCreate or at the unlock (TCL). */
+        @Volatile private var openedAtBoot = false
         private const val FRONT_CHECK_MS = 800L   // Android 10: how long to wait before checking the move worked
         private const val DEBOUNCE_MS = 1200L   // one jump per press, not one per event
         private const val BOOT_WINDOW_MS = 2 * 60_000L
