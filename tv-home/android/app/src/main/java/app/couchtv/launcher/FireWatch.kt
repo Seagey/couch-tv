@@ -85,13 +85,18 @@ class FireWatch : AccessibilityService() {
         // window event is never seen, and a Home press then changes nothing (the Google home is
         // already in front). Other Google TVs are left alone: one can start on an HDMI input or
         // live TV, and that must never be covered.
+        var boot = false
         if ((android.os.Build.MANUFACTURER.equals("Amazon", ignoreCase = true) || TclPlaceholderInput.isTcl()) &&
             SystemClock.elapsedRealtime() < BOOT_WINDOW_MS && !CrashGuard.standingAside(this)) {
             Log.i("couchtv.firewatch", "bound just after a restart: putting couch-tv in front")
-            runCatching { startActivity(Intent(this, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
+            boot = true
         }
         wakeMask?.close()
         wakeMask = WakeMask.start(this, handler)
+        if (boot) {
+            wakeMask?.bootCover()   // TCL: black until the page has drawn, so neither the Google home nor the app grid shows
+            runCatching { startActivity(Intent(this, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
+        }
     }
 
     override fun onUnbind(intent: Intent?): Boolean {

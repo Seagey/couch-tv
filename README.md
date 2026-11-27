@@ -357,7 +357,8 @@ gains a permission these tables do not explain.
   services, off until a computer switches them on. They see which window came forward, by its app and
   screen name, and put couch-tv's home back when the TV opens its own. They read no screen content. On a
   TCL with the Google TV home installed, the Home button watch also shows a black overlay for up to 6
-  seconds when the TV wakes, so the Google TV home does not flash.
+  seconds when the TV wakes, and for up to 20 seconds after a restart until the home page has drawn, so
+  the Google TV home and the app grid do not flash.
   The Home one declares the screen reading capability only because some TVs (a TCL on Android 12)
   send window events to nothing else.
 - **Home button watch check** (`WatchRepair`, Home): a job Android runs about every 15 minutes, even

@@ -99,6 +99,14 @@ TV launcher and System UI do not qualify. A doorbell card clears the overlay imm
 screen is on. The overlay has a 6-second timeout from the wake event; a window event on a lit screen also counts as
 the wake, in case the screen-on broadcast and the display callback are both missed.
 
+**A black screen for a few seconds after a restart.** On the same TCLs, TCL opens the Google TV home at
+power on, before Android has connected the Home button watch (about 5 seconds on a TCL Smart TV Pro,
+Android 12). When the watch connects in the first two minutes after a restart, it puts couch-tv in front
+(issue #94) and the same black overlay goes up at once. It stays until couch-tv's page itself has drawn,
+so the app grid that stands in while the page loads does not show either, or until a window from another
+app comes forward. It has a 20-second timeout, after which whatever is in front shows, the app grid
+included. The Google TV home can still show for the seconds before the watch connects.
+
 ## Hisense Google TV: the Google home after every restart or wake
 
 On a Hisense Google TV ("SmartTV 4K", Android 11, board songshan) with the on-TV app (option C), the TV came

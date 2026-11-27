@@ -20,9 +20,11 @@ import android.view.WindowManager.LayoutParams as Window
 
 internal const val WAKE_SETTLE_MS = 1_500L
 internal const val WAKE_TIMEOUT_MS = 6_000L
+/** After a restart the page can wait for Wi-Fi and a cold WebView, so the cover may stay this long. */
+internal const val BOOT_COVER_TIMEOUT_MS = 20_000L
 
 internal enum class WakePhase { IDLE, ARMED, AWAKE, FADING }
-internal enum class WakeEvent { SCREEN_OFF, SCREEN_ON, CHECK, DOORBELL, FADE_ENDED }
+internal enum class WakeEvent { SCREEN_OFF, SCREEN_ON, BOOT, CHECK, DOORBELL, FADE_ENDED }
 
 internal fun isOtherWakeApp(pkg: String?, homePackage: String): Boolean =
     pkg != null && pkg != homePackage && pkg != FireWatch.GOOGLE_TV_HOME && pkg != "com.android.systemui"
@@ -35,15 +37,17 @@ internal fun decideWakeMask(
     phase: WakePhase,
     event: WakeEvent,
     sinceWake: Long = 0L,
-    ready: Boolean = false
+    ready: Boolean = false,
+    limit: Long = WAKE_TIMEOUT_MS
 ): WakePhase = when (event) {
     WakeEvent.SCREEN_OFF -> WakePhase.ARMED
     WakeEvent.SCREEN_ON -> if (phase == WakePhase.ARMED) WakePhase.AWAKE else phase
+    WakeEvent.BOOT -> if (phase == WakePhase.IDLE) WakePhase.AWAKE else phase
     WakeEvent.DOORBELL -> if (phase == WakePhase.AWAKE || phase == WakePhase.FADING) WakePhase.IDLE else phase
     WakeEvent.FADE_ENDED -> if (phase == WakePhase.FADING) WakePhase.IDLE else phase
     WakeEvent.CHECK -> when {
         phase != WakePhase.AWAKE && phase != WakePhase.FADING -> phase
-        sinceWake >= WAKE_TIMEOUT_MS -> WakePhase.IDLE
+        sinceWake >= limit -> WakePhase.IDLE
         phase == WakePhase.AWAKE && sinceWake >= WAKE_SETTLE_MS && ready -> WakePhase.FADING
         else -> phase
     }
@@ -64,9 +68,11 @@ internal class WakeMask private constructor(
     private var latestPackage: String? = null
     private var lastFront: String? = null
     private var ownDialog = false
+    private var boot = false   // covering a restart rather than a wake: wait for the page itself, longer
+    private val limit get() = if (boot) BOOT_COVER_TIMEOUT_MS else WAKE_TIMEOUT_MS
     private val check = Runnable { checkContent() }
     private val settle = Runnable { checkContent() }
-    private val timeout = Runnable { transition(WakeEvent.CHECK, sinceWake = WAKE_TIMEOUT_MS) }
+    private val timeout = Runnable { transition(WakeEvent.CHECK, sinceWake = limit) }
 
     private val screenChanged = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
@@ -129,17 +135,18 @@ internal class WakeMask private constructor(
         if (phase != WakePhase.AWAKE) return
         val cycle = token ?: return
         val ready = isOtherWakeApp(latestPackage, service.packageName) ||
-            MainActivity.wakeContentReady(cycle, ownDialog)
+            MainActivity.wakeContentReady(cycle, ownDialog, needPage = boot)
         transition(WakeEvent.CHECK, SystemClock.uptimeMillis() - wokeAt, ready)
     }
 
     private fun transition(event: WakeEvent, sinceWake: Long = 0L, ready: Boolean = false) {
-        val next = decideWakeMask(phase, event, sinceWake, ready)
+        val next = decideWakeMask(phase, event, sinceWake, ready, limit)
         if (next == phase) return
         phase = next
         when (next) {
-            WakePhase.IDLE -> remove()
+            WakePhase.IDLE -> { boot = false; remove() }
             WakePhase.ARMED -> {
+                boot = false
                 cancelWake()
                 latestPackage = null
                 ownDialog = false
@@ -152,7 +159,8 @@ internal class WakeMask private constructor(
             WakePhase.AWAKE -> {
                 wokeAt = SystemClock.uptimeMillis()
                 token = Any()
-                handler.postDelayed(timeout, WAKE_TIMEOUT_MS)
+                if (boot) show()
+                handler.postDelayed(timeout, limit)
                 handler.postDelayed(settle, WAKE_SETTLE_MS)
                 // A doorbell card created while the screen was off is already up: don't hide it.
                 if (Doorbell.showing()) { transition(WakeEvent.DOORBELL); return }
@@ -161,6 +169,20 @@ internal class WakeMask private constructor(
             WakePhase.FADING -> view?.animate()?.alpha(0f)?.setDuration(150L)
                 ?.withEndAction { transition(WakeEvent.FADE_ENDED) }?.start()
         }
+    }
+
+    /**
+     * Just after a restart (TCL, issue #94): TCL opens the Google TV home before this watch is bound,
+     * and couch-tv's own page needs Wi-Fi and a cold WebView, so its app grid would show first. Cover
+     * from the moment the watch puts couch-tv in front until the page itself has drawn, at most
+     * [BOOT_COVER_TIMEOUT_MS] (then whatever is up shows, the app grid included).
+     */
+    fun bootCover() {
+        if (phase != WakePhase.IDLE) return
+        if (!runCatching { HomeRole.googleTv(service) && HomeRole.held(service) && !CrashGuard.standingAside(service) }
+                .getOrDefault(false)) return
+        boot = true
+        transition(WakeEvent.BOOT)
     }
 
     private fun show() {

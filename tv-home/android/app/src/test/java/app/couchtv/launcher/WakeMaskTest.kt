@@ -10,6 +10,21 @@ import org.junit.Test
 class WakeMaskTest {
     private val home = "app.couchtv.launcher"
 
+    @Test fun restartCoversOnlyFromIdle() {
+        assertEquals(AWAKE, decideWakeMask(IDLE, BOOT))
+        assertEquals(ARMED, decideWakeMask(ARMED, BOOT))
+        assertEquals(AWAKE, decideWakeMask(AWAKE, BOOT))
+        assertEquals(FADING, decideWakeMask(FADING, BOOT))
+    }
+
+    @Test fun restartCoverWaitsPastTheWakeTimeout() {
+        val limit = BOOT_COVER_TIMEOUT_MS
+        assertEquals(AWAKE, decideWakeMask(AWAKE, CHECK, sinceWake = WAKE_TIMEOUT_MS, limit = limit))
+        assertEquals(AWAKE, decideWakeMask(AWAKE, CHECK, sinceWake = limit - 1, limit = limit))
+        assertEquals(FADING, decideWakeMask(AWAKE, CHECK, sinceWake = 9_000, ready = true, limit = limit))
+        assertEquals(IDLE, decideWakeMask(AWAKE, CHECK, sinceWake = limit, limit = limit))
+    }
+
     @Test fun screenOffArmsAndIgnoresRevealRequests() {
         assertEquals(ARMED, decideWakeMask(IDLE, SCREEN_OFF))
         assertEquals(ARMED, decideWakeMask(ARMED, CHECK, sinceWake = 6_000, ready = true))

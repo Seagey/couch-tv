@@ -302,9 +302,10 @@ class MainActivity : Activity() {
         if (pageReady) { web?.onPause(); web?.pauseTimers() }
     }
 
-    private fun wakeContentReady(token: Any, ownDialog: Boolean): Boolean {
+    private fun wakeContentReady(token: Any, ownDialog: Boolean, needPage: Boolean): Boolean {
         if (!resumed || isFinishing || isDestroyed) return false
-        if (ownDialog || fallback?.isShown == true) return true
+        // After a restart the app grid is only a stand-in while the page loads: wait for the page.
+        if (ownDialog || (!needPage && fallback?.isShown == true)) return true
         val w = web ?: return false
         if (!pageReady || !w.isShown) return false
         val frame = wakeFrame
@@ -2277,8 +2278,8 @@ class MainActivity : Activity() {
         /** True while the home is resumed (in front). FireWatch checks this after a move to front on Android 10 (issue #202). */
         fun isInFront(): Boolean = shown?.get()?.resumed == true
 
-        internal fun wakeContentReady(token: Any, ownDialog: Boolean): Boolean =
-            shown?.get()?.wakeContentReady(token, ownDialog) == true
+        internal fun wakeContentReady(token: Any, ownDialog: Boolean, needPage: Boolean = false): Boolean =
+            shown?.get()?.wakeContentReady(token, ownDialog, needPage) == true
 
         /** What onNewIntent does for a Home press, for when FireWatch brought the home back without a new intent. */
         fun backToFirstTile() {
