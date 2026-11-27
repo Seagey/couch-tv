@@ -27,8 +27,13 @@ for (const f of css.matchAll(/@font-face\s*\{([^}]*)\}/g)) {
 }
 // a font with no file yet goes here, said so it is not forgotten (Cormorant Garamond was, to 23 Nov 2026)
 const KNOWN_GAP = [];
+// Phase 3 E1 (one font list, 28 Nov 2026): the three fonts words and clocks always had now come to widgets too. They
+// draw with the TV's own system fonts, the way words always have: Roboto Condensed ("sans-serif-condensed" on Android),
+// Noto Serif for serif and the system monospace. Each stack must end in a family every TV has.
+const SYSTEM = { condensed: /"sans-serif-condensed".*sans-serif$/, serif: /serif$/, mono: /monospace$/ };
 for (const name of Object.keys(FONT)) {
   if (KNOWN_GAP.indexOf(name) >= 0) continue;
+  if (SYSTEM[name]) { ok(SYSTEM[name].test(FONT[name]), "\"" + name + "\" ends in a system font every TV has (" + FONT[name] + ")"); continue; }
   const fam = first(FONT[name]), file = faces[fam];
   ok(file, "\"" + name + "\" draws with " + fam + ", which has an @font-face on the home");
   ok(fs.existsSync(path.join(web, file)) && fs.statSync(path.join(web, file)).size > 1000, fam + "'s file is there: " + file);

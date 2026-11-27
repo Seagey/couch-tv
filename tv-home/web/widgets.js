@@ -133,6 +133,7 @@
     return APPS[pkg] ? CW.logoBase + pkg + ".png" : null;
   }
   function appName(pkg, env) {
+    if (pkg === "tvsettings") return "TV settings";
     var c = catApp(pkg);
     if (c) return c.name;
     var list = dataOf(env).apps || [];
@@ -157,6 +158,7 @@
     else if (want.length || want.edited) {
       want.forEach(function (k) {
         var A = cat(), hit = null, i;
+        if (k === TVSET) { out.push(k); keys.push(k); return; }   // the TV's own settings: every TV has them
         // the TV's app list not read yet (the "Use this design?" preview draws before it is): never
         // "Not on this TV" for an app that may well be there; the catalogue's own picture instead
         if (A && A.get(k) && !have.length && env.card) { out.push(k); keys.push(k); return; }
@@ -169,6 +171,14 @@
     out = out.slice(0, max || 16); out.keys = keys.slice(0, max || 16);
     return out;
   }
+  // "TV settings" as an app in a dock, row or folder (Phase 3 item 17): opens the TV's own settings (the same
+  // as the quick button and the TV settings tile; app.js openTvSettings), on every TV
+  var TVSET = "tvsettings";
+  function tvsetNode(a, env, big) {
+    var n = E("div", "cw-app cw-tvset", "width:" + px(a) + ";height:" + px(a) + ";border-radius:" + px(a * 0.24) + ";font-size:" + px(clamp(a * 0.15, 23, 34)) + ";background:#3a3a44;flex-direction:column", [ic("settings", a * 0.46, "#fff"), a >= 150 ? E("span", "cw-tvset-w", "margin-top:4px", ["Settings"]) : null]);
+    if (big) n.style.margin = "22px";
+    return stop(n, "quick", TVSET, "TV settings");
+  }
   // a dock, row or folder on a TV may take one more app: an "Add app" place at its end
   function canAdd(env) { return !env.demo && !env.designer && !env.preview && !!env.edits; }
   function appNode(pkg, a, env, big) {
@@ -178,6 +188,7 @@
       if (big) plus.style.margin = "22px";
       return stop(plus, "addapp", "", "Add app");
     }
+    if (pkg === TVSET) return tvsetNode(a, env, big);
     var missing = pkg.indexOf("missing:") === 0, key = missing ? pkg.slice(8) : pkg;
     if (missing) {
       var m = appNode(key, a, env, big);
@@ -585,9 +596,26 @@
   var GRAD = { weather: "linear-gradient(180deg,#1b64b5,#2f7fd2)", hourly: "linear-gradient(180deg,#1b64b5,#2f7fd2)", week: "linear-gradient(180deg,#1b64b5,#2f7fd2)",
     bigtemp: "linear-gradient(160deg,#ffb340,#ff7a45)", countdown: "linear-gradient(160deg,#1f9150,#146b37)", uv: "linear-gradient(160deg,#ff9f0a,#ff6a3d)",
     surf: "linear-gradient(170deg,#0a6e8a,#0f9fb5)", screentime: "linear-gradient(160deg,#5e5ce6,#8e44ef)" };
-  var FONT = { inter: '"Inter", sans-serif', antonio: '"Antonio", "Arial Narrow", sans-serif', rounded: '"Nunito", "Inter", sans-serif', cormorant: '"Cormorant Garamond", Georgia, serif', jost: '"Jost", "Inter", sans-serif' };
+  // one font list everywhere (Phase 3 E1): the same eight as words and clocks (design.js FONTS)
+  var FONT = { inter: '"Inter", sans-serif', antonio: '"Antonio", "Arial Narrow", sans-serif', rounded: '"Nunito", "Inter", sans-serif', cormorant: '"Cormorant Garamond", Georgia, serif', jost: '"Jost", "Inter", sans-serif',
+    condensed: '"Roboto Condensed", "sans-serif-condensed", "Arial Narrow", sans-serif', serif: 'Georgia, "Noto Serif", "Times New Roman", serif', mono: '"Roboto Mono", "Droid Sans Mono", Menlo, monospace' };
+  var TEXTURES = ["paper", "linen", "grain"];
   var CORNER = { square: 12, soft: 28, round: 36, pill: 999 };
-  function nightNow() { var h = now().getHours(); return h >= 18 || h < 6; }
+  // Show "At night" or "In the day" (Phase 3 item 18b): the person's own times when the widget has them
+  // (style.day_from and day_to, "HH:MM"), else the TV's town's sunrise and sunset (dayNow: worked out from the
+  // town's place, else the forecast's, else 6am to 7pm). Not a fixed 6pm any more.
+  function hmOf(v) { var m = /^(\d{2}):(\d{2})$/.exec(String(v || "")); return m ? +m[1] * 60 + +m[2] : null; }
+  function dayFor(st, env) {
+    var t = now(), f = hmOf(st && st.day_from), e = hmOf(st && st.day_to), m = t.getHours() * 60 + t.getMinutes();
+    if (f !== null && e !== null && f !== e) return f < e ? m >= f && m < e : m >= f || m < e;
+    if (env && env.demo) {   // the demo forecast's day (5:41am to 7:22pm)
+      var r = hmOf("0" + DEMO_WX.sunrise), z = hmOf(DEMO_WX.sunset.replace(/^(\d+)/, function (h) { return ("0" + (+h + 12)).slice(-2); }));
+      return r !== null && z !== null ? m >= r && m < z : m >= 6 * 60 && m < 19 * 60;
+    }
+    var d = dataOf(env || {});
+    return dayNow(d.weather || {}, { place: d.place || {} });
+  }
+  function nightNow(st, env) { return !dayFor(st, env); }
 
   // What Liquid glass words show through them: the design's photo (#cd-bg i, placed as design.js placed it) or
   // the scene on screen, as the frosted copy for the five scenes that ship one. null (so frosted words) for a
@@ -614,6 +642,12 @@
     var panel = st.panel || (window.CouchDesign && window.CouchDesign.wpanel ? window.CouchDesign.wpanel({ kind: kind, style: st }) : "glass");
     // pictures with no panel keep their rounded corners (the photo look); words and clocks are bare
     var pcls = panel === "none" && PHOTO_KINDS.indexOf(kind) >= 0 ? "cw-photo" : (PANEL_CLS[panel] || "cw-glass");
+    // a texture on a solid box (Phase 3 item 15): Paper, Linen or Grain over its colour. Paper with no colour is
+    // the Paper box itself (an older design's "paper"), so it draws exactly as it always did.
+    var tex = TEXTURES.indexOf(st.texture) >= 0 && (panel === "solid" || panel === "colour" || panel === "paper") ? st.texture : "";
+    if (panel === "solid" && tex === "paper") { panel = "paper"; pcls = PANEL_CLS.paper; tex = ""; }
+    if (panel === "paper" && tex === "paper") tex = "";
+    if (tex) pcls += " cw-tx cw-tx-" + tex;
     var root = E("div", "cw cw-k-" + kind + " " + pcls, "width:" + px(b.w) + ";height:" + px(b.h));
     root.setAttribute("data-kind", kind);
     var look = env.look || {}, ink = null, tile = null;
@@ -665,6 +699,12 @@
     if (rr === 999) rr = Math.min(b.w, b.h) / 2;
     root.style.setProperty("--r", px(rr));
     if (st.shadow) root.classList.add("cw-sh-" + st.shadow);
+    // App icons (Phase 3 item 16): the shape (circle, square, rounded, words only) and the colour (full colour,
+    // black and white, the app's own) of every app in a dock, row, folder, app grid or app tile
+    if (APP_KINDS.indexOf(kind) >= 0) {
+      if (st.app_shape && st.app_shape !== "rounded") root.classList.add("cw-ish-" + st.app_shape);
+      if (st.app_colour && st.app_colour !== "colour") root.classList.add("cw-ico-" + st.app_colour);
+    }
     return { root: root, panel: panel, ink: ink || WHITE, tile: tile };
   }
   // the honest empty state: what this widget needs on this TV, said in its own box
@@ -1654,9 +1694,15 @@
     for (var c = 1; c <= Math.min(n, most || 6); c++) { var a = gridSize(n, c, b, top); if (a >= best.a) best = { cols: c, a: a }; }
     return best;
   }
-  function appGrid(list, b, cols, env, top) {
-    var gap = gridGap(b), a = gridSize(list.length, cols, b, top);
-    var g = E("div", "cw-grow", "display:flex;flex-wrap:wrap;align-content:center;justify-content:center;margin:" + px(-gap / 2), rowBreaks(list.map(function (p) { var n = appNode(p, a, env); n.style.margin = px(gap / 2); return n; }), cols));
+  function appGrid(list, b, cols, env, top, names) {
+    // names under the icons (a folder's "Names under icons"): each row gives up 40 px for its name
+    var nh = names ? 40 : 0, rows = Math.ceil(list.length / cols), gap = gridGap(b), a = gridSize(list.length, cols, names ? { w: b.w, h: Math.max(1, b.h - rows * nh) } : b, top);
+    var g = E("div", "cw-grow", "display:flex;flex-wrap:wrap;align-content:center;justify-content:center;margin:" + px(-gap / 2), rowBreaks(list.map(function (p) {
+      var n = appNode(p, a, env);
+      if (!names) { n.style.margin = px(gap / 2); return n; }
+      var nm = p === "add:" ? "Add app" : appName(String(p).replace(/^missing:/, ""), env);
+      return E("div", "cw-col cw-named", "align-items:center;width:" + px(a) + ";margin:" + px(gap / 2), [n, E("div", "cw-ell", "font-size:23px;line-height:1.2;height:" + px(nh - 8) + ";margin-top:8px;max-width:" + px(a + gap) + ";text-align:center;font-weight:650;color:var(--ink)", [nm])]);
+    }), cols));
     g.setAttribute("data-cols", String(cols));
     return g;
   }
@@ -1698,7 +1744,7 @@
       var bare = fixed ? { cols: fixed, a: gridSize(list.length, fixed, inner, 0) } : bestCols(list.length, inner, 0);
       if (bare.a > gridSize(list.length, cols, inner, top)) { label = null; top = 0; cols = bare.cols; }
     }
-    add(root, [label, appGrid(list, inner, cols, env, top)]);
+    add(root, [label, appGrid(list, inner, cols, env, top, setting(o, env, "names") === true)]);
     root.setAttribute("data-detail", "folder");
   };
   R.dock = function (root, o, b, env) {
@@ -2925,6 +2971,16 @@
   };
   var QNAMES = { sleep: ["sleep-timer", "Sleep timer"], picture: ["picture", "Picture"], look: ["picture", "Look"], soundscape: ["rain", "Soundscape"], screen_off: ["power", "Screen off"],
     headphones: ["headphones", "Headphones"], input: ["input", "Input"], bluetooth: ["bluetooth", "Bluetooth"], network: ["wifi", "Network"], tvsettings: ["settings", "TV settings"], screensaver: ["picture", "Screensaver"] };
+  // TV settings (Phase 3 item 17): one small tile, a gear and its words; OK opens the TV's own settings
+  // (picture, sound, Wi-Fi and apps), the same as the quick button and the app in a folder
+  R.tvsettings = function (root, o, b, env) {
+    var w = setting(o, env, "words") || "full", words = w === "none" ? "" : w === "short" ? "Settings" : "TV settings";
+    var s = Math.min(b.w, b.h), g = clamp(s * (words ? 0.34 : 0.48), 40, 120);
+    root.style.padding = "12px";
+    add(root, E("div", "cw-col", "height:100%;align-items:center;justify-content:center;text-align:center", [ic("settings", g, "currentColor"),
+      words ? E("div", "", "margin-top:" + px(clamp(s * 0.05, 6, 16)) + ";font-size:" + px(clamp(s * 0.15, 23, 40)) + ";font-weight:700;line-height:1.1;color:var(--ink)", [words]) : null]));
+    stop(root, "quick", "tvsettings", "TV settings");
+  };
   R.quick = function (root, o, b, env) {
     var q = op(o), mine = setting(o, env, "quick");
     mine = Object.prototype.toString.call(mine) === "[object Array]" ? mine.filter(function (x) { return !!QNAMES[x]; }).slice(0, 6) : [];
@@ -3499,8 +3555,14 @@
       if (!root.hasAttribute("data-act") && !root.querySelector("[data-act]")) stop(root, "detail", layer, (window.CouchWidgetCaps && window.CouchWidgetCaps.get(o.kind) || {}).name || o.kind);
     }
     // show when (EDITING.md 8): at night, in the day, only when there is something to show
-    var hide = (st.show === "night" && !nightNow()) || (st.show === "day" && nightNow()) || (st.show === "live" && root.getAttribute("data-empty"));
-    if (hide) { if (env.designer || env.preview) root.style.opacity = "0.35"; else root.style.visibility = "hidden"; root.setAttribute("data-hidden", "1"); }
+    var hide = (st.show === "night" && !nightNow(st, env)) || (st.show === "day" && nightNow(st, env)) || (st.show === "live" && root.getAttribute("data-empty"));
+    var hideIt = function (on) {
+      if (on) { if (env.designer || env.preview) root.style.opacity = "0.35"; else root.style.visibility = "hidden"; root.setAttribute("data-hidden", "1"); }
+      else { root.style.opacity = root.style.visibility = ""; root.removeAttribute("data-hidden"); }
+    };
+    if (hide) hideIt(true);
+    // night and day change while the home is up (sunset at 7:28pm): looked at again each minute
+    if (st.show === "night" || st.show === "day") live(root, 60000, function () { var h = st.show === "night" ? !nightNow(st, env) : nightNow(st, env); if (h !== root.hasAttribute("data-hidden")) hideIt(h); });
     return root;
   }
   // Smart stack: one place, up to 10 widgets taking turns; focused it stops, Left and Right flick it

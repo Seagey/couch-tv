@@ -458,6 +458,13 @@
         vidaa: inStudio("type the words (no numbers or web addresses)").concat(["Guest names from a bookings calendar need a home computer that stays on, running Couch TV. The website home cannot read a calendar."]) }),
       until: "Always shows the words. With guest names on and no bookings link yet: \"Add your bookings calendar\", and where", build: "",
       ok: "Nothing: it is to look at", platforms: EVERY(), sizes: sz(["wline", "wtile", "medium", "wide"], [4, 1]) },
+    // TV settings (Phase 3 item 17): one small tile that opens the TV's own settings; also an app in a folder or
+    // the dock ("tvsettings") and a quick button. Google TV, Android TV and Fire TV open Settings straight away
+    // (app.js openTvSettings: the launcher, else the bridge); elsewhere the TV says to press its own Settings key.
+    tvsettings: { name: "TV settings", status: "works", what: "Opens your TV's own settings: picture, sound, Wi-Fi and apps", needs: ["Nothing"],
+      setup: setup("nothing", ["Nothing to set up. OK on it opens the TV's own settings."]),
+      until: "Always shows", build: "",
+      ok: "Opens the TV's own settings", platforms: plat("works", "computer:partial", "works:partial", { web: "On a TV without the Couch TV app it says to press the remote's own Settings key.", vidaa: "On Vidaa it says to press the remote's own Settings key." }), sizes: sz(["tile", "wtile"], [2, 2]) },
     quick: { name: "Quick buttons", status: "works", what: "Sleep timer, picture mode, look, input and more", needs: ["Nothing: buttons this TV cannot do are left out"],
       setup: setup("tv", { android: [OPEN, "Go down to Quick buttons and press OK.", "OK shows or hides a button. Hold OK on one to move it along.", "Or pick this widget's own buttons in Couch TV Studio."],
         web: [OPEN, "Go down to Quick buttons and press OK.", "OK shows or hides a button. Picture mode and input need a Google TV, Android TV or Fire TV."],
@@ -749,7 +756,9 @@
     games: [APPS_IN("Games", "Hold OK on a game to change, move or remove it."), HEADING("Empty shows Play.")],
     app: [APPS_IN("App", "Hold OK on it and pick Change app.")],
     folder: [st("label", "Folder name", "text", "", "Shown above the apps. On a tile it shows when the folder is opened. Empty shows no name.", "design", ALL, true, { max: 40 }),
-      APPS_IN("Apps in the folder", "Hold OK on an app to change, move or remove it."), ACROSS("A tile always shows four small apps.")],
+      APPS_IN("Apps in the folder", "Hold OK on an app to change, move or remove it."), ACROSS("A tile always shows four small apps."),
+      st("names", "Names under icons", "toggle", false, "Each app's name under its icon. Not on a tile.", "design", ALL, true)],
+    tvsettings: [st("words", "Words", "choice", "full", "What it says under the gear.", "design", ALL, true, { options: [["full", "TV settings"], ["short", "Settings"], ["none", "None"]] })],
     dock: [APPS_IN("Apps", "None picked shows this TV's own apps. Hold OK on an app to change, move or remove it."),
       st("more", "All apps at the end", "toggle", true, "A tile at the end that opens every app.", "design", ALL, true)],
     appgrid: [APPS_IN("Apps", "None picked shows this TV's own apps. Hold OK on an app to change, move or remove it."), ACROSS(),
