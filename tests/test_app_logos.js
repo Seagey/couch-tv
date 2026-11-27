@@ -47,6 +47,19 @@ ids.forEach((id) => {
   assert.ok(new RegExp('\\| ' + id + '( |\\|)').test(sources), id + ': named in SOURCES.md with its source');
 });
 
+// even weight: a logo is sized by the ink it draws (box x density), so a heavy wordmark (Stan) is not bigger than a thin one (Disney+)
+{
+  const ink = (id, maxH, maxW) => { const s = LOGOS.svg(id, maxH, maxW); return +s.match(/width:([\d.]+)rem/)[1] * +s.match(/height:([\d.]+)rem/)[1] * LOGOS.logos[id].k; };
+  ids.forEach((id) => assert.ok(LOGOS.logos[id].k > 0 && LOGOS.logos[id].k <= 1, id + ': has an ink density'));
+  const words = ids.filter((id) => LOGOS.word(id));
+  const heavy = words.filter((id) => LOGOS.logos[id].k >= 0.5);
+  heavy.forEach((id) => { const a = ink(id, 2.75, 7.5); assert.ok(Math.abs(a - 5) < 0.6, id + ': heavy wordmark ink area ' + a.toFixed(2) + ' is the same as the others'); });
+  const stan = LOGOS.svg('stan', 2.75, 7.5), disney = LOGOS.svg('disney', 2.75, 7.5);
+  assert.ok(+stan.match(/height:([\d.]+)rem/)[1] < +disney.match(/height:([\d.]+)rem/)[1], 'Stan (heavy) is drawn shorter than Disney+ (thin)');
+  assert.ok(+disney.match(/height:([\d.]+)rem/)[1] <= 2.75, 'no taller than the card row allows');
+  ids.filter((id) => !LOGOS.word(id)).forEach((id) => { const h = +LOGOS.svg(id, 1.75, 6).match(/height:([\d.]+)rem/)[1]; assert.ok(h >= 1.2 && h <= 1.75, id + ': symbol height ' + h + ' stays in one band'); });
+}
+
 // an app with no logo gives "" (the card then keeps its picture)
 assert.strictEqual(LOGOS.svg('iview', 1.75, 6), '');
 assert.strictEqual(LOGOS.svg('nope', 1.75, 6), '');

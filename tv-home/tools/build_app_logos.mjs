@@ -24,6 +24,9 @@ const L = {
   disney: ["wm-disney", 1, null, "#3a7bff"], stan: ["wm-stan", 1, null, "#0072fb"], binge: ["wm-binge", 1, null, "#8a2be2"],
   prime: ["wm-prime", 2, null, "#00a8e1"], raiplay: ["wm-raiplay", 1, [0, 1], "#00b4e6"], vtmgo: ["wm-vtm", 1, null, "#ff01d5"],
 };
+// ink density (share of the logo's box that is drawn, measured by painting each path: coord/mockups-1128/L3/dens.mjs); the card sizes a logo
+// by its ink (area), so a heavy wordmark (Stan) and a thin one (Disney+) look the same weight
+const DENS = {"appletv":0.42,"binge":0.72,"crunchyroll":0.56,"dazn":0.41,"disney":0.17,"foxtel":0.51,"netflix":0.82,"now":0.66,"paramount":0.68,"prime":0.28,"raiplay":0.46,"spotify":0.64,"stan":0.62,"stremio":0.49,"twitch":0.44,"vtmgo":0.59,"youtube":0.89};
 const out = {};
 for (const id of Object.keys(L).sort()) {
   const [file, prec, keep, colour] = L[id];
@@ -40,15 +43,15 @@ for (const id of Object.keys(L).sort()) {
   const bs = paths.map((p) => bbox(p));
   const x0 = Math.min(...bs.map((b) => b[0])), y0 = Math.min(...bs.map((b) => b[1])), x1 = Math.max(...bs.map((b) => b[2])), y1 = Math.max(...bs.map((b) => b[3]));
   const r = (n) => String(+n.toFixed(prec + 1));
-  out[id] = { vb: [r(x0), r(y0), r(x1 - x0), r(y1 - y0)].join(" "), c: colour, d: paths };
+  out[id] = { vb: [r(x0), r(y0), r(x1 - x0), r(y1 - y0)].join(" "), c: colour, k: DENS[id], d: paths };
   if (WORD.has(id)) out[id].w = 1;
 }
 const js = "// Small vector logos for the Keep watching / Now playing cards (made by tv-home/tools/build_app_logos.mjs; sources and\n" +
   "// licences: SOURCES.md). { catalogue id: { vb: viewBox cut to the logo, c: brand colour, d: one path } }. An app not here keeps its picture.\n" +
   "(function (root) {\n  var L = " + JSON.stringify(out) + ";\n" +
-  "  // markup for the app's logo (white; the page's CSS may colour it), sized to fit `maxH` x `maxW` rem; \"\" when the app has none\n" +
+  "  // markup for the app's logo (white; the page's CSS may colour it), sized by its ink area (k) within `maxH` x `maxW` rem; \"\" when the app has none\n" +
   "  function svg(id, maxH, maxW) {\n    var l = Object.prototype.hasOwnProperty.call(L, id) ? L[id] : null;\n    if (!l) return \"\";\n" +
-  "    var v = l.vb.split(\" \"), r = v[2] / v[3], h = Math.min(maxH, maxW / r), w = Math.round(r * h * 100) / 100;\n" +
+  "    var v = l.vb.split(\" \"), r = v[2] / v[3], h = Math.min(maxH, maxW / r, Math.max(l.w ? 1.1 : 1.2, Math.sqrt((l.w ? 5 : 1.9) / (r * l.k)))), w = Math.round(r * h * 100) / 100;\n" +
   "    return '<svg class=\"alogo\" viewBox=\"' + l.vb + '\" style=\"width:' + w + 'rem;height:' + Math.round(h * 100) / 100 + 'rem\" fill=\"currentColor\" aria-hidden=\"true\">' + l.d.map(function (d) { return '<path d=\"' + d + '\"/>'; }).join('') + '</svg>';\n  }\n" +
   "  root.APP_LOGOS = { logos: L, svg: svg, word: function (id) { return !!(Object.prototype.hasOwnProperty.call(L, id) && L[id].w); }, has: function (id) { return Object.prototype.hasOwnProperty.call(L, id); } };\n" +
   "  if (typeof module !== \"undefined\" && module.exports) module.exports = root.APP_LOGOS;\n})(typeof window !== \"undefined\" ? window : this);\n";

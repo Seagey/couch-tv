@@ -1215,7 +1215,7 @@
     var id = window.CouchApps.idOf(pkg);
     if (!id || !window.APP_LOGOS.has(id)) return null;
     var word = LOGO_ONLY && window.APP_LOGOS.word(id);
-    return { html: window.APP_LOGOS.svg(id, word ? 2.25 : 1.75, word ? 7.5 : 6), word: word };
+    return { html: window.APP_LOGOS.svg(id, word ? 2.75 : 1.75, word ? 7.5 : 6), word: word };
   }
 
   // ---------------- the photo, the clock and the big title ----------------

@@ -629,7 +629,7 @@ html.spotify-align-center.theme-night .shelf {
 .ncard .nap img { width: 1.625rem; height: 1.625rem; border-radius: 0.4375rem; object-fit: cover; }
 /* the app's vector logo (app-logos.js): white, sharp at any size; its size comes from the markup */
 .ncard .nap.hasl { min-height: 1.625rem; overflow: visible; }   /* as tall as the 26 px picture it replaces, so a card is the height it was */
-.ncard .nap .alogo { flex: none; display: block; margin: -0.3125rem 0; color: rgba(255, 255, 255, 0.95); }   /* up to 2.25rem tall in a 1.625rem line: the card keeps its height */
+.ncard .nap .alogo { flex: none; display: block; margin: -0.5625rem 0; color: rgba(255, 255, 255, 0.95); }   /* up to 2.75rem tall in a 1.625rem line: the card keeps its height */
 .ncard b { display: block; margin-top: 0.375rem; font-size: 1.8125rem; line-height: 2.25rem; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .ncard i { display: block; font-style: normal; font-size: 1.3125rem; line-height: 1.75rem; color: rgba(255, 255, 255, 0.78); }
 .ncard .nbar { display: block; height: 0.3125rem; margin-top: 0.625rem; border-radius: 0.2rem; background: rgba(255, 255, 255, 0.25); overflow: hidden; }
