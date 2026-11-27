@@ -62,12 +62,42 @@ def slug(name):
 
 def opens_house(entity, attrs=None):
     """By its id, or by the name Home Assistant gives it (a switch called "Garage Door"): the same test
-    on domain + "." + the name in lower case with _ between words. Names in other languages are not caught."""
+    on domain + "." + the name in lower case with _ between words, and (G11, 28 Nov 2026) the name in any
+    language the home speaks (name_opens_house)."""
     entity = str(entity or "")
     if OPENS_HOUSE.fullmatch(entity):
         return True
-    n = slug((attrs or {}).get("friendly_name")) if isinstance(attrs, dict) else ""
-    return bool(n) and bool(OPENS_HOUSE.fullmatch(entity.split(".")[0] + "." + n))
+    raw = (attrs or {}).get("friendly_name") if isinstance(attrs, dict) else ""
+    n = slug(raw)
+    if n and OPENS_HOUSE.fullmatch(entity.split(".")[0] + "." + n):
+        return True
+    return entity.split(".")[0] in NAMED_DOMAINS and name_opens_house(raw)
+
+
+# G11 (lane B, 28 Nov 2026): a cover, switch, script or scene NAMED for a garage, gate, door, lock or alarm in any language
+# the home speaks ("Garagentor", "Puerta del garaje", "Alarme maison") never shows, whatever its id. The words are Matter's
+# (bridge/matter.py OPENS_HOUSE_WORDS, 13 languages) plus alarm words. tests/fixtures/opens_house_names.json is every copy's test.
+NAMED_DOMAINS = ("cover", "switch", "script", "scene")
+ALARM_WORDS = [r"alarm\w*", r"allarm[ei]", r"disarm\w*", r"[הבלמו]?אזעק\w*", r"(?:ال)?إنذار\w*"]
+
+
+def _name_words():
+    try:
+        from matter import OPENS_HOUSE_WORDS
+    except Exception:   # matter.py could not load: its words, kept in step by the fixture test
+        OPENS_HOUSE_WORDS = [r"garages?", r"gates?", r"doors?", r"locks?"]
+    return re.compile(r"(?<!\w)(?:" + "|".join(OPENS_HOUSE_WORDS + ALARM_WORDS) + r")(?!\w)", re.I)
+
+
+NAME_OPENS_HOUSE = _name_words()
+
+
+def name_opens_house(name):
+    if not name:
+        return False
+    s = re.sub(r"(?<=[a-zà-ÿ])(?=[A-ZÀ-Þ])", " ", str(name))
+    s = re.sub(r"[\d_]+", " ", s)
+    return bool(NAME_OPENS_HOUSE.search(s))
 MODES = ["off", "heat", "cool", "heat_cool", "auto", "dry", "fan_only"]
 FAN = re.compile(r"[A-Za-z0-9 _-]{1,24}")
 UNIT = re.compile(r"[^\x00-\x1f<>]{1,12}")
@@ -121,7 +151,7 @@ def parse(o):
             if not isinstance(x, dict):
                 continue
             ent = str(x.get("entity") or "").strip()
-            if not ok.fullmatch(ent) or OPENS_HOUSE.fullmatch(ent) or any(n["entity"] == ent for n in out):
+            if not ok.fullmatch(ent) or opens_house(ent, {"friendly_name": x.get("name")}) or any(n["entity"] == ent for n in out):
                 continue
             out.append({"entity": ent, "name": str(x.get("name") or "").strip()[:40]})
         return out

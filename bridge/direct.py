@@ -22,6 +22,8 @@ import os
 import re
 import time
 
+import rooms
+
 FILE = "direct.json"
 HOST = re.compile(r"[A-Za-z0-9.-]{1,253}")
 HUE_USER = re.compile(r"[A-Za-z0-9_-]{20,64}")
@@ -364,6 +366,29 @@ class Direct:
                 return {"ok": False, "error": "failed"}
             self.cache = {"at": time.time(), "data": data}
         return {"ok": True}
+
+    # ---------------- rooms per TV (bridge/rooms.py): which zones, lights and speakers each TV may see
+    def room(self, tv_id):
+        """The room the account gave this TV (by its id in config.json), or None: every zone."""
+        if not tv_id:
+            return None
+        r = self._kept().get("rooms")
+        return rooms.clean(r.get(str(tv_id))) if isinstance(r, dict) else None
+
+    def set_room(self, tv_id, room):
+        o = self._kept()
+        r = o.get("rooms") if isinstance(o.get("rooms"), dict) else {}
+        c = rooms.clean(room)
+        if c:
+            r[str(tv_id)] = c
+        else:
+            r.pop(str(tv_id), None)
+        if r:
+            o["rooms"] = r
+        else:
+            o.pop("rooms", None)
+        self._write(o)
+        return c
 
     def forget(self, which):
         o = self._kept()

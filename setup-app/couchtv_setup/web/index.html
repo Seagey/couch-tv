@@ -12,6 +12,7 @@
 <link rel="icon" type="image/png" href="img/icon-128.png">
 <link rel="stylesheet" href="style.css">
 <link rel="stylesheet" href="tidy.css">
+<link rel="stylesheet" href="smarthome.css">
 </head>
 <body>
 <svg width="0" height="0" aria-hidden="true" focusable="false" class="defs"><defs>
@@ -444,7 +445,71 @@
       <button class="tool" id="health-look" type="button"><span><small>Something not right?</small><b>Show the health report</b></span><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#arrow"/></svg></button>
       <button class="tool" id="debug-off" type="button"><span><small>Done with the computer?</small><b>Switch debugging off</b></span><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#arrow"/></svg></button>
       <button class="tool" id="tidy-go" type="button" hidden><span><small>Clear out what you do not use</small><b>Tidy up your TV</b></span><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#arrow"/></svg></button>
+      <button class="tool" id="smart-go" type="button"><span><small>Air con, lights and speakers</small><b>Add your smart home</b></span><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#arrow"/></svg></button>
     </div>
+  </section>
+
+  <!-- the Smart home step (smart.js, smarthome.css; mockups in couch-tv/coord/mockups-1128/B). Nothing here touches a TV. -->
+  <section data-step="smart" class="sheet wide shome" hidden>
+    <h1>Your smart home</h1>
+    <p class="lead">We looked on your Wi-Fi. Connect the ones you want on your TVs.</p>
+    <p class="hint" id="sh-looking" aria-live="polite">Looking on your Wi-Fi...</p>
+    <ul class="shlist" id="sh-list"></ul>
+    <details class="which" id="sh-matter-box" hidden><summary>Add a Matter device with a code</summary>
+      <p class="small">In Google Home, Apple Home, SmartThings or Alexa, choose the device, then Share or Linked Matter apps. Copy the 11 digit code here.</p>
+      <label>Matter code<span class="row"><input id="sh-matter-code" inputmode="numeric" autocomplete="off" maxlength="40"><button class="primary" id="sh-matter-go" type="button">Add it</button></span></label>
+      <p class="hint" id="sh-matter-status" aria-live="polite"></p>
+    </details>
+    <details class="which"><summary>Not listed? Type its address</summary>
+      <label>Home Assistant address<span class="row"><input id="sh-ha-addr" placeholder="http://homeassistant.local:8123" autocomplete="off"><button id="sh-ha-addr-go" type="button">Connect</button></span></label>
+      <label>Hue Bridge address<span class="row"><input id="sh-hue-addr" placeholder="the address in the Hue app" autocomplete="off"><button id="sh-hue-addr-go" type="button">Connect</button></span></label>
+      <label>AirTouch console address<span class="row"><input id="sh-at-addr" placeholder="the address on the AirTouch screen" autocomplete="off"><button id="sh-at-addr-go" type="button">Connect</button></span></label>
+    </details>
+    <p class="small">Locks, alarms, garage doors and gates never show on a TV.</p>
+    <p class="hint" id="sh-status" aria-live="polite"></p>
+    <div class="actions"><button class="primary" id="sh-next" type="button" disabled>Next: rooms for each TV</button><button class="link" id="sh-skip" type="button">Skip smart home</button><button class="link" id="sh-again" type="button">Look again</button></div>
+  </section>
+
+  <section data-step="smart-ha" class="sheet shome" hidden>
+    <h1>Sign in to Home Assistant</h1>
+    <p class="lead">We opened Home Assistant in your browser. Sign in there, then come back.</p>
+    <div class="linkstep"><div class="waitbox"><span class="spin"></span><span id="sh-ha-wait">Waiting for you to sign in</span></div></div>
+    <div class="actions"><button id="sh-ha-open" type="button">Open it again</button></div>
+    <details class="which" id="sh-ha-tokbox"><summary>Use a long-lived token instead</summary>
+      <p class="small">In Home Assistant, open your profile, then Security, then Create token. Copy it here.</p>
+      <label>Home Assistant address<input id="sh-ha-base" autocomplete="off"></label>
+      <label>Token<input id="sh-ha-token" type="password" autocomplete="off"></label>
+      <div class="actions"><button class="primary" id="sh-ha-token-go" type="button">Use this token</button></div>
+    </details>
+    <p class="hint" id="sh-ha-status" aria-live="polite"></p>
+    <p class="small">Your key is locked in your account. Only the TVs you choose get it.</p>
+  </section>
+
+  <section data-step="smart-hue" class="sheet shome" hidden>
+    <h1>Press the button on your Hue Bridge</h1>
+    <p class="lead">It is the big round button on top. You have 30 seconds.</p>
+    <div class="huepic" aria-hidden="true"><div class="hb"><i></i></div></div>
+    <div class="linkstep"><div class="waitbox"><span class="spin"></span><span id="sh-hue-wait">Waiting for the button</span></div></div>
+    <p class="hint" id="sh-hue-status" aria-live="polite"></p>
+    <div class="actions"><button id="sh-hue-again" type="button">Try again</button><button class="link" id="sh-hue-skip" type="button">Skip Hue</button></div>
+  </section>
+
+  <section data-step="smart-rooms" class="sheet wide shome" hidden>
+    <h1>Rooms for each TV</h1>
+    <p class="lead">Pick what each TV can see and control.</p>
+    <p class="hint" id="sh-rooms-note" aria-live="polite"></p>
+    <div class="shtvs" id="sh-tvs"></div>
+    <p class="small">Locks, alarms, garage doors and gates never show. A TV with nothing ticked gets no smart home key.</p>
+    <p class="hint" id="sh-save-status" aria-live="polite"></p>
+    <div class="actions"><button class="primary" id="sh-save" type="button">Save to my account</button></div>
+  </section>
+
+  <section data-step="smart-done" class="sheet shome" hidden>
+    <h1>Your smart home is saved</h1>
+    <p class="lead">Each TV picks it up the next time it checks with your account.</p>
+    <ul class="checks" id="sh-done-list"></ul>
+    <p class="small">Change rooms any time in your account, under Connections.</p>
+    <div class="actions"><button class="primary" id="sh-done" type="button">Done</button></div>
   </section>
 
   <!-- what each card on the finish screen opens -->
@@ -564,5 +629,6 @@
 </footer>
 <script src="app.js"></script>
 <script src="tidy.js"></script>
+<script src="smart.js"></script>
 </body>
 </html>

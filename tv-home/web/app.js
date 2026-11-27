@@ -670,6 +670,8 @@
   function haTaken() { var h = keptKeys(); if (h.ha && h.ha.pending) { delete h.ha.pending; keepKeys(h); } }
   // at start: a Home Assistant key the launcher has not taken yet (the page restarted before the check finished) is applied now
   function resumeAccountKeys() {
+    if (!ACCOUNT) ACCOUNT = keptAccount();
+    applyAccountRoom();
     var h = keptKeys();
     if (h.ha && h.ha.pending) useAccountKey("ha", { url: h.ha.url, token: h.ha.pending });
     else if (h.ha && h.ha.dropping) dropAccountKey("ha", h.ha);
@@ -774,6 +776,16 @@
     }
     if (r.photos && applyAccountPhotos(r.photos)) { saveSettings(); ahChanged(); }
     if (r.keys) applyAccountKeys(r.keys);
+    applyAccountRoom();
+  }
+  // Lane B (28 Nov 2026): the room the account gave this TV (a pack's details.rooms holds only this TV's own one). Smart home then shows and
+  // answers only that room's air con, lights and speakers: the page (smarthome.js setRoom), the launcher and the home computer each enforce it.
+  // Only with account details in hand: a TV with no account details leaves whatever room it has.
+  function applyAccountRoom() {
+    var d = ACCOUNT && ACCOUNT.details;
+    if (!d || typeof d !== "object" || !(window.smartHome && window.smartHome.setRoom)) return;
+    var r = d.rooms && typeof d.rooms === "object" ? d.rooms : null, k = r ? Object.keys(r) : [];
+    try { window.smartHome.setRoom(k.length === 1 && r[k[0]] && typeof r[k[0]] === "object" ? r[k[0]] : null); } catch (e) {}
   }
   // A pack that arrived with a design (held by design-code.js until now). The account wins: its people
   // first, then the ones added on this TV; the town and the guest Wi-Fi too. A wipe takes out only what

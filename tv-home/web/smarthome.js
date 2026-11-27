@@ -52,6 +52,8 @@
     // Matter devices shared from Google Home, Apple Home, SmartThings or Alexa (matter.js): the same lists
     if (window.CouchMatter) window.CouchMatter.merge(INFO);
     INFO.controls = INFO.controls.filter(houseSafe); INFO.scenes = INFO.scenes.filter(houseSafe);
+    // only this TV's room (setRoom): the launcher and the home computer leave the rest out too, this catches Matter and anything merged here
+    INFO.climate = INFO.climate.filter(inRoom); INFO.controls = INFO.controls.filter(inRoom); INFO.speakers = INFO.speakers.filter(inRoom);
     INFO.energy = INFO.energy === true; INFO.doorbell = INFO.doorbell === true; INFO.doorbell_camera = INFO.doorbell_camera === true;
     return INFO;
   }
@@ -103,7 +105,19 @@
     return false;
   }
   var OPENERS = {};
-  function houseSafe(x) { var e = x && typeof x.entity === "string" ? x.entity : ""; return !!e && !x.blocked && !OPENERS[e] && !opensHouse(e); }
+  // G11 (lane B, 28 Nov 2026): a cover, switch, script or scene NAMED for a garage, gate, door, lock or alarm in any language the home
+  // speaks ("Garagentor", "Puerta del garaje", "Alarme maison") never shows, whatever its id. Matter's words (bridge/matter.py
+  // OPENS_HOUSE_WORDS) plus alarm words, matched against whole words without lookbehind or Unicode classes (older TV browsers);
+  // tests/fixtures/opens_house_names.json is every copy's test.
+  var NAME_WORDS = ["garages?", "gates?", "doors?", "locks?", "garagen.*", "tore?", ".*(?:tür|tuer)(?:e|en)?", ".*schlo(?:ss|ß)", ".*(?:einfahrts|hof|garten|roll|schiebe|flügel|fluegel)tore?", "(?:voor|achter|garage|zij|tuin|schuif|kantel|rol|kelder|balkon|terras)?deur(?:en)?", "(?:garage|toegangs|tuin|rol|schuif|inrit)?poort(?:en)?", "slot(?:en)?", "(?:tuin|toegangs|schuif|draai|inrit)?hek(?:ken)?", "portails?", "portes?", "serrures?", "barrières?", "garajes?", "cocheras?", "puertas?", "port[oó]n(?:es)?", "verjas?", "cerraduras?", "cancelas?", "cerrojos?", "portas?", "portone", "portoni", "cancell[oi]", "serratur[ae]", "basculante", "garage[mn]s?", "port[ãa]o", "port[õo]es", "fechaduras?", "garaj.*", "kap[ıi].*", "kilit.*", "kilid.*", "gara[žżz].*", "kapij.*", "vrata", "brav[au]", "bram(?:a|y|ę|ie|ą|ka|ki|kę)?", "drzwi", "zam(?:ek|ka|ku|ki|kiem)", "gar[áa][žz].*", "br[áa]n(?:a|y|u|ou|ě)", "dve[řr].*", "z[áa]m(?:ek|ku|ky|kem)", "[הבלמו]?(?:מוסך|שער|דלת|מנעול)", "(?:ال)?(?:مرآب|كراج|جراج|بوابة|باب|قفل)", "alarm.*", "allarm[ei]", "disarm.*", "[הבלמו]?אזעק.*", "(?:ال)?إنذار.*"];
+  var NAME_RE = new RegExp("^(?:" + NAME_WORDS.join("|") + ")$", "i");
+  function nameOpensHouse(name) {
+    if (!name) return false;
+    var s = String(name).replace(/([a-z\u00e0-\u00ff])([A-Z\u00c0-\u00de])/g, "$1 $2").replace(/[\d_]+/g, " ");
+    return s.split(/[\s.,;:!?'"()\[\]{}\/\\+&*#@%=<>|~`^\-]+/).some(function (w) { return !!w && NAME_RE.test(w); });
+  }
+  function namedOpener(e, name) { return /^(cover|switch|script|scene)\./.test(e) && nameOpensHouse(name); }
+  function houseSafe(x) { var e = x && typeof x.entity === "string" ? x.entity : ""; return !!e && !x.blocked && !OPENERS[e] && !opensHouse(e) && !namedOpener(e, x.name); }
   function safeControls(r) {
     if (!r || !r.ok || !Array.isArray(r.controls)) return r;
     r.controls.forEach(function (c) { if (c && c.blocked && typeof c.entity === "string") OPENERS[c.entity] = true; });
@@ -112,9 +126,63 @@
     return r;
   }
   function ask(action, entity, value) {
-    if (action === "controls") return askMatter(action, entity, value).then(safeControls);
+    if (ROOM && entity && ROOM_ONE.indexOf(action) >= 0 && !roomAllows(ROOM, entity)) return Promise.resolve({ ok: false, error: "refused" });
+    if (action === "controls") return askMatter(action, entity, value).then(safeControls).then(roomed);
     if (action === "scene") return askMatter(action, entity, value).then(function (r) { return sceneRefused(entity, r); });
-    return askMatter(action, entity, value);
+    return askMatter(action, entity, value).then(roomed);
+  }
+
+  // ---------------- rooms per TV (Phase 2 lane B, 28 Nov 2026) ----------------
+  // The account says which air con, lights and speakers this TV may see (details.rooms[<this TV>], set in Couch TV Setup or the account).
+  // app.js hands it over with setRoom. The one rule every copy follows (HomeAssistant.kt RoomCap, bridge/rooms.py, Setup's smarthome.py,
+  // the account's lib/home-v2.mjs; tests/fixtures/room_caps.json): no room or a name only, everything; only climate.*, light.* and
+  // media_player.* are capped; an AirTouch zone "airtouch_2" is climate.airtouch_2; "only" caps all three to their lists, otherwise
+  // a kind is capped only when it has a list.
+  var ROOM = null, ROOM_SIG = "", ROOM_API = null;
+  var ROOM_ONE = ["temp", "mode", "fan", "on", "off", "set", "volume", "playpause", "history"];
+  function roomAllows(room, entity) {
+    var e = String(entity || ""), d = e.split(".")[0];
+    if (!room || typeof room !== "object" || ["climate", "light", "media_player"].indexOf(d) < 0) return true;
+    var zones = Array.isArray(room.zones) ? room.zones.map(function (z) { z = String(z); return z.indexOf(".") >= 0 ? z : "climate." + z; }) : null;
+    var lists = {
+      climate: Array.isArray(room.climate) || zones ? (Array.isArray(room.climate) ? room.climate : []).concat(zones || []) : null,
+      light: Array.isArray(room.lights) ? room.lights : null,
+      media_player: Array.isArray(room.speakers) ? room.speakers : null
+    };
+    var l = lists[d];
+    if (!l) return room.only !== true;
+    return l.indexOf(e) >= 0;
+  }
+  function inRoom(x) { return !ROOM || !(x && typeof x.entity === "string") || roomAllows(ROOM, x.entity); }
+  function roomed(r) {
+    if (!ROOM || !r || typeof r !== "object") return r;
+    ["rooms", "controls", "speakers"].forEach(function (k) { if (Array.isArray(r[k])) r[k] = r[k].filter(inRoom); });
+    return r;
+  }
+  // a room that caps something, checked, or null
+  function cleanRoom(room) {
+    if (!room || typeof room !== "object") return null;
+    var o = {}, any = false;
+    if (room.only === true) { o.only = true; any = true; }
+    ["climate", "lights", "speakers", "zones"].forEach(function (k) {
+      if (!Array.isArray(room[k])) return;
+      o[k] = room[k].filter(function (e) { return typeof e === "string" && /^[A-Za-z0-9_.:-]{1,80}$/.test(e); }).slice(0, 16);
+      any = true;
+    });
+    return any ? o : null;
+  }
+  function pushRoom() {
+    var n = window.TVHA;
+    if (n && n.setupRoomFromAccount) setupAsk(function (id) { n.setupRoomFromAccount(id, JSON.stringify(ROOM)); });
+    var api = (BRIDGE && BRIDGE.api) || ROOM_API;
+    if (api) api("POST", "/api/ha/room", { room: ROOM }, 15000).then(function () { if (BRIDGE) bridgeInfo(); }, function () {});
+  }
+  function setRoom(room) {
+    var r = cleanRoom(room), sig = JSON.stringify(r);
+    if (sig === ROOM_SIG) return;
+    ROOM = r; ROOM_SIG = sig;
+    pushRoom();
+    reload();
   }
   // a scene or script picked earlier that the TV or computer refuses to run (it opens the house): its
   // button goes from every list at once, as the bridge's info() leaves it out from then on
@@ -496,6 +564,8 @@
   }
   function useBridge(api) {
     if (window.CouchMatter) window.CouchMatter.use(api);   // Matter devices through the same server
+    // the home computer learns this TV's room too (it answers Hue, AirTouch and, on a web TV, Home Assistant): a room set before it was there
+    if (typeof api === "function" && !ROOM_API) { ROOM_API = api; if (ROOM_SIG) api("POST", "/api/ha/room", { room: ROOM }, 15000).then(function () {}, function () {}); }
     if (window.TVHA) { useDirect(api); return; }
     if (BRIDGE || typeof api !== "function") return;
     var post = function (path, body, id, cb) {
@@ -570,6 +640,8 @@
     // Hue or AirTouch was set up on the home computer from this TV: read its list again
     rebridge: function (api) { if (window.TVHA) { DIRECT = null; reload(); useDirect(api); } else bridgeInfo(); },
     useBridge: useBridge, setup: setup, setupReply: setupReply, reload: reload,
+    // the room the account gave this TV (app.js applyAccountRoom), and the rule, for the tests
+    setRoom: setRoom, room: function () { return ROOM; }, roomAllows: roomAllows,
     phoneChanged: phoneChanged, onPhone: function (f) { if (typeof f === "function" && phoneWatchers.indexOf(f) < 0) phoneWatchers.push(f); },
     enabled: enabled, live: live, still: still, stillOk: stillOk,
     available: available, open: open, close: close, move: move, ok: ok, paint: paint, reply: reply,
@@ -614,4 +686,5 @@
   };
   // the house test, for the tests (tests/test_ws2_smarthome.mjs runs every id in tests/fixtures/opens_house_ids.json)
   window.smartHome.opensHouse = opensHouse;
+  window.smartHome.nameOpensHouse = namedOpener;
 })();

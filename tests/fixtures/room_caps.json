@@ -1,0 +1,29 @@
+{
+ "about": "The per room rule (lane B, 28 Nov 2026): which entities one TV may see and control, given its room from the account (details.rooms[<tv id>]). Every copy is tested with these: HomeAssistant.kt RoomCap, tv-home/web/smarthome.js roomAllows, bridge/rooms.py, setup-app couchtv_setup/smarthome.py, tv-designer server lib/home-v2.mjs roomAllows.",
+ "cases": [
+  {"room": null, "entity": "climate.lounge", "ok": true},
+  {"room": {"label": "Lounge"}, "entity": "light.kitchen", "ok": true},
+  {"room": {"label": "Guest", "only": true}, "entity": "climate.lounge", "ok": false},
+  {"room": {"label": "Guest", "only": true}, "entity": "light.kitchen", "ok": false},
+  {"room": {"label": "Guest", "only": true}, "entity": "media_player.lounge", "ok": false},
+  {"room": {"label": "Guest", "only": true}, "entity": "switch.kettle", "ok": true},
+  {"room": {"label": "Guest", "only": true}, "entity": "scene.movie_night", "ok": true},
+  {"room": {"label": "Guest", "only": true}, "entity": "camera.front", "ok": true},
+  {"room": {"label": "Guest", "only": true, "climate": ["climate.guest"]}, "entity": "climate.guest", "ok": true},
+  {"room": {"label": "Guest", "only": true, "climate": ["climate.guest"]}, "entity": "climate.lounge", "ok": false},
+  {"room": {"label": "Guest", "only": true, "zones": ["airtouch_3"]}, "entity": "climate.airtouch_3", "ok": true},
+  {"room": {"label": "Guest", "only": true, "zones": ["airtouch_3"]}, "entity": "climate.airtouch_1", "ok": false},
+  {"room": {"label": "Guest", "only": true, "zones": ["airtouch_3"]}, "entity": "climate.guest", "ok": false},
+  {"room": {"label": "Guest", "only": true, "lights": ["light.hue_4"]}, "entity": "light.hue_4", "ok": true},
+  {"room": {"label": "Guest", "only": true, "lights": ["light.hue_4"]}, "entity": "light.hue_5", "ok": false},
+  {"room": {"label": "Guest", "only": true, "speakers": ["media_player.guest"]}, "entity": "media_player.guest", "ok": true},
+  {"room": {"zones": ["airtouch_2"]}, "entity": "climate.airtouch_2", "ok": true},
+  {"room": {"zones": ["airtouch_2"]}, "entity": "climate.airtouch_1", "ok": false},
+  {"room": {"zones": ["airtouch_2"]}, "entity": "climate.bedroom", "ok": false},
+  {"room": {"zones": ["airtouch_2"]}, "entity": "light.kitchen", "ok": true},
+  {"room": {"zones": ["airtouch_2"]}, "entity": "media_player.lounge", "ok": true},
+  {"room": {"lights": ["light.lamp"]}, "entity": "light.lamp", "ok": true},
+  {"room": {"lights": ["light.lamp"]}, "entity": "light.desk", "ok": false},
+  {"room": {"lights": ["light.lamp"]}, "entity": "climate.lounge", "ok": true}
+ ]
+}

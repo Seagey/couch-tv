@@ -90,14 +90,38 @@ object HomeAssistant {
         changed?.invoke(ctx)
     }
 
-    /** The section, checked, or null when smart home is off. */
+    /**
+     * The section, checked, or null when smart home is off. When the account gave this TV a room (keepRoom), what is outside it is
+     * left out here, so every read, every control and every list (answer, info, status, the widgets) only ever sees this TV's room.
+     */
     fun settings(ctx: Context): Settings? {
         val raw = store(ctx).getString(KEY, null) ?: return null
-        if (raw == cachedFrom) return cached
-        val s = try { parse(JSONObject(raw)) } catch (e: Exception) { null }
-        cached = s; cachedFrom = raw
+        val room = store(ctx).getString(ROOM, null)
+        val from = raw + "\u0000" + (room ?: "")
+        if (from == cachedFrom) return cached
+        val s = try { parse(JSONObject(raw))?.let { RoomCap.apply(RoomCap.parse(room), it) } } catch (e: Exception) { null }
+        cached = s; cachedFrom = from
         return s
     }
+
+    private const val ROOM = "room"
+
+    /**
+     * The room Couch TV Studio's account gave this TV (details.rooms[<this TV>], from Couch TV Setup or the account page): only its air con,
+     * lights and speakers show and answer here. Null or a room that caps nothing takes it away. It is a cap on top of whatever is ticked:
+     * ticking more on the TV, or a phone sign in, never widens it; only the account changes it.
+     */
+    fun keepRoom(ctx: Context, room: JSONObject?) {
+        val r = RoomCap.parse(room?.toString())
+        val e = store(ctx).edit()
+        if (r == null) e.remove(ROOM) else e.putString(ROOM, r.toJson().toString())
+        e.commit()
+        cached = null; cachedFrom = null
+        changed?.invoke(ctx)
+    }
+
+    /** The room kept now, as the page may know it (names of entities only), or null. */
+    fun room(ctx: Context): JSONObject? = RoomCap.parse(store(ctx).getString(ROOM, null))?.toJson()
 
     private fun parse(o: JSONObject): Settings? {
         val base = cleanBase(o.optString("url")) ?: return null
@@ -113,7 +137,7 @@ object HomeAssistant {
                 if (out.size >= most) break
                 val x = a.optJSONObject(k) ?: continue
                 val ent = x.optString("entity").trim()
-                if (!ok.matches(ent) || HaReadings.OPENS_HOUSE.matches(ent) || out.any { it.entity == ent }) continue
+                if (!ok.matches(ent) || HaReadings.OPENS_HOUSE.matches(ent) || (ent.substringBefore('.') in setOf("cover", "switch", "script", "scene") && HaReadings.nameOpensHouse(x.optString("name"))) || out.any { it.entity == ent }) continue
                 out.add(Named(ent, x.optString("name").trim().take(40)))   // no name: Home Assistant's own
             }
             return out
@@ -726,6 +750,56 @@ object HomeAssistant {
 
     /** The page's question, answered as the launcher would (tests: HomeAssistantTest). */
     internal fun answerForTest(s: Settings?, action: String, entity: String, value: String): JSONObject = answer(s, action, entity, value)
+}
+
+/**
+ * Which rooms this TV may see and control (Phase 2 lane B, 28 Nov 2026). The one rule every copy follows (tv-home/web/smarthome.js
+ * roomAllows, bridge/rooms.py, setup-app smarthome.py, the account's lib/home-v2.mjs), tested with tests/fixtures/room_caps.json:
+ * no room, or a name only: everything. Only climate.*, light.* and media_player.* are capped. An AirTouch zone "airtouch_2" is
+ * climate.airtouch_2. "only" caps all three to their lists (no list: none of that kind); otherwise a kind is capped only when listed.
+ */
+class RoomCap(val only: Boolean, val climate: List<String>?, val lights: List<String>?, val speakers: List<String>?, val zones: List<String>?) {
+    private val air: List<String>? = if (climate == null && zones == null) null else (climate.orEmpty() + zones.orEmpty().map { if ('.' in it) it else "climate.$it" })
+
+    fun allows(entity: String): Boolean {
+        val list = when (entity.substringBefore('.')) {
+            "climate" -> air
+            "light" -> lights
+            "media_player" -> speakers
+            else -> return true
+        }
+        return if (list == null) !only else entity in list
+    }
+
+    fun toJson(): JSONObject = JSONObject().apply {
+        if (only) put("only", true)
+        climate?.let { put("climate", JSONArray(it)) }; lights?.let { put("lights", JSONArray(it)) }
+        speakers?.let { put("speakers", JSONArray(it)) }; zones?.let { put("zones", JSONArray(it)) }
+    }
+
+    companion object {
+        private val ENTITY = Regex("[a-z_]{1,32}\\.[a-z0-9_]{1,64}")
+        private val ZONE = Regex("[A-Za-z0-9_.:-]{1,40}")
+
+        /** A room as the account sends it, checked; null when it caps nothing. */
+        fun parse(raw: String?): RoomCap? {
+            val o = try { JSONObject(raw ?: return null) } catch (e: Exception) { return null }
+            fun list(k: String, ok: Regex): List<String>? {
+                val a = o.optJSONArray(k) ?: return null
+                return (0 until minOf(a.length(), 16)).map { a.optString(it).trim() }.filter { ok.matches(it) }.distinct()
+            }
+            val r = RoomCap(o.optBoolean("only", false), list("climate", ENTITY), list("lights", ENTITY), list("speakers", ENTITY), list("zones", ZONE))
+            return if (r.only || r.climate != null || r.lights != null || r.speakers != null || r.zones != null) r else null
+        }
+
+        /** The settings with what is outside the room left out (null room: unchanged). */
+        fun apply(r: RoomCap?, s: HomeAssistant.Settings): HomeAssistant.Settings {
+            if (r == null) return s
+            fun keep(l: List<HomeAssistant.Named>) = l.filter { r.allows(it.entity) }
+            return HomeAssistant.Settings(s.base, s.token, keep(s.climate), s.scenes, s.doorbell, keep(s.controls), s.cameras, s.sensors, s.energy,
+                keep(s.speakers), s.refresh, s.client)
+        }
+    }
 }
 
 /**

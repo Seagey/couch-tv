@@ -54,6 +54,7 @@ import smarthome
 import haphone
 import bookings
 import direct
+import rooms
 import matter
 import say
 import phonepage
@@ -3488,6 +3489,37 @@ def _tv_ips():
     return _tv_addrs["ips"]
 
 
+_tv_by_addr = {"at": 0.0, "map": {}}
+
+
+def tv_id_of(request):
+    """The id (config.json) of the TV asking, found by its address; None for this computer, a phone or anything else."""
+    ip = client_ip(request)
+    if not ip:
+        return None
+    if time.time() - _tv_by_addr["at"] > 300:
+        m = {}
+        for c in config.TVS:
+            h = config.tv_host(c)
+            if not h:
+                continue
+            try:
+                for a in socket.getaddrinfo(str(h), None):
+                    m.setdefault(a[4][0], c["id"])
+            except OSError:
+                pass
+        _tv_by_addr.update(at=time.time(), map=m)
+    return _tv_by_addr["map"].get(ip)
+
+
+def room_of(request):
+    """The room the account gave the TV asking (bridge/rooms.py), or None: no cap."""
+    try:
+        return HA.direct.room(tv_id_of(request)) if HA.direct else None
+    except Exception:
+        return None
+
+
 def secret_caller_ok(request):
     if config.PAIRING_KEY:
         return True   # the middleware has already checked the key on every /api/ call
@@ -3543,7 +3575,7 @@ async def h_stay_names(request):
 
 async def h_ha_info(request):
     # phone: this bridge serves the phone page that sets smart home up (bridge/haphone.py, /ha)
-    return ok(info=HA.info(), status=dict(HA.status(), phone=True))
+    return ok(info=rooms.info(room_of(request), HA.info()), status=dict(HA.status(), phone=True))
 
 
 # Smart home set up from a phone: the TV shows a QR code for /ha (bridge/haphone.py). One entry URL,
@@ -3562,7 +3594,26 @@ async def h_ha(request):
     action = str(data.get("action") or "")
     if action not in smarthome.ACTIONS:
         return ok(result={"ok": False, "error": "refused"})
-    return ok(result=await HA.answer(action, data.get("entity"), data.get("value")))
+    # per room: a TV whose room the account set never reaches another room's air con, lights or speakers (bridge/rooms.py)
+    room = room_of(request)
+    if not rooms.ask_ok(room, action, data.get("entity")):
+        return ok(result={"ok": False, "error": "refused"})
+    return ok(result=rooms.answer(room, action, await HA.answer(action, data.get("entity"), data.get("value"))))
+
+
+@tv_or_paired
+async def h_ha_room(request):
+    """The TV's page hands over the room its account gave it ({room}: details.rooms[<account tv id>], or null for none).
+    A TV sets its own room only; a paired phone or this computer names the TV with "tv"."""
+    data = await body(request)
+    tv = tv_id_of(request)
+    if not tv:
+        want = str(data.get("tv") or "")
+        if want and (config.PAIRING_KEY or client_ip(request) is None) and any(c["id"] == want for c in config.TVS):
+            tv = want
+    if not tv or not HA.direct:
+        return ok(result={"ok": False, "error": "refused"})
+    return ok(result={"ok": True, "room": HA.direct.set_room(tv, data.get("room"))})
 
 
 @tv_or_paired
@@ -6008,6 +6059,7 @@ def make_app():
     r.add_post("/api/ha/check", h_ha_check)
     r.add_post("/api/ha/save", h_ha_save)
     r.add_post("/api/ha/forget", h_ha_forget)
+    r.add_post("/api/ha/room", h_ha_room)
     r.add_post("/api/ha/phone", h_ha_phone)
     HA_PHONE.routes(r)
     r.add_post("/api/ha/direct", h_direct)
