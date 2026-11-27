@@ -1396,7 +1396,9 @@ sub dlWidget(out as Object, o as Object, ctx as Object, look as Object)
         cf = "Antonio-Light"
         if dlIsStr(st.font) and st.font <> "antonio" then cf = "Inter-Medium"
         dh = ih
-        if dlTrue(op.date) then dh = ih * 0.72
+        ' any size (28 Nov 2026): the date line only where it still reads (a clock one row tall is the time alone)
+        showDate = dlTrue(op.date) and ih >= 110
+        if showDate then dh = ih * 0.72
         if kind = "tallclock"
             parts = t.split(":")
             size = dlFit("00", cf, iw, dh / 2, 600)
@@ -1417,7 +1419,7 @@ sub dlWidget(out as Object, o as Object, ctx as Object, look as Object)
             size = dlFit(t, cf, iw, dh / 1.15, 600)
             items.push(dlLabel(t, x + pad, y + pad + (dh - size * 1.15) / 2, iw, size * 1.2, cf, size, ink, align))
         end if
-        if dlTrue(op.date) and kind <> "flipclock"
+        if showDate and kind <> "flipclock"
             d = dlDateText(invalid, now)
             ds = dlFit(d, "Inter-Medium", iw, ih * 0.2, 48)
             items.push(dlLabel(d, x + pad, y + pad + ih - ds * 1.3, iw, ds * 1.3, "Inter-Medium", ds, dimc, align))

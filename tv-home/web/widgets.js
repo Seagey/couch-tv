@@ -876,14 +876,43 @@
   }
 
   // clocks
+  // a clock's own edge: the usual 24 px, less in a small box so the time keeps the room (owner, 28 Nov 2026:
+  // a clock can be dragged to any size, from one tile up to the whole wall)
+  function clockPad(root, b) {
+    if (root.classList.contains("cw-bare") || root.classList.contains("cw-photo")) return 0;
+    var pd = Math.round(clamp(Math.min(b.w, b.h) * 0.12, 8, 24));
+    root.style.setProperty("--pad", px(pd));
+    return pd;
+  }
+  // The digital clock at any size: the time as big as the box allows, then the date line and the seconds
+  // (when they are switched on) only where they still fit, the date short where the long one would not.
+  // The digits' widths: Inter at weight 640 is about .62 em a figure; am and pm are a third the size.
   R.clock = function (root, o, b, env) {
-    var secs = setting(o, env, "seconds") === true;
-    var p = clockParts(nowIn(o, env), o, env, secs), sub = setting(o, env, "date") !== false && b.h >= 200, shortD = b.w < 420;
-    var align = op(o).align || "center", showAp = setting(o, env, "ampm") !== false && p.ap && b.w >= 300;
-    var fs = Math.min((b.h - (sub ? 60 : 0)) * 0.75, b.w / (p.t.length * 0.62 + (showAp ? 0.6 : 0)), 240);
-    var tEl = E("span", "", "", [p.t]), aEl = showAp ? E("span", "", "font-size:" + px(Math.max(24, fs * 0.3)) + ";letter-spacing:0;margin-left:.12em;font-weight:600;opacity:.8", [p.ap]) : null;
-    var big = E("div", "cw-big", "font-size:" + px(fs) + ";font-weight:640;text-align:" + align + (root.classList.contains("cw-bare") ? ";text-shadow:0 4px 30px rgba(0,0,0,.25)" : ""), [tEl, aEl]);
-    var dEl = sub ? E("div", "cw-t29 cw-dim", "margin-top:" + px(Math.max(14, fs * 0.12)) + ";text-align:" + align + (root.classList.contains("cw-bare") ? ";text-shadow:0 2px 14px rgba(0,0,0,.3)" : ""), [shortD ? shortDate(nowIn(o, env)) : longDate(nowIn(o, env))]) : null;
+    var pd = clockPad(root, b), iw = b.w - 2 * pd, ih = b.h - 2 * pd, d0 = nowIn(o, env);
+    // am and pm from 300 wide, the date line from 200 tall (as before); the seconds when switched on and they still read
+    var wantSecs = setting(o, env, "seconds") === true, wantDate = setting(o, env, "date") !== false && b.h >= 200, wantAp = setting(o, env, "ampm") !== false && b.w >= 300;
+    var fit = function (secs, ap, date) {
+      var p = clockParts(d0, o, env, secs), apOn = ap && !!p.ap;
+      var dFs = date ? clamp(ih * 0.13, 23, 96) : 0, dGap = date ? Math.max(8, dFs * 0.4) : 0;
+      var fs = Math.min((ih - dFs * 1.22 - dGap) / 0.95, iw / (p.t.length * 0.62 + (apOn ? 0.5 : 0)));
+      var dTxt = date ? (iw >= longDate(d0).length * dFs * 0.58 ? "long" : iw >= shortDate(d0).length * dFs * 0.6 ? "short" : null) : "";
+      return { secs: secs, ap: apOn, date: date, fs: fs, dFs: dFs, dGap: dGap, dTxt: dTxt, ok: fs >= 20 && dTxt !== null };
+    };
+    // the date line and am or pm first (each goes when the time would be much smaller with it), then the seconds
+    // on top when they are switched on and the time still reads at 30 px or more
+    var bare = fit(false, false, false), L = bare;
+    [[wantAp, wantDate], [false, wantDate], [wantAp, false]].some(function (c) {
+      if (!c[0] && !c[1]) return false;
+      var t = fit(false, c[0], c[1]);
+      if (t.ok && t.fs >= bare.fs * (c[1] ? 0.7 : 0.8)) { L = t; return true; }
+      return false;
+    });
+    if (wantSecs) { var ts = fit(true, L.ap, L.date); if (ts.ok && ts.fs >= 30) L = ts; }
+    var fs = Math.max(16, L.fs), secs = L.secs, showAp = L.ap, sub = L.date, shortD = L.dTxt === "short";
+    var align = op(o).align || "center", p = clockParts(d0, o, env, secs);
+    var tEl = E("span", "", "display:inline-block", [p.t]), aEl = showAp ? E("span", "", "display:inline-block;font-size:" + px(Math.max(23, fs * 0.3)) + ";letter-spacing:0;margin-left:.12em;font-weight:600;opacity:.8", [p.ap]) : null;
+    var big = E("div", "cw-big", "font-size:" + px(fs) + ";font-weight:640;white-space:nowrap;text-align:" + align + (root.classList.contains("cw-bare") ? ";text-shadow:0 4px 30px rgba(0,0,0,.25)" : ""), [tEl, aEl]);
+    var dEl = sub ? E("div", "cw-t29 cw-dim", "font-size:" + px(L.dFs) + ";white-space:nowrap;margin-top:" + px(L.dGap) + ";text-align:" + align + (root.classList.contains("cw-bare") ? ";text-shadow:0 2px 14px rgba(0,0,0,.3)" : ""), [shortD ? shortDate(d0) : longDate(d0)]) : null;
     add(root, E("div", "cw-col cw-center", "height:100%;align-items:" + (align === "left" ? "flex-start" : align === "right" ? "flex-end" : "center"), [big, dEl]));
     live(root, 1000, function () { var q = clockParts(nowIn(o, env), o, env, secs); tEl.textContent = q.t; if (aEl) aEl.textContent = q.ap; if (dEl) dEl.textContent = shortD ? shortDate(nowIn(o, env)) : longDate(nowIn(o, env)); });
   };
@@ -891,8 +920,8 @@
   // box grows .12em at the bottom (and a little at the top) to hold them whole, and the size comes from
   // the room inside the widget's own padding (seagey, 18 Nov 2026: the bottom of the digits was cut off)
   function tallFs(root, b, len) {
-    var ins = root.classList.contains("cw-bare") || root.classList.contains("cw-photo") ? 0 : 48;
-    return Math.max(24, Math.min((b.h - ins) / 0.98, (b.w - ins) / (len * 0.42)));
+    var ins = 2 * clockPad(root, b);
+    return Math.max(16, Math.min((b.h - ins) / 0.98, (b.w - ins) / (len * 0.42)));
   }
   var TALL = "font-family:Antonio,'Arial Narrow',sans-serif;font-weight:300;line-height:.82;padding:.03em 0 .13em;letter-spacing:-.02em;white-space:nowrap;flex:none;";
   R.tallclock = function (root, o, b, env) {
@@ -914,7 +943,7 @@
     live(root, 1000, function () { tEl.textContent = clockParts(nowIn(o, env), o, env).t; });
   };
   R.analog = function (root, o, b, env, sh) {
-    var s = Math.min(b.w, b.h) - 48, d = nowIn(o, env), hand = "#ff6a3d", ink = rgba(sh.ink, 1);
+    var s = Math.min(b.w, b.h) - 2 * clockPad(root, b), d = nowIn(o, env), hand = "#ff6a3d", ink = rgba(sh.ink, 1);
     var ticks = [];
     for (var i = 0; i < 12; i++) ticks.push(S("line", { x1: 50, y1: 5, x2: 50, y2: i % 3 ? 9 : 13, stroke: ink, "stroke-width": i % 3 ? 1.2 : 2.6, "stroke-linecap": "round", transform: "rotate(" + i * 30 + " 50 50)", opacity: i % 3 ? 0.5 : 0.95 }));
     var hH = S("line", { x1: 50, y1: 50, x2: 50, y2: 25, stroke: ink, "stroke-width": 4.4, "stroke-linecap": "round" });
@@ -934,7 +963,7 @@
     void d;
   };
   R.flipclock = function (root, o, b, env) {
-    var pad = root.classList.contains("cw-bare") ? 0 : 48, cw = Math.min((b.w - pad - 20 - 56) / 4, (b.h - pad) * 0.72), hgt = Math.min(b.h - pad, cw / 0.72), cards = [];
+    var pad = 2 * clockPad(root, b), cw =Math.min((b.w - pad - 20 - 56) / 4, (b.h - pad) * 0.72), hgt = Math.min(b.h - pad, cw / 0.72), cards = [];
     var card = function () { var t = E("span", "", "", ["0"]); var c = E("div", "", "position:relative;width:" + px(cw) + ";height:" + px(hgt) + ";border-radius:22px;background:#1f1f23;display:flex;align-items:center;justify-content:center;font-size:" + px(Math.min(hgt * 0.78, cw * 1.25)) + ";font-weight:700;letter-spacing:-.04em;color:#f2f2f2;box-shadow:inset 0 -3px 0 rgba(0,0,0,.4);margin:0 7px", [t, E("i", "", "position:absolute;left:0;right:0;top:50%;height:3px;background:#0b0b0d")]); cards.push(t); return c; };
     add(root, E("div", "cw-row cw-center", "height:100%", [card(), card(), E("div", "", "width:20px"), card(), card()]));
     var set = function () { var t = clockParts(nowIn(o, env), o, env).t.replace(":", ""); if (t.length === 3) t = "0" + t; for (var i = 0; i < 4; i++) cards[i].textContent = t.charAt(i); };
@@ -945,9 +974,13 @@
     var precise = setting(o, env, "precise") === true, dayline = setting(o, env, "dayline") !== false;
     // the longest the words get, so the size holds as the minutes change
     var tw = precise ? "Twenty seven minutes past\neleven" : timeWords(nowIn(o, env)), tl = tw.split("\n"), longest = Math.max.apply(null, tl.map(function (l) { return l.length; }));
-    var fs = clamp(Math.min((b.w - 48) / (longest * 0.56), (b.h - (dayline ? 120 : 48)) / (tl.length * 1.06)), 36, 130);
+    // any size (owner, 28 Nov 2026): the words grow with the box, and the day line with them
+    var pd = clockPad(root, b), iw = b.w - 2 * pd, ih = b.h - 2 * pd;
+    var dFs = dayline ? clamp(ih * 0.09, 23, 64) : 0, dGap = dayline ? clamp(dFs * 0.6, 8, 36) : 0;
+    if (dayline && ih - dFs * 1.22 - dGap < tl.length * 1.06 * 30) { dayline = false; dFs = 0; dGap = 0; }
+    var fs = Math.max(23, Math.min(iw / (longest * 0.56), (ih - dFs * 1.22 - dGap) / (tl.length * 1.06)));
     var w = E("div", "", "font-size:" + px(fs) + ";font-weight:780;line-height:1.02;letter-spacing:-.03em;white-space:pre-line", [timeWords(nowIn(o, env), precise)]);
-    var s = dayline ? E("div", "cw-t29 cw-dim", "margin-top:18px", [DAYS[nowIn(o, env).getDay()] + " " + partOfDay(nowIn(o, env))]) : null;
+    var s = dayline ? E("div", "cw-t29 cw-dim", "font-size:" + px(dFs) + ";margin-top:" + px(dGap), [DAYS[nowIn(o, env).getDay()] + " " + partOfDay(nowIn(o, env))]) : null;
     add(root, E("div", "cw-grow cw-col", "justify-content:center", [w, s]));
     live(root, precise ? 5000 : 15000, function () { w.textContent = timeWords(nowIn(o, env), precise); if (s) s.textContent = DAYS[nowIn(o, env).getDay()] + " " + partOfDay(nowIn(o, env)); });
   };
@@ -1180,7 +1213,8 @@
       var t = Timer.live();
       var own = timerOwn(o, env);
       if (!t && env.demo) t = { end: Date.now() + 668000, total: 1080000, label: own.label || "Pizza", demo: 1 };
-      var wide = b.w > b.h * 1.6, s = Math.min(wide ? b.h : b.w, b.h) - 48;
+      // wide: the ring beside the time, only when the time still has room beside it at 30 px or more
+      var wide = b.w > b.h * 1.6 && (b.w - 48 - (b.h - 48) - 24) / (5 * 0.62) >= 30, s = Math.min(wide ? b.h : b.w, b.h) - 48;
       if (!t) {
         // the widget's own name and Quick start, so OK does what it says
         var l1 = own.label ? own.label : "No timer", l2 = own.minutes ? tl("OK starts {time}", { time: minWordsShort(own.minutes) }) : "OK to start one";
@@ -1199,7 +1233,7 @@
       var fs = clamp(s * (words.length > 5 ? 0.17 : 0.21), 26, 110);
       var label = E("div", "cw-t23 cw-ell", "max-width:" + px(s * 0.78) + (done ? ";color:#ff453a;font-weight:700" : ""), [t.label]);
       if (wide) {
-        add(root, E("div", "cw-row", "height:100%", [ring(s, frac, null, done), E("div", "cw-col", "margin-left:24px;min-width:0", [E("div", "cw-big", "font-size:" + px(clamp(b.h * 0.42, 40, 96)), [words]), label])]));
+        add(root, E("div", "cw-row", "height:100%", [ring(s, frac, null, done), E("div", "cw-col", "margin-left:24px;min-width:0", [E("div", "cw-big", "white-space:nowrap;font-size:" + px(Math.min(clamp(b.h * 0.42, 40, 96), (b.w - 48 - s - 24) / (words.length * 0.62))), [words]), label])]));
       } else {
         add(root, E("div", "cw-grow cw-row cw-center", "position:relative", [ring(s, frac, null, done),
           E("div", "", "position:absolute;text-align:center", [E("div", "", "font-size:" + px(fs) + ";font-weight:650;letter-spacing:-.02em" + (done ? ";color:#ff453a" : ""), [words]), s >= 140 ? label : null])]));
@@ -1231,7 +1265,7 @@
       return;
     }
     add(root, [q.place === false ? null : E("div", "cw-t29 cw-ell", "font-weight:640", [w.place || "Here"]),
-      E("div", "cw-big", "font-size:" + px(tiny ? 72 : large ? Math.min(124, b.h * 0.3) : 92) + ";margin-top:6px", [w.temp + "°"]), E("div", "cw-grow"),
+      E("div", "cw-big", "white-space:nowrap;font-size:" + px(Math.min(tiny ? 72 : large ? Math.min(124, b.h * 0.3) : 92, fitPx(w.temp + "°", b.w - 48, 124))) + ";margin-top:6px", [w.temp + "°"]), E("div", "cw-grow"),
       tiny ? null : ic(wxIcon(w.code, w.is_day), 40, rgba(sh.ink, 1), "solid"),
       E("div", "cw-t25 cw-ell", "color:var(--ink);font-weight:600;margin-top:6px", [wxWords(w.code)]),
       q.hilo === false || w.hi === undefined ? null : E("div", "cw-t23", "", [w.ahead ? w.ahead.label + " H:" + w.ahead.hi + "° L:" + w.ahead.lo + "°" : "H:" + w.hi + "° L:" + w.lo + "°"])]);
@@ -1263,6 +1297,8 @@
       b.h >= 300 ? E("div", "cw-t23 cw-ell cw-ahead", "", [wxWords(ah.code)]) : null])
       : E("div", "cw-t29 cw-ell", "font-weight:680;margin-top:6px", [wxWords(w.code) + (w.hi !== undefined && b.w >= 400 ? ", top of " + w.hi + "°" : "")]);
     if (ah) fs = Math.min(fs, b.h * 0.42);
+    // any size: the number never pushes the line under it out of a short wide box (the icon grows with the width)
+    fs = Math.max(40, Math.min(fs, (b.h - 48 - clamp(b.w / 6, 44, 80) - (ah && b.h >= 300 ? 76 : 44)) / 0.92));
     add(root, [E("div", "cw-row cw-sp", "", [o.opts && o.opts.place === false ? E("span") : E("div", "cw-t29 cw-ell", "font-weight:700", [w.place || "Here"]), ic(wxIcon(w.code, w.is_day), clamp(b.w / 6, 44, 80), rgba(sh.ink, 1), "solid")]),
       E("div", "cw-grow"), E("div", "cw-big", "font-size:" + px(fs) + ";letter-spacing:-.06em", [w.temp + "°"]), words]);
   };
@@ -1391,8 +1427,8 @@
     var swell = compass(m.dir) + " swell" + (isFinite(m.period) ? ", " + Math.round(m.period) + "s" : "");
     var u = env.demo ? { h: "m", w: "kmh" } : surfUnits(o, env);
     var wind = isFinite(m.wind) ? compass(m.windDir) + " " + windIn(m.wind, u) : "";
-    var big = E("div", "cw-big", "font-size:" + px(b.h < 200 ? (b.w < 460 ? 56 : 64) : 92), [waveIn(m.wave, u), E("span", "", "font-size:" + (b.h < 200 && b.w < 460 ? "23px" : ".4em"), [u.h === "ft" ? "ft" : "m"])]);
-    if (b.h < 200) {
+    var big = E("div", "cw-big", "font-size:" + px(b.h < 300 ? (b.w < 460 ? 56 : 64) : 92), [waveIn(m.wave, u), E("span", "", "font-size:" + (b.h < 300 && b.w < 460 ? "23px" : ".4em"), [u.h === "ft" ? "ft" : "m"])]);
+    if (b.h < 300) {
       // a wide tile: the place, the swell and the wind beside the height (a place of its own: no icon, the room for its name)
       add(root, E("div", "cw-row cw-sp", "height:100%", [E("div", "cw-col", "min-width:0;flex:0 1 auto;align-items:stretch;text-align:left", [lab(pk && pk.name ? null : "wind", place, "rgba(255,255,255,.88)"), E("div", "cw-t25 cw-ell", "color:#fff;margin-top:4px", [swell]),
         wind ? E("div", "cw-t23 cw-ell", "color:#fff;margin-top:2px", [wind]) : null]), E("div", "", "flex:none;margin-left:10px", [big])]));
@@ -1498,7 +1534,7 @@
     var card = E("div", "cw-layer", "", [E("div", "cw-fill", "background:#2a2a30 center/cover;" + (s.art ? "background-image:" + cssImg(s.art) : "")),
       E("div", "cw-fill", "background:linear-gradient(180deg,rgba(0,0,0,.05) 35%,rgba(0,0,0,.8))"),
       E("div", "", "position:absolute;left:24px;right:24px;bottom:22px;color:#fff", [
-        b.h >= 300 ? E("div", "cw-row", "", [s.app ? appIcon(s.app, logoA, env) : null, E("span", "cw-t23", "color:rgba(255,255,255,.88);margin-left:10px", [s.owner ? tl("{name} is watching", { name: s.owner }) : "Keep watching"])]) : null,
+        b.h >= 300 ? E("div", "cw-row", "max-width:100%;min-width:0", [s.app ? appIcon(s.app, logoA, env) : null, E("span", "cw-t23 cw-ell", "min-width:0;color:rgba(255,255,255,.88);margin-left:10px", [s.owner ? tl("{name} is watching", { name: s.owner }) : "Keep watching"])]) : null,
         b.h >= 300 ? E("div", "cw-t38 cw-ell", "margin-top:10px;font-weight:720", [s.title]) : fitT(E("div", "", WRAP + "font-size:25px;line-height:1.15;font-weight:720;margin-top:10px", [s.title])), b.h >= 220 && s.sub ? E("div", "cw-t23 cw-ell", "color:rgba(255,255,255,.82)", [s.sub]) : null,
         s.progress ? E("div", "cw-bar", "margin-top:14px", [E("b", "", "width:" + Math.round(s.progress * 100) + "%;background:#fff")]) : null])]);
     stop(card, s.act || "show", s.arg !== undefined ? s.arg : i, s.title);
@@ -1768,7 +1804,7 @@
     var m = music(env), buttons = setting(o, env, "buttons") !== false;
     if (m && setting(o, env, "cover") === false) { m = JSON.parse(JSON.stringify(m)); m.art = ""; m.noCover = true; }
     if (!m) return dataOf(env).bridge === false ? soon(root, b, "music", "nowplaying") : empty(root, b, "music", "Nothing playing", "Songs playing on this TV show up here");
-    if (b.w < 300 && b.h < 300) {
+    if (b.w < 300) {   // (one tile across, however tall: the cover)
       // a tile: the cover, with play or pause on it; OK opens the player
       root.classList.add("cw-photo");
       add(root, [E("div", "cw-fill", "background:#333 center/cover;display:flex;align-items:center;justify-content:center;" + (m.art ? "background-image:" + cssImg(m.art) : ""), m.noCover ? [ic("music", 64, "rgba(255,255,255,.6)")] : null), E("div", "cw-fill", "background:linear-gradient(180deg,transparent 40%,rgba(0,0,0,.7))"),
@@ -1780,11 +1816,13 @@
     var art = E("div", "", "width:" + px(s) + ";height:" + px(s) + ";border-radius:24px;background:#333 center/cover;flex:none;box-shadow:0 14px 40px rgba(0,0,0,.35);" + (m.art ? "background-image:" + cssImg(m.art) : ""));
     var btn = function (name, sz) { return E("div", "", "padding:10px;border-radius:50%;display:flex", [ic(name, sz, "currentColor", "solid")]); };
     var pct = m.dur ? clamp(m.pos / m.dur, 0, 1) : 0.38;
-    var info = E("div", "cw-col", "min-width:0;" + (wide ? "flex:0 1 auto;margin-left:30px;width:" + px(Math.min(b.w - 48 - s - 30, Math.max(260, (b.w - 48 - s - 30) * 0.6))) : "flex:1"), [
-      E("div", "cw-lab", "", [m.app ? appIcon(m.app, 34, env) : ic("music", 30), m.source || "Now playing"]),
-      E("div", "cw-ell", "margin-top:10px;font-size:" + px(big ? 64 : 38) + ";font-weight:760;letter-spacing:-.02em;line-height:1.1", [m.title]),
-      E("div", "cw-ell cw-dim", "font-size:" + px(big ? 38 : 29) + ";font-weight:560", [m.artist]), E("div", "cw-grow"),
-      b.h >= 420 && env.demo ? E("div", "cw-row", "margin-top:18px", ["Living", "Kitchen"].map(function (r2, i) { return E("div", "cw-chip", "height:48px;font-size:23px;" + (i ? "margin-left:12px" : ""), [ic("speaker", 26), r2]); })) : null,
+    // any size: a short wide box (one row of tiles tall) has the song and the artist only, a bit smaller
+    var infoW = wide ? Math.min(b.w - 48 - s - 30, Math.max(260, (b.w - 48 - s - 30) * 0.6)) : b.w - 48, short = wide && b.h < 240;
+    var info = E("div", "cw-col", "min-width:0;" + (wide ? "flex:0 1 auto;margin-left:30px;" + (short ? "max-width:" : "width:") + px(infoW) : "flex:1") + (short ? ";justify-content:center" : ""), [
+      short ? null : E("div", "cw-lab", "", [m.app ? appIcon(m.app, 34, env) : ic("music", 30), m.source || "Now playing"]),
+      E("div", "cw-ell", "margin-top:" + (short ? 0 : 10) + "px;font-size:" + px(short ? 32 : big ? 64 : 38) + ";font-weight:760;letter-spacing:-.02em;line-height:1.1", [m.title]),
+      E("div", "cw-ell cw-dim", "font-size:" + px(short ? 25 : big ? 38 : 29) + ";font-weight:560", [m.artist]), short ? null : E("div", "cw-grow"),
+      b.h >= 420 && env.demo && infoW >= 400 ? E("div", "cw-row", "margin-top:18px", ["Living", "Kitchen"].map(function (r2, i) { return E("div", "cw-chip", "height:48px;font-size:23px;" + (i ? "margin-left:12px" : ""), [ic("speaker", 26), r2]); })) : null,
       b.h >= 240 ? E("div", "cw-bar", "margin-top:14px", [E("b", "", "width:" + Math.round(pct * 100) + "%")]) : null,
       b.h >= 300 && m.dur ? E("div", "cw-row cw-sp cw-t23", "margin-top:8px", [E("span", "", "", [Math.floor(m.pos / 60) + ":" + ("0" + Math.floor(m.pos % 60)).slice(-2)]), E("span", "", "", ["-" + Math.floor((m.dur - m.pos) / 60) + ":" + ("0" + Math.floor((m.dur - m.pos) % 60)).slice(-2)])]) : null,
       b.h >= 300 && buttons ? E("div", "cw-row cw-np-buttons", "justify-content:center;margin-top:10px", [btn("previous", 40, "prev"), E("div", "", "width:40px"), btn(m.state === "playing" ? "pause" : "play", 52, "play"), E("div", "", "width:40px"), btn("next", 40, "next")]) : null]);
@@ -1998,7 +2036,7 @@
       // a long name: on its own lines above, the volume under it
       return E("div", "cw-col", "flex:none;width:100%;align-items:" + (al === "left" ? "flex-start" : al === "right" ? "flex-end" : "center"), [fitWords(root, s.name, W, 25, 2, 650), pct]);
     };
-    if (b.h < 200) {
+    if (b.h < 300) {
       // a wide tile: the one playing (else the first), its volume and what it plays
       var p = list.filter(function (s) { return s.state === "playing"; })[0] || list[0], song = spkSong(p);
       add(root, [head(p, false), E("div", "cw-grow"), song ? fitWords(root, song, W, 24, 1, 560, "color:var(--sub)") : null, bar(p)]);
@@ -2068,7 +2106,7 @@
         E("div", "cw-big", "font-size:" + px(nm1 ? clamp(b.w * 0.36, 44, 64) : 40), [r.current != null ? Math.round(tconv(r.current, r, env)) + "°" : tdeg(r.target, r, env)]), E("div", "cw-t23 cw-ell", "", [on ? roomMode(r) + " " + tdeg(r.target, r, env) : "Off"])]);
     } else if (b.h < 200) {
       // a wide tile: the room and its mode beside the set temperature
-      add(root, E("div", "cw-row", "height:100%", [E("div", "cw-col", "flex:1;min-width:0", [fitLab(root, "aircon", r.name || "Aircon", b.w - 48 - 140), E("div", "cw-row", "margin-top:8px", [dot, E("span", "cw-t25 cw-ell", "margin-left:12px;color:var(--ink);font-weight:650", [on ? roomMode(r) : "Off"])]),
+      add(root, E("div", "cw-row", "height:100%;width:100%;justify-content:center", [E("div", "cw-col", "flex:0 1 auto;min-width:0", [fitLab(root, "aircon", r.name || "Aircon", b.w - 48 - 140), E("div", "cw-row", "margin-top:8px", [dot, E("span", "cw-t25 cw-ell", "margin-left:12px;color:var(--ink);font-weight:650", [on ? roomMode(r) : "Off"])]),
         E("div", "cw-t23 cw-ell", "margin-top:2px", [tl("Now {temp}", { temp: tdeg(r.current, r, env) })])]),
         E("div", "cw-big", "font-size:84px;margin-left:16px;opacity:" + (on ? 1 : 0.55), [tdeg(r.target, r, env)])]));
     } else {
@@ -2078,9 +2116,9 @@
       var under = !wideA && b.h >= 700 && b.w >= 700 && others.length && setting(o, env, "others") !== false;
       var s = Math.min(b.h - 130 - (under ? 90 : 0), wideA ? b.w * 0.5 : b.w - 48);
       var chip = function (z, css) { var zo = roomOn(z); return E("div", "cw-chip" + (zo ? " on" : ""), css + (zo ? "background:" + (MODE_COL[z.state] || "#64d2ff") : ""), [zo ? z.name + " " + tdeg(z.target, z, env) : tl("{room} off", { room: z.name })]); };
-      if (!wideA) root.style.justifyContent = "center";
+      root.style.justifyContent = "center";   // any size: the name and the dial together in the middle
       add(root, [E("div", "cw-row cw-sp", "", [lab("aircon", r.name || "Aircon"), E("div", "cw-chip on", "height:44px;font-size:23px;background:" + col + ";color:#1a1406", [on ? roomMode(r) : "Off"])]),
-        E("div", (wideA ? "cw-grow " : "") + "cw-row cw-center", wideA ? "" : "margin-top:20px", [dial(s, r.target != null ? r.target : (roomUnit(r) === "f" ? 72 : 22), r.current != null ? Math.round(r.current * 10) / 10 : null, r, env), wideA && b.w >= 700 && others.length && setting(o, env, "others") !== false ? E("div", "cw-col", "margin-left:30px", others.map(function (z) {
+        E("div", (wideA && b.h < 500 ? "cw-grow " : "") + "cw-row cw-center", wideA && b.h < 500 ? "" : "margin-top:20px", [dial(s, r.target != null ? r.target : (roomUnit(r) === "f" ? 72 : 22), r.current != null ? Math.round(r.current * 10) / 10 : null, r, env), wideA && b.w >= 700 && others.length && setting(o, env, "others") !== false ? E("div", "cw-col", "margin-left:30px", others.map(function (z) {
           return chip(z, "margin:7px 0;");
         })) : null]), under ? E("div", "cw-row cw-center", "margin-top:24px;flex-wrap:wrap", others.map(function (z) { return chip(z, "margin:0 7px;"); })) : null]);
     }
@@ -2102,8 +2140,11 @@
       stop(root, "detail", "scenes", op(o).label || "Scenes");
       return;
     }
-    var strip = b.h < 200, cols = strip ? Math.max(1, Math.min(list.length, Math.floor((b.w - 28) / 160))) : b.w > 500 ? 3 : 2, rows = strip ? 1 : Math.max(1, Math.floor((b.h - 70) / 150)), n = Math.min(list.length, cols * rows);
-    var mw = (b.w - 48 - 20 * (cols - 1)) / cols, mh = strip ? b.h - 48 : (b.h - 48 - 60 - 20 * (rows - 1)) / rows;
+    // any size: as many columns and rows as the scenes need (no empty rows), so the tiles fill the box
+    var strip = b.h < 200, cols = strip ? Math.max(1, Math.min(list.length, Math.floor((b.w - 28) / 160))) : Math.max(1, Math.min(list.length, b.w < 300 ? 1 : b.w > 500 ? Math.max(3, Math.floor((b.w - 48) / 300)) : 2));
+    var rows = strip ? 1 : Math.max(1, Math.min(Math.ceil(list.length / cols), Math.floor((b.h - 70) / 150))), n = Math.min(list.length, cols * rows);
+    // whole pixels, so a row of modules never wraps on a rounding
+    var mw = Math.floor((b.w - 48 - 20 * (cols - 1)) / cols), mh = Math.floor(strip ? b.h - 48 : (b.h - 48 - 60 - 20 * (rows - 1)) / rows);
     add(root, [strip ? null : lab("favourite", op(o).label || "Scenes"), E("div", "cw-mods", strip ? "" : "margin-top:8px", list.slice(0, n).map(function (x) {
       var inner = mw - (strip ? 32 : 40), room = mh - (strip ? 24 : 32), icS = strip ? 46 : 58;
       var one = fitWords(root, x[1], inner, 25, 1, 700, "color:inherit"), nm = one || fitWords(root, x[1], inner, 25, 2, 700, "color:inherit");
@@ -2192,7 +2233,7 @@
       for (var cols = small ? Math.max(1, Math.min(items.length, Math.floor((W + 20) / 150))) : (q.cols || clamp(Math.round(b.w / 230), 1, 6)); cols >= 1 && !best; cols--) {
         var rows = small ? 1 : Math.max(1, Math.floor((H - head + 20) / 150)), n = Math.min(items.length, cols * rows), c2 = Math.min(cols, n);
         rows = Math.ceil(n / c2);
-        var mw = (W - 20 * (c2 - 1)) / c2, mh = small ? H : Math.min(220, (H - head - 20 * (rows - 1)) / rows);
+        var mw = Math.floor((W - 20 * (c2 - 1)) / c2), mh = Math.floor(small ? H : Math.min(220, (H - head - 20 * (rows - 1)) / rows));   // whole pixels: a row never wraps on a rounding
         var mods = items.slice(0, n).map(function (c) { return ctlMod(root, c, mw, mh, al); });
         var named = mods.every(function (m, i) { return !items[i].name || m.textContent.indexOf(items[i].name) >= 0; });
         if (named || cols === 1) best = { mods: mods, n: n };
@@ -2257,13 +2298,15 @@
       var strip = b.h < 200, side = strip || b.w > b.h * 1.4, picW = side ? (strip ? H * 1.3 : W * 0.46) : W, colW = side && cam ? W - picW - 20 : W;
       var picH = side ? H : Math.min(H * 0.5, W * 0.5625), colH = side || !cam ? H : H - picH - 16;
       var pic = cam ? E("div", "", "position:relative;flex:none;border-radius:22px;overflow:hidden;background:#2b3035 center/cover;" + (src ? "background-image:" + cssImg(src) + ";" : "") +
-        "width:" + px(picW) + ";height:" + px(picH), [!strip ? E("div", "cw-t23", "position:absolute;left:0;right:0;bottom:10px;text-align:center;color:#fff;text-shadow:0 1px 6px rgba(0,0,0,.7)", [env.demo || ring ? "At the ring" : "Door now"]) : null]) : null;
+        "width:" + px(picW) + ";height:" + px(picH), [!strip && picH >= 90 && picW >= 150 ? E("div", "cw-t23", "position:absolute;left:0;right:0;bottom:10px;text-align:center;color:#fff;text-shadow:0 1px 6px rgba(0,0,0,.7)", [env.demo || ring ? "At the ring" : "Door now"]) : null]) : null;
       var big = strip ? 40 : b.w >= 700 ? 72 : 52;
       var timeEl = fitNum(root, words[0], colW, big, hot + "font-weight:700"), lineEl = fitWords(root, strip ? words[2] : words[1], colW, 25, 1, 560, "margin-top:6px;color:var(--sub)");
       var labEl = colH >= (strip || (cam && !side) ? 96 : 150) ? fitLab(root, "doorbell", name, colW) : null;
       var text = E("div", "cw-col", "flex:1;min-width:0;justify-content:center;align-items:" + (al === "left" ? "flex-start" : al === "right" ? "flex-end" : "center") + ";" + (side && cam ? "margin-left:20px" : cam ? "margin-top:16px" : ""), [labEl, labEl ? E("div", "", "height:8px;flex:none") : null, timeEl, lineEl]);
       if (side && cam) { text.style.flex = "0 1 auto"; text.style.maxWidth = px(W - picW - 20); }
-      add(root, E("div", side ? "cw-row" : "cw-col", "width:100%;height:100%;align-items:" + (side ? "stretch" : "center") + ";min-height:0" + (side ? ";" + justify(al) : ""), [pic, text]));
+      // stacked (a tall box): the picture and the words together in the middle, not the words alone
+      if (!side && cam) text.style.flex = "0 1 auto";
+      add(root, E("div", side ? "cw-row" : "cw-col", "width:100%;height:100%;align-items:" + (side ? "stretch" : "center") + ";min-height:0" + (side ? ";" + justify(al) : ";justify-content:center"), [pic, text]));
       // no picture kept from the ring: the door camera now, a new still every two seconds
       if (pic && !ring) liveStill(root, pic, "doorbell", b, env);
     }
@@ -2293,7 +2336,7 @@
         (ownE && fitWords(root, ownE + " kWh", W, 25, 1, 620, "color:var(--ink)")) || (ownE && fitWords(root, ownE, W, 25, 1, 620, "color:var(--ink)")) || fitWords(root, "kWh today", W, 25, 1, 560, "color:var(--sub)") || fitWords(root, "kWh", W, 25, 1, 560, "color:var(--sub)")]);
     } else if (b.h < 200) {
       var leftW = Math.min(W * 0.5, 200);
-      add(root, E("div", "cw-row", "width:100%;height:100%;align-items:stretch", [E("div", "cw-col", "flex:none;width:" + px(leftW) + ";justify-content:center;align-items:" + (al === "right" ? "flex-end" : al === "left" ? "flex-start" : "center"), [fitLab(root, "bolt", name, leftW),
+      add(root, E("div", "cw-row", "width:100%;height:100%;align-items:stretch", [E("div", "cw-col", "flex:none;max-width:" + px(leftW) + ";justify-content:center;align-items:" + (al === "right" ? "flex-end" : al === "left" ? "flex-start" : "center"), [fitLab(root, "bolt", name, leftW),
         fitNum(root, kwh(e.total), leftW, 60, "margin-top:6px"), fitWords(root, "kWh today", leftW, 24, 1, 560, "color:var(--sub)")]),
         E("div", "cw-col", "flex:1;min-width:0;margin-left:16px;justify-content:center", [hourBars(hours, H - 20, 1)])]));
     } else {
@@ -2355,7 +2398,7 @@
     if (!p.s || p.s.ok === false) return haWait(root, b, o, iconName, p.name, NOT_ANSWERING);
     alignRoot(root, al);
     var t = sensorText(p.s, env), pts = p.hist && p.hist.points && p.hist.points.map(function (v) { return v == null ? v : sensorConv(v, p.s, env); }), got = (pts || []).filter(function (v) { return v != null; });
-    if (b.w < 300 && b.h < 300) {
+    if (b.w < 300) {
       add(root, [fitLab(root, iconName, p.name, W), E("div", "cw-grow"), sensorValue(root, t, W, 64)]);
     } else {
       root.setAttribute("data-ha-hist", p.entity);   // smarthome.js reads its last 24 hours
@@ -2425,18 +2468,51 @@
     var v = (wsetOf(o, env) || {})[key];
     return Object.prototype.toString.call(v) === "[object Array]" ? v.filter(function (x) { return typeof x === "string" && x.length <= 120; }).slice(0, 16) : [];
   }
+  // The people card's layout at any size, for n people whose longest name has len letters (0: no names).
+  // Shared with Couch TV Studio (CouchWidgets.peopleLay), so the card it grows for a third person is exactly
+  // the card the TV draws. Faces as big as the box allows, one row on a wide card, more rows on a tall one;
+  // a name past ten letters ends in "..."; with no room for names beside the faces, the faces alone.
+  function peopleLay(w, h, n, len) {
+    var padV = h < 100 ? 6 : Math.round(clamp(h * 0.08, 14, 40)), padH = Math.round(clamp(h * 0.12, 16, 40));
+    var iw = w - 2 * padH, ih = h - 2 * padV, gap = 20, ring = 8, L0 = Math.min(10, len || 0);
+    n = Math.max(1, n || 1);
+    var lay = function (L) {
+      var best = null;
+      for (var rows = 1; rows <= n; rows++) {
+        var cols = Math.ceil(n / rows), cw = (iw - (cols - 1) * gap) / cols - ring, ch = (ih - (rows - 1) * gap * 0.6) / rows - ring;
+        // face a, name font clamp(a * .42, 25, 72) at about .56 em a letter, 12 px between them
+        var a = Math.min(ch, cw, 400);
+        if (L) { var lo = 0, hi = a; for (var it = 0; it < 24; it++) { var mid = (lo + hi) / 2; if (mid + 12 + L * 0.56 * clamp(mid * 0.42, 25, 72) <= cw) lo = mid; else hi = mid; } a = lo; }
+        if (!best || a > best.av + 0.5) best = { av: a, rows: rows, cols: cols };
+      }
+      return best;
+    };
+    var best = lay(L0), names = L0 > 0;
+    if (names && best.av < 34) { names = false; best = lay(0); }
+    var size = Math.max(24, Math.floor(best.av));
+    return { size: size, font: Math.round(clamp(size * 0.42, 25, 72)), names: names, rows: best.rows, cols: best.cols, padV: padV, padH: padH };
+  }
   R.people = function (root, o, b, env) {
     var ps = people(env), who = env.demo ? [] : ownList(o, env, "who"), names = setting(o, env, "names") !== false;
     if (!ps.length) return empty(root, b, "people", "Add people in Home settings", "");
     // Who shows, picked on this TV: only those (in the home's order); someone since removed is skipped
     if (who.length) { var some = ps.filter(function (x) { return who.indexOf(String(x[3])) >= 0; }); if (some.length) ps = some; }
-    var av = clamp(b.h - 20, 40, 62);
-    root.style.padding = b.h < 100 ? "0 20px" : "14px 20px";
-    add(root, E("div", "cw-row", "height:100%;max-width:100%", ps.slice(0, Math.max(1, Math.floor(b.w / (names ? 150 : av + 24)))).map(function (x, i) {
-      var p = E("div", "cw-row", "min-width:0;flex:0 1 auto;opacity:" + (x[2] ? 1 : 0.68) + ";" + (i ? "margin-left:20px" : "") + ";border-radius:40px;padding:4px", [E("div", "", "width:" + px(av) + ";height:" + px(av) + ";border-radius:50%;overflow:hidden;flex:none;" + (x[2] ? "box-shadow:0 0 0 4px #fff" : ""), [personFace(x, av)]),
-        names ? E("span", "cw-t25 cw-ell", "color:var(--ink);margin-left:12px;font-weight:" + (x[2] ? 700 : 560), [x[1]]) : null]);
+    // Any size (owner, 26 and 28 Nov 2026): everyone shows, and the faces and names grow to fill the card. A
+    // wide card keeps one row; a tall one takes the rows that give the biggest faces. A name longer than about
+    // ten letters ends in "..." rather than shrinking everyone.
+    var gap = 20, best = peopleLay(b.w, b.h, ps.length, names ? Math.max.apply(null, ps.map(function (x) { return String(x[1] || "").length; })) : 0);
+    root.style.padding = best.padV + "px " + best.padH + "px";
+    names = best.names;
+    var av = best.size, nfs = best.font;
+    var one = function (x, i) {
+      var p = E("div", "cw-row", "min-width:0;flex:0 1 auto;opacity:" + (x[2] ? 1 : 0.68) + ";" + (i ? "margin-left:" + px(gap) : "") + ";border-radius:" + px(av) + ";padding:4px", [E("div", "", "width:" + px(av) + ";height:" + px(av) + ";border-radius:50%;overflow:hidden;flex:none;" + (x[2] ? "box-shadow:0 0 0 " + px(clamp(av / 16, 3, 8)) + " #fff" : ""), [personFace(x, av)]),
+        names ? E("span", "cw-t25 cw-ell", "font-size:" + px(nfs) + ";color:var(--ink);margin-left:12px;font-weight:" + (x[2] ? 700 : 560), [x[1]]) : null]);
       return stop(p, "person", x[3], x[1]);
-    })));
+    };
+    if (best.rows === 1) { add(root, E("div", "cw-row", "height:100%;max-width:100%;justify-content:center", ps.map(one))); return; }
+    var rowEls = [];
+    for (var r0 = 0; r0 < best.rows; r0++) rowEls.push(E("div", "cw-row", "max-width:100%;justify-content:center;flex:none" + (r0 ? ";margin-top:" + px(gap * 0.6) : ""), ps.slice(r0 * best.cols, (r0 + 1) * best.cols).map(one)));
+    add(root, E("div", "cw-col", "height:100%;width:100%;justify-content:center;align-items:center", rowEls));
   };
 
   // info
@@ -3105,8 +3181,8 @@
     // items 30 px narrower, for its dots)
     var gapL = b.w < 460 ? 14 : 20, mw = b.h - 48, fam = famOf(root);
     while (mw > 64 && fitPxText(m.full, b.w - 48 - mw - gapL, 24, 1, 560, fam) < 24) mw -= 4;
-    add(root, E("div", "cw-row", "height:100%", [svg("0 0 100 100", mw, mw, [S("circle", { cx: 50, cy: 50, r: r, fill: "#2a2a30" }), lit], flip),
-      E("div", "cw-col", "margin-left:" + gapL + "px;min-width:0;flex:1 1 0", [E("div", b.w < 460 ? "cw-t25" : "cw-t29", "font-weight:680;" + TWO, [m.name]), E("div", "cw-t23 cw-ell", "", [m.full])])]));
+    add(root, E("div", "cw-row", "height:100%;justify-content:center", [svg("0 0 100 100", mw, mw, [S("circle", { cx: 50, cy: 50, r: r, fill: "#2a2a30" }), lit], flip),
+      E("div", "cw-col", "margin-left:" + gapL + "px;min-width:0;flex:0 1 auto", [E("div", b.w < 460 ? "cw-t25" : "cw-t29", "font-weight:680;" + TWO, [m.name]), E("div", "cw-t23 cw-ell", "", [m.full])])]));
   };
   CR.bins = function (root, o, b, env) {
     var q = op(o), d = now(), wd = binDay(q) === null ? 3 : binDay(q), ahead = (wd - d.getDay() + 7) % 7;
@@ -3262,7 +3338,7 @@
     var wk = ag.days === "week", d = now(), list = wk ? ag.week : ag.today.length ? ag.today : ag.tomorrow, nx = list[0], day = DAYS[d.getDay()].slice(0, 3).toUpperCase() + " " + d.getDate();
     var heading = wk ? agendaWeek(op(o).label) : agendaHeading(op(o).label, !ag.today.length && ag.tomorrow.length);
     var none = wk ? "this week" : ag.days === "today" ? "today" : "today or tomorrow";
-    if (b.h < 200) {
+    if (b.h < 200 || b.w < 300) {   // (one tile across, however tall: the tile's own layout)
       // a tile or a wide tile: the day, what is next and when. On a tile the day is the event's own
       // ("SUN 22"), with its time alone under it, and the title may take two lines
       if (b.w < 300) {
@@ -3359,7 +3435,8 @@
     if (!w || !w.ssid) return soon(root, b, "wifi", "wifi");
     if (b.h < 200 || b.w < 200) { add(root, ahCol(a, [ahLab("wifi", "Guest Wi-Fi"), one1("cw-t29", "font-weight:700;color:var(--ink);margin-top:4px", w.ssid), one1("cw-t23", "", "OK shows the code")])); return; }
     var nopass = w.sec === "nopass" || !w.pass, hideSet = !nopass && setting(o, env, "hidepass") === true;
-    var narrow = b.w < 600, pwLine = narrow && !nopass && !hideSet, qs = Math.max(80, narrow ? Math.min(b.h - 48 - 46 - (pwLine ? 32 : 0), b.w - 48) : b.h - 48), code = qrNode(w.qr, qs - 24);
+    // a box taller than it is wide stacks the code over the words too (any size: never a code wider than its box)
+    var narrow = b.w < 600 || b.w < b.h * 1.3, pwLine = narrow && !nopass && !hideSet, qs = Math.max(80, narrow ? Math.min(b.h - 48 - 46 - (pwLine ? 32 : 0), b.w - 48) : b.h - 48), code = qrNode(w.qr, qs - 24);
     var box = E("div", "", "width:" + px(qs) + ";height:" + px(qs) + ";border-radius:22px;background:#fff;padding:12px;flex:none;overflow:hidden", [code || E("div", "cw-t23", "color:#1d1b18;padding:8px;" + lines(4), ["The name and password are too long for a code"])]);
     // Hide the password (set on this TV): the code still joins, the words never show (a name and password too long for a code always show the words)
     var hide = hideSet && !!code;
@@ -3460,12 +3537,23 @@
   CR.screentime = R.screentime;
 
   // ---------------- one widget, a stack, the API ----------------
+  // the height (TV px) under which a kind draws its small layout (CR): the full one needs this much room
+  var CR_UNDER = { hourly: 300 };
+  // the biggest box (TV px) a kind's own layout is made for: bigger boxes zoom it up to fill them (one())
+  var GROW = { date: [1160, 100], commute: [1160, 560], quick: [760, 160], timer: [360, 160], word: [760, 560], list: [560, 360], welcome: [1160, 260], agenda: [560, 360] };
   function one(o, b, env) {
     // what was set for this widget on this TV goes over the design's opts (the detail layer gets the same)
     try { o = withSettings(o, env); } catch (e) {}
+    // any size (owner, 28 Nov 2026: white space only as a style choice): a kind whose layout is made for a box up to
+    // GROW[kind] is drawn at that box and the whole widget zoomed up to fill a bigger one, words and all
+    var z = GROW[o.kind] ? clamp(Math.min(b.w / GROW[o.kind][0], b.h / GROW[o.kind][1]), 1, 3) : 1, bOut = b;
+    if (z > 1.05) { b = {}; for (var bk in bOut) if (Object.prototype.hasOwnProperty.call(bOut, bk)) b[bk] = bOut[bk]; b.w = Math.round(bOut.w / z); z = bOut.w / b.w; b.h = Math.floor(bOut.h / z); } else z = 1;
     var sh = shell(o, b, env), root = sh.root, st = o.style || {};
+    if (z > 1) { root.style.zoom = String(Math.round(z * 1000) / 1000); root.setAttribute("data-zoom", String(z)); }
     CTX = { icons: st.icons || (env.look && env.look.icons) || "line" };
-    var draw = (b.h < 200 && CR[o.kind]) || R[o.kind];
+    // any size (owner, 28 Nov 2026): a kind whose full layout needs more height draws its small one below that height, and
+    // a box under 300 wide (one tile across, however tall) draws the small one too
+    var draw = ((b.h < (CR_UNDER[o.kind] || 200) || b.w < 300) && CR[o.kind]) || R[o.kind];
     // seagey, 18 Nov 2026: "all icons etc are default centre align unless it's changed in the designer".
     // Words and icons sit in the middle unless the design sets opts.align (widgets.css .cw-mid); a
     // renderer that places something itself still does
@@ -3553,6 +3641,7 @@
 
   window.CouchWidgets = {
     config: CW,
+    peopleLay: peopleLay,
     kinds: function () { return Object.keys(R); },
     setting: setting,
     // the widget with what was set for it on this TV over its design opts (for app.js's web loader:

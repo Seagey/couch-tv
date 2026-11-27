@@ -904,7 +904,7 @@ struct DesignWidget: View {
                     if o.ampm == true && !clock24 { Text(DesignDates.ampm(date)).font(HomeFont.inter(h * 0.16, .medium)).foregroundStyle(sub) }
                 }
                 .opacity(kind == "glassclock" ? 0.86 : 1)
-                if o.date == true { Text(DesignDates.text(date, format: nil)).font(HomeFont.inter(max(23, h * 0.13))).foregroundStyle(sub) }
+                if o.date == true && h >= 140 { Text(DesignDates.text(date, format: nil)).font(HomeFont.inter(max(23, h * 0.13))).foregroundStyle(sub) }
             }
             .shadow(color: .black.opacity(0.3), radius: 18, y: 6)
             .frame(width: w, height: h, alignment: frameAlign(o.align))
