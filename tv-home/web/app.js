@@ -4928,8 +4928,13 @@
       paintFocus();
     }
   }
+  // the live card link kept in the account (Your details, Card; details.card.url), used when this home's own settings name none
+  function accountCardUrl() {
+    var d = ACCOUNT && ACCOUNT.details, u = d && d.card && d.card.url;
+    return typeof u === "string" && /^https?:\/\/[^\s]+$/i.test(u) && u.length <= 2000 ? u : "";
+  }
   function refreshCards(force) {
-    var src = HOME.custom_cards, CC = window.CustomCards;
+    var own = HOME.custom_cards, src = own || accountCardUrl(), CC = window.CustomCards;
     if (!src || !CC) return;
     // a link: the on-TV app (or a home with no computer) reads it itself, so it needs CORS
     var direct = function () {
@@ -4938,7 +4943,7 @@
         .then(function (r) { return r.ok ? r.text() : null; })
         .then(function (s) { setCards(s == null ? null : CC.parse(s)); }, function () {});
     };
-    if (OFFLINE) { direct(); return; }
+    if (OFFLINE || !own) { direct(); return; }   // the account's link is read by the TV itself, never through the home computer
     var q = force ? "?force=1" : "";
     api("GET", "/api/custom-cards" + q, null, 9000).then(function (j) { setCards(CC.clean(j.cards || [])); }, direct);
   }
@@ -11499,7 +11504,8 @@
     startVideo();
     photoTimer = setInterval(nextPhoto, PHOTO_MS);
     // custom cards (home.custom_cards): every 10 minutes, and never before the home is drawn
-    if (HOME.custom_cards && window.CustomCards) {
+    // (or the account's link, which may arrive later in a pack: the timer always runs and reads nothing until there is a link)
+    if (window.CustomCards) {
       setTimeout(refreshCards, 1500);
       setInterval(refreshCards, window.CustomCards.EVERY_MIN * 60000);
     }

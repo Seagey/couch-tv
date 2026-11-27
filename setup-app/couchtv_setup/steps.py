@@ -529,6 +529,9 @@ def make_home(tv, apk_path, ambient_off=True, people=None, weather=None, progres
     resolved = (_lines(tv.shell(RESOLVE)) or [""])[-1]
     if tv.shell(f"appops get {HOME_PKG} SYSTEM_ALERT_WINDOW").find("allow") >= 0:
         tv.shell(f"appops set {HOME_PKG} SYSTEM_ALERT_WINDOW default")   # no doorbell card in this setup
+    from . import widgetperms        # the doorbell card the person turned on in Widget permissions stays on
+    if widgetperms.keep_after_install(tv):
+        done.append("widget permissions kept")
     cfg = home_config(people, weather)
     sets = f' --es bridge none --es config_b64 {cfg} --es ha_b64 none --es key ""'
     stop = f"am force-stop {HOME_PKG}; "
@@ -710,6 +713,8 @@ def undo(tv, progress=lambda f, msg=None: None):
         if p in present:
             tv.shell(f"pm enable {p}")
     done.append("switched back on")
+    from . import widgetperms        # Widget permissions: back to Android's defaults
+    widgetperms.all_off(tv)
     tv.shell(f"appops set {HOME_PKG} SYSTEM_ALERT_WINDOW default; appops set {HOME_PKG} WRITE_SETTINGS default; "
              f"pm revoke {HOME_PKG} android.permission.WRITE_SECURE_SETTINGS; "
              f"cmd notification disallow_listener {HOME_PKG}/{HOME_PKG}.SpotifySessionAccess")
