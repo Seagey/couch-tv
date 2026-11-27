@@ -7,13 +7,13 @@ const assert = require('assert');
 
 console.log('Running frost tests...');
 const src = fs.readFileSync(path.join(__dirname, '../tv-home/web/frost.js'), 'utf8');
-function load(classes) {
+function load(classes, ua) {
   const list = new Set(classes);
   const root = { classList: { contains: (k) => list.has(k), add: (k) => list.add(k), remove: (k) => list.delete(k) }, className: classes.join(' ') };
   const win = {};
   const doc = { readyState: 'complete', documentElement: root, body: { className: '' }, getElementById: () => null, querySelector: () => null, querySelectorAll: () => [] };
   win.window = win; win.document = doc;
-  vm.runInNewContext(src, Object.assign(win, { setTimeout, clearTimeout, getComputedStyle: () => ({}) }));
+  vm.runInNewContext(src, Object.assign(win, { setTimeout, clearTimeout, getComputedStyle: () => ({}), navigator: { userAgent: ua || "Mozilla/5.0 (Linux; Android 12) AppleWebKit/537.36 Chrome/140.0.0.0 Safari/537.36" } }));
   return { F: win.CouchFrost, list };
 }
 const { F } = load(['theme-night']);
@@ -51,6 +51,14 @@ for (const k of ['lighter', 'glass', 'old-engine', 'depth-zoom', 'has-video', 'n
 }
 assert.strictEqual(load(['theme-classic']).F.allowed(), false, 'only the Night look');
 assert.strictEqual(load(['theme-night', 'cd', 'settled']).F.allowed(), true, 'Couch Original (a design) and the focus settling');
+
+// how the browser fills in past a panel's edges: mirrored from Chrome 129, the edge pixels repeated before; unknown: live blur
+assert.strictEqual(F.edgeMode("Mozilla/5.0 (Linux; Android 12; wv) AppleWebKit/537.36 Version/4.0 Chrome/91.0.4472.114 Mobile Safari/537.36"), "clamp", "WebView 91 (the low end emulator) repeats the edge");
+assert.strictEqual(F.edgeMode("Chrome/128.0.0.0"), "clamp");
+assert.strictEqual(F.edgeMode("Chrome/129.0.0.0"), "mirror");
+assert.strictEqual(F.edgeMode("Mozilla/5.0 (Web0S; Linux/SmartTV) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/87.0.4280.88 Safari/537.36 WebAppManager"), "clamp", "webOS");
+assert.strictEqual(F.edgeMode("Mozilla/5.0 (Macintosh) AppleWebKit/605.1.15 Version/17.0 Safari/605.1.15"), null);
+assert.strictEqual(load(["theme-night"], "Mozilla/5.0 Safari/605.1.15").F.allowed(), false, "no Chrome version: the live blur");
 
 // wiring: loaded after app.js, and the rule that shows the picture under the tint
 const html = fs.readFileSync(path.join(__dirname, '../tv-home/web/index.html'), 'utf8');

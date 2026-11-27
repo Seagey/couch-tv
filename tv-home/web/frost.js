@@ -20,7 +20,7 @@
   // Off where the live blur must stay: not the Night look, or something under the glass moves or is not drawn here
   function allowed() {
     var c = root.classList;
-    if (!c.contains("theme-night") || c.contains("lighter") || c.contains("glass") || c.contains("old-engine") ||
+    if (!EDGE || !c.contains("theme-night") || c.contains("lighter") || c.contains("glass") || c.contains("old-engine") ||
         c.contains("depth-zoom") || c.contains("has-video") || c.contains("np-sync-colors") || c.contains("theme-loop") || c.contains("amb-fx")) return false;
     if (document.querySelector("#scenes .scene.on .svid.playing")) return false;
     return true;
@@ -87,16 +87,31 @@
   function overlaps(a, b) { return a.left < b.right && b.left < a.left + a.width && a.top < b.bottom && b.top < a.top + a.height; }
 
   // one panel's picture: its part of the scene, edges mirrored, blurred and saturated, at 1/s
+  // How the browser fills in past a panel's edges before it blurs: Chrome 129 (September 2024) and newer mirror the
+  // picture (the CSS spec, blink-dev "Update CSS backdrop-filter to use mirror edgeMode"); older ones repeat the edge
+  // pixels. Anything else (no Chrome version to read): null, the live blur stays.
+  function edgeMode(ua) {
+    var m = /\b(?:Chrome|Chromium)\/(\d+)/.exec(ua || "");
+    return m ? (+m[1] >= 129 ? "mirror" : "clamp") : null;
+  }
+  var EDGE = edgeMode(navigator.userAgent);
+
   function frostOf(b, r, glass, s) {
     var x = r.left / s, y = r.top / s, w = Math.max(1, Math.round(r.width / s)), h = Math.max(1, Math.round(r.height / s));
     var cut = canvas(w, h);
     cut.getContext("2d").drawImage(b, -x, -y);
     var P = Math.ceil(glass[0] * 3 / s), m = canvas(w + 2 * P, h + 2 * P), mg = m.getContext("2d");
-    var nx = Math.ceil(P / w), ny = Math.ceil(P / h);
-    for (var kx = -nx; kx <= nx; kx++) for (var ky = -ny; ky <= ny; ky++) {
-      var fx = kx % 2 !== 0, fy = ky % 2 !== 0;
-      mg.setTransform(fx ? -1 : 1, 0, 0, fy ? -1 : 1, P + kx * w + (fx ? w : 0), P + ky * h + (fy ? h : 0));
-      mg.drawImage(cut, 0, 0);
+    if (EDGE === "clamp") {   // the edge rows and columns stretched outwards, the corners from the corner pixels
+      mg.drawImage(cut, P, P);
+      mg.drawImage(cut, 0, 0, 1, h, 0, P, P, h); mg.drawImage(cut, w - 1, 0, 1, h, P + w, P, P, h);
+      mg.drawImage(m, 0, P, w + 2 * P, 1, 0, 0, w + 2 * P, P); mg.drawImage(m, 0, P + h - 1, w + 2 * P, 1, 0, P + h, w + 2 * P, P);
+    } else {
+      var nx = Math.ceil(P / w), ny = Math.ceil(P / h);
+      for (var kx = -nx; kx <= nx; kx++) for (var ky = -ny; ky <= ny; ky++) {
+        var fx = kx % 2 !== 0, fy = ky % 2 !== 0;
+        mg.setTransform(fx ? -1 : 1, 0, 0, fy ? -1 : 1, P + kx * w + (fx ? w : 0), P + ky * h + (fy ? h : 0));
+        mg.drawImage(cut, 0, 0);
+      }
     }
     var o = canvas(w, h), z = o.getContext("2d");
     z.filter = "blur(" + glass[0] / s + "px)" + (glass[1] !== 1 ? " saturate(" + glass[1] + ")" : "");
@@ -216,6 +231,6 @@
     soon(1000);
   }
 
-  window.CouchFrost = { parseGlass: parseGlass, vgrad: vgrad, allowed: allowed, draw: draw, off: off, draws: function () { return draws; } };
+  window.CouchFrost = { edgeMode: edgeMode, parseGlass: parseGlass, vgrad: vgrad, allowed: allowed, draw: draw, off: off, draws: function () { return draws; } };
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", start); else start();
 })();
