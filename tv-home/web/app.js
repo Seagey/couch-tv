@@ -598,7 +598,53 @@
   }
   // the guest Wi-Fi as the At home store keeps it (athome.js), or null
   function ahWifiNow() { try { return AH ? AH.store.get().wifi || null : null; } catch (e) { return null; } }
-  function homeNow() { return { people: peopleNow(), place: ST.place || null, wifi: ahWifiNow(), account: ACCOUNT }; }
+  function ahRecordNow() { try { return AH ? AH.store.get() : null; } catch (e) { return null; } }
+  function homeNow() { return { people: peopleNow(), place: ST.place || null, wifi: ahWifiNow(), ah: ahRecordNow(), photos: Array.isArray(ST.photos) ? ST.photos : [], account: ACCOUNT }; }
+  // ---- Phase 2 shared base: what a v2 pack adds (design-code.js planV2). The details go into At home (the TV's own changes win);
+  // the account's photos join the photo list as "acc_<id>" with the day each was taken; the keys the account gave this TV are kept
+  // in the launcher's private store and handed to the part that uses them (Ask AI, Home Assistant). Never in a design.
+  var KEYS_KEY = "tvhome.home.keys";
+  function keptKeys() {
+    var v = null;
+    try { if (TV && TV.keptPrivate) v = TV.keptPrivate(PFX + KEYS_KEY); } catch (e) {}
+    if (v == null || v === "") try { v = localStorage.getItem(PFX + KEYS_KEY); } catch (e) {}
+    try { v = v ? JSON.parse(v) : null; } catch (e) { v = null; }
+    return v && typeof v === "object" && !Array.isArray(v) ? v : {};
+  }
+  function keepKeys(o) {
+    var j = JSON.stringify(o);
+    if (TV && TV.keepPrivate) { try { TV.keepPrivate(PFX + KEYS_KEY, j); try { localStorage.removeItem(PFX + KEYS_KEY); } catch (e) {} return; } catch (e) {} }
+    try { localStorage.setItem(PFX + KEYS_KEY, j); } catch (e) {}
+  }
+  // a key the account gave this TV, or null (what the parts that use a key ask for)
+  function accountKey(kind) { var k = keptKeys()[kind]; return k && typeof k === "object" ? k : null; }
+  function applyAccountKeys(ks) {
+    var held = keptKeys(), any = false;
+    Object.keys(ks).forEach(function (kind) {
+      if (ks[kind]) { held[kind] = ks[kind]; any = true; } else if (held[kind]) { delete held[kind]; any = true; }
+    });
+    if (!any) return;
+    keepKeys(held);
+    // Ask AI: the key and where it goes (ask.js keeps them locked to that address)
+    try {
+      if (!ks.ai && ks.ai !== undefined && typeof CouchAsk !== "undefined" && CouchAsk.forget) CouchAsk.forget();
+      else if (ks.ai && typeof CouchAsk !== "undefined" && CouchAsk.save) CouchAsk.save({ route: "own", provider: ks.ai.provider || "", base: ks.ai.base || undefined, model: ks.ai.model || undefined, key: ks.ai.key });
+    } catch (e) {}
+    // Home Assistant: the launcher checks the address and token (smarthome.js setup.check); the picks come from the account's details
+    try {
+      if (ks.ha && window.smartHome && window.smartHome.setup && window.smartHome.setup.can()) window.smartHome.setup.check(ks.ha.url || "", ks.ha.token);
+    } catch (e) {}
+  }
+  function applyAccountPhotos(p, dates) {
+    var list = Array.isArray(ST.photos) ? ST.photos.slice() : [], changed = false;
+    (p.remove || []).forEach(function (id) { var n = list.length; list = list.filter(function (x) { return !(x && x.id === id); }); if (list.length !== n) changed = true; });
+    (p.update || []).forEach(function (u) { list.forEach(function (x) { if (x && x.id === u.id && x.url !== u.url) { x.url = u.url; changed = true; } }); });
+    (p.add || []).forEach(function (a) { if (list.length < MAX_PHOTOS) { list.push({ id: a.id, url: a.url, src: "account" }); changed = true; } });
+    if (changed) { ST.photos = list; }
+    var keys = Object.keys(dates || {});
+    if (keys.length) { var d = ahRead("tvhome.athome.dates") || {}; keys.forEach(function (u) { d[u] = dates[u]; }); ahWrite("tvhome.athome.dates", d); DATES = null; }
+    return changed;
+  }
   // what mergeHome worked out, kept: the record (with the photos), the town in Location, the guest Wi-Fi
   // in At home. The people are the caller's (the list on screen changes differently at start and later).
   function keepHome(r) {
@@ -610,6 +656,13 @@
       AH.store.edit(function (x) { if (r.wifi) x.wifi = r.wifi; else delete x.wifi; });
       ahChanged();
     }
+    // pack v2 (design-code.js mergeHome): details into At home, the account's photos, the keys this TV may use
+    if (r.ah && AH && Object.keys(r.ah).length) {
+      AH.store.edit(function (x) { Object.keys(r.ah).forEach(function (f) { if (r.ah[f] === null) delete x[f]; else x[f] = r.ah[f]; }); });
+      ahChanged();
+    }
+    if (r.photos && applyAccountPhotos(r.photos, r.dates)) { saveSettings(); ahChanged(); }
+    if (r.keys) applyAccountKeys(r.keys);
   }
   // A pack that arrived with a design (held by design-code.js until now). The account wins: its people
   // first, then the ones added on this TV; the town and the guest Wi-Fi too. A wipe takes out only what
@@ -618,8 +671,11 @@
   // pack waits for its answer (bridgePeople); with none it is the one this TV keeps (readConfig).
   function takeAccountHome(base) {
     if (typeof CouchDesignCode === "undefined" || !CouchDesignCode.takeHome || PREVIEW || /[?&]designer=1\b/.test(Q)) return false;
-    var pack = CouchDesignCode.takeHome();
+    var pack = CouchDesignCode.takeHome(true);
     if (!pack) return false;
+    // a v2 pack fills At home: it waits (held) until At home is ready, then is taken
+    if ((pack.details || pack.photos || pack.keys) && !AH) return false;
+    CouchDesignCode.takeHome();
     var now = homeNow();
     if (base) now.people = base;
     var r = CouchDesignCode.mergeHome(now, pack);
@@ -9352,6 +9408,9 @@
   function ahChanged() { if (typeof CouchDesign !== "undefined" && CouchDesign.dataChanged) CouchDesign.dataChanged("athome", Date.now()); }
   function ahRead(key) { try { var v = AH.io.get(key); return v ? JSON.parse(v) : null; } catch (e) { return null; } }
   function ahWrite(key, v) { try { AH.io.set(key, JSON.stringify(v)); } catch (e) {} }
+  // a home with no computer took its pack before At home was ready (takeAccountHome waits for it): take it now
+  if ((OFFLINE || ALONE) && AH && typeof CouchDesignCode !== "undefined" && CouchDesignCode.takeHome && CouchDesignCode.takeHome(true))
+    setTimeout(function () { if (takeAccountHome()) { try { restart(); } catch (e) {} } }, 0);
 
   // the calendar: read every 15 minutes while an Agenda is on the home. The launcher reads it (no
   // computer); a TV whose home a computer runs asks that computer (POST /api/calendar on the bridge);
