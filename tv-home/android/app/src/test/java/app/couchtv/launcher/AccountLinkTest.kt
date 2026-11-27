@@ -99,6 +99,8 @@ class AccountLinkTest {
         assertEquals("unlinked", AccountLink.readInbox(401, "", null).getString("state"))
         assertEquals(90L, AccountLink.readInbox(429, """{"error":"slow_down","retry_after":90}""", "90").getLong("wait"))
         assertEquals("https://couchtv.joshuaseage.com", AccountLink.STUDIO)
+        // a build made without -PstudioTestUrl (every release and every normal debug build) asks Couch TV Studio itself
+        if (BuildConfig.STUDIO_TEST.isEmpty()) assertEquals(AccountLink.STUDIO, AccountLink.studio())
     }
 
     // "Remove my keys" on the website: the store says drop_keys once in the inbox answer, and the page drops the account's keys

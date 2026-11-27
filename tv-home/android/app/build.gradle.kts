@@ -29,6 +29,10 @@ android {
         // a pre-release), "beta" only for a test build installed by hand: -PupdateChannel=beta.
         val channel = if ((project.findProperty("updateChannel") as String? ?: "").trim() == "beta") "beta" else "stable"
         buildConfigField("String", "UPDATE_CHANNEL", "\"" + channel + "\"")
+        // Emulator tests only: -PstudioTestUrl=http://<this computer as the emulator sees it>:<port> points a DEBUG build's TV inbox at a local site
+        // (AccountLink.studio()). Release builds ignore it; empty by default.
+        val studioTest = (project.findProperty("studioTestUrl") as String? ?: "").trim().filter { it.isLetterOrDigit() || it in ":/.-" }
+        buildConfigField("String", "STUDIO_TEST", "\"" + studioTest + "\"")
         // A beta build names its own version (-PbetaVersionCode=15 -PbetaVersionName=0.13-beta.1). Its
         // versionCode sits between this release and the next one, so the next stable release must use
         // a higher versionCode than any beta handed out (Android never steps a version down).

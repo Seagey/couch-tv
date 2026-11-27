@@ -68,7 +68,7 @@ object AccountLink {
     fun letGo(token: String) {
         Thread {
             runCatching {
-                val c = java.net.URL("$STUDIO/v1/setup/leave").openConnection() as java.net.HttpURLConnection
+                val c = java.net.URL("${studio()}/v1/setup/leave").openConnection() as java.net.HttpURLConnection
                 try {
                     c.instanceFollowRedirects = false
                     c.connectTimeout = 10000
@@ -105,6 +105,9 @@ object AccountLink {
     // https, no redirects followed (the token never goes anywhere else), no cookies, at most 64 KB read.
     // The page gets only what readInbox keeps: one checked CTV1 code and its title, or a state.
     const val STUDIO = "https://couchtv.joshuaseage.com"
+    /** Where the inbox and leave calls go: always [STUDIO], except a DEBUG build made with -PstudioTestUrl=<local site>
+     *  (emulator tests of Send to a linked TV against a local site; a release build never reads it). */
+    fun studio(): String = BuildConfig.STUDIO_TEST.takeIf { BuildConfig.DEBUG && Regex("https?://[A-Za-z0-9.:-]+").matches(it) } ?: STUDIO
     private const val INBOX_MAX = 64 * 1024
     // When the TV asks is the page's (design-code.js, app.js: after 30 minutes away, a press, or once a week; Studio's
     // poll only when longer). Here the numbers are only kept sane: poll 30 s to 20 days (a week when missing),
@@ -153,7 +156,7 @@ object AccountLink {
     fun inbox(kv: Kv): org.json.JSONObject {
         val token = token(kv) ?: return org.json.JSONObject().put("state", "unlinked")
         val r = try {
-            val c = java.net.URL("$STUDIO/v1/setup/inbox").openConnection() as java.net.HttpURLConnection
+            val c = java.net.URL("${studio()}/v1/setup/inbox").openConnection() as java.net.HttpURLConnection
             try {
                 c.instanceFollowRedirects = false
                 c.connectTimeout = 10000
