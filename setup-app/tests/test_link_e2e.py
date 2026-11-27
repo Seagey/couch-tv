@@ -506,6 +506,86 @@ class AgainstTheRealRoutes(LinkEndToEnd, unittest.TestCase):
             raise unittest.SkipTest("node is not installed")
         cls.port = json.loads(cls.proc.stdout.readline())["port"]
 
+    # ---- link trust (Opus check B2, 27 Nov 2026): who gets the home pack with no tick ----
+    OTHER = {"x-test-who": "198.51.100.7"}      # the website seen from another network than the Setup that asked
+
+    def allow(self, code, one_tap, headers=None, who="1"):
+        return self.http("POST", "/v1/setup/allow", {"user_code": code, "one_tap": True} if one_tap else {"user_code": code},
+                         {"Cookie": "tvm_s=" + who, "Origin": "http://127.0.0.1:5480", **(headers or {})})
+
+    def link_by_device(self, one_tap, headers=None):
+        """Setup's Link this TV: the website says Yes (one tap, or by typing the code), Setup signs in and links a TV.
+        Returns the Allow answer and the TV's id."""
+        d = self.api("/api/device/start", {"silent": True, "tv_name": "TCL lounge TV"})
+        code, ans = self.allow(d["user_code"], one_tap, headers)
+        if code == 200:
+            self.assertEqual(self.api("/api/device/poll")["account"]["email"], "s***@example.test")
+            self.connected_tv()
+            self.assertTrue(self.run_job("/api/link-tv")["account"]["linked"])
+        return code, ans, server.S.link.tv and server.S.link.tv.get("tv_id")
+
+    def tv_row(self, tv_id):
+        return [r for r in self.http("GET", "/test/db?t=tvd_tvs")[1] if r["id"] == tv_id][0]
+
+    def send(self, tv_id, **kw):
+        code, j = self.http("POST", "/test/send", {"tv_id": tv_id, **kw})
+        self.assertEqual(code, 200, j)
+        return j
+
+    def test_same_network_one_tap_is_trusted_and_its_inbox_send_carries_the_pack(self):
+        code, ans, tv = self.link_by_device(True)
+        self.assertEqual((code, ans["trusted"]), (200, True))
+        self.assertTrue(self.tv_row(tv)["link_trusted"])
+        j = self.send(tv)
+        self.assertEqual((j["queued"], j["home"], j["pack"]), (True, "sent", True), "no tick needed for a trusted link")
+        self.assertFalse(j["token_in_answer"], "no long token for a QR")
+        self.assertIsNone(self.http("POST", "/test/take", {"send_id": j["send_id"], "kind": "short"})[1]["pack"], "a short code never gets it")
+        got = self.http("POST", "/test/take", {"send_id": j["send_id"], "kind": "token"})[1]["pack"]
+        self.assertEqual(got["people"][0]["name"], "Sam")
+
+    def test_a_trusted_link_still_obeys_the_opt_out(self):
+        _, _, tv = self.link_by_device(True)
+        j = self.send(tv, home=False)
+        self.assertEqual((j["home"], j["pack"]), (None, False), "the no dialog All my TVs send never ships the pack")
+
+    def test_one_tap_from_another_network_is_refused_and_nothing_is_approved(self):
+        d = self.api("/api/device/start", {"silent": True})
+        code, ans = self.allow(d["user_code"], True, self.OTHER)
+        self.assertEqual((code, ans["error"]), (409, "other_network"))
+        # still pending: Setup is not signed in, and the code is still there to be typed
+        self.assertEqual(self.api("/api/device/poll").get("pending"), True)
+        self.assertIsNone(self.api("/api/account")["account"])
+
+    def test_typed_code_from_another_network_works_but_is_not_trusted(self):
+        code, ans, tv = self.link_by_device(False, self.OTHER)
+        self.assertEqual((code, ans["trusted"]), (200, False))
+        self.assertFalse(self.tv_row(tv)["link_trusted"])
+        j = self.send(tv)
+        self.assertEqual((j["queued"], j["home"], j["pack"]), (True, None, False), "an untrusted link needs the tick")
+        self.assertFalse(j["token_in_answer"])
+        j = self.send(tv, home=True)
+        self.assertEqual((j["home"], j["pack"]), ("sent", True), "with the tick it goes")
+
+    def test_a_typed_code_on_the_same_network_is_not_trusted_either(self):
+        code, ans, tv = self.link_by_device(False)
+        self.assertEqual((code, ans["trusted"]), (200, False))
+        self.assertEqual(self.send(tv)["pack"], False)
+
+    def test_the_website_buttons_own_link_is_trusted(self):
+        long = re.search(r"handoff=([A-Za-z0-9_-]+)", self.page_start()["open"]).group(1)
+        ask = self.api("/api/handoff", {"code": long})["ask"]
+        self.api("/api/link-yes", {"id": ask["id"]})
+        self.connected_tv()
+        self.assertTrue(self.run_job("/api/link-tv")["account"]["linked"])
+        tv = server.S.link.tv["tv_id"]
+        self.assertTrue(self.tv_row(tv)["link_trusted"])
+        self.assertEqual(self.send(tv)["pack"], True)
+
+    def test_mine_says_which_linked_tv_is_trusted(self):
+        _, _, tv = self.link_by_device(True)
+        row = [t for t in self.mine()["tvs"] if t["id"] == tv][0]
+        self.assertEqual((row["linked"], row["trusted"]), (True, True))
+
     @classmethod
     def tearDownClass(cls):
         cls.proc.terminate()
