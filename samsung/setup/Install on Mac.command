@@ -111,7 +111,10 @@ done
 # ---- 4. install ----
 say "" "Next, a browser may open for your Samsung account. It is Samsung's own sign-in page:"
 say "this setup never sees your password. It makes a certificate for your TV only. If Samsung"
-say "asks you to agree or to allow access, say yes. Then come back to this window." ""
+say "asks you to agree or to allow access, say yes. Samsung may also ask for a code from your"
+say "email, or show new terms (optional boxes can stay empty, press Agree) or a reminder"
+say "(Skip for now). It is done when the browser says: Signed in. You can close this tab."
+say "Then come back to this window." ""
 ask "Press Return to put couch-tv on the TV:"
 "$CLI" install "$WGT" --tv "$TV"
 CODE=$?
@@ -124,7 +127,11 @@ if [ $CODE -eq 3 ]; then
     CODE=$?
   fi
 fi
-[ $CODE -eq 0 ] || stop "couch-tv did not go on the TV. What went wrong is above. Help: couchtv.joshuaseage.com/help/tv-samsung"
+if [ $CODE -ne 0 ]; then
+  say "" "If it says no sign-in arrived: the browser stopped on one of Samsung's pages (a code,"
+  say "new terms or a reminder). Run this again and keep going until it says Signed in."
+  stop "couch-tv did not go on the TV. What went wrong is above. Help: couchtv.joshuaseage.com/help/tv-samsung"
+fi
 
 "$CLI" launch CouchTVApp.Home --tv "$TV" >/dev/null 2>&1
 say "" "couch-tv is on your TV. If it is not on screen, open it from the TV's row of apps (Couch TV)." ""

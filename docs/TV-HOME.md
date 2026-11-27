@@ -403,6 +403,10 @@ off the TV takes them with it.
   tone, Colour tile, Glass or Playful. Your app pictures are not changed by it.
 - **Glass app icons** draws your picture in glass like the rest. Switch it off (Look) to see your
   pictures as they are.
+- **Input tiles** (`home.inputs`, a console on an HDMI port) take a picture the same way: name it
+  `icons/input.<name>.png` after the tile's name, in lower case with anything but letters and digits as
+  `_` (`"PS5"` is `icons/input.ps5.png`, `"Xbox Series X"` is `icons/input.xbox_series_x.png`). Without one
+  the tile keeps its drawn icon. An input's `image` in `config.json` still wins over it.
 - The phone remote's app grid keeps the apps' own icons.
 - The on-TV app (option C), LG, Samsung, Roku and the rest keep the apps' own icons.
 

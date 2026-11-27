@@ -142,7 +142,10 @@ while ($true) {
 Write-Host ""
 Write-Host "Next, a browser may open for your Samsung account. It is Samsung's own sign-in page:"
 Write-Host "this setup never sees your password. It makes a certificate for your TV only. If Samsung"
-Write-Host "asks you to agree or to allow access, say yes. Then come back to this window."
+Write-Host "asks you to agree or to allow access, say yes. Samsung may also ask for a code from your"
+Write-Host "email, or show new terms (optional boxes can stay empty, press Agree) or a reminder"
+Write-Host "(Skip for now). It is done when the browser says: Signed in. You can close this tab."
+Write-Host "Then come back to this window."
 Write-Host ""
 Read-Host "Press Enter to put couch-tv on the TV" | Out-Null
 & $Cli install $Wgt --tv $Tv
@@ -157,7 +160,12 @@ if ($Code -eq 3) {
     $Code = $LASTEXITCODE
   }
 }
-if ($Code -ne 0) { Stop-Setup "couch-tv did not go on the TV. What went wrong is above. Help: couchtv.joshuaseage.com/help/tv-samsung" }
+if ($Code -ne 0) {
+  Write-Host ""
+  Write-Host "If it says no sign-in arrived: the browser stopped on one of Samsung's pages (a code,"
+  Write-Host "new terms or a reminder). Run this again and keep going until it says Signed in."
+  Stop-Setup "couch-tv did not go on the TV. What went wrong is above. Help: couchtv.joshuaseage.com/help/tv-samsung"
+}
 
 Write-Host ""
 & $Cli launch CouchTVApp.Home --tv $Tv | Out-Null
