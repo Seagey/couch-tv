@@ -355,7 +355,7 @@
     "photo", "slideshow", "mosaic", "artframe", "memory",
     "keep", "keeprow", "upnext", "picks",
     "app", "folder", "dock", "appgrid", "games",
-    "nowplaying", "soundscape", "queue", "speakers",
+    "nowplaying", "soundscape", "speakers",
     "aircon", "scenes", "controls", "camera", "doorbell", "energy", "sensor", "battery",
     "bins", "people", "agenda", "note", "list",
     "card", "quote", "word", "news", "sports", "stocks", "commute",
@@ -373,7 +373,7 @@
   var WACT = ["keep", "keeprow", "upnext", "picks", "app", "folder", "dock", "appgrid", "games", "nowplaying", "soundscape", "aircon", "scenes", "controls", "people", "quick", "stack",
     "clock", "tallclock", "glassclock", "analog", "flipclock", "wordclock", "timer", "solar", "worldclock", "date", "month", "agenda",
     "weather", "bigtemp", "hourly", "week", "rain", "uv", "sun", "moon", "air", "surf", "photo", "slideshow", "mosaic", "artframe",
-    "camera", "doorbell", "card", "news", "sports", "memory", "queue", "speakers", "energy", "sensor", "battery", "note", "list", "stocks", "commute", "wifi", "guide", "screentime", "ask", "agent"];
+    "camera", "doorbell", "card", "news", "sports", "memory", "speakers", "energy", "sensor", "battery", "note", "list", "stocks", "commute", "wifi", "guide", "screentime", "ask", "agent"];
   var WSIZES = ["line", "wline", "tile", "wtile", "small", "tall", "medium", "wide", "large", "xl", "hero", "full", "row8", "row12", "row18"];
   var WSTYLE = { panel: ["glass", "solid", "colour", "paper", "none"], gradient: ["off", "soft"], ink: ["auto", "white", "ink", "accent", "glass", "liquid"],
     font: ["inter", "antonio", "rounded", "cormorant", "jost"], icons: ["line", "solid", "duotone", "tile", "glass", "playful", "classic"],
@@ -451,7 +451,7 @@
     photo: "image fit caption sub", slideshow: "seconds_each caption sub shuffle", mosaic: "count", artframe: "image mat caption sub", memory: "align range ago",
     keep: "", keeprow: "label shows", upnext: "apps sport", picks: "label align",
     app: "apps", folder: "label apps cols", dock: "apps more", appgrid: "apps cols names", games: "label apps",
-    nowplaying: "", soundscape: "sound volume", queue: "", speakers: "",
+    nowplaying: "", soundscape: "sound volume", speakers: "",
     aircon: "entity others", scenes: "label", controls: "label controls cols", camera: "label", doorbell: "", energy: "", sensor: "label", battery: "low",
     bins: "label weekday alt anchor lid_a lid_b bin_a bin_b", people: "names", agenda: "label align days", note: "align byline", list: "label icon align done",
     card: "label text icon", quote: "text sub mood", word: "lang meaning", news: "feed label align count", sports: "label league team align games", stocks: "label tickers align price", commute: "label arrive_h arrive_m buffer weekdays align",
@@ -481,11 +481,11 @@
   OPT.appcount = function (v) { return v === "auto" ? "auto" : SAN.n(v, 0, 8, true); };
   // align: centred unless the design says left or right (seagey, 18 Nov 2026)
   WOPT.controls = "label controls cols switches align"; WOPT.camera = "label cam align"; WOPT.doorbell = "label align picture"; WOPT.energy = "label align now";
-  WOPT.sensor = "label reading align"; WOPT.speakers = "label players align"; WOPT.queue = "label align";
+  WOPT.sensor = "label reading align"; WOPT.speakers = "label players align";
   // the watching, apps and music widgets' own settings (widget-caps.js settings, store "design")
   OPT.mix = function (v) { return SAN.pick(v, ["all", "others", "mine"]); }; OPT.buttons = SAN.b; OPT.cover = SAN.b;
   OPT.turn = function (v) { return SAN.pick(v, [0, 10, 20, 30, 60]); };
-  WOPT.picks = "label align mix"; WOPT.nowplaying = "buttons cover"; WOPT.queue = "label align count"; WOPT.stack = "turn";
+  WOPT.picks = "label align mix"; WOPT.nowplaying = "buttons cover"; WOPT.stack = "turn";
   // settings that were kept on the TV only, with nothing private in them, now in the design too (0.13.10,
   // widget-caps.js store "design"), so Couch TV Studio can set them; a TV's own choice still wins:
   // temperature in, the moon's half of the world, the air quality scale, the surf's units, the
@@ -515,7 +515,9 @@
     return Object.keys(out).length ? out : undefined;
   }
   function sanWidget(src, out, inStack) {
-    var kind = SAN.pick(src.kind, WKINDS);
+    // the Spotify queue widget was dropped (28 Nov 2026: each person would need their own Spotify developer app). A design that
+    // still has one shows Now playing in its place, so the home keeps its music widget.
+    var kind = src.kind === "queue" ? "nowplaying" : SAN.pick(src.kind, WKINDS);
     if (!kind || (inStack && kind === "stack")) return false;
     out.kind = kind;
     put(out, "size", typeof src.size === "string" && (WSIZES.indexOf(src.size) >= 0 || /^\d{1,2}x\d{1,2}$/.test(src.size)) ? src.size : undefined);

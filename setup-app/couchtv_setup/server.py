@@ -27,7 +27,7 @@ import webbrowser
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
-from . import errors, finder, guide, health, linkin, pairing, paths, release, scanlog, steps, studio, tidy, tvprofile
+from . import errors, finder, guide, health, linkin, live, pairing, paths, release, scanlog, steps, studio, tidy, tvprofile
 from .helper import autostart as hautostart, config as hconfig, deeplink
 from .identity import Identity
 from .tv import Tv, TvError
@@ -41,7 +41,7 @@ SECRET = secrets.token_urlsafe(24)
 OS = "mac" if sys.platform == "darwin" else "windows" if sys.platform == "win32" else "linux"
 # What this Setup can do beyond the basics. The page shows a feature's button only when it is listed, so a
 # build without it hides it. "link-tv" (link a TV that is already set up) is on in every build (account linking).
-FEATURES = ["reset-tv", "link-tv"]
+FEATURES = ["reset-tv", "link-tv", "live"]   # live: the finish screen's Ask AI, own AI, apps and Live cards (live.py)
 ALLOW_WAIT_S = 45     # how long one try waits for Allow on the TV; the page counts it down
 IDLE_S = 180         # the page asks every 20 s; this long without it means the tab is closed
 FIRST_S = 600
@@ -71,6 +71,7 @@ class State:
         self.tv_key = None             # which TV is connected (steps.tv_key), not its address
         self.profile = None            # tvprofile of the connected TV
         self.intent = None             # "helper" when opened by couchtv://helper/on
+        self.live_apps = None          # the TV's apps as last read on the Apps on this TV sheet (live.py)
 
 
 S = State()
@@ -439,7 +440,7 @@ def api(method, path, body):
                 S.tv.close()
             except Exception:
                 pass
-        S.tv = S.ip = S.route = S.facts = S.profile = None
+        S.tv = S.ip = S.route = S.facts = S.profile = S.live_apps = None
         S.health = None
         S.link.tv = None
         S.job = {"running": False}
@@ -635,6 +636,8 @@ def api(method, path, body):
         tv = need_tv()
         return {"items": steps.plan(tv, S.facts, ambient_off=bool(body.get("ambient_off", False)),
                                     ontv_home_off=bool(body.get("ontv_home_off", True))), "facts": S.facts}
+    if path.startswith("/api/live/"):
+        return live.route(path[len("/api/live/"):], body, S, need_tv)
     if path.startswith("/api/tidy/"):
         return tidy.route(path[len("/api/tidy/"):], body, need_tv(), run_job)
     if path == "/api/place":
@@ -805,6 +808,9 @@ def main(argv=None):
     if "--bridge" in argv:      # the helper's child process: the bridge, inside this program
         from .helper import bridge_proc
         return bridge_proc.run_bridge()
+    if "--mcp" in argv:         # your own AI's way to the TV (live.py agent_lines): the TV's MCP server, on stdio
+        from .helper import bridge_proc
+        return bridge_proc.run_mcp()
     if "--helper" in argv:      # Couch TV Helper: the bridge and the menu bar item, no setup page
         from .helper import app as helper_app
         return sys.exit(helper_app.run())

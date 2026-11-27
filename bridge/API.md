@@ -522,15 +522,6 @@ are `POST /api/key` with `previous`, `play_pause` and `next`.
  "art": "https://is1-ssl.mzstatic.com/.../600x600bb.jpg", "position": 42.5, "duration": 215.0}}
 ```
 
-### `GET /api/music/queue`
-The Up next widget: the next songs in the Spotify queue (at most 10: `title`, `artist`, `art` from
-Spotify's own picture host or `null`), read with the Spotify login above (bridge/spotify_now.py, the
-same scopes), at most every 15 seconds. `queue` is `null` when Spotify is not connected on this
-bridge, `[]` when nothing is queued. No other music app shares its queue.
-```json
-{"ok": true, "configured": true, "queue": [{"title": "Low Tide", "artist": "Saltwater Radio", "art": "https://i.scdn.co/image/..."}]}
-```
-
 ### `GET /api/custom-cards`
 The household's own cards (`home.custom_cards`, docs/TV-HOME.md "Custom cards"), read from the file
 or link, cleaned and capped: at most 8, `title` (40 characters), optional `subtitle` (60), `value`

@@ -1,5 +1,5 @@
 // The smart home and music widgets (group C: Control Centre, camera, doorbell, energy, sensor, speakers,
-// Up next queue), in a real browser at 1920x1080, against a pretend Home Assistant (mock.js ?ha=1,
+// and the old queue widget as Now playing), in a real browser at 1920x1080, against a pretend Home Assistant (mock.js ?ha=1,
 // the launcher's window.TVHA stand in) and a pretend bridge. Nothing real is ever asked.
 //  1. every size of each, as Couch TV Studio draws it (demo), as a TV with readings, long names and big numbers, or align left draws it, and as a
 //     TV with nothing set up draws it: words 23 px and up, nothing past its box, the set up card when
@@ -38,7 +38,7 @@ if (SHOTS) fs.mkdirSync(SHOTS, { recursive: true });
 let n = 0;
 const ok = (c, m) => { assert.ok(c, m); n++; };
 const rect = (c, r, w, h) => ({ x: 80 + c * 100, y: 60 + r * 100, w: w * 100 - 40, h: h * 100 - 40 });
-const KINDS = ["controls", "camera", "doorbell", "energy", "sensor", "speakers", "queue"];
+const KINDS = ["controls", "camera", "doorbell", "energy", "sensor", "speakers"];
 
 const browser = await chromium.launch();
 async function home(widgets, q) {
@@ -242,18 +242,10 @@ for (const [kind, layer, size] of [["energy", "energy", [8, 4]], ["sensor", "sen
   ok(page.errors.length === 0, kind + ": no page errors (" + page.errors.join("; ") + ")");
   await page.close();
 }
-{ // Up next: the Spotify queue through the pretend bridge; not connected: the setup card
-  let page = await home([["queue", 0, 0, 4, 6], ["app", 10, 0, 2, 2, { apps: ["com.netflix.ninja"] }]], "&queue=1");
-  await page.waitForFunction(() => /Low Tide/.test(document.querySelector('.cw-o[data-obj="w0"] .cw').textContent), null, { timeout: 9000 });
-  ok(/Fog Lights/.test(await text(page)), "queue: the next songs from Spotify");
-  await openOn(page);
-  ok((await cur(page)).name === "queue", "queue: OK opens Up next");
-  await press(page, "Escape", 600);
-  await page.close();
-  page = await home([["queue", 0, 0, 4, 6]], "");
-  await page.waitForFunction(() => document.querySelector('.cw-o[data-obj="w0"] .cw').getAttribute("data-setup"), null, { timeout: 9000 });
-  // (0.13.10) the setup face: its line says what it shows, then how to set it up (no phone page here)
-  ok(/Your Spotify queue/.test(await text(page)) && /Press OK to set it up|Set up on your phone/.test(await text(page)), "queue: not connected says what it is and how to set it up: " + await text(page));
+{ // the Spotify queue widget was dropped (28 Nov 2026): an old design's one draws Now playing in its place
+  const page = await home([["queue", 0, 0, 4, 6]], "");
+  const k = await page.evaluate(() => [...document.querySelectorAll(".cw-o .cw")].map((c) => c.className));
+  ok(k.length === 1 && /cw-k-nowplaying/.test(k[0]), "an old queue widget is Now playing now: " + k.join(" | "));
   await page.close();
 }
 { // no Home Assistant on this TV: every smart home widget is its setup card, and nothing is asked

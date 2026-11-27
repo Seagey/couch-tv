@@ -798,7 +798,17 @@
     keep("tvhome.people.list", { people: r.people, pending: true });
     keep("tvhome.people.order", { ids: r.people.map(function (p) { return p.id; }), pending: false });
     keepHome(r);
+    applyAccountNowPlaying(pack.details);
     return true;
+  }
+  // The account's Now playing card switch (watching.md nowplaying, route a). Applied when the account's choice changes; a change made
+  // on this TV afterwards (Home settings, Look, Now playing card) stays until the account's choice changes again.
+  function applyAccountNowPlaying(d) {
+    var v = d && d.watch ? d.watch.now_playing : undefined;
+    if (typeof v !== "boolean" || ST.now_playing_acct === v) return;
+    ST.now_playing_acct = v; ST.now_playing = v; NP_ON = v;
+    saveSettings();
+    if (typeof refreshMusic === "function") refreshMusic();
   }
   // Home settings, People: take everything the account sent off this TV now (as a wipe from the account
   // does): its people, their photos, its town and its guest Wi-Fi. What was added here stays. The next
@@ -3534,21 +3544,6 @@
       }).catch(function () {});
     }
   }
-
-  var QUEUE, queueAt = 0;
-  function refreshQueue() {
-    if (document.hidden || (OFFLINE && !STANDALONE) || !document.querySelector(".cd-layer .cw-k-queue")) return;
-    queueAt = Date.now();
-    var ask = STANDALONE ? fetch(window.CouchSpotify ? window.CouchSpotify.url("api/now?queue=1") : "api/now?queue=1", { cache: "no-store" })
-      .then(function (r) { return r.json(); })
-      : api("GET", "/api/music/queue", null, 8000);
-    ask.then(function (j) {
-      QUEUE = j && Array.isArray(j.queue) ? { ok: true, items: j.queue.slice(0, 10) } : { ok: false };
-      if (typeof CouchDesign !== "undefined" && CouchDesign.dataChanged) CouchDesign.dataChanged("queue", QUEUE.ok ? QUEUE.items.map(function (s) { return s && s.title; }) : "off");
-    }, function () {});
-  }
-  window.CouchQueueNow = function () { return QUEUE; };
-  setInterval(function () { var age = Date.now() - queueAt; if ((QUEUE === undefined && age > 6000) || age > 20000) refreshQueue(); }, 2000);
 
   function refreshMusic() {
     if (SPOTIFY.enabled) {

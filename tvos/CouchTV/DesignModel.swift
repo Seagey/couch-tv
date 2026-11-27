@@ -452,7 +452,8 @@ struct DesignObject: Equatable, Identifiable {
     private static func read(widget s: [String: Any], into o: inout DesignObject, inStack: Bool) -> Bool {
         // a kind this Apple TV does not know (a newer couch-tv Studio widget) still keeps its place as a plain
         // "Widget" card, so the design does not have a hole in it. Its own name is never drawn. Not in a stack.
-        let named = DesignGate.pick(s["kind"], DesignWidgets.kinds)
+        // the Spotify queue widget was dropped (28 Nov 2026): an older design's one shows Now playing (design.js sanWidget)
+        let named = (s["kind"] as? String) == "queue" ? "nowplaying" : DesignGate.pick(s["kind"], DesignWidgets.kinds)
         let unknown = named == nil && !inStack && (s["kind"] as? String)?.range(of: "^[a-z][a-z0-9_-]{1,31}$", options: .regularExpression) != nil
         guard let kind = named ?? (unknown ? DesignWidgets.other : nil), !(inStack && kind == "stack") else { return false }
         o.kind = kind
@@ -566,7 +567,7 @@ enum DesignWidgets {
                         "photo", "slideshow", "mosaic", "artframe", "memory",
                         "keep", "keeprow", "upnext", "picks",
                         "app", "folder", "dock", "appgrid", "games",
-                        "nowplaying", "soundscape", "queue", "speakers",
+                        "nowplaying", "soundscape", "speakers",
                         "aircon", "scenes", "controls", "camera", "doorbell", "energy", "sensor", "battery",
                         "bins", "people", "agenda", "note", "list",
                         "card", "quote", "word", "news", "sports", "stocks", "commute",
@@ -582,7 +583,7 @@ enum DesignWidgets {
         "keeprow": "label shows", "upnext": "apps sport", "picks": "label align", "app": "apps", "folder": "label apps cols",
         "dock": "apps more", "appgrid": "apps cols names", "games": "label apps", "soundscape": "sound", "aircon": "entity",
         "scenes": "label", "controls": "label controls cols switches align", "camera": "label cam align", "doorbell": "label align",
-        "energy": "label align", "sensor": "label reading align", "speakers": "label players align", "queue": "label align",
+        "energy": "label align", "sensor": "label reading align", "speakers": "label players align",
         "bins": "label weekday alt anchor lid_a lid_b bin_a bin_b", "agenda": "label align", "note": "align",
         "list": "label icon align", "card": "label text icon", "quote": "text sub", "news": "feed label align",
         "sports": "label league team align", "stocks": "label tickers align", "commute": "label arrive_h arrive_m buffer weekdays align",
@@ -642,7 +643,7 @@ enum DesignWidgets {
             "solar": "Sunrise and sunset", "timer": "Timer", "hourly": "Hourly forecast", "week": "This week", "rain": "Rain",
             "uv": "UV", "sun": "Sun", "moon": "Moon", "air": "Air quality", "surf": "Surf", "slideshow": "Photos", "mosaic": "Photos",
             "memory": "Memories", "upnext": "Up next", "picks": "Picks for you", "nowplaying": "Now playing",
-            "soundscape": "Soundscape", "queue": "Up next in music", "speakers": "Speakers", "aircon": "Air conditioning",
+            "soundscape": "Soundscape", "speakers": "Speakers", "aircon": "Air conditioning",
             "scenes": "Scenes", "controls": "Controls", "camera": "Camera", "doorbell": "Doorbell", "energy": "Energy",
             "sensor": "Sensor", "battery": "Batteries", "bins": "Bin night", "agenda": "Today", "list": "List", "word": "Word of the day",
             "news": "News", "sports": "Sport", "stocks": "Shares", "commute": "Commute", "wifi": "Wi-Fi", "guide": "House guide",
@@ -659,7 +660,7 @@ enum DesignWidgets {
             "solar": "sunrise", "timer": "timer", "hourly": "clock", "week": "calendar", "rain": "cloud.rain", "uv": "sun.max",
             "sun": "sun.horizon", "moon": "moon", "air": "aqi.medium", "surf": "water.waves", "slideshow": "photo.on.rectangle",
             "mosaic": "square.grid.2x2", "memory": "photo", "upnext": "play.rectangle", "picks": "sparkles",
-            "nowplaying": "music.note", "soundscape": "waveform", "queue": "music.note.list", "speakers": "hifispeaker",
+            "nowplaying": "music.note", "soundscape": "waveform", "speakers": "hifispeaker",
             "aircon": "thermometer", "scenes": "sparkles", "controls": "switch.2", "camera": "video", "doorbell": "bell",
             "energy": "bolt", "sensor": "sensor", "battery": "battery.75", "bins": "trash", "agenda": "calendar",
             "list": "list.bullet", "word": "textformat", "news": "newspaper", "sports": "sportscourt", "stocks": "chart.line.uptrend.xyaxis",

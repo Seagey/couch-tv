@@ -1899,50 +1899,8 @@
     add(root, [fitLab(root, iconName, title, b.w - 48), E("div", "cw-grow"), fitWords(root, line, b.w - 48, 25, 3, 560, "color:var(--sub)") || fitWords(root, "Checking", b.w - 48, 25, 1, 560)]);
   }
 
-  // Up next queue: the next songs on the Spotify account, read by the home computer (the bridge's
-  // /api/music/queue) or the standalone home's own site (api/now?queue=1), from the person's own
-  // Spotify sign in. Other music apps do not share their queue with anything, so it is Spotify only.
-  //   queue undefined: not asked yet; { ok: false }: Spotify is not connected; { ok: true, items }
-  var DEMO_QUEUE = [["Sunday Best", "Surfaces", "surf"], ["Riptide", "Vance Joy", "hike"], ["Electric Feel", "MGMT", "camp"], ["Dreams", "Fleetwood Mac", "beach"],
-    ["Bloom", "The Paper Kites", "dog"], ["Holocene", "Bon Iver", "nan"], ["Sunsets", "Thelma Plum", "art"], ["Old Pine", "Ben Howard", "birthday"]];
-  function queueOf(env) {
-    if (env.demo) return { ok: true, items: DEMO_QUEUE.map(function (s) { return { title: s[0], artist: s[1], art: demoImg(s[2]) }; }) };
-    var q = dataOf(env).queue;
-    if (q === undefined && window.CouchQueueNow) q = window.CouchQueueNow();
-    return q && typeof q === "object" ? q : undefined;
-  }
   // a cover: only a picture from Spotify's own picture host (or the designer's demo pictures)
   function coverOk(u, env) { return typeof u === "string" && (/^https:\/\/i\.scdn\.co\/image\/[A-Za-z0-9]+$/.test(u) || (env.demo && /^[a-z0-9\/._-]+\.jpg$/.test(u))); }
-  R.queue = function (root, o, b, env) {
-    var q = queueOf(env), d = dataOf(env), al = alignOf(o), W = b.w - 48;
-    if (!env.demo && ((d.bridge === false && !window.COUCH_STANDALONE) || (q && q.ok === false))) return soonFit(root, b, "music", "queue");
-    var title = op(o).label || "Up next";
-    if (!q) return haWait(root, b, o, "music", title, "Checking Spotify");
-    var items = (q.items || []).filter(function (s) { return s && s.title; });
-    if (!items.length) return haWait(root, b, o, "music", title, "Nothing up next in Spotify");
-    alignRoot(root, al);
-    var big = b.w >= 700, cs = big ? 96 : 76, gap = big ? 24 : 18, textW = W - cs - 20, left = b.h - 48 - 46, rows = [], most = +setting(o, env, "count");
-    most = isFinite(most) && most >= 1 ? Math.min(10, Math.round(most)) : 10;
-    for (var i = 0; i < Math.min(most, items.length); i++) {
-      var s = items[i], name = String(s.title).slice(0, 120), tl = 1, tpx = fitPxText(name, textW, big ? 38 : 29, 1, 650, famOf(root));
-      if (!tpx) { tl = 2; tpx = fitPxText(name, textW, 25, 2, 650, famOf(root)); }
-      if (!tpx) continue;   // a title too long for this box is left out, never cut
-      var t = E("div", "cw-fit", "font-size:" + tpx + "px;font-weight:650;line-height:1.2;overflow-wrap:normal;max-width:" + Math.floor(textW) + "px", [name]);
-      var a = s.artist ? fitWords(root, String(s.artist).slice(0, 120), textW, 25, 1, 560, "color:var(--sub)") : null;
-      var h = Math.max(cs, Math.ceil(tpx * 1.2 * tl) + (a ? Math.ceil(parseFloat(a.style.fontSize) * 1.2) : 0));
-      if (h + (rows.length ? gap : 0) > left) break;
-      left -= h + (rows.length ? gap : 0);
-      var ok = coverOk(s.art, env), cover = E("div", "", "width:" + px(cs) + ";height:" + px(cs) + ";border-radius:14px;flex:none;margin-right:20px;display:flex;align-items:center;justify-content:center;background:#333 center/cover;" + (ok ? "background-image:" + cssImg(s.art) : ""), ok ? null : [ic("music", cs * 0.42, "rgba(255,255,255,.6)")]);
-      rows.push(E("div", "cw-row", "flex:none;max-width:100%;text-align:left;" + (rows.length ? "margin-top:" + gap + "px" : ""), [cover, E("div", "", "min-width:0", [t, a])]));
-    }
-    // the label and the songs as one group in the middle of the box
-    root.style.justifyContent = "center";
-    add(root, [fitLab(root, "music", title, W), E("div", "cw-col", "flex:0 1 auto;width:100%;margin-top:16px;justify-content:center;min-height:0;align-items:" + (al === "left" ? "flex-start" : al === "right" ? "flex-end" : "center"),
-      // the songs as one block, each row from its left edge, the block centred (or where the design says)
-      [E("div", "cw-col", "flex:none;max-width:100%;align-items:flex-start", rows)])]);
-    stop(root, "detail", "queue", title);
-  };
-
   // Speakers: each Home Assistant speaker (media_player.* named in config.json) and its volume
   function speakersOf(env, o) {
     var ha = haOf(env), want = setting(o, env, "players");
@@ -3608,7 +3566,7 @@
       athome: athome, listOf: listOf, wifiOf: wifiOf, guideOf: guideOf, guidePart: guidePart, agendaEvents: agendaEvents, memoryList: memoryList, memoryWeek: memoryWeek, mixed: mixed, guideIcon: guideIcon, qrNode: qrNode, demoEvents: demoEvents, evDay: evDay, hhmm: hhmm, EV_COL: EV_COL, yearsAgo: yearsAgo }
   };
   // the smart home and music widgets' readers, for their detail layers (widget-detail.js)
-  window.CouchWidgets.kit.ha = { haOf: haOf, controlsOf: controlsOf, ctlIcon: ctlIcon, ctlWord: ctlWord, speakersOf: speakersOf, pickedOf: pickedOf, houseSafe: houseSafe, opensHouse: opensHouse, spkWord: spkWord, spkSong: spkSong, sensorPick: sensorPick, sensorText: sensorText, spark: spark, hourBars: hourBars, kwh: kwh, ringWords: ringWords, queueOf: queueOf, coverOk: coverOk, stillWidth: stillWidth, SENSOR_ICON: SENSOR_ICON };
+  window.CouchWidgets.kit.ha = { haOf: haOf, controlsOf: controlsOf, ctlIcon: ctlIcon, ctlWord: ctlWord, speakersOf: speakersOf, pickedOf: pickedOf, houseSafe: houseSafe, opensHouse: opensHouse, spkWord: spkWord, spkSong: spkSong, sensorPick: sensorPick, sensorText: sensorText, spark: spark, hourBars: hourBars, kwh: kwh, ringWords: ringWords, coverOk: coverOk, stillWidth: stillWidth, SENSOR_ICON: SENSOR_ICON };
   // what the web widgets' detail layers share with them (widget-detail.js)
   window.CouchWidgets.webKit = { webOf: webOf, agoOf: agoOf, DEMO_NEWS: DEMO_NEWS, demoScores: demoScores, gameStatus: gameStatus, shortScore: shortScore, demoQuote: demoQuote, upDown: upDown, commuteOf: commuteOf, picksOf: picksOf, picksFor: picksFor };
 })();

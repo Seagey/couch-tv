@@ -498,7 +498,7 @@ enum DesignNotHere {
         "slideshow": "Slideshow", "mosaic": "Photo mosaic", "artframe": "Art frame", "memory": "On this day",
         "keep": "Keep watching", "keeprow": "Keep watching row", "upnext": "Up next", "picks": "Picks for you", "app": "One app",
         "folder": "App folder", "dock": "Dock", "appgrid": "App grid", "games": "Games", "nowplaying": "Now playing",
-        "soundscape": "Soundscape", "queue": "Up next queue", "speakers": "Speakers", "aircon": "Aircon", "scenes": "Scenes",
+        "soundscape": "Soundscape", "speakers": "Speakers", "aircon": "Aircon", "scenes": "Scenes",
         "controls": "Control Centre", "camera": "Camera", "doorbell": "Doorbell", "energy": "Solar and energy",
         "sensor": "Sensor", "battery": "Batteries", "bins": "Bin night", "people": "People", "agenda": "Agenda",
         "note": "Family note", "list": "List", "card": "Custom card", "quote": "Quote", "word": "Word of the day",

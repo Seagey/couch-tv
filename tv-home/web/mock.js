@@ -571,8 +571,6 @@
           var daily = [0, 1, 2, 3, 4, 5, 6].map(function (i) { var d = new Date(nw.getTime() + i * 86400000); return { date: iso(d), code: [c0, 95, 61, 2, 0, 0, 3][i], hi: t0 + [3, 1, -2, 0, 2, 4, 2][i], lo: t0 - [7, 6, 7, 8, 9, 7, 6][i], sunrise: iso(d) + "T04:41", sunset: iso(d) + "T18:22", uv: 11 }; });
           return resolve({ ok: true, temp: t0, code: c0, text: "", is_day: true, hourly: hourly, daily: daily, hi: daily[0].hi, lo: daily[0].lo, uv: 11, rain15: [0, 0, 0.1, 0.4, 1.2, 2.8, 3, 1, 0.4, 0, 0, 0] });
         }
-        // Up next (?queue=1: three made up songs; ?queue=empty: connected, nothing queued; none: Spotify not connected)
-        if (path.indexOf("/api/music/queue") === 0) return resolve({ ok: true, configured: !!arg("queue"), queue: arg("queue") === "empty" ? [] : arg("queue") ? SONGS.map(function (x) { return { title: x[0], artist: x[1], art: null }; }) : null });
         if (path.indexOf("/api/music") === 0) return resolve({ ok: true, music: arg("music") ? mockSong() : null });
         if (path.indexOf("/api/custom-cards") === 0) return resolve({ ok: true, cards: arg("cards") ? [
           { title: "Solar today", subtitle: "Roof panels", value: "18.4 kWh", app: "com.google.android.youtube.tv" },

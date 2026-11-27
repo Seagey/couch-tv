@@ -76,13 +76,14 @@ jobs:
           python stamp_version.py windows-file version.txt
           # Mac: the website's "Set up my TV" link (couchtv://) reaches the app as an argument at start
           ARGV=""; [ "$RUNNER_OS" = "macOS" ] && ARGV="--argv-emulation"
-          # Couch TV Helper: the bridge's code and the packages it imports, run in-process by --bridge. Not mcp:
-          # the bridge never imports it (bridge/mcp_server.py is a separate program the AI agent starts), and
-          # collecting its submodules needs typer, which the bridge does not install.
+          # Couch TV Helper: the bridge's code and the packages it imports, run in-process by --bridge. mcp only in part:
+          # bridge/mcp_server.py is a separate program the person's own AI app starts (Setup --mcp, live.py), and collecting all of
+          # mcp needs typer (mcp.cli), which the bridge does not install, so only the server, client and shared parts are collected.
           HELPER=""
           if [ "${{ steps.helper.outputs.bundled }}" = "yes" ]; then
             HELPER="--add-data ../bridge${SEP}bridge"
-            for m in aiohttp androidtvremote2 zeroconf adb_shell airtouch5py PIL; do HELPER="$HELPER --collect-submodules $m"; done
+            for m in aiohttp androidtvremote2 zeroconf adb_shell airtouch5py PIL mcp.server.fastmcp mcp.server.lowlevel mcp.shared mcp.types; do HELPER="$HELPER --collect-submodules $m"; done
+            HELPER="$HELPER --copy-metadata mcp"
             # the standard library modules only the bridge uses (imaplib broke the first build): PyInstaller cannot see
             # into bridge/ because it is added as data. Made from the bridge's own imports (see setup-app/BUILD.md).
             for m in imaplib asyncio atexit collections collections.abc contextlib contextvars email itertools logging math signal stat uuid colorsys csv zoneinfo html mimetypes unicodedata hmac email.policy email.utils xml.etree.ElementTree xml.sax.saxutils importlib.util; do HELPER="$HELPER --hidden-import $m"; done

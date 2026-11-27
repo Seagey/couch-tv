@@ -1,5 +1,5 @@
 // Widget settings, round 2, the watching, apps and music widgets (keep, keeprow, upnext, picks, nowplaying,
-// queue, soundscape, games, app, appgrid, dock, folder, quick, stack), in a real browser:
+// soundscape, games, app, appgrid, dock, folder, quick, stack), in a real browser:
 //  A. every setting changes the drawn widget, and clearing it goes back to the default (widgets.js, the
 //     settings set on this TV in env.wset, the design's own in opts);
 //  B. on the real TV home (?mock=1 with a design): each widget's settings show in Home settings, Widgets on
@@ -206,17 +206,11 @@ const WATCH = { who: "sam", shows: MINE, apps: INSTALLED, bridge: true,
   ok(d.sound === "fire|50", "soundscape: the design's fire");
   ok((await draw(o, WATCH, {})).sound === "rain|50", "soundscape: cleared, rain at 50 again");
 }
-// queue: heading, how many songs
+// queue: the Spotify queue widget was dropped (28 Nov 2026); a design that still has one draws Now playing in its place
 {
-  const o = { id: "q", kind: "queue", w: 900, h: 1060 };
-  const Q = Object.assign({}, WATCH, { queue: { ok: true, items: ["One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight"].map((t) => ({ title: t + " song", artist: "Band" })) } });
-  let a = await draw(o, Q), b = await draw(o, Q, { count: 3 }), c = await draw(o, Q, { label: "Next songs" });
-  const songs = (r) => (r.text.match(/ song/g) || []).length;
-  ok(songs(a) >= 5 && songs(b) === 3, "queue, How many songs 3: " + songs(a) + " then " + songs(b)); tested("queue", "count");
-  ok(/Up next/.test(a.text) && /Next songs/.test(c.text), "queue, Heading"); tested("queue", "label");
-  ok(songs(await draw(o, Q, {})) === songs(a), "queue: cleared");
-  const off = await draw(o, Object.assign({}, WATCH, { queue: { ok: false } }));
-  ok(off.empty && !/song/.test(off.text), "queue with Spotify not connected: the setup card, no songs: " + off.text);
+  const g = await page.evaluate(() => window.CouchDesign && CouchDesign.check ? CouchDesign.check({ v: 1, objects: [{ id: "q", type: "widget", kind: "queue", x: 0, y: 0, w: 400, h: 400, opts: { count: 3, label: "Next" } }] }) : null);
+  const go = g && g.clean && g.clean.objects;
+  ok(go && go[0] && go[0].kind === "nowplaying" && !(go[0].opts && go[0].opts.count), "an old queue widget becomes Now playing, its own settings dropped: " + JSON.stringify(go));
 }
 // the app widgets: their apps (the design's, then Hold OK's edits on this TV) and their own settings
 {
@@ -290,12 +284,12 @@ ok(!errors.length, "no page errors: " + errors.join("; "));
 await page.close();
 
 // ================= B. the real home: shown only while on the design =================
-const KINDS = ["keep", "keeprow", "upnext", "picks", "nowplaying", "queue", "soundscape", "games", "app", "appgrid", "dock", "folder", "quick", "stack"];
-const KEYS = { keep: ["person"], keeprow: ["label", "shows", "person"], upnext: ["sport", "apps"], picks: ["label", "mix"], nowplaying: ["buttons", "cover"], queue: ["label", "count"],
+const KINDS = ["keep", "keeprow", "upnext", "picks", "nowplaying", "soundscape", "games", "app", "appgrid", "dock", "folder", "quick", "stack"];
+const KEYS = { keep: ["person"], keeprow: ["label", "shows", "person"], upnext: ["sport", "apps"], picks: ["label", "mix"], nowplaying: ["buttons", "cover"],
   soundscape: ["sound", "volume"], games: ["apps", "label"], app: ["apps"], appgrid: ["apps", "cols", "names"], dock: ["apps", "more"], folder: ["label", "apps", "cols"], quick: ["quick"], stack: ["turn"] };
-const NAMES = { keep: "Keep watching", keeprow: "Keep watching row", upnext: "Up next", picks: "Picks for you", nowplaying: "Now playing", queue: "Up next queue", soundscape: "Soundscape",
+const NAMES = { keep: "Keep watching", keeprow: "Keep watching row", upnext: "Up next", picks: "Picks for you", nowplaying: "Now playing", soundscape: "Soundscape",
   games: "Games", app: "One app", appgrid: "App grid", dock: "Dock", folder: "App folder", quick: "Quick buttons", stack: "Smart stack" };
-const POS = { keep: [40, 40, 360, 360], keeprow: [420, 40, 760, 300], upnext: [1220, 40, 660, 360], picks: [40, 440, 760, 300], nowplaying: [840, 440, 520, 300], queue: [1400, 440, 480, 300],
+const POS = { keep: [40, 40, 360, 360], keeprow: [420, 40, 760, 300], upnext: [1220, 40, 660, 360], picks: [40, 440, 760, 300], nowplaying: [840, 440, 520, 300],
   soundscape: [40, 780, 200, 200], games: [260, 780, 460, 200], app: [740, 780, 200, 200], appgrid: [960, 780, 300, 260], dock: [1280, 780, 600, 120], folder: [1280, 920, 300, 140], quick: [1600, 920, 300, 100], stack: [420, 360, 360, 60] };
 const objects = KINDS.map((k) => { const p = POS[k]; const o = { id: "o" + k, type: "widget", kind: k, x: p[0], y: p[1], w: p[2], h: p[3] };
   if (k === "stack") { o.items = [{ kind: "clock" }, { kind: "date" }]; o.y = 1000; o.x = 40; o.w = 360; o.h = 70; }

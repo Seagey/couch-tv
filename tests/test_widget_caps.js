@@ -92,7 +92,7 @@ ok(CAPS.need("quote", "Roku OS") === "setup" && CAPS.need("quote", "tvOS") === "
 ["weather", "bigtemp", "keep", "keeprow", "people"].forEach((k) => ok(CAPS.need(k, "Roku OS") === "computer" && CAPS.need(k, "tvOS") === "works", k + ": needs the home computer on a Roku, works on an Apple TV"));
 ok(/once a minute/.test(CAPS.get("stack").platforms["Roku OS"].note), "a stack on a Roku says how it moves on");
 ["clock", "weather", "note", "list", "quote", "welcome", "stack", "people", "card", "app", "dock", "appgrid"].forEach((k) => ["Tizen", "webOS"].forEach((p) => ok(CAPS.need(k, p) !== "computer" && !/home computer is on|has to be on/.test(CAPS.get(k).platforms[p].note), k + " on " + p + ": works in the app without a home computer")));
-["news", "stocks", "aircon", "agenda", "keep", "queue", "agent"].forEach((k) => ["Tizen", "webOS"].forEach((p) => ok(CAPS.need(k, p) === "computer", k + " on " + p + ": still needs the home computer")));
+["news", "stocks", "aircon", "agenda", "keep", "agent"].forEach((k) => ["Tizen", "webOS"].forEach((p) => ok(CAPS.need(k, p) === "computer", k + " on " + p + ": still needs the home computer")));
 ["Saphi", "TiVo OS", "My Home Screen"].forEach((p) => ok(CAPS.need("clock", p) === "computer", "the clock on " + p + ": the computer opens the home there"));
 ok(CAPS.need("agent", "Google TV") === "setup" && CAPS.need("agent", "Fire OS") === "setup" && CAPS.get("agent").setup.where === "tv", "From your AI on an Android TV: set up, no computer needed");
 // Keep watching and the rest on an Android TV: Couch TV's home reads Android's own Continue watching list,

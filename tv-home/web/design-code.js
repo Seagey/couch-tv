@@ -251,6 +251,11 @@
       Object.keys(d.watch.whose).slice(0, 24).forEach(function (id) { var v = d.watch.whose[id]; if (WID.test(id) && (v === "all" || (typeof v === "string" && /^p_[a-z0-9]{6,12}$/.test(v)))) { w[id] = v; wn++; } });
       if (wn) o.watch = { whose: w };
     }
+    // the Now playing card on or off, from the account (lane D, 28 Nov 2026)
+    if (plainObj(d.watch) && typeof d.watch.now_playing === "boolean") {
+      o.watch = o.watch || {};
+      o.watch.now_playing = d.watch.now_playing;
+    }
     if (plainObj(d.rooms)) {
       var rooms = {}, rn = 0;
       Object.keys(d.rooms).slice(0, 10).forEach(function (tv) {
