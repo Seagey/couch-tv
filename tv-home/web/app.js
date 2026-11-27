@@ -5,6 +5,9 @@
   "use strict";
 
   var TV = window.TVOS || null;
+  // a Samsung build (samsung/build.py writes COUCH_TIZEN): Home settings gets its own Samsung section,
+  // and drops the rows for what only Android TV, Google TV, Fire TV or LG can do
+  var SAMSUNG = !!window.COUCH_TIZEN;
   var Q = location.search;
   var MOCK = /[?&]mock\b/.test(Q);
   var PREVIEW = /[?&]preview\b/.test(Q);
@@ -3308,7 +3311,8 @@
   // Where the Spotify card can work: the TV home app reads the TV's own player (TV.spotifyState), and a
   // computer at home reads it over ADB (/api/spotify/now_playing) for the home app on an Android TV. Not in a
   // browser, the on-TV app, a standalone site or a TV a computer runs without Android.
-  function spotifyWorks() { return !!(TV && (TV.spotifyState || (!OFFLINE && !ON_TV))); }
+  // the local music session is read over ADB (Android TV); a Samsung has none
+  function spotifyWorks() { return !SAMSUNG && !!(TV && (TV.spotifyState || (!OFFLINE && !ON_TV))); }
   // A cover from the TV's own player is a picture inside the message (data:), never a link: a link would load
   // from Spotify, and the card sends nothing to Spotify. The computer at home's cover comes from its own lookup.
   function localArt(a) { return typeof a === "string" && a.indexOf("data:image/") === 0 ? a : null; }
@@ -5015,7 +5019,9 @@
     keep("tvhome.apps.seen", seen.concat(fresh));
     newApps = newApps.concat(fresh.filter(function (p) { return newApps.indexOf(p) < 0; }));
     keep("tvhome.apps.new", newApps);
-    if (!NIGHT) return;
+    // a Samsung keeps a new app behind More apps, with its New dot (a QN90F, 28 Nov 2026: the
+    // household wants the dock to stay as they arranged it)
+    if (!NIGHT || SAMSUNG) return;
     materialise();
     var o = data.order;
     fresh.forEach(function (p) {
@@ -6013,6 +6019,12 @@
   // so the Settings key reaches them even when the quick row is off. Nothing is toggled from here:
   // Android keeps Wi-Fi, Bluetooth and brightness to the system screens on Android TV 10 and newer.
   function gearItems() {
+    // Samsung: Couch TV's own settings and its Samsung behaviour section, where the Samsung
+    // shortcuts (Samsung Home, TV settings, the app store, ...) live
+    if (SAMSUNG) return [
+      { ic: ICONS.sliders, ti: t("gear_home"), sub: updReady() ? t("upd_gear", { v: UPD.latest, c: UPD.current || "" }) : t("gear_home_sub"), act: openSettings },
+      { ic: ICONS.screen, ti: t("sec_samsung"), sub: t("gear_samsung_sub"), act: openSamsungSection }
+    ];
     var items = [
       { ic: ICONS.sliders, ti: t("gear_home"), sub: updReady() ? t("upd_gear", { v: UPD.latest, c: UPD.current || "" }) : t("gear_home_sub"), act: openSettings },
       { ic: ICONS.gear, ti: t("gear_tv"), sub: t("gear_tv_sub"), act: openTvSettings }
@@ -6028,6 +6040,18 @@
     }
     items.push({ ic: ICONS.screen_off, ti: t("screen_off"), sub: "", act: function () { closeGear(); paintFocus(); toggleScreenOff(true); } });
     return items;
+  }
+  function refreshAppsNow() {
+    status(t("apps_refresh_busy"), true);
+    TV.refreshApps(function (changed) { status(t(changed === null ? "apps_refresh_failed" : changed ? "apps_refresh_new" : "apps_refresh_same")); });
+  }
+  // the gear's Samsung behaviour: Home settings, open on that section's first row
+  function openSamsungSection() {
+    openSettings();
+    var at = secIndex("samsung");
+    if (at >= 0) SET.sec = at;
+    SET.col = "rows"; SET.ri = Math.max(0, firstRow(rowsNow()));
+    renderSettings();
   }
   function openGear() {
     zone = "gear"; gi = 0;
@@ -6069,10 +6093,14 @@
     document.documentElement.classList.remove("gearing");
     if (zone === "gear") zone = "grid";
   }
+  function openSamsungScreen(key) {
+    TV.samsungKey(key).catch(function () { status(t(key === "settings" ? "tv_settings_none" : "samsung_home_failed")); });
+  }
   // Android's own settings: the Settings app where the TV has one, else the system settings screen.
   function openTvSettings() {
     closeGear();
     paintFocus();
+    if (TV && TV.samsungKey) { openSamsungScreen("settings"); return; }
     var done = false;
     try { done = !!(TV && ((TV.launch && tvLaunch(SETTINGS_PKG)) || (TV.openSettings && TV.openSettings()))); } catch (e) {}
     if (done) return;
@@ -6092,6 +6120,8 @@
   // (football and updates are spliced in before the last one, About, below).
   var PRIMARY = [["phone", "bolt"], ["picture", "look"], ["remote", "apps"], ["thistv", "screen"], ["more", "chevron"]];
   var SECS = [["language", "globe"], ["weather", "cloud"], ["designer", "designer"], ["about", "info"]];
+  // a Samsung build: Samsung behaviour among the main sections, just above More
+  if (SAMSUNG) PRIMARY.splice(PRIMARY.length - 1, 0, ["samsung", "screen"]);
   var SET = { more: false, col: "secs", sec: 0, ri: 0, keyFocus: null, sub: null, lift: null, confirm: null, dirty: false, typing: null,
     msg: "", geo: { q: "", list: null, busy: false, err: false } };
   var REPO_URL = "github.com/Seagey/couch-tv";
@@ -6410,6 +6440,7 @@
     if (id === "remote") return quickRows().concat(appsRows());
     if (id === "thistv") return thisTvRows();
     if (id === "more") return moreRows();
+    if (id === "samsung") return samsungRows();
     if (id === "football") return footballRows();
     if (id === "updates") return updateRows();
     if (id === "language") return languageRows();
@@ -7172,9 +7203,11 @@
         ST.idle_photo_seconds = IDLE_PHOTO_SECONDS; saveSettings(); resetIdlePhoto();
       } });
     // the TV's own screensaver (Google TV's Ambient mode) and the albums it shows
-    rows.push(head(t("ambient_head")));
-    rows.push({ kind: "action", key: "ambient", label: t("ambient_settings"), sub: t("ambient_settings_sub"),
-      act: function () { openAmbientSettings(); } });
+    if (!SAMSUNG) {
+      rows.push(head(t("ambient_head")));
+      rows.push({ kind: "action", key: "ambient", label: t("ambient_settings"), sub: t("ambient_settings_sub"),
+        act: function () { openAmbientSettings(); } });
+    }
     // Smart Idle & OLED-safe Ambient Mode
     rows.push(head(t("smart_idle_head")));
     rows.push({ kind: "toggle", key: "smart-idle-on", label: t("smart_idle_on"), sub: t("smart_idle_on_sub"),
@@ -7194,7 +7227,7 @@
         SMART_IDLE.home_action = SMART_IDLE_ACTIONS[(i + 1) % SMART_IDLE_ACTIONS.length];
         ST.smart_idle = SMART_IDLE; saveSettings(); renderSettings();
       } });
-    rows.push({ kind: "cycle", key: "smart-idle-paused", label: t("smart_idle_paused"), sub: t("smart_idle_paused_sub"),
+    if (!SAMSUNG) rows.push({ kind: "cycle", key: "smart-idle-paused", label: t("smart_idle_paused"), sub: t("smart_idle_paused_sub"),
       value: SMART_IDLE.paused_idle_minutes ? t("n_min", { n: SMART_IDLE.paused_idle_minutes }) : t("off"), act: function () {
         var i = SMART_IDLE_PAUSED_STEPS.indexOf(SMART_IDLE.paused_idle_minutes);
         SMART_IDLE.paused_idle_minutes = SMART_IDLE_PAUSED_STEPS[(i + 1) % SMART_IDLE_PAUSED_STEPS.length];
@@ -7882,7 +7915,7 @@
 
   // ---- quick buttons ----
   function quickRows() {
-    var on = QUICK.slice(), order = on.concat(QUICK_ALL.filter(function (q) { return on.indexOf(q) < 0; }));
+    var on = QUICK.slice(), order = on.concat(QUICK_ALL.filter(function (q) { return on.indexOf(q) < 0 && !(SAMSUNG && SAMSUNG_NO_QUICK[q]); }));
     var rows = order.map(function (q) {
       var enabled = on.indexOf(q) >= 0;
       return { kind: "check", key: "quick:" + q, label: t("quick_" + q), checked: enabled, sub: quickNeeds(q),
@@ -7890,6 +7923,143 @@
     });
     rows.push(info("quick-note", t("quick_note")));
     return rows;
+  }
+  // quick buttons a Samsung cannot do: picture modes and Bluetooth go over ADB, the screensaver and the
+  // direct settings screens need the Android app, Developer Mode extending is LG's
+  var SAMSUNG_NO_QUICK = { picture: 1, headphones: 1, screensaver: 1, bluetooth: 1, network: 1, extend: 1 };
+
+  // ---- Samsung behaviour (Samsung builds only) ----
+  // What the bridge does with this TV (kept by the bridge, not in ST) and how Samsung's Home key behaves.
+  var SAMSUNG_BEH = null, samsungBehAsked = false;
+  function samsungBehRead() {
+    if (samsungBehAsked || OFFLINE) return;
+    samsungBehAsked = true;
+    api("GET", "/api/tizen/behaviour").then(function (j) {
+      SAMSUNG_BEH = j;
+      if (zone === "settings") renderSettings();
+    }, function () { samsungBehAsked = false; });
+  }
+  function samsungRows() {
+    var rows = [];
+    samsungBehRead();
+    // what the gear menu has on other TVs: here on a Samsung, so the gear keeps to Couch TV's own.
+    // Settings changed just before would reload the page as it closes, under the action: an app
+    // opened reloads a moment later, behind it; Screen off keeps the reload for the next close.
+    function away(fn, inPage) {
+      return function () {
+        var dirty = SET.dirty;
+        SET.dirty = false;
+        closeSettings();
+        fn();
+        if (dirty && inPage) SET.dirty = true;
+        else if (dirty) setTimeout(restart, 1500);
+      };
+    }
+    if (TV && TV.samsungKey) rows.push({ kind: "action", key: "samsung-home-open", label: t("samsung_home"), act: away(function () { openSamsungScreen("smart_hub"); }) });
+    rows.push({ kind: "action", key: "samsung-tv-settings", label: t("gear_tv"), sub: t("gear_tv_sub"), act: away(openTvSettings) });
+    if (TV && TV.openStore) rows.push({ kind: "action", key: "samsung-store", label: t("samsung_store"), sub: t("samsung_store_sub"), act: away(function () { TV.openStore(); }) });
+    if (TV && TV.refreshApps) rows.push({ kind: "action", key: "samsung-apps-refresh", label: t("apps_refresh"), sub: t("apps_refresh_sub"), act: away(refreshAppsNow, true) });
+    rows.push({ kind: "action", key: "samsung-screen-off", label: t("screen_off"), act: away(function () { toggleScreenOff(true); }, true) });
+    if (!OFFLINE) {
+      var open = SAMSUNG_BEH && SAMSUNG_BEH.open_on_power_on;
+      rows.push({ kind: "toggle", key: "samsung-open", label: t("samsung_open"), sub: t("samsung_open_sub"),
+        value: SAMSUNG_BEH ? (open ? t("on") : t("off")) : "…", act: function () {
+          if (!SAMSUNG_BEH) return;
+          var want = !SAMSUNG_BEH.open_on_power_on;
+          api("POST", "/api/tizen/behaviour", { open_on_power_on: want }).then(function (j) {
+            SAMSUNG_BEH = j;
+            if (zone === "settings") renderSettings();
+          }, function () { SET.msg = t("samsung_beh_failed"); if (zone === "settings") renderSettings(); });
+        } });
+    } else rows.push(info("samsung-open", t("samsung_open"), "", t("quick_needs_bridge")));
+    if (TV && TV.liveTvKeys) rows.push({ kind: "toggle", key: "samsung-livekeys", label: t("samsung_livekeys"), sub: t("samsung_livekeys_sub"),
+      value: t(TV.liveTvKeys() === "leftright" ? "samsung_livekeys_lr" : "samsung_livekeys_ud"),
+      act: function () { TV.toggleLiveTvKeys(); } });
+    if (TV && TV.liveTvCountries && !OFFLINE) {
+      var picked = (SAMSUNG_BEH && SAMSUNG_BEH.live_regions) || [];
+      rows.push({ kind: "nav", key: "samsung-live-regions", label: t("samsung_live_regions"), sub: t("samsung_live_regions_sub"),
+        value: !SAMSUNG_BEH ? "…" : picked.length ? picked.map(function (c) { return c.toUpperCase(); }).join(", ") : t("off"),
+        act: openLiveRegions });
+    }
+    // Live TV opens on: the last channel watched, this country's channels, or a country ticked above
+    if (TV && TV.liveTvStart) {
+      var startAt = TV.liveTvStart();
+      rows.push({ kind: "nav", key: "samsung-live-start", label: t("samsung_live_start"), sub: t("samsung_live_start_sub"),
+        value: liveStartName(startAt), act: openLiveStart });
+    }
+    if (TV && TV.samsungHomeShortcut) rows.push({ kind: "toggle", key: "samsung-home-shortcut", label: t("samsung_home_shortcut"),
+      value: t(TV.samsungHomeShortcut() === "double" ? "samsung_home_double" : "samsung_home_tile"),
+      act: function () { TV.toggleSamsungHomeShortcut(); } });
+    return rows;
+  }
+  // Live TV countries: other countries' free Samsung TV Plus channels, sports first. The bridge tries a
+  // few of each from this home (at most every 6 hours) and keeps the choice (/api/tizen/behaviour).
+  var LIVE_REGIONS = null, liveRegionsAsked = false;
+  function openLiveRegions() {
+    SET.sub = { back: "samsung-live-regions", crumb: t("sec_samsung"), title: function () { return t("samsung_live_regions"); },
+      rows: liveRegionRows };
+    SET.ri = 0;
+    if (!liveRegionsAsked) {
+      liveRegionsAsked = true;
+      // the bridge tries a few channels of every country first: up to about 15 seconds on a Pi
+      api("GET", "/api/livetv/regions", null, 45000).then(function (j) {
+        LIVE_REGIONS = j.regions || [];
+        if (zone === "settings") renderSettings();
+      }, function () { liveRegionsAsked = false; LIVE_REGIONS = []; SET.msg = t("samsung_live_regions_none"); if (zone === "settings") renderSettings(); });
+    }
+    renderSettings();
+  }
+  function liveRegionRows() {
+    if (!LIVE_REGIONS) return [info("lr-wait", t("samsung_live_regions_wait"))];
+    var picked = (SAMSUNG_BEH && SAMSUNG_BEH.live_regions) || [];
+    var rows = [], good = LIVE_REGIONS.filter(function (r) { return r.played && r.sports; });
+    if (good.length) rows.push(info("lr-tip", t("samsung_live_regions_tip", { list: good.slice(0, 3).map(function (r) { return r.name; }).join(", ") })));
+    LIVE_REGIONS.forEach(function (r) {
+      var on = picked.indexOf(r.code) >= 0, bits = [t("samsung_live_regions_count", { n: r.channels })];
+      if (r.sports) bits.push(t("samsung_live_regions_sports", { n: r.sports, names: r.examples.slice(0, 3).join(", ") }));
+      if (r.tried) bits.push(t("samsung_live_regions_played", { n: r.played, of: r.tried }));
+      rows.push({ kind: "check", key: "lr:" + r.code, label: r.name, checked: on, sub: bits.join(" · "), act: function () {
+        var want = on ? picked.filter(function (c) { return c !== r.code; }) : picked.concat([r.code]);
+        if (want.length > 8) { SET.msg = t("samsung_live_regions_max"); renderSettings(); return; }
+        api("POST", "/api/tizen/behaviour", { live_regions: want }).then(function (j) {
+          SAMSUNG_BEH = j;
+          if (zone === "settings") renderSettings();
+        }, function () { SET.msg = t("samsung_beh_failed"); if (zone === "settings") renderSettings(); });
+      } });
+    });
+    rows.push(info("lr-note", t("samsung_live_regions_note")));
+    return rows;
+  }
+  function countryName(code) {
+    var r = (LIVE_REGIONS || []).filter(function (x) { return x.code === code; })[0];
+    if (r) return r.name;
+    try { return new Intl.DisplayNames([document.documentElement.lang || "en"], { type: "region" }).of(code.toUpperCase()); } catch (e) {}
+    return code.toUpperCase();
+  }
+  function liveStartName(code) {
+    if (!code) return t("samsung_live_start_last");
+    if (code === "home") {
+      var home = SAMSUNG_BEH && SAMSUNG_BEH.country;
+      return home ? countryName(home) : t("samsung_live_start_home");
+    }
+    return countryName(code);
+  }
+  function openLiveStart() {
+    SET.sub = { back: "samsung-live-start", crumb: t("sec_samsung"), title: function () { return t("samsung_live_start"); },
+      rows: liveStartRows };
+    SET.ri = 0;
+    renderSettings();
+  }
+  function liveStartRows() {
+    var now = TV.liveTvStart(), picked = (SAMSUNG_BEH && SAMSUNG_BEH.live_regions) || [];
+    // a country no longer ticked above is still listed while it is the choice, so it can be changed
+    var codes = ["", "home"].concat(picked, now && now !== "home" && picked.indexOf(now) < 0 ? [now] : []);
+    return codes.map(function (code) {
+      return { kind: "check", key: "ls:" + (code || "last"), label: liveStartName(code), checked: code === now, act: function () {
+        TV.setLiveTvStart(code);
+        renderSettings();
+      } };
+    });
   }
   function quickNeeds(q) {
     if (q === "sleep" && OFFLINE && !nativeSleep()) return t("quick_needs_bridge");
@@ -9772,14 +9942,16 @@
         });
       } });
     if (sr.url) rows.push({ kind: "action", key: "ah-stay-clear", label: "Remove the bookings link", danger: true, act: function () { ahEdit(function (x) { if (x.stay) delete x.stay.url; }, "The bookings link is removed from this TV."); stayRefresh(true); } });
-    // screen time
-    rows.push(head("Screen time"));
-    var s = screenNow(), goal = (r.screen || {}).goal || 0;
-    rows.push(info("ah-screen", "Today", s.ok ? CouchAtHome.hm(s.minutes) : "", s.ok ? "Time in apps on this TV today." : s.why === "access" ? "This TV has not allowed Couch TV to read screen time yet." : s.why === "tv" ? "This TV does not share screen time: it needs a Google TV, Android TV or Fire TV." : s.why === "ontv" ? "Screen time needs Couch TV set up once from a computer, with the free Setup app. The app put on with just a phone cannot read it." : "Needs the Couch TV home app 0.13.2 or newer: Home settings, Updates."));
-    rows.push({ kind: "cycle", key: "ah-goal", label: "Daily goal", value: goal ? CouchAtHome.hm(goal) : t("off"), act: function () {
-      ahEdit(function (x) { var g = CouchAtHome.GOALS, i = g.indexOf((x.screen || {}).goal || 0); x.screen = { goal: g[(i + 1) % g.length] }; });
-    } });
-    if (s.why === "access" && TV && TV.openUsageAccess) rows.push({ kind: "action", key: "ah-screen-allow", label: "Allow screen time", sub: "Opens the TV's Usage access list: switch on Home", act: function () { if (!TV.openUsageAccess()) SET.msg = "This TV has no such screen. Ask whoever set up Couch TV to switch on screen time from their computer."; SCR.at = 0; } });
+    // screen time: Android's usage stats, which a Samsung does not share
+    if (!SAMSUNG) {
+      rows.push(head("Screen time"));
+      var s = screenNow(), goal = (r.screen || {}).goal || 0;
+      rows.push(info("ah-screen", "Today", s.ok ? CouchAtHome.hm(s.minutes) : "", s.ok ? "Time in apps on this TV today." : s.why === "access" ? "This TV has not allowed Couch TV to read screen time yet." : s.why === "tv" ? "This TV does not share screen time: it needs a Google TV, Android TV or Fire TV." : s.why === "ontv" ? "Screen time needs Couch TV set up once from a computer, with the free Setup app. The app put on with just a phone cannot read it." : "Needs the Couch TV home app 0.13.2 or newer: Home settings, Updates."));
+      rows.push({ kind: "cycle", key: "ah-goal", label: "Daily goal", value: goal ? CouchAtHome.hm(goal) : t("off"), act: function () {
+        ahEdit(function (x) { var g = CouchAtHome.GOALS, i = g.indexOf((x.screen || {}).goal || 0); x.screen = { goal: g[(i + 1) % g.length] }; });
+      } });
+      if (s.why === "access" && TV && TV.openUsageAccess) rows.push({ kind: "action", key: "ah-screen-allow", label: "Allow screen time", sub: "Opens the TV's Usage access list: switch on Home", act: function () { if (!TV.openUsageAccess()) SET.msg = "This TV has no such screen. Ask whoever set up Couch TV to switch on screen time from their computer."; SCR.at = 0; } });
+    }
     return rows;
   }
   function timeStr(d) { var h = d.getHours(), m = d.getMinutes(); return CLOCK24 ? h + ":" + (m < 10 ? "0" : "") + m : (h % 12 || 12) + ":" + (m < 10 ? "0" : "") + m + (h < 12 ? "am" : "pm"); }

@@ -50,6 +50,18 @@ VISIBLE_FRESH = 30
 # for this long (#53: a 20 second dropout opened couch-tv over a football game).
 GONE_MEANS_OFF = 120
 
+# A restart (hold Power, a software update) drops the TV off the network for well under
+# GONE_MEANS_OFF and never says "standby". What tells it from a dropout: running apps survive a
+# dropout, so couch-tv running before a gap of at least this long and stopped after it is a restart.
+RESTART_GAP = 5
+# A restart settles this long after the TV answers again: a restarted QN90F started couch-tv itself,
+# then put Live TV over it about 5 seconds later (26 Nov 2026).
+BOOT_SETTLE = 12
+
+# What the TV puts up by itself as it comes on, not something a person chose: couch-tv goes over it
+# (a QN90F in India comes on in Live TV, which is Samsung TV Plus, Tizen id below).
+TV_OWN = {"HEPsqFNie0.tvplusstandalone"}
+
 KEYS = {
     "up": "KEY_UP", "down": "KEY_DOWN", "left": "KEY_LEFT", "right": "KEY_RIGHT",
     "ok": "KEY_ENTER", "select": "KEY_ENTER", "enter": "KEY_ENTER",
@@ -112,8 +124,21 @@ class SamsungTV:
         # another app with Samsung's title data, which only an app on the TV may do.
         self._tv_jobs = asyncio.Queue()
         self._tv_answers = {}
-        # Open couch-tv when the TV comes on ("open_on_power_on": false to stop it).
+        # Open couch-tv when the TV comes on ("open_on_power_on": false to stop it). Home settings,
+        # Samsung behaviour, can change it from the TV: that choice is kept in data/ and wins. The same
+        # file keeps the other countries whose Live TV channels the TV shows (live_regions, livetv.py).
         self.open_on_power_on = cfg.get("open_on_power_on", True) is not False
+        self.live_regions = []
+        self.behaviour_file = os.path.join(config.DATA, f"samsung-{self.id}-behaviour.json")
+        try:
+            with open(self.behaviour_file) as f:
+                kept = json.load(f)
+            if isinstance(kept.get("open_on_power_on"), bool):
+                self.open_on_power_on = kept["open_on_power_on"]
+            if isinstance(kept.get("live_regions"), list):
+                self.live_regions = [r for r in kept["live_regions"] if isinstance(r, str)][:8]
+        except (OSError, ValueError, AttributeError):
+            pass
         self.remote_name = cfg.get("remote_name") or config.CLIENT_NAME
         self.token_file = os.path.join(config.DATA, f"samsung-{self.id}-token.txt")
         # Paired means the TV has said Allow once (a token is kept). Keys need it; the rest does not.
@@ -142,6 +167,15 @@ class SamsungTV:
         self._art_task = None
         self._tasks = []
         self.quiet_until = 0.0      # the hook leaves the TV alone until then (a command just ran)
+        self.home_button = cfg.get("home_button") is True or isinstance(cfg.get("home_button"), dict)
+        self.home_apps = []
+        self.home_quiet_until = 0.0
+        self.home_reopened_at = float("-inf")
+        self._home_front = None
+        self._home_scan_at = 0.0
+        self._couch_running = None  # home_button TVs: was couch-tv running at the last look
+        self.page_started_at = float("-inf")   # when couch-tv's page last said it started (tizen.js)
+        self.back_at = float("-inf")            # when the TV last answered again after a gap of RESTART_GAP
         self._hook_at = -60.0
         self.hook_log = []          # (time, what) for the last few hook decisions, for /api/tvs
 
@@ -341,7 +375,10 @@ class SamsungTV:
             try:
                 before = (self.connected, self.power, self.art_mode, self.visible, self._vol.get("level"), self._vol.get("muted"))
                 self.connected = await self._read_device()
+                gap = None
                 if self.connected:
+                    if self._gone_since is not None:
+                        gap = time.monotonic() - self._gone_since
                     self._gone_since = None
                 elif self._gone_since is None:
                     self._gone_since = time.monotonic()
@@ -374,6 +411,11 @@ class SamsungTV:
                 elif not self.connected and (was_on is None
                                              or time.monotonic() - self._gone_since > GONE_MEANS_OFF):
                     was_on = False   # gone from the network for a while counts as off
+                if self.home_button:
+                    if on is True and gap is not None and gap >= RESTART_GAP:
+                        self.back_at = time.monotonic()
+                        asyncio.create_task(self._after_gap(time.monotonic() - gap, self._couch_running))
+                    await self._recover_home(on is True and not getattr(self, "_hook_busy", False))
                 after = (self.connected, self.power, self.art_mode, self.visible, self._vol.get("level"), self._vol.get("muted"))
                 if after != before:
                     self._changed()
@@ -382,14 +424,115 @@ class SamsungTV:
             except Exception as e:
                 self.log.warning("watch: %s %s", type(e).__name__, e)
             ticks += 1
-            await asyncio.sleep(2)
+            # off: look twice a second, so couch-tv opens as soon as the TV comes on
+            await asyncio.sleep(0.5 if self.is_on is False and self.open_on_power_on
+                                else 1 if self.is_on is not True or self.home_button else 2)
+
+    def set_behaviour(self, open_on_power_on=None, live_regions=None):
+        """Home settings, Samsung behaviour: keep the choices (data/, so a bridge update keeps them)."""
+        if open_on_power_on is not None:
+            self.open_on_power_on = bool(open_on_power_on)
+        if live_regions is not None:
+            self.live_regions = list(live_regions)[:8]
+        tmp = self.behaviour_file + ".tmp"
+        os.makedirs(os.path.dirname(self.behaviour_file), exist_ok=True)
+        with open(tmp, "w") as f:
+            json.dump({"open_on_power_on": self.open_on_power_on, "live_regions": self.live_regions}, f)
+        os.replace(tmp, self.behaviour_file)
+
+    async def _after_gap(self, gone_at, was_running):
+        """Back on after a short gap. It was a restart, not a Wi-Fi dropout, when couch-tv stopped
+        (it was running before) or its page started again during the gap (the TV starts it while
+        booting): apps keep running through a dropout. After a restart couch-tv goes in front, over
+        whatever the TV put up itself (22:58 and 23:30, 26 Nov 2026: a hold-Power restart of a QN90F
+        left Samsung's home, then Live TV, on screen). Not once couch-tv has been on screen or opened
+        an app since (00:16, 27 Nov: that put couch-tv back over a channel picked just after the restart)."""
+        if not self.open_on_power_on:
+            return   # a restart is a switch-on: "open_on_power_on": false leaves it alone too
+        deadline = time.monotonic() + BOOT_SETTLE
+        while True:
+            state = await self._app_state(self.app_id)
+            if (not state or self.is_on is not True or state.get("visible")
+                    or time.monotonic() < self.quiet_until):
+                return
+            closed = was_running and state.get("running") is False
+            settled = time.monotonic() >= deadline
+            if closed or (settled and self.page_started_at >= gone_at):
+                break
+            if settled:
+                return   # a Wi-Fi dropout: couch-tv kept running and its page did not start again
+            await asyncio.sleep(1)
+        front = await self._front()
+        if self._picked(front):   # opened from the phone, or cast to the TV as it came back
+            self._note(f"TV restarted in {self._package_of(front)}, left alone")
+            return
+        self.home_quiet_until = 0.0   # a Samsung Home kept up on purpose does not outlive a restart
+        self._note("TV restarted, back to couch-tv")
+        try:
+            await self._launch_tizen(self.app_id)
+        except Exception as e:
+            self._note(f"TV restarted, could not open couch-tv: {e}")
+
+    async def _recover_home(self, watching):
+        """Only infer a return from a positively observed app losing visibility. A dead
+        launcher alone says nothing about whether the viewer is on Home, HDMI or Live TV."""
+        if not watching:
+            self._home_front = None
+            return
+        state = await self._app_state(self.app_id)
+        if state and isinstance(state.get("running"), bool):
+            self._couch_running = state["running"]
+        now = time.monotonic()
+        if now < max(self.quiet_until, self.home_quiet_until) or now - self._hook_at < 15:
+            self._home_front = None
+            return
+        if not state or state.get("running") is not False:
+            self._home_front = None
+            return
+        previous = self._home_front
+        if previous:
+            state = await self._app_state(previous)
+            if not state or not isinstance(state.get("visible"), bool):
+                self._home_front = None
+                return
+            if state["visible"]:
+                return
+        elif now < self._home_scan_at:
+            return
+        self._home_scan_at = now + 10
+        candidates = dict.fromkeys([*self.home_apps, *self.ids])
+        unknown = False
+        for app in candidates:
+            if app in (previous, self.app_id):
+                continue
+            state = await self._app_state(app)
+            if state and state.get("visible") is True:
+                self._home_front = app
+                return
+            unknown |= not state or not isinstance(state.get("visible"), bool)
+        self._home_front = None
+        if not previous or unknown or time.monotonic() < max(self.quiet_until, self.home_quiet_until):
+            return
+        state = await self._app_state(self.app_id)
+        if (self.is_on is True and state and state.get("running") is False
+                and time.monotonic() >= max(self.quiet_until, self.home_quiet_until)):
+            await self._launch_tizen(self.app_id)
+            self.home_reopened_at = time.monotonic()
 
     def _note(self, what):
         self.log.info("hook: %s", what)
         self.hook_log = (self.hook_log + [(time.strftime("%H:%M:%S"), what)])[-8:]
 
+    def _picked(self, front):
+        """The app on screen when someone chose it (from the phone, or by casting to the TV), else
+        None: nothing known, couch-tv itself, or the TV's own Live TV (TV_OWN), which couch-tv goes over."""
+        if not front or front == self.app_id:
+            return None
+        package = self._package_of(front)
+        return None if package in TV_OWN else package
+
     async def _hook(self):
-        """The TV just came on. If nothing else is on screen, open couch-tv."""
+        """The TV just came on. If nothing someone chose is on screen, open couch-tv."""
         if not self.open_on_power_on:
             return
         if time.monotonic() - self._hook_at < 15:
@@ -398,7 +541,7 @@ class SamsungTV:
         if time.monotonic() < self.quiet_until:
             self._note("TV came on, left alone (a command is running)")
             return
-        await asyncio.sleep(1.5)   # let the TV settle on whatever it opens by itself
+        await asyncio.sleep(0.5)   # let the TV settle on whatever it opens by itself
         if time.monotonic() < self.quiet_until:   # a phone command landed while it settled
             self._note("TV came on, left alone (a command is running)")
             return
@@ -406,7 +549,7 @@ class SamsungTV:
         if front == self.app_id:
             self._note("TV came on, couch-tv already open")
             return
-        if front:
+        if self._picked(front):
             self._note(f"TV came on in {self._package_of(front)}, left alone")
             return
         await self._open_couch()
@@ -416,26 +559,33 @@ class SamsungTV:
         wakes or a Frame leaves Art Mode it can refuse the launch, or drop off the network for a
         moment. Seen on a 2021 Frame on 20 Nov 2026: one try failed with "not answering on the
         network" and the hook gave up, leaving Samsung's screen. So it tries three times."""
-        last = None
+        last, own = None, None
         for attempt in range(3):
+            # couch-tv or the phone opened something meanwhile; the quiet the last try set itself does
+            # not count (27 Nov 2026: it stopped every second try, "left alone (a command is running)")
+            if time.monotonic() < self.quiet_until and self.quiet_until != own:
+                self._note("TV came on, left alone (a command is running)")
+                return
             if attempt:
                 await asyncio.sleep(3)
                 front = await self._front()
                 if front == self.app_id:
                     self._note(f"TV came on, opened couch-tv (on screen after try {attempt})")
                     return
-                if front:
+                if self._picked(front):
                     self._note(f"TV came on in {self._package_of(front)}, left alone")
                     return
             try:
                 how = await self._launch_tizen(self.app_id)
+            except Exception as e:
+                how, last = None, f"could not open couch-tv: {e}"
+            own = self.quiet_until
+            if how:
                 await asyncio.sleep(3)
                 if await self._front() == self.app_id:
                     self._note(f"TV came on, opened couch-tv ({how}{', try %d' % (attempt + 1) if attempt else ''})")
                     return
                 last = f"asked it to open couch-tv ({how}) but it is not on screen"
-            except Exception as e:
-                last = f"could not open couch-tv: {e}"
         self._note(f"TV came on, {last}")
 
     async def _art_loop(self):
@@ -568,6 +718,8 @@ class SamsungTV:
         # A power press from the phone should land on couch-tv, like one from the TV's own remote
         # (29 Oct: off and on from the phone left the Frame on Samsung's home).
         power = isinstance(name, str) and resolve_key(name) == "KEY_POWER"
+        if power:
+            self.home_quiet_until = 0.0
         self.quiet_until = 0.0 if power else time.monotonic() + 20
         if isinstance(name, str) and name.strip().lower() == "home":
             # couch-tv's Home is our app; Samsung's own menu is "smart_hub".
@@ -576,6 +728,8 @@ class SamsungTV:
         code = resolve_key(name)
         if not code:
             raise messages.with_key(ValueError(f"unknown key: {name}"), "err_unknown_key", key=name)
+        if code == "KEY_HOME":
+            self.home_quiet_until = time.monotonic() + 120
         # Power is never held (docs/SAMSUNG.md): on a Frame a held power switches it fully off, so a
         # held power from the phone or the MCP tool is one press, which goes to Art Mode on a Frame.
         if hold and code != "KEY_POWER":

@@ -186,10 +186,13 @@
   "use strict";
   var S = window.COUCH_TIZEN || {};
   var MAP = window.COUCH_TIZEN_APPS || {};
+  var OWN_LOGOS = {};   // samsung/my-logos/<id or name>.png, for apps with no entry in MAP
+  (window.COUCH_TIZEN_OWN_LOGOS || []).forEach(function (n) { OWN_LOGOS[n] = true; });
   var SELF = "CouchTVApp.Home";
   var BRIDGE = ((location.search.match(/[?&]api=([^&]+)/) || [])[1] || "");
   BRIDGE = decodeURIComponent(BRIDGE);
   var TV_ID = (location.search.match(/[?&]tv=([a-z0-9-]+)/) || [])[1] || "";
+  var HOME = S.home_button;
 
   // ---------- optional debug log (build.py --log-url), for testing without a screenshot ----------
   var LOG = S.log || "";
@@ -247,28 +250,38 @@
   // A few store-installed extras are Samsung's own and stay hidden.
   var STORE = /^[A-Za-z0-9]{10}$/;
   var HIDE = /^(e-Manual|Security Center|Samsung Promotion|Smarthub Connection Test)$/i;
+  // Samsung's in-store demo (ePOP): on a 2025 QN90F in India, "2025.SmartTV.Rose" (2025ePop01.SmartTV),
+  // which would not even open from couch-tv
+  var DEMO = /^\d{4}ePop\d*\./i;
   var byPkg = {}, shown = [];
   function sortOut() {
     byPkg = {}; shown = [];
     tizenApps.forEach(function (a) {
       if (a.id === SELF || a.packageId === SELF.split(".")[0]) return;
+      if (LIVE_ON && (a.id === TVPLUS || /^Samsung TV Plus$/i.test(a.name || ""))) return;   // Live TV plays its channels; its own app froze couch-tv behind it
       var pkg = byTizen[a.id] || byTizen[a.packageId];
       if (pkg && !byPkg[pkg]) {
         byPkg[pkg] = a;
         shown.push({ package: pkg, label: MAP[pkg].name || a.name });
-      } else if (!pkg && a.show && STORE.test(a.packageId || "") && !HIDE.test(a.name || "") && !byPkg[a.id]) {
+      } else if (!pkg && a.show && STORE.test(a.packageId || "") && !HIDE.test(a.name || "") && !DEMO.test(a.id || "") && !byPkg[a.id]) {
         byPkg[a.id] = a;
-        shown.push({ package: a.id, label: a.name });
+        // a store tagline is left off the tile ("ZEE5 - Movies, Shows, LiveTV, ..." is "ZEE5")
+        shown.push({ package: a.id, label: String(a.name || "").split(/\s+[-–—|:]\s+|:\s+/)[0] || a.name });
       }
     });
+    if (LIVE_ON) shown.unshift({ package: LIVE, label: S.live_tv.name || "Live TV" });
     if (SKY_PORT) shown.unshift({ package: SKY, label: "Sky" });
   }
   var SKY = "local.sky", SKY_PORT = parseInt(S.sky_hdmi, 10) || 0, skyOn = false;
+  // Samsung TV Plus's channels played inside couch-tv ("live_tv" in this TV's entry, livetv.js)
+  var LIVE = "local.livetv", LIVE_ON = !!(S.live_tv && typeof S.live_tv === "object");
+  var TVPLUS = "HEPsqFNie0.tvplusstandalone";   // Samsung TV Plus's own app, left out while Live TV is on
   sortOut();
   send("log", "apps on this TV: " + tizenApps.length + ", shown: " + shown.map(function (a) { return a.label; }).join(", "));
+  // --log-url: every app a person could open that couch-tv leaves out, Samsung's own included
   if (LOG) send("log", "not shown: " + tizenApps.filter(function (a) {
-    return !/^(org\.tizen|com\.samsung)/.test(a.id || "") && !shown.some(function (s) { return byPkg[s.package] === a; });
-  }).map(function (a) { return a.name + " [" + a.id + " show=" + a.show + "]"; }).join(", "));
+    return (a.show || !/^(org\.tizen|com\.samsung)/.test(a.id || "")) && !shown.some(function (s) { return byPkg[s.package] === a; });
+  }).map(function (a) { return a.name + " [" + a.id + " pkg=" + a.packageId + " show=" + a.show + "]"; }).join(", "));
 
   // Older TVs (a 2016 one on Tizen 2.4) will not hand another app's icon file to this one, so the
   // picture fails. Show the app's name on the tile instead of a broken picture.
@@ -321,9 +334,11 @@
   document.addEventListener("DOMContentLoaded", paintIcons);
 
   // The list in localStorage is last time's. Read it again a few seconds after the home is up (a TV
-  // with hundreds of apps takes several seconds to answer), save it, and reload the home only if the
-  // apps shown have changed (#53).
-  setTimeout(function () {
+  // with hundreds of apps takes several seconds to answer), after a visit to Samsung's app store, and
+  // when asked (the gear menu's Look for new apps). Save it, and reload the home only if the apps
+  // shown have changed (#53). done(changed) hears true or false, or null when the TV did not answer.
+  function readApps(done) {
+    function answer(v) { if (done) try { done(v); } catch (e) {} }
     try {
       tizen.application.getAppsInfo(function (list) {
         var fresh = list.map(function (a) {
@@ -333,13 +348,18 @@
         try { localStorage.setItem("couch.tizen.apps", JSON.stringify(fresh)); } catch (e) {}
         tizenApps = fresh;
         sortOut();
-        if (shown.map(function (a) { return a.package; }).join("|") !== before) {
+        reportHomeApps();
+        var changed = shown.map(function (a) { return a.package; }).join("|") !== before;
+        answer(changed);
+        if (changed) {
           send("log", "app list changed, reloading");
-          location.reload();
+          // asked from the gear menu: the home first says so
+          if (done) setTimeout(function () { location.reload(); }, 1500); else location.reload();
         }
-      }, function () {});
-    } catch (e) {}
-  }, 4000);
+      }, function () { answer(null); });
+    } catch (e) { answer(null); }
+  }
+  setTimeout(function () { readApps(null); }, 4000);
 
   // ---------- a Sky box on an HDMI input ("sky_hdmi" in this TV's entry in config.json) ----------
   // tvwindow shows the input full screen in front of this app. The Sky remote talks to the box, so
@@ -408,7 +428,29 @@
     x.send(JSON.stringify(TV_ID ? { app: pkg, tv: TV_ID } : { app: pkg }));
   }
 
+  var selfLaunchAt = 0;   // when couch-tv last opened an app itself (the Home watch below ignores that)
+  var selfOpened = null;  // the app couch-tv last opened, while it runs (closing it brings couch-tv back)
+  function openLive() {
+    if (!window.CouchLiveTV) return false;
+    return window.CouchLiveTV.open({ bridge: BRIDGE, tv: TV_ID, key: S.key || "",
+      log: function (text) { send("log", "live tv: " + text); } });
+  }
+  // Samsung's app store. A 2025 QN90F lists two "Apps": org.volt.apps opened on a blue screen from
+  // couch-tv (28 Nov 2026), so this is the one. Back from it, the apps are read again, so one just
+  // installed is on the home.
+  var STORE_APP = "com.samsung.tv.store", fromStore = false;
+  function openStore() {
+    fromStore = true;
+    send("log", "store: opening " + STORE_APP);
+    return launch(STORE_APP);
+  }
   function launch(pkg) {
+    // Live TV plays inside couch-tv, which stays in front: not an app opened (Home still counts at once)
+    if (pkg === LIVE) return openLive();
+    selfLaunchAt = Date.now();
+    // the bridge leaves the TV alone for a while: someone is choosing what to watch (26 Nov 2026: its
+    // restart recovery put couch-tv back over a channel opened a few seconds after the TV came back)
+    if (BRIDGE) homeRequest("POST", "/api/tizen/home", { opened: true }).catch(function () {});
     if (pkg === SKY) return openSky();
     var a = byPkg[pkg], m = MAP[pkg];
     var ids = a ? [a.id] : [];
@@ -423,6 +465,7 @@
       try {
         tizen.application.launch(ids[i], function () {
             send("log", "launched " + ids[i]);
+            selfOpened = ids[i];
             // Some store apps (SVT Play, #327) report success and open nothing. If our page is still
             // in front a few seconds later, ask the bridge to launch it over REST instead.
             setTimeout(function () { if (!document.hidden) { send("log", ids[i] + " did not open, asking the bridge"); bridgeLaunch(pkg); } }, 3500);
@@ -435,18 +478,79 @@
 
   function iconUrl(pkg) {
     if (pkg === SKY) return "logo-sky.png";
+    if (pkg === LIVE) return "logo-livetv.png";
     var m = MAP[pkg];
     if (m && m.logo) return "logos/" + pkg + ".png";
     var a = byPkg[pkg];
+    var own = [pkg].concat(a ? [a.id, a.packageId, a.name] : []).filter(function (n) { return n && OWN_LOGOS[n]; })[0];
+    if (own) return "logos/" + own + ".png";
+    // the TV hands couch-tv no other app's icon file (a QN90F, Tizen 9.0): the bridge finds the app's
+    // icon by its name (bridge/appicons.py). A picture that fails shows the app's name instead.
+    var name = (a && a.name) || (m && m.name);
+    if (BRIDGE && name) {
+      var q = ["name=" + encodeURIComponent(name)];
+      if (TV_ID) q.push("tv=" + TV_ID);
+      if (S.key) q.push("key=" + encodeURIComponent(S.key));
+      return BRIDGE + "/api/tizen/icon?" + q.join("&");
+    }
     if (a && a.iconPath) return /^[a-z]+:/.test(a.iconPath) ? a.iconPath : "file://" + a.iconPath;
     return null;
   }
 
+  function homeRequest(method, path, data, wait) {
+    return new Promise(function (resolve, reject) {
+      var x = new XMLHttpRequest();
+      x.open(method, BRIDGE + path + (TV_ID ? (path.indexOf("?") < 0 ? "?" : "&") + "tv=" + TV_ID : ""));
+      if (S.key) x.setRequestHeader("Authorization", "Bearer " + S.key);
+      if (data) x.setRequestHeader("Content-Type", "application/json");
+      x.timeout = wait || 2000;
+      x.onload = function () {
+        if (x.status >= 200 && x.status < 300) {
+          try { resolve(JSON.parse(x.responseText)); return; } catch (e) {}
+        }
+        reject(new Error("Bridge request failed"));
+      };
+      x.onerror = x.ontimeout = function () { reject(new Error("Bridge not reachable")); };
+      x.send(data ? JSON.stringify(data) : null);
+    });
+  }
+
+  function reportHomeApps() {
+    if (!HOME || !BRIDGE) return;
+    var ids = Object.keys(byPkg).map(function (pkg) { return byPkg[pkg].id; });
+    homeRequest("POST", "/api/tizen/home", { apps: ids }).catch(function () {});
+  }
+  reportHomeApps();
+
+  function homeKept(k) { try { return +localStorage.getItem("couch.home." + k) || 0; } catch (e) { return 0; } }
+  function homeKeep(k, v) { try { localStorage.setItem("couch.home." + k, String(v)); } catch (e) {} }
+  function shortcut() { return homeKept("shortcut") === 2 ? "tile" : "double"; }
+
+  function samsungKey(key) {
+    return homeRequest("POST", "/api/key", { key: key }).then(function () {
+      if (key === "smart_hub") homeKeep("quiet", Date.now() + 120000);
+    });
+  }
   window.TVOS = {
     apps: function () { return JSON.stringify(shown); },
     launch: launch,
     iconUrl: iconUrl,
     bannerUrl: function () { return null; },
+    // Samsung's system screens cannot be opened as Android packages.
+    samsungKey: BRIDGE ? samsungKey : null,
+    samsungHomeShortcut: HOME && BRIDGE ? shortcut : null,
+    toggleSamsungHomeShortcut: function () { homeKeep("shortcut", shortcut() === "double" ? 2 : 1); },
+    // Home settings, Samsung behaviour, Live TV arrows: which arrows change channel (livetv.js)
+    liveTvKeys: LIVE_ON ? function () { return homeKept("livekeys") === 2 ? "leftright" : "updown"; } : null,
+    toggleLiveTvKeys: function () { homeKeep("livekeys", homeKept("livekeys") === 2 ? 1 : 2); },
+    // Home settings, Samsung behaviour, Live TV opens on: "" the last channel, "home", or a country code
+    liveTvStart: LIVE_ON ? function () { try { return localStorage.getItem("couch.home.livestart") || ""; } catch (e) { return ""; } } : null,
+    setLiveTvStart: function (v) { try { localStorage.setItem("couch.home.livestart", String(v || "")); } catch (e) {} },
+    // Home settings, Samsung behaviour, Live TV countries: kept by the bridge, so only with one
+    liveTvCountries: LIVE_ON && BRIDGE ? true : null,
+    // the gear menu: Look for new apps, and Samsung's app store
+    refreshApps: readApps,
+    openStore: openStore,
     // Home settings, About: couch-tv's version (it said "Web preview" on a Samsung, 20 Nov 2026)
     version: function () { return String(S.version || ""); },
     kept: function (k) { try { return localStorage.getItem("tvos." + k); } catch (e) { return null; } },
@@ -534,9 +638,146 @@
   }
   jobs();
 
-  // coming back to the app (after Netflix, say): read the lists again
+  // ---------- Samsung's Home button brings couch-tv back ("home_button" in config.json) ----------
+  // No app can take a Samsung's Home key, and the TV's REST API answers 404 for every system app. What
+  // does show it: Samsung's home starts com.samsung.tv.homeupdateview for a few seconds each time it
+  // opens (a 2025 QN90F, Tizen 9.0: every Home press, from couch-tv and from inside YouTube; not when an
+  // app opens, nor for Settings). Source starts it too, as an overlay: couch-tv stays in front then.
+  // Background support keeps this watch running even when hidden. Source from another app looks
+  // like Home on this firmware. Home again shortly after a bounce is the default escape.
+  if (HOME && window.tizen && tizen.application && tizen.application.getAppsContext) {
+    var markers = HOME.markers || ["com.samsung.tv.homeupdateview"];
+    var running = null, startedAt = 0;   // startedAt: when a marker last started
+    var checking = false;
+    // Back to the front without starting the page again: config.xml's app-control for this operation
+    // has reload="disable", so Tizen sends an appcontrol event to the page instead of reloading it
+    // (a reload put the empty home, "Keep watching" on black, up for a moment on every Home press).
+    // A TV that refuses the app-control gets the plain launch, which reloads.
+    var FRONT = "http://couch-tv.app/appcontrol/operation/front";
+    var bringBack = function () {
+      var reload = function () {
+        tizen.application.launch(SELF, function () {}, function (e) { send("log", "home: reopen failed " + (e && e.name)); });
+      };
+      try {
+        tizen.application.launchAppControl(new tizen.ApplicationControl(FRONT), SELF, function () {}, reload);
+      } catch (e) { reload(); }
+    };
+    // couch-tv back on screen (opened by hand, by the bridge after a restart, or by the TV): Samsung's
+    // home is no longer wanted, so Home works again at once. 26 Nov 2026: holding Power to restart
+    // showed the power menu 3 seconds after a bounce, which reads as Home twice, and the 2 minute
+    // quiet outlived the restart, so Home did nothing once the TV was back.
+    var endQuiet = function () {
+      if (document.hidden) return;
+      if (homeKept("quiet") > Date.now()) {
+        homeKeep("quiet", 0);
+        send("log", "home: couch-tv is back, Home brings it back again");
+      }
+      if (BRIDGE) homeRequest("POST", "/api/tizen/home", { quiet: false }).catch(function () {});
+    };
+    endQuiet();
+    // the bridge tells a restart from a Wi-Fi dropout by this: the page only starts again after one
+    if (BRIDGE) homeRequest("POST", "/api/tizen/home", { started: true }).catch(function () {});
+    var exitAt = 0;   // when couch-tv came back because the app it opened was closed
+    var comeBack = function (why) {
+      // Samsung's home opens right after the app closes: the same moment, not a second Home press
+      if (checking || Date.now() < homeKept("quiet") || Date.now() - exitAt < 4000) return;
+      function decide(state) {
+        checking = false;
+        var t = Date.now();
+        if (!document.hidden || t < homeKept("quiet") || (state && state.quiet)) return;
+        if (shortcut() === "double" && (t - homeKept("back") < 5000 || (state && state.reopened))) {
+          homeKeep("quiet", t + 120000);
+          if (BRIDGE) homeRequest("POST", "/api/tizen/home", { quiet: true }).catch(function () {});
+          send("log", "home: pressed twice, Samsung's home stays");
+          return;
+        }
+        homeKeep("back", t);
+        send("log", "home: " + why + ", back to couch-tv");
+        bringBack();
+      }
+      if (BRIDGE) {
+        checking = true;
+        homeRequest("GET", "/api/tizen/home").then(decide, function () { decide(null); });
+      } else decide(null);
+    };
+    var reading = false;
+    var look = function () {
+      if (reading) return;
+      reading = true;
+      try {
+        tizen.application.getAppsContext(function (list) {
+          reading = false;
+          var now = {};
+          list.forEach(function (c) { now[c.appId] = true; });
+          // --log-url only: every change in the running apps, to find a firmware's markers
+          if (LOG) {
+            var plus = Object.keys(now).filter(function (a) { return !running || !running[a]; });
+            var minus = running ? Object.keys(running).filter(function (a) { return !now[a]; }) : [];
+            if (plus.length || minus.length) send("log", "apps" + (document.hidden ? " (hidden)" : "") + ": +" + plus.join(" +") + " -" + minus.join(" -"));
+          }
+          var started = running && markers.some(function (m) { return now[m] && !running[m]; });
+          // The app couch-tv opened was closed (Back, then Exit): couch-tv comes back straight away
+          // rather than after Samsung's home has opened (Apple Music, 27 Nov 2026: home flashed up first)
+          var closed = selfOpened && running && running[selfOpened] && !now[selfOpened];
+          running = now;
+          if (closed) {
+            send("log", "home: " + selfOpened + " closed, back to couch-tv");
+            selfOpened = null;
+            if (document.hidden && Date.now() >= homeKept("quiet")) { exitAt = Date.now(); bringBack(); }
+          }
+          if (!started) return;
+          startedAt = Date.now();
+          // Home over couch-tv's own Live TV: Samsung's home opens over the playing picture and
+          // couch-tv is never hidden (27 Nov 2026), so the checks below never ran. The player closes
+          // and couch-tv comes back to the front, on its home.
+          if (!document.hidden && window.CouchLiveTV && CouchLiveTV.isOpen() && Date.now() >= homeKept("quiet")) {
+            send("log", "home: pressed over Live TV, back to couch-tv");
+            CouchLiveTV.close();
+            homeKeep("back", startedAt);
+            bringBack();
+            return;
+          }
+          if (document.hidden && startedAt - selfLaunchAt >= 4000) comeBack("Samsung's home opened");
+        }, function () { reading = false; });
+      } catch (e) { reading = false; }
+    };
+    look();
+    setInterval(look, 250);
+    // The TV starting up: it opens couch-tv itself, then may put Live TV over it a few seconds later
+    // (a QN90F, 26 Nov 2026). Nothing pressed on couch-tv yet and the bridge saw the TV just come back:
+    // couch-tv goes straight back in front.
+    var pageAt = Date.now(), touched = false;
+    document.addEventListener("keydown", function () { touched = true; }, true);
+    document.addEventListener("visibilitychange", function () {
+      send("log", "visibility: " + (document.hidden ? "hidden" : "shown"));
+      if (!document.hidden) { endQuiet(); return; }
+      if (Date.now() - selfLaunchAt < 4000) return;   // an app couch-tv opened
+      if (!touched && Date.now() - pageAt < 15000 && BRIDGE) {
+        // front=1: the bridge also says which app is in front. One someone opened from the phone, or by
+        // casting to the TV as it came on, stays; the TV's own Live TV does not.
+        homeRequest("GET", "/api/tizen/home?front=1", null, 6000).then(function (s) {
+          if (s && s.booting && !s.front && document.hidden && Date.now() >= homeKept("quiet")) {
+            send("log", "home: the TV covered couch-tv while starting up, back to couch-tv");
+            bringBack();
+          }
+        }, function () {});
+      }
+      var t = Date.now();
+      if (shortcut() === "double" && t - homeKept("back") < 5000) comeBack("hidden again");
+      else if (t - startedAt < 1200) comeBack("Samsung's home opened");   // Home: the part started a moment before
+    });
+  }
+
+  // coming back to the app (after Netflix, say): read the lists again, and the apps after the store
   document.addEventListener("visibilitychange", function () {
     if (!document.hidden && window.tv && window.tv.resume) window.tv.resume();
     if (!document.hidden && !polling) jobs();
+    if (!document.hidden && fromStore) { fromStore = false; readApps(null); }
   });
+  // --log-url only: Samsung's app store opened over couch-tv without hiding it (a QN90F, 28 Nov 2026),
+  // so whether the page keeps the keys is what tells when it is in front
+  if (LOG) {
+    window.addEventListener("blur", function () { send("log", "focus: lost" + (fromStore ? " (store)" : "")); });
+    window.addEventListener("focus", function () { send("log", "focus: back" + (fromStore ? " (store)" : "")); });
+  }
 })();

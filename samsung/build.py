@@ -168,13 +168,17 @@ def main():
             shutil.copy(os.path.join(LOGOS, name), os.path.join(stage, "logos", name))
             logos.add(name[:-4])
     # Your own logo for an app (git ignored): samsung/my-logos/<package>.png beats the bundled one and
-    # the TV's own icon, for an app whose Tizen icon looks wrong on the home.
+    # the TV's own icon, for an app whose Tizen icon looks wrong on the home. For an app couch-tv has
+    # no entry for and the bridge finds no icon for (Samsung's own Workspace), name the file after its
+    # Tizen app id, package id or its name as the TV shows it (Workspace.png).
     mine = os.path.join(HERE, "my-logos")
+    own_logos = []
     if os.path.isdir(mine) and not a.release:
         for name in sorted(os.listdir(mine)):
             if name.endswith(".png"):
                 shutil.copy(os.path.join(mine, name), os.path.join(stage, "logos", name))
                 logos.add(name[:-4])
+                own_logos.append(name[:-4])
 
     # config.xml: the app's version is couch-tv's (update.js compares it with the latest release)
     cfg_xml = os.path.join(stage, "config.xml")
@@ -200,7 +204,8 @@ def main():
     html = html.replace(tag, '<script src="$WEBAPIS/webapis/webapis.js"></script>\n'
                              '<script src="settings.js"></script>\n<script src="kept.js"></script>\n'
                              '<script src="tizen-apps.js"></script>\n'
-                             '<script src="tizen.js"></script>\n<script src="update.js"></script>\n' + tag)
+                             '<script src="tizen.js"></script>\n<script src="livetv.js"></script>\n'
+                             '<script src="update.js"></script>\n' + tag)
     gate = '<script src="designer-gate.js"></script>'
     if gate not in html:
         raise SystemExit("tv-home/web/index.html no longer loads designer-gate.js; update samsung/build.py")
@@ -223,18 +228,59 @@ def main():
     if sky is not None and (not isinstance(sky, int) or isinstance(sky, bool) or not 1 <= sky <= 4):
         raise SystemExit(f"{tv_cfg['id']}: sky_hdmi must be a port number from 1 to 4, or left out")
     key = "" if a.release else (a.key or config.PAIRING_KEY)
+    # "home_button": true (or {"markers": [app ids]}): Samsung's Home brings couch-tv back (tizen.js).
+    # It needs the app to keep running while hidden, so background-support is on for this TV only.
+    home = tv_cfg.get("home_button")
+    if home is True:
+        home = {}
+    markers = home.get("markers", ["x"]) if isinstance(home, dict) else None
+    if home not in (None, False) and not (isinstance(markers, list) and markers and all(
+            isinstance(m, str) and m for m in markers)):
+        raise SystemExit(f"{tv_cfg['id']}: home_button must be true, false or {{\"markers\": [\"app id\", ...]}}")
+    home = home if isinstance(home, dict) else None
+    if home is not None:
+        with open(cfg_xml) as f:
+            xml = f.read()
+        xml, n = re.subn(r'background-support="disable"', 'background-support="enable"', xml)
+        if n != 1:
+            raise SystemExit("samsung/app/config.xml has no background-support=\"disable\"; update samsung/build.py")
+        with open(cfg_xml, "w") as f:
+            f.write(xml)
+    # "app_names": {"<package>": "<name>"} in this TV's entry: the name on an app's tile, for a
+    # household that knows it by another name ("News" for Samsung TV Plus, or the Live TV tile's
+    # "local.livetv").
+    names = tv_cfg.get("app_names", {})
+    if not (isinstance(names, dict) and all(isinstance(k, str) and isinstance(v, str) and v.strip()
+                                            for k, v in names.items())):
+        raise SystemExit(f"{tv_cfg['id']}: app_names must map app packages to names")
+    # "live_tv": {"groups": ["Hindi News", ...]}: a Live TV tile that plays Samsung TV Plus's free
+    # channels inside couch-tv (livetv.js), so couch-tv stays the app in front. "groups" picks the
+    # channels it shows (all of them when left out). Other countries' channels, and which channels it
+    # opens on, are picked on the TV (Home settings, Samsung behaviour). Without "live_tv" there is no tile.
+    live = tv_cfg.get("live_tv")
+    if live is True:
+        live = {}
+    elif live is False:
+        live = None
+    if live is not None:
+        groups = live.get("groups", []) if isinstance(live, dict) else None
+        if not (isinstance(groups, list) and all(isinstance(g, str) and g.strip() for g in groups)
+                and not set(live) - {"groups"}):
+            raise SystemExit(f"{tv_cfg['id']}: live_tv must be {{\"groups\": [\"Hindi News\", ...]}}, true, or left out")
+        live = {"groups": [g.strip() for g in groups], "name": names.get("local.livetv", "Live TV").strip()}
     settings = {"bridge": a.bridge.rstrip("/"), "tv": a.tv, "log": a.log_url.rstrip("/"), "sky_hdmi": sky, "key": key,
-                "version": version}
+                "home_button": home, "live_tv": live, "version": version}
     with open(os.path.join(stage, "settings.js"), "w") as f:
         f.write("window.COUCH_TIZEN = " + json.dumps(settings) + ";\n")
     table = {}
     for app in apps.APPS:
         t = apps.TIZEN.get(app["id"])
         if t:
-            table[app["package"]] = {"id": app["id"], "name": app["name"], "ids": t["ids"],
-                                     "app": t.get("app"), "logo": app["package"] in logos}
+            table[app["package"]] = {"id": app["id"], "name": names.get(app["package"], app["name"]).strip(),
+                                     "ids": t["ids"], "app": t.get("app"), "logo": app["package"] in logos}
     with open(os.path.join(stage, "tizen-apps.js"), "w") as f:
         f.write("window.COUCH_TIZEN_APPS = " + json.dumps(table, indent=1) + ";\n")
+        f.write("window.COUCH_TIZEN_OWN_LOGOS = " + json.dumps(own_logos) + ";\n")
 
     wgt = os.path.join(OUT, "CouchTV.wgt")
     if os.path.exists(wgt):

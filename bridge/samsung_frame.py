@@ -99,7 +99,8 @@ class SamsungTV(samsung.SamsungTV):
                     return True
             else:
                 in_a_row = 0
-            await asyncio.sleep(HOOK_STEP)
+            # a TV with no Art Mode has no blip to wait out: half the step, so couch-tv is up sooner
+            await asyncio.sleep(HOOK_STEP if self.frame else HOOK_STEP / 2)
         return False
 
     async def _hook(self):
@@ -128,7 +129,7 @@ class SamsungTV(samsung.SamsungTV):
             if front == self.app_id:
                 self._note("TV came on, couch-tv already open")
                 return
-            if front:
+            if self._picked(front):   # Samsung TV Plus (its Live TV) is not picked: couch-tv goes over it
                 self._note(f"TV came on in {self._package_of(front)}, left alone")
                 return
             await self._open_couch()   # up to three tries: the TV can refuse just after Art Mode
