@@ -1492,7 +1492,8 @@
   };
 
   // watching
-  function noShows(root, b, env) { return env && dataOf(env).bridge === false ? soon(root, b, "tv", "keep") : empty(root, b, "tv", "Nothing to keep watching yet", "Shows you start on this TV show up here"); }
+  // no computer: the TV's own Watch Next list (watchNext) still fills Keep watching, so it waits for a show instead of asking for setup
+  function noShows(root, b, env) { var d = env ? dataOf(env) : {}; return d.bridge === false && !d.watchNext ? soon(root, b, "tv", "keep") : empty(root, b, "tv", "Nothing to keep watching yet", "Shows you start on this TV show up here"); }
   function showCard(s, b, env, i, n) {
     var logoA = clamp(b.h / 9, 34, 48);
     var card = E("div", "cw-layer", "", [E("div", "cw-fill", "background:#2a2a30 center/cover;" + (s.art ? "background-image:" + cssImg(s.art) : "")),
@@ -1616,7 +1617,7 @@
     var a = alignOf(o), list = picksFor(o, env);
     if (!list.length) {
       // no Keep watching at all (no bridge, no on-TV app): its setup steps; otherwise nothing yet
-      if (!env.demo && dataOf(env).bridge === false && !(dataOf(env).household || []).some(function (p) { return p.shows && p.shows.length; })) { soon(root, b, "favourite", "picks"); return; }
+      if (!env.demo && dataOf(env).bridge === false && !dataOf(env).watchNext && !(dataOf(env).household || []).some(function (p) { return p.shows && p.shows.length; })) { soon(root, b, "favourite", "picks"); return; }
       return webEmpty(root, b, "favourite", "No picks yet", "Shows anyone at home starts on this TV make picks here", "No picks yet");
     }
     var gap = 20, n = clamp(Math.floor((b.w - 48 + gap) / 220), 1, list.length), pw = Math.floor((b.w - 48 - (n - 1) * gap) / n);
@@ -1767,7 +1768,7 @@
   R.nowplaying = function (root, o, b, env) {
     var m = music(env), buttons = setting(o, env, "buttons") !== false;
     if (m && setting(o, env, "cover") === false) { m = JSON.parse(JSON.stringify(m)); m.art = ""; m.noCover = true; }
-    if (!m) return dataOf(env).bridge === false ? soon(root, b, "music", "nowplaying") : empty(root, b, "music", "Nothing playing", "Songs playing on this TV show up here");
+    if (!m) return dataOf(env).bridge === false && !dataOf(env).musicHere ? soon(root, b, "music", "nowplaying") : empty(root, b, "music", "Nothing playing", "Songs playing on this TV show up here");
     if (b.w < 300 && b.h < 300) {
       // a tile: the cover, with play or pause on it; OK opens the player
       root.classList.add("cw-photo");

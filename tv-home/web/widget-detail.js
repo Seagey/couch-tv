@@ -104,10 +104,18 @@
     S.body.appendChild(head(NEED_ICON[need] || "info", f ? f.name : c.name, f ? f.line : ""));
     var here = function () { if (api.tvEdit) api.tvEdit(id); };
     if (!need) {
-      // nothing to set on the phone (a permission on the TV, a widget not on this TV): its one line
+      // nothing to set on the phone (a permission on the TV, a step on the computer): its line, then the numbered steps for this
+      // TV (emulator test 28 Nov 2026: "OK here shows how" opened the same line again and no steps)
       var cd = C.card ? C.card(kind, false) : { line: "", sub: "" };
-      S.body.appendChild(E("div", "cwd-col cwd-grow cwd-center", "", [E("div", "cwd-mid", "text-align:center;max-width:1300px", [cd.line]),
-        cd.sub ? E("div", "cwd-small", "margin-top:16px;text-align:center;max-width:1300px", [cd.sub]) : null]));
+      var plat = window.COUCH_STANDALONE ? "vidaa" : window.COUCH_WEBOS || window.COUCH_TIZEN ? "web" : window.TVOS ? "android" : "web";
+      var st = C.steps ? C.steps(kind, plat) : [];
+      if (!st.length) {
+        S.body.appendChild(E("div", "cwd-col cwd-grow cwd-center", "", [E("div", "cwd-mid", "text-align:center;max-width:1300px", [cd.line]),
+          cd.sub ? E("div", "cwd-small", "margin-top:16px;text-align:center;max-width:1300px", [cd.sub]) : null]));
+        return;
+      }
+      S.body.appendChild(E("div", "cwd-col cwd-grow", "margin-top:24px", [label(cd.line),
+        E("div", "cwd-list cwd-steps", "", st.map(function (t, i) { return E("div", "cwd-li", "", [E("b", "", "flex:none;width:44px", [String(i + 1) + "."]), E("span", "", "", [t])]); }))]));
       return;
     }
     var box = E("div", "cwd-qr", "width:420px;height:420px;border-radius:32px;background:#fff;display:flex;align-items:center;justify-content:center;flex:none");

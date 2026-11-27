@@ -201,15 +201,46 @@ class Watch(unittest.TestCase):
         self.assertEqual(r["keep"]["count"], 2, "hidden and untitled rows are left out")
         self.assertEqual(r["keep"]["shows"][0], {"title": "The Bear", "app": "Disney+"}, "newest first")
         self.assertEqual(r["now"]["playing"], {"title": "Riptide", "app": "Spotify"})
-        self.assertTrue(r["now"]["spotify_only"], "no Couch TV app on the TV: Spotify only")
-        self.assertEqual(len(tv.log), 2)
-        self.assertTrue(all(c.startswith(("content query", "dumpsys")) for c in tv.log), "read only")
+        self.assertFalse(r["now"]["any_app"], "Now playing not turned on yet")
+        self.assertEqual(len(tv.log), 3)
+        self.assertTrue(all(c.startswith(("content query", "dumpsys", "settings get")) for c in tv.log), "read only")
 
-    def test_with_the_tv_app_any_music_app(self):
-        s = S(tv=Tv(), facts={"name": "Lounge TV", "installed": {"home": "0.13.16", "ontv": "0.13.16"}})
+    def test_now_playing_on_reads_any_music_app(self):
+        s = S(tv=Tv({"enabled_notification_listeners": "com.x/.L:" + live.MUSIC_LISTENER}))
         r = live.route("watch", {}, s, need(s))
         self.assertTrue(r["now"]["any_app"])
         self.assertEqual(r["keep"]["count"], 0)
+
+    def test_turn_on_now_playing(self):
+        class Tv2(Tv):
+            def __init__(self, front):
+                super().__init__()
+                self.granted, self.front = False, front
+
+            def shell(self, cmd, timeout_s=60):
+                self.log.append(cmd)
+                if cmd.startswith("cmd notification allow_listener"):
+                    self.granted = True
+                if "enabled_notification_listeners" in cmd:
+                    return live.MUSIC_LISTENER if self.granted else "null"
+                if "mResumedActivity" in cmd:
+                    return self.front
+                return ""
+        tv = Tv2("mResumedActivity: ActivityRecord{1 u0 app.couchtv.launcher/.MainActivity t9}")
+        s = S(tv=tv)
+        self.assertEqual(live.route("music-on", {}, s, need(s)), {"on": True, "now": True})
+        self.assertIn("cmd notification allow_listener " + live.MUSIC_LISTENER, tv.log)
+        self.assertTrue(any("--ez restart true" in c for c in tv.log), "the home looks again while it is on screen")
+        tv = Tv2("mResumedActivity: ActivityRecord{1 u0 com.netflix.ninja/.Main t9}")
+        s = S(tv=tv)
+        self.assertEqual(live.route("music-on", {}, s, need(s)), {"on": True, "now": False})
+        self.assertFalse(any(c.startswith("am start") for c in tv.log), "never pulled in front of a show")
+
+    def test_turn_on_refused(self):
+        s = S(tv=Tv({"enabled_notification_listeners": "null"}))
+        with self.assertRaises(TvError) as e:
+            live.route("music-on", {}, s, need(s))
+        self.assertEqual(e.exception.code, "music_refused")
 
     def test_a_tv_that_will_not_answer(self):
         s = S(tv=Tv(fail=("content query", "dumpsys")))

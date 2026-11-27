@@ -88,7 +88,15 @@ class Live(unittest.TestCase):
         tv = self.h.tvs[-1]
         tv_shell = tv.shell
 
+        granted = []
+
         def shell(cmd, timeout_s=60):
+            tv.log.append(cmd)
+            if cmd.startswith("cmd notification allow_listener"):
+                granted.append(1)
+                return ""
+            if "enabled_notification_listeners" in cmd:
+                return "app.couchtv.launcher/app.couchtv.launcher.SpotifySessionAccess" if granted else "null"
             if "watch_next_program" in cmd:
                 return "Row: 0 _id=4, title=Bluey, package_name=au.net.abc.iview, browsable=1, last_engagement_time_utc_millis=1764300000000"
             return tv_shell(cmd, timeout_s)
@@ -106,8 +114,11 @@ class Live(unittest.TestCase):
         pg.wait_for_selector("#watch-rows .live-row")
         txt = pg.inner_text("#watch-rows")
         self.assertIn("Bluey (ABC iview)", txt)
-        self.assertIn("Spotify only", txt)
-        self.assertTrue(pg.is_visible("#watch-remote"), "offers the phone remote app for any music app")
+        self.assertIn("Off until you turn it on here", txt)
+        self.assertTrue(pg.is_visible("#watch-music"), "offers Turn on Now playing")
+        pg.click("#watch-music")
+        pg.wait_for_selector('section[data-step="live-watch"] .hint:has-text("Now playing is on")')
+        self.assertIn("cmd notification allow_listener app.couchtv.launcher/app.couchtv.launcher.SpotifySessionAccess", tv.log)
         over = pg.evaluate("document.documentElement.scrollWidth - document.documentElement.clientWidth")
         self.assertLessEqual(over, 0)
 

@@ -206,6 +206,42 @@ const WATCH = { who: "sam", shows: MINE, apps: INSTALLED, bridge: true,
   ok(d.sound === "fire|50", "soundscape: the design's fire");
   ok((await draw(o, WATCH, {})).sound === "rain|50", "soundscape: cleared, rain at 50 again");
 }
+// no computer on an Android TV (emulator test 28 Nov 2026): the TV reads Watch Next and its media sessions itself, so Keep watching,
+// Keep watching row, Up next, Picks and Now playing wait for a show or a song; they ask for setup only when the TV cannot read them
+{
+  const none = { who: "sam", shows: [], apps: INSTALLED, bridge: false, people: [{ id: "sam", name: "Sam" }], household: [] };
+  for (const kind of ["keep", "keeprow", "upnext", "picks"]) {
+    const r = await draw({ id: "k", kind, w: 760, h: 360 }, Object.assign({}, none, { watchNext: true }));
+    ok(!/Needs the Couch TV app|Needs setting up/.test(r.text) && /Nothing to keep watching yet|No picks yet/.test(r.text), kind + " with Watch Next and no computer waits for a show: " + r.text);
+    const off = await draw({ id: "k", kind, w: 760, h: 360 }, none);
+    ok(/Needs the Couch TV app|Needs setting up|OK here shows how/.test(off.text), kind + " with nothing to read asks for setup: " + off.text);
+  }
+  const np = await draw({ id: "n", kind: "nowplaying", w: 760, h: 360 }, Object.assign({}, none, { musicHere: true }));
+  ok(/Nothing playing/.test(np.text) && !/Turn on/.test(np.text), "nowplaying with media access and no computer: Nothing playing: " + np.text);
+  const npOff = await draw({ id: "n", kind: "nowplaying", w: 760, h: 360 }, none);
+  ok(/Turn on Now playing from your computer/.test(npOff.text) && !/Couch TV app on this TV/.test(npOff.text), "nowplaying not turned on says what to do from the computer: " + npOff.text);
+  // OK on the setup card opens numbered steps, not the same line again (shot 39 of the emulator test)
+  for (const [kind, want] of [["keep", /Make Show Keep watching On/], ["nowplaying", /Couch TV Setup/]]) {
+    const d = await page.evaluate(([kind, none]) => {
+      document.querySelectorAll(".ws-host").forEach((h) => h.remove());
+      const host = document.createElement("div"); host.className = "ws-host cw-o"; document.body.appendChild(host);
+      const had = window.TVOS; window.TVOS = had || {};   // an Android TV home
+      const env = { data: none };
+      const root = window.CouchWidgets.render({ id: "k", kind, w: 760, h: 360 }, env);
+      host.appendChild(root);
+      const stop = root.hasAttribute("data-act") ? root : root.querySelector("[data-act]") || root;
+      window.CouchDetail.open(stop, env, {});
+      const t = (document.querySelector(".cwd-panel") || {}).textContent || "";
+      const n = document.querySelectorAll(".cwd-panel .cwd-li").length;
+      window.CouchDetail.close(true);
+      if (!had) delete window.TVOS;
+      return { t: t.replace(/\s+/g, " "), n };
+    }, [kind, none]);
+    ok(d.n >= 2 && want.test(d.t), kind + ": OK on the setup card shows numbered steps: " + d.n + " " + d.t.slice(0, 300));
+  }
+  const steps = await page.evaluate(() => window.CouchWidgetCaps.steps("nowplaying", "android").join(" "));
+  ok(/Couch TV Setup/.test(steps) && /Turn on Now playing/.test(steps), "nowplaying's steps name Couch TV Setup, Live from this TV: " + steps);
+}
 // queue: the Spotify queue widget was dropped (28 Nov 2026); a design that still has one draws Now playing in its place
 {
   const g = await page.evaluate(() => window.CouchDesign && CouchDesign.check ? CouchDesign.check({ v: 1, objects: [{ id: "q", type: "widget", kind: "queue", x: 0, y: 0, w: 400, h: 400, opts: { count: 3, label: "Next" } }] }) : null);

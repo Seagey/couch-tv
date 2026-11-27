@@ -122,7 +122,7 @@
     // the Couch TV home app alone reads Android's own Continue watching list (MainActivity.kt readWatchNext,
     // app.js refreshNow when there is no computer), the same for everyone; the on-TV app or a home computer
     // keeps each person's own
-    android: ["Nothing more to set up: Couch TV's home shows the shows Android keeps under Continue watching. If the TV asks, allow it once.", "For each person's own list, add the Couch TV app on this TV or a home computer that stays on.", "Start a show, then come back to the home: the show is waiting here."],
+    android: ["Nothing more to set up: Couch TV's home shows the shows Android keeps under Continue watching.", OPEN, "Make Show Keep watching On, if it is Off.", "Start a show in Netflix, YouTube or most apps, then come back to the home: the show is waiting here."],
     web: ["Keep the home computer on: it runs Couch TV for this TV.", "Start a show from Couch TV's home (Netflix, YouTube and some others).", "Come back to the home: the show is waiting here."],
     vidaa: ["Needs a home computer that stays on, running Couch TV. The website home cannot do this.", "Start a show from Couch TV's home.", "Come back to the home: the show is waiting here."]
   };
@@ -164,6 +164,8 @@
   var TOWN_NEED = "Your town, set on the TV";
   var PHOTOS_NEED = "Your photos on the TV, or one photo put in the widget";
   var WATCH_NEED = "The Couch TV app on this TV or a home computer that stays on";
+  // Now playing with no computer: the TV lets Couch TV see its media sessions, switched on once from Couch TV Setup (lane D, 28 Nov 2026)
+  var MUSIC_NEED = "Now playing switched on from Couch TV Setup on your computer";
   var HA_NEED = "Home Assistant (a smart home app) running at home";
   // the smart home widgets (group C): set up on the TV (Home settings, Designs, Smart home)
   function haSteps(what) { return shSteps(what, [].slice.call(arguments, 1)); }
@@ -305,10 +307,10 @@
       ok: "OK on a game opens it", platforms: plat("works", "computer", "computer", { vidaa: "Needs a home computer: the website home cannot open apps." }), sizes: sz(["small", "medium", "wide"], [4, 3]) },
 
     // ---------- music ----------
-    nowplaying: { name: "Now playing", status: "setup", what: "The song playing on this TV: cover, song and artist", needs: [WATCH_NEED],
+    nowplaying: { name: "Now playing", status: "setup", what: "The song playing on this TV: cover, song and artist", needs: [MUSIC_NEED],
       // any music app through the on-TV app or a home computer; Couch TV's home alone reads only Spotify's
       // media session (SpotifyPlayer.kt, home.spotify_player), so the computer is not the one way
-      setup: setup("tv", { android: ["Any music app shows with the Couch TV app on this TV or a home computer. With neither, only Spotify shows, if it was switched on when Couch TV was set up.", OPEN, "Go down to Look and scenes, then Now playing card, and make it On.", "Play music in Spotify or any music app."],
+      setup: setup("tv", { android: ["On your computer, open Couch TV Setup and connect to this TV.", "Pick Live from this TV, then Turn on Now playing. It lets Couch TV see the song playing in any music app on this TV.", "Play music in Spotify or any music app: the song shows here."],
         web: ["Not possible on this TV: it does not say what is playing."], vidaa: ["Not possible on this TV: it does not say what is playing."] }),
       until: "\"Nothing playing\" while nothing plays", build: "",
       ok: "Opens the player: back, play or pause, next, volume", platforms: plat("setup", "no", "no", { web: "This TV does not say what is playing.", vidaa: "This TV does not say what is playing." }), sizes: sz(["tile", "wtile", "small", "medium", "large"], [2, 2]) },
@@ -863,6 +865,7 @@
   SHORT[TOWN_NEED] = ["Set your town", "Home settings, Location", "Set your town"];
   SHORT[PHOTOS_NEED] = ["Add your photos", "Home settings, Look and scenes, Your photos", "Add photos"];
   SHORT[WATCH_NEED] = ["Needs the Couch TV app on this TV or a home computer", "OK here shows how", "Needs setting up"];
+  SHORT[MUSIC_NEED] = ["Turn on Now playing from your computer", "Couch TV Setup, Live from this TV. OK here shows how", "Needs setting up"];
   SHORT[HA_NEED] = ["Needs Home Assistant", "Home settings, Designs, Smart home", "Needs Home Assistant"];
   SHORT[C.card.needs[0]] = ["Type your words in Couch TV Studio", "Or a live number from the home computer. OK here shows how", "Type your words"];
   SHORT[C.surf.needs[0]] = ["Set your town by the beach", "Home settings, Location", "Set your town"];

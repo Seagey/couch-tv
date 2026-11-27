@@ -40,6 +40,9 @@ PROVIDERS = [
 MONEY_LINE = "This key can spend your money. Whoever has it can run up charges with that company."
 HTTPS_BASE = re.compile(r"^https://[A-Za-z0-9.-]+(:\d{1,5})?(/[^\s?#]*)?$")
 
+# Now playing with no computer: the home reads the TV's media sessions once the TV lets it (notification access for this one service,
+# which has no notification callbacks: SpotifyPlayer.kt SpotifySessionAccess). Switched on only when the person presses Turn on Now playing.
+MUSIC_LISTENER = "app.couchtv.launcher/app.couchtv.launcher.SpotifySessionAccess"
 WATCH_NEXT_COLS = ["_id", "title", "package_name", "browsable", "last_engagement_time_utc_millis"]
 WATCH_NEXT = ("content query --uri content://android.media.tv/watch_next_program --projection " + ":".join(WATCH_NEXT_COLS))
 SESSIONS = "dumpsys media_session"
@@ -112,7 +115,7 @@ def live_state(tv, facts):
     sessions = parse_sessions(ask(SESSIONS) or "")
     ontv = bool(((facts or {}).get("installed") or {}).get("ontv"))
     playing = next((s for s in sessions if s.get("playing")), None)
-    music_any = ontv
+    music_any = music_is_on(tv)
     return {
         "keep": {"ok": wn_out is not None and "Error" not in (wn_out or ""), "count": len(rows),
                  "shows": [{"title": r["title"][:60], "app": app_name(r.get("package_name") or "")} for r in rows[:3]]},
@@ -122,6 +125,26 @@ def live_state(tv, facts):
         "ontv": ontv,
         "helper": hconfig.load()["mode"] == "helper",
     }
+
+
+def music_is_on(tv):
+    try:
+        return MUSIC_LISTENER in (tv.shell("settings get secure enabled_notification_listeners", timeout_s=15) or "")
+    except Exception:
+        return False
+
+
+def music_on(tv):
+    """Turn on Now playing: the TV lets Couch TV's home see its media sessions (any music app). Then the home looks again, but only
+    when it is on screen (never pulled in front of a show)."""
+    tv.shell(f"cmd notification allow_listener {MUSIC_LISTENER}", timeout_s=15)
+    if not music_is_on(tv):
+        raise TvError("The TV did not let Couch TV see what is playing. Update Couch TV on the TV, then try again.", "music_refused")
+    front = tv.shell("dumpsys activity activities | grep -m 1 mResumedActivity", timeout_s=15) or ""
+    if f"{steps.HOME_PKG}/" in front:
+        tv.shell(f"am start -n {steps.HOME_PKG}/.MainActivity --ez restart true", timeout_s=15)
+        return {"on": True, "now": True}
+    return {"on": True, "now": False}
 
 
 # ---------------------------------------------------------------- Ask AI into the account
@@ -266,4 +289,6 @@ def route(name, body, S, need_tv):
         return apps_send(S.link, getattr(S, "live_apps", None) or (S.profile or {}).get("apps"))
     if name == "watch":
         return live_state(need_tv(), S.facts)
+    if name == "music-on":
+        return music_on(need_tv())
     raise TvError("No such step.", "404")

@@ -218,7 +218,7 @@
     b.appendChild(rows);
     var act = el("div", "actions");
     var again = button(null, "Check again", "watch-again");
-    var remote = button("primary", "Add the phone remote app", "watch-remote"); remote.hidden = true;
+    var remote = button("primary", "Turn on Now playing", "watch-music"); remote.hidden = true;
     act.appendChild(remote); act.appendChild(again);
     b.appendChild(act);
     b.appendChild(el("p", "small", "The show titles found stay on this page. Nothing is sent anywhere."));
@@ -238,15 +238,20 @@
           s.keep.ok ? "From the TV" : "Not shared", s.keep.ok ? "ok" : "warn");
         row("Picks for you", "Made on the TV from everyone's Keep watching. Add people in your account.", "From the TV", "ok");
         var np = s.now.playing ? "Playing now: " + (s.now.playing.title || "something") + " (" + s.now.playing.app + ")." : "Nothing playing now.";
-        row("Now playing", (s.now.any_app ? "Any music app. " : "Spotify by itself. Any music app with the phone remote app. ") + np,
-          s.now.any_app ? "Any app" : "Spotify only", s.now.any_app ? "ok" : "warn");
+        row("Now playing", (s.now.any_app ? "Any music app on this TV. " : "Off until you turn it on here. It lets Couch TV see the song playing in any music app. ") + np,
+          s.now.any_app ? "On" : "Off", s.now.any_app ? "ok" : "warn");
         row("Plex and your imported history", "Need the Couch TV Helper on a computer that stays on.", s.helper ? "Helper on" : "Needs the Helper", s.helper ? "ok" : "dim");
-        remote.hidden = !!s.ontv;
+        remote.hidden = !!s.now.any_app;
         say(sec, "");
       }, function (e) { say(sec, e.message); });
     }
     again.addEventListener("click", look);
-    remote.addEventListener("click", function () { var g = document.getElementById("remote-go"); if (g) g.click(); });
+    remote.addEventListener("click", function () {
+      var sec = sheets["live-watch"];
+      lock(sec, true);
+      api("/api/live/music-on").then(function (r) { return look().then(function () { say(sec, r.now ? "Now playing is on. Play a song: it shows on the TV." : "Now playing is on. Press Home on the TV, then play a song."); }); },
+        function (e) { say(sec, e.message); }).then(function () { lock(sec, false); });
+    });
     return look;
   }
 
