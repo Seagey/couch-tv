@@ -209,6 +209,18 @@ Italian the places in Italy come first, in German the places in Germany.
 Open-Meteo is the only weather provider for now. Since 0.13: **Ambient weather
 effects** (light rain, snow and fog over the scenes), off to start.
 
+**Shabbat times** (off to start): a card at the start of the Keep watching row with this week's candle
+lighting, then havdalah and the parsha (or the Yom Tov, in a week without one). It uses the town set
+under Location, so there is nothing else to set up, and the TV asks
+[Hebcal](https://www.hebcal.com/shabbat) itself once an hour (18 minutes before
+sunset; no computer needed). The times are the town's own, whatever zone the TV is in, and follow the
+12 or 24 hour clock. Or `home.shabbat: true` in `config.json`. Shabbat times by Hebcal.com (CC BY 4.0).
+
+**Shabbat look** (on with Shabbat times, or `home.shabbat_look: false` to keep only the card): from candle
+lighting to havdalah the whole home takes on candlelight. A warm glow comes up from below the scene, the
+scene and the glass panels turn gold, and two flickering candles with "Shabbat Shalom · Havdalah 5:16 pm"
+sit over the date. At havdalah it goes back by itself. Lighter home keeps the flames still.
+
 ### Look and scenes
 
 - Night scenes, OLED Cinema, Classic or Loop (see [The Loop look](#the-loop-look)).
