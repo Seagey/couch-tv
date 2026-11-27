@@ -5879,7 +5879,7 @@
     if (zone === "np") { npPress(); return; }
     if (zone === "football") {
       openSettings();
-      for (var fi = 0; fi < SECS.length; fi++) if (SECS[fi][0] === "football") { SET.sec = fi; break; }
+      var fi = secIndex("football"); if (fi >= 0) SET.sec = fi;
       SET.col = "rows"; SET.ri = firstRow(footballRows()); renderSettings(); return;
     }
     if (zone === "pmenu") {
@@ -6037,9 +6037,12 @@
   // Saved on this TV (page storage and the launcher's own store, TVOS.keep) and, with a bridge,
   // also on the computer (/api/settings), so the phone and the TV agree.
   var ST_KEY = "tvhome.settings";
-  var SECS = [["language", "globe"], ["location", "pin"], ["weather", "cloud"], ["look", "look"], ["music", "note"],
-    ["apps", "apps"], ["people", "person"], ["quick", "bolt"], ["designer", "designer"], ["about", "info"]];
-  var SET = { col: "secs", sec: 0, ri: 0, keyFocus: null, sub: null, lift: null, confirm: null, dirty: false, typing: null,
+  // Slimmed 27 Nov 2026 (mockup 3): four sections and More. People, photos, town, Wi-Fi and the linking
+  // codes are the account's job now, so Location and People are gone from the TV. SECS is what More opens
+  // (football and updates are spliced in before the last one, About, below).
+  var PRIMARY = [["phone", "bolt"], ["picture", "look"], ["remote", "apps"], ["thistv", "screen"], ["more", "chevron"]];
+  var SECS = [["language", "globe"], ["weather", "cloud"], ["designer", "designer"], ["about", "info"]];
+  var SET = { more: false, col: "secs", sec: 0, ri: 0, keyFocus: null, sub: null, lift: null, confirm: null, dirty: false, typing: null,
     msg: "", geo: { q: "", list: null, busy: false, err: false } };
   var REPO_URL = "github.com/Seagey/couch-tv";
   var WX_DEFAULT = WX_NONE;
@@ -6166,6 +6169,8 @@
         var qr = $("set-phone-qr");
         qr.innerHTML = "";
         try { qr.appendChild(window.TVQR.svg(j.url, 120)); } catch (e) { off(); return; }
+        // the Couch TV logo in the middle, small enough for the code's error correction (level M) to read round it
+        var lg = document.createElement("img"); lg.className = "set-phone-logo"; lg.src = "couchtv-logo.svg"; lg.alt = ""; qr.appendChild(lg);
         PHONE_QR.url = j.url;
       }
       $("set-phone-head").textContent = t("set_phone");
@@ -6187,7 +6192,7 @@
     closeGear();
     zone = "settings";
     if (window.AmbientWeather) window.AmbientWeather.pause();
-    SET.col = "secs"; SET.sec = 0; SET.ri = 0; SET.keyFocus = null; SET.sub = null; SET.lift = null; SET.confirm = null; SET.msg = ""; SET_ALL = false;
+    SET.col = "secs"; SET.sec = 0; SET.ri = 0; SET.keyFocus = null; SET.sub = null; SET.lift = null; SET.confirm = null; SET.msg = ""; SET_ALL = false; SET.more = false;
     clearFocus();
     $("settings").classList.add("on");
     document.documentElement.classList.add("setting");
@@ -6213,7 +6218,11 @@
 
   // ---- rows ----
   // Couch TV Studio is a name, the same in every language
-  function secName(id) { return id === "designer" ? "Designs" : t("sec_" + id); }
+  function secName(id) {
+    var n = { phone: "Set up from your phone", picture: "Picture and sound", remote: "Remote and buttons",
+      thistv: "This TV", more: "More", about: "Help and reset" };
+    return id === "designer" ? "Designs" : n[id] || t("sec_" + id);
+  }
   function rowsNow() { return SET.sub ? SET.sub.rows() : sectionRows(secsNow()[SET.sec][0]); }
   function focusable(r) { return !!r && r.kind !== "head" && r.kind !== "info" && r.kind !== "code" && r.kind !== "qr"; }
   function firstRow(rows) { for (var i = 0; i < rows.length; i++) if (focusable(rows[i])) return i; return -1; }
@@ -6285,8 +6294,14 @@
   }
   function secsNow() {
     var r = SET_ALL ? null : useRules();
-    if (!r) return SECS;
-    return SECS.filter(function (sc) { var id = sc[0]; return r[id] === undefined || r[id] !== false; });
+    var more = SET.more ? SECS : [];
+    if (!r) return PRIMARY.concat(more);
+    return PRIMARY.concat(more.filter(function (sc) { var id = sc[0]; return r[id] === undefined || r[id] !== false; }));
+  }
+  // The index of a section in the left list. A section under More opens More first.
+  function secIndex(id) {
+    for (var i = 0; i < SECS.length; i++) if (SECS[i][0] === id) SET.more = true;
+    return secsNow().map(function (sc) { return sc[0]; }).indexOf(id);
   }
   // the row keys each rule hides (a heading goes when nothing under it is left)
   var ROW_RULE = { "keep-photo": "scenes", "keep-photo-pick": "scenes", "photos-count-look": "scenes", "sun-sync": "scenes", "scene-secs": "scenes",
@@ -6340,6 +6355,11 @@
 
   function sectionRows(id) { return designAware(id, sectionRowsAll(id)); }
   function sectionRowsAll(id) {
+    if (id === "phone") return setupPhoneRows();
+    if (id === "picture") return lookRows().concat(musicRows());
+    if (id === "remote") return quickRows().concat(appsRows());
+    if (id === "thistv") return thisTvRows();
+    if (id === "more") return moreRows();
     if (id === "football") return footballRows();
     if (id === "updates") return updateRows();
     if (id === "language") return languageRows();
@@ -6353,6 +6373,36 @@
     if (id === "people") return peopleRows();
     if (id === "quick") return quickRows();
     return aboutRows();
+  }
+  // Set up from your phone: the scan card is on the right (phoneQr); a linked TV also asks for its new design here.
+  function setupPhoneRows() {
+    var rows = [info("phone-note", t("set_phone2_head"), "", t("set_phone2_sub"))];
+    if (inboxCan()) rows.push(inboxRow("top-inbox-now"));
+    return rows;
+  }
+  // This TV: its name from the account when it has one, the version, and how it is running.
+  function thisTvRows() {
+    var ver = "";
+    try { ver = TV && TV.version ? TV.version() : ""; } catch (e) {}
+    var run = ALONE || ON_TV ? "run_alone" : OFFLINE ? "run_off" : data.bridge === false ? "run_quiet" : "run_bridge";
+    var rows = [];
+    if (thisTvName()) rows.push(info("tv-name", "Name", thisTvName()));
+    rows.push(info("ver", t("about_version"), ver || t("about_web")));
+    rows.push(info("run", t("about_running"), t(run)));
+    return rows;
+  }
+  function thisTvName() {
+    var n = ACCOUNT && (ACCOUNT.tv_name || ACCOUNT.tv && ACCOUNT.tv.name);
+    return typeof n === "string" ? n.slice(0, 60) : "";
+  }
+  // More: Language, Weather, Designs, Updates and Help and reset. OK on one opens it under More.
+  function moreRows() {
+    return SECS.map(function (sc) {
+      return { kind: "nav", key: "more:" + sc[0], label: secName(sc[0]), act: function () {
+        var i = secIndex(sc[0]);
+        if (i >= 0) { SET.sec = i; SET.sub = null; SET.keyFocus = null; SET.ri = 0; enterRows(); }
+      } };
+    });
   }
   function footballRows() {
     var rows = [info("football-help", "Choose the competitions to show", "", "The scores card cycles through your selections.")];
@@ -8126,7 +8176,7 @@
       // design from your phone right under it)
       welcomeClose("code");
       openSettings();
-      var at = secsNow().map(function (sc) { return sc[0]; }).indexOf("designer");
+      var at = secIndex("designer");
       if (at >= 0) SET.sec = at;
       SET.col = "rows"; SET.keyFocus = "design-get"; SET.ri = 0;
       typeDesignCode("");
@@ -10562,7 +10612,7 @@
   function openWidgetPage(key) {
     if (!widgetByKey(key)) return;
     openSettings();
-    var i = secsNow().map(function (s) { return s[0]; }).indexOf("designer");
+    var i = secIndex("designer");
     if (i >= 0) SET.sec = i;
     openWidget(key);
     renderSettings();
