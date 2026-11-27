@@ -65,6 +65,8 @@ cannot do it. Read [docs/SYNC.md](SYNC.md) first.
   ```
 - Your settings are in `config.json`, your secrets in `.env`, your data in `bridge/data/`. All
   three are ignored by git.
+- On a Samsung with a bridge, for an app couch-tv has no logo for, the bridge sends that app's name
+  to Apple's public app search to find its picture ([SAMSUNG.md](SAMSUNG.md#app-pictures)).
 - Before you push a fork, run `scripts/privacy-scan.sh`. It checks for private addresses, emails,
   phone numbers, MAC addresses, home network names and secrets, in the files and the git history.
   You can also give it a file of your own words to block: `scripts/privacy-scan.sh my-denylist.txt`
