@@ -95,7 +95,7 @@ function load() {
   {
     const src = fs.readFileSync(path.join(__dirname, "../tv-home/web/i18n.js"), "utf8");
     const blocks = (src.match(/set_phone_pc:/g) || []).length, words = src.match(/phone_code: "[^"]*\{code\}[^"]*"/g) || [];
-    ok(blocks === 16 && words.length === blocks, "phone_code is in all " + blocks + " language blocks, each with {code}: " + words.length);
+    ok(blocks === 17 && words.length === blocks, "phone_code is in all " + blocks + " language blocks, each with {code}: " + words.length);
     ok(!words.some((w) => /[–—]/.test(w)), "no long dashes in it");
   }
   console.log("phone page (TV home side) tests: " + n + " passed");

@@ -1369,7 +1369,7 @@
         if (isPhoto && SCENES[scene] === s && SCENES.length > 1) showScene(nextFrom(scene));
       }
     };
-    img.onload = function () { delete img.dataset.tries; };
+    img.onload = function () { img.removeAttribute("data-tries"); };   // old webOS throws on deleting from dataset (#150)
   }
 
   /** The scene's photo is in and drawable. */
@@ -1398,9 +1398,9 @@
     var el = sceneEls[k];
     if (!el || !el.classList.contains("ready")) return;
     el.classList.remove("ready");
-    Array.prototype.forEach.call(el.querySelectorAll("img"), function (img) { img.removeAttribute("src"); delete img.dataset.tries; });
+    Array.prototype.forEach.call(el.querySelectorAll("img"), function (img) { img.removeAttribute("src"); img.removeAttribute("data-tries"); });
     Array.prototype.forEach.call(el.querySelectorAll(".gclock .fill"), function (f) { f.style.backgroundImage = ""; });
-    delete el.dataset.hm;
+    el.removeAttribute("data-hm");
   }
 
   // An own scene whose photo is not on this TV (option A with an app built before the scene was

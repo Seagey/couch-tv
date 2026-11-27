@@ -24,7 +24,7 @@ assert(appJs.includes('if (KW_ON && postersFit()) rows.push({ kind: "toggle", ke
 assert(css.includes('html.kw-poster.theme-night .shelf .show { width: 15.625rem; height: 8.789rem; }'), 'two dock columns wide, 16:9');
 assert(css.includes('.no-flex-gap.kw-poster.theme-night .shelf-track > * + * { margin-left: 1.625rem; }'), 'older WebViews keep the gap');
 
-// all 16 languages have the string
+// all 17 languages have the string
 const count = (i18n.match(/\bkw_posters:/g) || []).length;
-assert.strictEqual(count, 16, `kw_posters must exist in all 16 languages (found ${count})`);
+assert.strictEqual(count, 17, `kw_posters must exist in all 17 languages (found ${count})`);
 console.log('Keep watching poster style tests passed.');
