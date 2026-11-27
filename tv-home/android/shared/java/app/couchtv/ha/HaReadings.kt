@@ -37,8 +37,46 @@ object HaReadings {
      */
     fun opensHouse(entity: String, attrs: JSONObject?): Boolean {
         if (OPENS_HOUSE.matches(entity)) return true
-        val n = slug(attrs?.optString("friendly_name").orEmpty())
-        return n.isNotEmpty() && OPENS_HOUSE.matches(entity.substringBefore('.') + "." + n)
+        val raw = attrs?.optString("friendly_name").orEmpty()
+        val n = slug(raw)
+        if (n.isNotEmpty() && OPENS_HOUSE.matches(entity.substringBefore('.') + "." + n)) return true
+        return entity.substringBefore('.') in NAMED_DOMAINS && nameOpensHouse(raw)
+    }
+
+    /**
+     * G11 (lane B, 28 Nov 2026): a cover, switch, script or scene NAMED for a garage, gate, door, lock or alarm in any language the home
+     * speaks ("Garagentor", "Puerta del garaje", "Alarme maison") never shows, whatever its id. The words are the on-TV app's Matter list
+     * (MatterModel.OPENS_HOUSE_WORDS, the same as bridge/matter.py) plus alarm words; tests/fixtures/opens_house_names.json is every copy's test.
+     */
+    private val NAMED_DOMAINS = setOf("cover", "switch", "script", "scene")
+    private val NAME_WORDS = listOf(
+        """garages?""", """gates?""", """doors?""", """locks?""",
+        """garagen\w*""", """tore?""", """\w*(?:tür|tuer)(?:e|en)?""", """\w*schlo(?:ss|ß)""",
+        """\w*(?:einfahrts|hof|garten|roll|schiebe|flügel|fluegel)tore?""",
+        """(?:voor|achter|garage|zij|tuin|schuif|kantel|rol|kelder|balkon|terras)?deur(?:en)?""",
+        """(?:garage|toegangs|tuin|rol|schuif|inrit)?poort(?:en)?""", """slot(?:en)?""", """(?:tuin|toegangs|schuif|draai|inrit)?hek(?:ken)?""",
+        """portails?""", """portes?""", """serrures?""", """barrières?""",
+        """garajes?""", """cocheras?""", """puertas?""", """port[oó]n(?:es)?""", """verjas?""", """cerraduras?""",
+        """cancelas?""", """cerrojos?""",
+        """portas?""", """portone""", """portoni""", """cancell[oi]""", """serratur[ae]""", """basculante""",
+        """garage[mn]s?""", """port[ãa]o""", """port[õo]es""", """fechaduras?""",
+        """garaj\w*""", """kap[ıi]\w*""", """kilit\w*""", """kilid\w*""",
+        """gara[žżz]\w*""", """kapij\w*""", """vrata""", """brav[au]""",
+        """bram(?:a|y|ę|ie|ą|ka|ki|kę)?""", """drzwi""", """zam(?:ek|ka|ku|ki|kiem)""",
+        """gar[áa][žz]\w*""", """br[áa]n(?:a|y|u|ou|ě)""", """dve[řr]\w*""", """z[áa]m(?:ek|ku|ky|kem)""",
+        """[הבלמו]?(?:מוסך|שער|דלת|מנעול)""",
+        """(?:ال)?(?:مرآب|كراج|جراج|بوابة|باب|قفل)""",
+        """alarm\w*""", """allarm[ei]""", """disarm\w*""", """[הבלמו]?אזעק\w*""", """(?:ال)?إنذار\w*""",
+    )
+    private const val WORD = """[\p{L}\p{M}\p{N}_]"""
+    private val NAME_OPENS_HOUSE: Regex = java.util.regex.Pattern.compile(
+        "(?<!$WORD)(?:" + NAME_WORDS.joinToString("|").replace("""\w""", WORD) + ")(?!$WORD)",
+        java.util.regex.Pattern.CASE_INSENSITIVE or java.util.regex.Pattern.UNICODE_CASE).toRegex()
+
+    fun nameOpensHouse(name: String?): Boolean {
+        if (name.isNullOrBlank()) return false
+        val s = name.replace(Regex("(?<=[a-zà-ÿ])(?=[A-ZÀ-Þ])"), " ").replace(Regex("[\\d_]+"), " ")
+        return NAME_OPENS_HOUSE.containsMatchIn(s)
     }
 
     /** What a scene sets (Home Assistant lists it in its "entity_id" attribute). */

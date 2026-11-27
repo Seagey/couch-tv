@@ -121,6 +121,8 @@
         <!-- The account link from a computer over ADB (SetupLink.kt): android.permission.DUMP is held by ADB's shell
              and by no TV app. -->
         <receiver android:name=".SetupLink" android:exported="true" android:permission="android.permission.DUMP" />
+        <!-- A Matter sharing code from Couch TV Setup over ADB (matter/MatterFromComputer.kt), behind the same DUMP permission. -->
+        <receiver android:name=".matter.MatterFromComputer" android:exported="true" android:permission="android.permission.DUMP" />
         <receiver android:name=".BootReceiver" android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.BOOT_COMPLETED" />

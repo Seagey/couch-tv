@@ -27,7 +27,7 @@ import webbrowser
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
-from . import errors, finder, guide, health, linkin, pairing, paths, release, scanlog, steps, studio, tidy, tvprofile
+from . import errors, finder, guide, health, linkin, pairing, paths, release, scanlog, smarthome, steps, studio, tidy, tvprofile
 from .helper import autostart as hautostart, config as hconfig, deeplink
 from .identity import Identity
 from .tv import Tv, TvError
@@ -726,6 +726,65 @@ def api(method, path, body):
     if path == "/api/undo":
         tv = need_tv()
         return run_job("undo", lambda p: steps.undo(tv, p))
+    if path.startswith("/api/smart/"):
+        return smart_api(path[len("/api/smart/"):], body)
+    raise TvError("No such step.", "404")
+
+
+# ---- the Smart home step (smarthome.py; lane B, 28 Nov 2026). Nothing here touches a TV: it is all the home Wi-Fi and the account.
+def smart_api(name, body):
+    if name == "state":
+        out = {**smarthome.view(), "choices": smarthome.choices(), "account": None}
+        if S.link.token:
+            try:
+                out["account"] = _account(lambda: smarthome.account(S.link))
+            except TvError as e:
+                out["account_error"] = str(e)
+        return out
+    if name == "find":
+        return run_job("smart-find", smarthome.find)
+    if name == "ha-start":
+        url = smarthome.ha_start(body.get("base"), S.port)
+        if not os.environ.get("COUCHTV_SETUP_NO_BROWSER"):
+            webbrowser.open(url)
+        return {"opened": True}
+    if name == "ha-token":
+        base, token = body.get("base"), body.get("token")
+        return run_job("smart-ha", lambda p: smarthome.ha_use(base, token))
+    if name == "hue":
+        addr = body.get("address")
+        return run_job("smart-hue", lambda p: smarthome.hue_pair(addr))
+    if name == "airtouch":
+        addr = body.get("address")
+        return run_job("smart-airtouch", lambda p: smarthome.airtouch_use(addr))
+    if name == "matter":
+        code = body.get("code")
+        tv = S.tv
+
+        def add(progress):
+            # the TV this Setup is connected to, when it has the on-TV app (it is then the Matter controller); else this computer's Helper
+            if tv is not None and body.get("on") != "computer":
+                try:
+                    has = steps.ONTV_PKG in steps._packages(tv)
+                except Exception:
+                    has = False
+                if has:
+                    progress(0.2, "Adding it on the TV")
+                    return smarthome.matter_add_tv(tv, code)
+            progress(0.2, "Adding it on this computer")
+            return smarthome.matter_add(code)
+        return run_job("smart-matter", add)
+    if name == "save":
+        tvs = body.get("tvs")
+
+        def save(progress):
+            progress(0.2, "Saving to your account")
+            _account(lambda: smarthome.report(S.link))
+            return _account(lambda: smarthome.save(S.link, tvs))
+        return run_job("smart-save", save)
+    if name == "forget":
+        smarthome.SM.reset()
+        return smarthome.view()
     raise TvError("No such step.", "404")
 
 
@@ -788,6 +847,12 @@ class Handler(BaseHTTPRequestHandler):
         path = self.path.split("?")[0]
         if path.startswith("/api/"):
             return self._send(405, {"error": "POST only"})
+        if path == "/ha/back":   # Home Assistant's own sign in page sends the browser back here (smarthome.ha_start)
+            ok, words = smarthome.ha_back(self.path.partition("?")[2])
+            page = ('<!doctype html><html lang="en-AU"><head><meta charset="utf-8"><title>Couch TV Setup</title><link rel="stylesheet" href="/style.css"></head>'
+                    '<body><main><section class="sheet"><h1>%s</h1><p class="lead">%s</p></section></main></body></html>'
+                    % ("Connected" if ok else "Not connected", words.replace("<", "")))
+            return self._send(200, page.encode(), "text/html; charset=utf-8")
         name = "index.html" if path in ("", "/") else path.lstrip("/")
         f = (WEB / name).resolve()
         if WEB.resolve() not in f.parents or not f.is_file():

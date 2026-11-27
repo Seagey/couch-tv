@@ -130,6 +130,22 @@ class HaPage(ctx: Context, private val web: WebView) {
         }
     }
 
+    /**
+     * The room the account gave this TV (details.rooms[<this TV>]; "null" for none): from now on only its air con, lights and speakers show and
+     * answer, whatever is ticked here (HomeAssistant.keepRoom, RoomCap). Lane B, 28 Nov 2026.
+     */
+    @JavascriptInterface
+    fun setupRoomFromAccount(id: String, room: String) {
+        if (!ids.matches(id) || room.length > 8192) return
+        main.post {
+            if (!trusted(web.url)) { setupReply(id, JSONObject().put("ok", false).put("error", "refused")); return@post }
+            io.execute {
+                val ok = try { HomeAssistant.keepRoom(app, if (room == "null" || room.isBlank()) null else JSONObject(room)); true } catch (e: Exception) { false }
+                main.post { setupReply(id, JSONObject().put("ok", ok)) }
+            }
+        }
+    }
+
     @JavascriptInterface
     fun setupForget(id: String) {
         if (!ids.matches(id)) return
