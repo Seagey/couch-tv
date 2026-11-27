@@ -19,6 +19,14 @@
 .cw-paper { color: #1d1b18; --ink: #1d1b18; --sub: rgba(29, 27, 24, 0.74); --faint: rgba(29, 27, 24, 0.45); }
 .cw-paper > .cw-bg { background: var(--paperbg); }
 .cw-tint > .cw-bg { background: var(--tile, #0a84ff); }
+/* Textures on a solid box (Phase 3 item 15, style.texture): drawn once over the box's colour, under the words.
+   Paper: soft light fibres. Linen: a fine woven cross. Grain: film grain. A slower TV (lighter) leaves them off. */
+.cw-tx > .cw-bg::after { content: ""; position: absolute; left: 0; top: 0; right: 0; bottom: 0; border-radius: inherit; pointer-events: none; }
+.cw-tx-paper > .cw-bg::after { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='240'%3E%3Cfilter id='p'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.035 0.6' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 0.5 0'/%3E%3C/filter%3E%3Crect width='240' height='240' filter='url(%23p)'/%3E%3C/svg%3E"); opacity: 0.34; }
+.cw-tx-linen > .cw-bg::after { background-image: repeating-linear-gradient(0deg, rgba(255, 255, 255, 0.07) 0 1px, transparent 1px 4px),
+  repeating-linear-gradient(90deg, rgba(0, 0, 0, 0.08) 0 1px, transparent 1px 4px); }
+.cw-tx-grain > .cw-bg::after { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0.55 0'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)'/%3E%3C/svg%3E"); opacity: 0.22; }
+html.lighter .cw-tx > .cw-bg::after { display: none; }
 /* Glass words (style.ink "glass", widgets.js shell): see through white with a light top edge and a soft
    shadow, or smoked dark glass on a light box. A slower TV (lighter, glass lite) draws them solid. */
 .cw-ink-glass, .cw-ink-glass * { text-shadow: 0 -1px 0 rgba(255, 255, 255, 0.5), 0 1px 2px rgba(0, 0, 0, 0.3), 0 6px 24px rgba(0, 0, 0, 0.34) !important; }
@@ -92,6 +100,17 @@ html:not(.lighter):not(.glass-lite) .cw-ink-liquid.cw-lq-on > :not(.cw-bg) * {
   display: -webkit-flex; display: flex; -webkit-align-items: center; align-items: center; -webkit-justify-content: center; justify-content: center;
   color: #fff; font-weight: 700; text-align: center; line-height: 1.05; padding: 0; word-break: break-word; }
 .cw-app.cw-has-icon { color: transparent; }
+/* App icons (Phase 3 item 16, a widget's style.app_shape and app_colour, widgets.js shell) */
+.cw-ish-circle .cw-app { border-radius: 50% !important; }
+.cw-ish-square .cw-app { border-radius: 8% !important; }
+.cw-ish-words .cw-app { background: rgba(255, 255, 255, 0.16) !important; color: #fff !important; box-shadow: inset 0 0 0 1.5px rgba(255, 255, 255, 0.22); padding: 6% !important; }
+.cw-ish-words .cw-app > img { display: none; }
+.cw-paper.cw-ish-words .cw-app { background: rgba(0, 0, 0, 0.07) !important; color: #1d1b18 !important; }
+.cw-ico-mono .cw-app > img, .cw-ico-mono .cw-app.cw-tvset { -webkit-filter: grayscale(1); filter: grayscale(1); }
+.cw-ico-mono .cw-app:not(.cw-has-icon) { background: #2a2a30 !important; }
+.cw-ico-own .cw-app { border-radius: 0 !important; background: transparent !important; box-shadow: none !important; overflow: visible; }
+.cw-ico-own .cw-app > img { object-fit: contain !important; }
+.cw-tvset .cw-tvset-w { color: #fff; font-weight: 700; }
 /* a Folder tile's four minis: the name hides behind the icon; with no icon (or one that failed) it shows */
 .cw-app.cw-mini.cw-has-icon { font-size: 0 !important; }
 .cw-more { background: rgba(255, 255, 255, 0.16); box-shadow: none; }

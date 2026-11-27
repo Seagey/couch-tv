@@ -38,7 +38,11 @@
     antonio: '"Antonio", "Arial Narrow", sans-serif',
     serif: 'Georgia, "Noto Serif", "Times New Roman", serif',
     mono: '"Roboto Mono", "Droid Sans Mono", Menlo, monospace',
-    condensed: '"Roboto Condensed", "Arial Narrow", sans-serif'
+    condensed: '"Roboto Condensed", "sans-serif-condensed", "Arial Narrow", sans-serif',
+    // one font list everywhere (Phase 3 E1): words, clocks and widgets take the same eight, in the same order
+    rounded: '"Nunito", "Inter", sans-serif',
+    cormorant: '"Cormorant Garamond", Georgia, serif',
+    jost: '"Jost", "Inter", sans-serif'
   };
   // Any Google Fonts family by its name (google-fonts.js, a list made from Google Fonts' public
   // metadata): a design may name up to three. The TV never asks Google: each font's file comes from the
@@ -359,13 +363,13 @@
     "aircon", "scenes", "controls", "camera", "doorbell", "energy", "sensor", "battery",
     "bins", "people", "agenda", "note", "list",
     "card", "quote", "word", "news", "sports", "stocks", "commute",
-    "welcome", "quick", "wifi", "guide", "screentime", "ask", "agent", "stack"];
+    "welcome", "quick", "wifi", "guide", "screentime", "ask", "agent", "stack", "tvsettings"];
   // which panel each kind has when its style does not say (glass, solid, colour, paper, none)
   var WPANEL = { clock: "none", tallclock: "none", glassclock: "none", flipclock: "none", date: "none", welcome: "none", quote: "none", quick: "none",
     photo: "none", slideshow: "none", mosaic: "none", artframe: "none", memory: "none", keep: "none", keeprow: "none", upnext: "none", picks: "none",
     app: "none", appgrid: "none", camera: "none", stack: "none", analog: "colour", wordclock: "colour", countdown: "colour", weather: "colour",
     bigtemp: "colour", hourly: "colour", week: "colour", uv: "colour", surf: "colour", screentime: "colour", note: "colour", word: "paper",
-    worldclock: "solid", moon: "solid", timer: "solid", stocks: "solid", battery: "solid", ask: "glass", agent: "glass" };
+    worldclock: "solid", moon: "solid", timer: "solid", stocks: "solid", battery: "solid", ask: "glass", agent: "glass", tvsettings: "glass" };
   // the kinds the remote stops on (they do something with OK); the rest are to look at (GRID.md Focus 6)
   // (and, from 18 Nov 2026, every kind whose OK opens its detail layer, widget-detail.js: a clock opens
   // Timers, the weather the forecast, a photo the slideshow; a widget with nothing real to show opens
@@ -373,11 +377,18 @@
   var WACT = ["keep", "keeprow", "upnext", "picks", "app", "folder", "dock", "appgrid", "games", "nowplaying", "soundscape", "aircon", "scenes", "controls", "people", "quick", "stack",
     "clock", "tallclock", "glassclock", "analog", "flipclock", "wordclock", "timer", "solar", "worldclock", "date", "month", "agenda",
     "weather", "bigtemp", "hourly", "week", "rain", "uv", "sun", "moon", "air", "surf", "photo", "slideshow", "mosaic", "artframe",
-    "camera", "doorbell", "card", "news", "sports", "memory", "queue", "speakers", "energy", "sensor", "battery", "note", "list", "stocks", "commute", "wifi", "guide", "screentime", "ask", "agent"];
+    "camera", "doorbell", "card", "news", "sports", "memory", "queue", "speakers", "energy", "sensor", "battery", "note", "list", "stocks", "commute", "wifi", "guide", "screentime", "ask", "agent", "tvsettings"];
   var WSIZES = ["line", "wline", "tile", "wtile", "small", "tall", "medium", "wide", "large", "xl", "hero", "full", "row8", "row12", "row18"];
+  // Box behind it (Phase 3 item 15): Glass, Solid or None in Couch TV Studio. "colour" and "paper" stay in the
+  // list because every TV out there reads them: Studio shows both as Solid (a colour, or the Paper texture with
+  // no colour), and an older TV keeps drawing them as it always did. texture: a pattern on a solid box.
+  // app_shape and app_colour: how a dock, row, folder or app tile draws its apps (item 16).
+  // day_from and day_to (HH:MM, both or neither): a person's own day for Show "At night" and "In the day";
+  // without them the TV's town's sunrise and sunset decide (item 18b).
   var WSTYLE = { panel: ["glass", "solid", "colour", "paper", "none"], gradient: ["off", "soft"], ink: ["auto", "white", "ink", "accent", "glass", "liquid"],
-    font: ["inter", "antonio", "rounded", "cormorant", "jost"], icons: ["line", "solid", "duotone", "tile", "glass", "playful", "classic"],
-    corners: ["square", "soft", "round", "pill"], shadow: ["none", "soft", "lifted"], show: ["always", "live", "night", "day"] };
+    font: ["inter", "antonio", "rounded", "condensed", "jost", "serif", "cormorant", "mono"], icons: ["line", "solid", "duotone", "tile", "glass", "playful", "classic"],
+    corners: ["square", "soft", "round", "pill"], shadow: ["none", "soft", "lifted"], show: ["always", "live", "night", "day"],
+    texture: ["none", "paper", "linen", "grain"], app_shape: ["circle", "square", "rounded", "words"], app_colour: ["colour", "mono", "own"] };
   var QUICK_IDS = ["sleep", "picture", "look", "soundscape", "screen_off", "headphones", "input", "bluetooth", "network", "tvsettings", "screensaver"];
   var SCENE_IDS = ["night", "fog", "golden", "dawn", "water"];
   var CTL_ICONS = ["light", "lamp", "pendant", "blinds", "lock", "outlet", "speaker", "shield", "fan", "aircon", "tv", "camera", "garage", "light-off"];
@@ -404,6 +415,7 @@
     apps: function (v) {
       var A = typeof window !== "undefined" && window.CouchApps;
       return SAN.list(v, 16, function (p) {
+        if (p === "tvsettings") return p;   // the TV's own settings, as an app (Phase 3 item 17)
         if (!A) return pkgOk(p) && KEEP.indexOf(p) < 0 ? p : undefined;
         if (A.get(p)) return p;
         return pkgOk(p) && KEEP.indexOf(p) < 0 ? A.idOf(p) || undefined : undefined;
@@ -450,12 +462,13 @@
     weather: "place hilo night degrees", bigtemp: "place degrees", hourly: "place hours degrees", week: "place", rain: "label", uv: "label", sun: "label", moon: "hemi", air: "label scale", surf: "label units wind",
     photo: "image fit caption sub", slideshow: "seconds_each caption sub shuffle", mosaic: "count", artframe: "image mat caption sub", memory: "align range ago",
     keep: "", keeprow: "label shows", upnext: "apps sport", picks: "label align",
-    app: "apps", folder: "label apps cols", dock: "apps more", appgrid: "apps cols names", games: "label apps",
+    app: "apps", folder: "label apps cols names", dock: "apps more", appgrid: "apps cols names", games: "label apps",
     nowplaying: "", soundscape: "sound volume", queue: "", speakers: "",
     aircon: "entity others", scenes: "label", controls: "label controls cols", camera: "label", doorbell: "", energy: "", sensor: "label", battery: "low",
     bins: "label weekday alt anchor lid_a lid_b bin_a bin_b", people: "names", agenda: "label align days", note: "align byline", list: "label icon align done",
     card: "label text icon", quote: "text sub mood", word: "lang meaning", news: "feed label align count", sports: "label league team align games", stocks: "label tickers align price", commute: "label arrive_h arrive_m buffer weekdays align",
-    welcome: "kicker text sub align source times", quick: "quick align", wifi: "align hidepass", guide: "align", screentime: "align appcount", ask: "label align keep", agent: "label align keep who", stack: ""
+    welcome: "kicker text sub align source times", quick: "quick align", wifi: "align hidepass", guide: "align", screentime: "align appcount", ask: "label align keep", agent: "label align keep who", stack: "",
+    tvsettings: "words"
   };
   // The smart home and music widgets: which of the TV's own Home Assistant things a widget shows,
   // named by entity id only (never a reading, a state or an address). A TV shows one only when it is
@@ -498,15 +511,34 @@
   OPT.wind = function (v) { return SAN.pick(v, ["auto", "kmh", "kn", "mph"]); };
   OPT.volume = function (v) { return SAN.n(v, 10, 100, true); };
   OPT.hidepass = SAN.b;
+  // the TV settings tile's words: "TV settings", "Settings", or the gear alone
+  OPT.words = function (v) { return SAN.pick(v, ["full", "short", "none"]); };
   // a countdown to a day that moves each year: the TV works the date out (widgets.js RULES); "date" is the day and month
   OPT.rule = function (v) { return SAN.pick(v, ["date", "easter", "mothers_day", "fathers_day", "fathers_day_june"]); };
+  // a time of day as "HH:MM" (24 hour), else undefined
+  function hhmm(v) { var m = typeof v === "string" && /^([01]\d|2[0-3]):([0-5]\d)$/.exec(v); return m ? v : undefined; }
   function sanWStyle(src) {
     src = obj(src);
     var out = {};
     Object.keys(WSTYLE).forEach(function (k) { put(out, k, SAN.pick(src[k], WSTYLE[k])); });
     if (out.font === undefined) put(out, "font", gfont(src.font));   // or any Google Fonts family by name
     put(out, "colour", SAN.c(src.colour)); put(out, "accent", SAN.c(src.accent)); put(out, "opacity", SAN.n(src.opacity, 0.2, 1));
+    var df = hhmm(src.day_from), dt = hhmm(src.day_to);
+    if (df && dt && df !== dt) { out.day_from = df; out.day_to = dt; }
     return Object.keys(out).length ? out : undefined;
+  }
+  // Opening an older design (Phase 3 item 15): a box colour only ever showed on a "colour" box, so on any other
+  // box it is dropped (the look stays exactly as it was, and Studio's Solid row never shows a colour that is not
+  // there). A texture on a see through box (glass, none) is dropped the same way; "paper" as a texture on a
+  // plain solid box is the Paper box itself.
+  function tidyBox(kind, st) {
+    if (!st) return st;
+    var panel = st.panel || WPANEL[kind] || "glass";
+    if (st.colour && panel !== "colour") delete st.colour;
+    if (st.texture === "none" || ((panel === "glass" || panel === "none") && st.texture)) delete st.texture;
+    if (panel === "solid" && st.texture === "paper") { st.panel = "paper"; delete st.texture; }
+    if (panel === "paper" && st.texture === "paper") delete st.texture;
+    return Object.keys(st).length ? st : undefined;
   }
   function sanWOpts(kind, src) {
     src = obj(src);
@@ -519,7 +551,7 @@
     if (!kind || (inStack && kind === "stack")) return false;
     out.kind = kind;
     put(out, "size", typeof src.size === "string" && (WSIZES.indexOf(src.size) >= 0 || /^\d{1,2}x\d{1,2}$/.test(src.size)) ? src.size : undefined);
-    put(out, "style", sanWStyle(src.style));
+    put(out, "style", tidyBox(kind, sanWStyle(src.style)));
     put(out, "opts", sanWOpts(kind, src.opts));
     if (inStack) return true;
     put(out, "start", SAN.b(src.start)); put(out, "pinned", SAN.b(src.pinned));
@@ -862,6 +894,9 @@
     // time the words change; weighed like a frosted card (3 each)
     var ltext = inked("liquid");
     if (ltext) out.push(["Liquid glass words (" + ltext + ")", ltext * 3, "liquidtext"]);
+    // a texture on a solid box (Paper with a colour, Linen, Grain): one more layer to draw, 1 each
+    var tex = shown.filter(function (o) { return o.type === "widget" && [o].concat(list(o.items)).some(function (it) { var t = obj(obj(it).style).texture; return t && t !== "none"; }); }).length;
+    if (tex) out.push(["Textures (" + tex + ")", tex, "texture"]);
     var strong = Object.keys(E).filter(function (k) { return obj(E[k]).shadow === "strong"; }).length + shown.filter(function (o) { return o.shadow === "strong"; }).length;
     if (strong) out.push(["Strong shadows (" + strong + ")", strong, "strong"]);
     var turned = shown.filter(function (o) { return o.rotate; }).length;
@@ -3265,6 +3300,8 @@
     wopts: function () { return JSON.parse(JSON.stringify(WOPT)); },
     wstyle: function () { return JSON.parse(JSON.stringify(WSTYLE)); },
     wpanel: function (o) { return wpanel(obj(o)); },
+    // an older design's box, tidied as sanitize does (Phase 3 item 15); a copy, the style given is not changed
+    tidyBox: function (kind, st) { return tidyBox(kind, JSON.parse(JSON.stringify(obj(st)))); },
     colour: function (c) { return colour(c); },
     imgOk: function (u) { return imgOk(u); },
     dataChanged: function (what, key) { key = JSON.stringify(key === undefined ? DATA_V + 1 : key); if (DATA_KEYS[what] === key) return; DATA_KEYS[what] = key; DATA_V++; if (D && ON) objects(D); },

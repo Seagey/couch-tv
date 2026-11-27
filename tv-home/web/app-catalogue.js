@@ -170,6 +170,9 @@
   a("jellyfin", "Jellyfin", "Tools", WORLD, false, ["org.jellyfin.androidtv"], { colour: "#00a4dc" });
   a("stremio", "Stremio", "Tools", WORLD, false, ["com.stremio.one"], { lg: "io.strem.tv", colour: "#8a5aab" });
   a("nuvio", "Nuvio", "Tools", WORLD, true, ["com.nuvio.tv"], { colour: "#111111" });
+  // the TV's own settings as an app in a dock, row or folder (Phase 3 item 17). Every TV has them, so the TV
+  // never says "Not on this TV": OK opens them the way the TV settings quick button does (widgets.js TVSET)
+  a("tvsettings", "TV settings", "Tools", WORLD, false, ["com.android.tv.settings"], { fire: ["com.amazon.tv.settings"], names: ["Settings"], colour: "#3a3a44" });
 
   var CAT = { version: 1, groups: GROUPS, apps: APPS };
 
