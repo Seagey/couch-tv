@@ -334,7 +334,7 @@ const press = async (p, k, wait) => { await p.keyboard.press(k); await p.waitFor
 async function closeSettings() { for (let k = 0; k < 6 && await tv.evaluate(() => document.getElementById("settings").classList.contains("on")); k++) await press(tv, "Escape", 250); await tv.waitForTimeout(700); }
 async function homeSettingsWidgets() {
   await tv.evaluate(() => window.tv.settingsKey()); await tv.waitForTimeout(250); await press(tv, "Enter", 500);
-  const secs = await tv.evaluate(() => [...document.querySelectorAll("#set-secs .ssec")].map((e) => e.textContent.trim()));
+  const secs = await tv.evaluate(() => { window.tv.settingsMore(); return [...document.querySelectorAll("#set-secs .ssec")].map((e) => e.textContent.trim()); });
   const i = secs.indexOf("Designs");
   const at = await tv.evaluate(() => [...document.querySelectorAll("#set-secs .ssec")].findIndex((e) => e.classList.contains("focus")));
   for (let k = 0; k < Math.abs(i - at); k++) await press(tv, i > at ? "ArrowDown" : "ArrowUp", 80);

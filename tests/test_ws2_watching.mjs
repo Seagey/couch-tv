@@ -326,7 +326,7 @@ async function newDesign(p, d, q) {
 const phoneView = (p) => p.evaluate(() => window.tv.atHomeRead().design);
 async function homeRows(p) {
   await p.evaluate(() => window.tv.settingsKey()); await p.waitForTimeout(250); await press(p, "Enter", 500);
-  const list = await p.evaluate(() => [...document.querySelectorAll("#set-secs .ssec")].map((e) => e.textContent.trim()));
+  const list = await p.evaluate(() => { window.tv.settingsMore(); return [...document.querySelectorAll("#set-secs .ssec")].map((e) => e.textContent.trim()); });
   const i = list.indexOf("Designs");
   for (let k = 0; k < 4 && await p.evaluate(() => !document.querySelector("#set-secs .ssec.focus")); k++) await press(p, "ArrowLeft", 120);
   const at = await p.evaluate(() => [...document.querySelectorAll("#set-secs .ssec")].findIndex((e) => e.classList.contains("focus")));

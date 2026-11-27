@@ -409,8 +409,10 @@
 
     // ---- the settings screen ----
     set_title: "Home settings",
-    set_phone: "Change this on your phone",
-    set_phone_sub: "Scan with the phone's camera, on the same Wi-Fi as the TV.",
+    set_phone: "Use your phone",
+    set_phone_sub: "Scan to change this TV from your phone. Use the phone's camera, on the same Wi-Fi as the TV.",
+    set_phone2_head: "Set up from your phone",
+    set_phone2_sub: "Scan the code on the right. People, photos, your town and Wi-Fi are set up in your account now, not on the TV.",
     set_phone_pc: "Or on a computer: {addr}, code {code}",
     phone_code: "Code for your phone: {code}",
     sec_language: "Language",

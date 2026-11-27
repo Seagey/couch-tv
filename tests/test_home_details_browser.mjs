@@ -92,11 +92,11 @@ ok(seen.every((u) => !/9j|Ruby|Bellingen|horse/.test(u)), "nothing of it went to
 
 // Home settings, People: the photos in the rows and the mark
 await page.evaluate(() => window.tv.settingsKey()); await page.waitForTimeout(300); await press(page, "Enter", 400);
-for (let i = 0; i < 14 && !(await page.evaluate(() => /People/.test((document.querySelector(".ssec.focus") || {}).textContent || ""))); i++) await press(page, "ArrowDown");
+for (let i = 0; i < 14 && !(await page.evaluate(() => /^This TV/.test((document.querySelector(".ssec.focus") || {}).textContent || ""))); i++) await press(page, "ArrowDown");
 await press(page, "ArrowRight", 400);
 const rows = await page.evaluate(() => document.getElementById("set-rows").textContent);
-ok(/Ruby/.test(rows) && /From your account/.test(rows) && /Change these names in your Couch TV Studio account/.test(rows), "People says From your account and where to change them");
-ok(await page.evaluate(() => document.querySelectorAll("#set-rows .avatar-photo").length) === 2, "Ruby's and Nan's photos in the rows");
+// 27 Nov 2026 (slimmed settings): the people and their photos are no longer listed on the TV; the account changes them
+ok(!/Ruby/.test(rows), "the TV settings no longer list the people");
 ok(/Take your account's names, town and guest Wi-Fi off this TV/.test(rows), "and a way to take them off this TV");
 await press(page, "Escape", 200); await press(page, "Escape", 600);
 

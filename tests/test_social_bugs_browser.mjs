@@ -155,7 +155,7 @@ try {
     });
     await page.clock.install();
     await open(page, "&look=night");
-    await openSection(page, /^Look/);
+    await openSection(page, /^Picture/);
     const add = async (url, wait) => {
       ok(await toRow(page, /^Add a photo from a web address/), "the Add a photo from a web address row (" + url + ")");
       await keys(page).press("Enter", 250);
@@ -197,7 +197,7 @@ try {
     await p2.goto(BASE + "&look=night");
     await p2.waitForFunction(() => window.tv && document.querySelector("#shelf"));
     for (let i = 0; i < 8; i++) { await p2.clock.fastForward(5000); await p2.waitForTimeout(80); }
-    await openSection(p2, /^Look/);
+    await openSection(p2, /^Picture/);
     await toRow(p2, /^Remove photo 1/);
     row = await rowText(p2, /^Remove photo 1/);
     ok(/did not open on the home/.test(row || ""), "a photo that never opened on the home says so on its row (" + row + ")");
@@ -271,12 +271,12 @@ try {
     await open(page, "&look=night&lighter=off");
     await page.mouse.move(100, 100); await page.mouse.move(110, 110);
     await page.evaluate(() => window.tv.settingsKey()); await page.waitForTimeout(300); await page.keyboard.press("Enter"); await page.waitForTimeout(400);
-    const look = await page.evaluate(() => { const i = [...document.querySelectorAll("#set-secs > *")].findIndex((e) => /^Look/.test(e.textContent)); return i; });
+    const look = await page.evaluate(() => { const i = [...document.querySelectorAll("#set-secs > *")].findIndex((e) => /^Picture/.test(e.textContent)); return i; });
     const lookBox = await box("#set-secs > *", look);
     await page.mouse.move(lookBox.x, lookBox.y, { steps: 3 });
     await page.mouse.click(lookBox.x, lookBox.y);
     await page.waitForTimeout(300);
-    ok(await page.evaluate(() => /^Look/.test((document.querySelector(".ssec.on, .ssec.sel, .ssec.focus") || {}).textContent || "")), "a click on a section opens it");
+    ok(await page.evaluate(() => /^Picture/.test((document.querySelector(".ssec.on, .ssec.sel, .ssec.focus") || {}).textContent || "")), "a click on a section opens it");
     const rowI = await page.evaluate(() => [...document.querySelectorAll("#set-rows > .srow")].findIndex((e) => /^Glass app icons/.test(e.textContent)));
     ok(rowI >= 0, "the Glass app icons row is there");
     // the row is further down the list: the wheel (an air mouse's scroll) brings it into view first
@@ -314,7 +314,7 @@ try {
     current = "g31";
     const page = await fresh();
     await open(page, "&look=night");
-    await openSection(page, /^Quick/);
+    await openSection(page, /^Remote/);
     const checked = () => page.evaluate(() => [...document.querySelectorAll("#set-rows > .srow")].filter((r) => r.classList.contains("on") || r.getAttribute("aria-checked") === "true" || /✓/.test(r.textContent)).map((r) => r.textContent.trim().slice(0, 30)));
     ok(await toRow(page, /^Look switch|^Look/), "the Look button row");
     await keys(page).press("Enter", 250);
@@ -431,7 +431,7 @@ try {
     await p2.waitForTimeout(6500);
     const s2 = await p2.evaluate(() => ({ has: document.documentElement.classList.contains("has-video"), src: document.getElementById("bgvid").getAttribute("src"), mark: localStorage.getItem("couchtv.video.green") }));
     ok(!s2.has && !s2.src && !!s2.mark, "a green video link goes and the photo is back (" + JSON.stringify(s2) + ")");
-    await openSection(p2, /^Look/);
+    await openSection(p2, /^Picture/);
     await toRow(p2, /^Video link/);
     ok(/green screen, so the photo is back/.test(await p2.evaluate(() => document.getElementById("set-rows").textContent)), "Look says why in plain words");
     await p2.evaluate(() => localStorage.setItem("couchtv.video.slow", String(Date.now())));
@@ -498,7 +498,7 @@ try {
     const app = await page.evaluate(() => { const i = document.querySelector('#grid [data-pkg="com.netflix.ninja"] .face img'); return i ? i.getAttribute("src") : null; });
     ok(!app || /app-logos/.test(app), "the apps keep their own icons (" + app + ")");
     // Home settings, Look, Icon style: steps through the styles and is kept
-    await openSection(page, /^Look/);
+    await openSection(page, /^Picture/);
     ok(await toRow(page, /^Icon style/), "a Look row Icon style");
     ok(/Solid/.test(await rowText(page, /^Icon style/)), "it says Solid, the style in use");
     await keys(page).press("Enter", 300);

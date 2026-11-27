@@ -61,7 +61,7 @@ async function open(query, tvos, settings) {
 async function lookRows(page) {
   await page.evaluate(() => window.tv.settingsKey()); await page.waitForTimeout(300);
   await page.keyboard.press("Enter"); await page.waitForTimeout(400);
-  for (let i = 0; i < 16 && !(await page.evaluate(() => /^Look/.test((document.querySelector(".ssec.focus") || {}).textContent || ""))); i++) {
+  for (let i = 0; i < 16 && !(await page.evaluate(() => /^Picture/.test((document.querySelector(".ssec.focus") || {}).textContent || ""))); i++) {
     await page.keyboard.press("ArrowDown"); await page.waitForTimeout(120);
   }
   await page.keyboard.press("ArrowRight"); await page.waitForTimeout(300);
@@ -79,7 +79,7 @@ try {
   ok(/App name/.test(rows) && /Long titles/.test(rows) && /Card alignment/.test(rows), "browser: App name, Long titles and Card alignment under Now playing");
   const lookList = await page.evaluate(() => [...document.querySelectorAll("#set-rows > *")].map((r) => r.textContent));
   const at = (re) => lookList.findIndex((x) => re.test(x));
-  ok(at(/^Long titles/) > at(/^Now playing$/) && at(/^Now playing$/) >= 0 && at(/^Long titles/) < at(/^Your photos$/), "browser: Long titles sits in the Now playing part of Look");
+  ok(at(/^Long titles/) > at(/^Now playing$/) && at(/^Now playing$/) >= 0, "browser: Long titles sits in the Now playing part of Look");
   ok(page.errors.length === 0, "browser: no page errors (" + page.errors.join(" | ") + ")");
   await page.close();
 

@@ -122,6 +122,7 @@ try {
   await page.evaluate(() => window.I18N.set("pl"));
   await page.evaluate(() => window.tv.settingsKey()); await page.waitForTimeout(300);
   await page.keyboard.press("Enter"); await page.waitForTimeout(800);
+  await page.evaluate(() => window.tv.settingsMore()); await page.waitForTimeout(300);
   const secs = await page.evaluate(() => Array.from(document.querySelectorAll(".ssec")).map((x) => x.textContent.trim()));
   ok(secs.indexOf("Projekty") >= 0 && secs.indexOf("Designs") < 0, "Polish: the Designs section is Projekty: " + secs.join(", "));
   // go to it: its rows in Polish

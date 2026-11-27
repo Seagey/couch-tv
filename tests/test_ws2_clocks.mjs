@@ -143,7 +143,7 @@ async function settle(page, id, before) {
   return probe(page, id);
 }
 const rowsText = (page) => page.evaluate(() => [...document.querySelectorAll("#set-rows .srow, #set-rows .shead")].map((e) => e.textContent.trim()));
-const secs = (page) => page.evaluate(() => [...document.querySelectorAll("#set-secs .ssec")].map((e) => e.textContent.trim()));
+const secs = (page) => page.evaluate(() => { window.tv.settingsMore(); return [...document.querySelectorAll("#set-secs .ssec")].map((e) => e.textContent.trim()); });
 async function closeSettings(page) { for (let k = 0; k < 6 && await page.evaluate(() => document.getElementById("settings").classList.contains("on")); k++) await back(page, 250); await page.waitForTimeout(700); }
 async function goSec(page, name) {
   const list = await secs(page), i = list.indexOf(name);

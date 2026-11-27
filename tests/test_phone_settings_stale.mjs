@@ -57,6 +57,7 @@ const phoneSaves = (page, photo) => page.evaluate(([pl, ph]) => {
 const serverCopy = (page) => page.evaluate(() => JSON.parse(localStorage.getItem("mock:api.settings") || "null"));
 const tvCopy = (page) => page.evaluate(() => { const r = JSON.parse(localStorage.getItem("mock:tvhome.settings") || "null"); return r && r.s; });
 async function changeWeatherOnTv(page) {
+  await page.evaluate(() => window.tv.settingsMore()); await page.waitForTimeout(200);
   const secs = await page.evaluate(() => Array.from(document.querySelectorAll(".ssec")).map((x) => x.textContent.trim()));
   const wi = secs.findIndex((s) => /^Weather/.test(s));
   for (let i = 0; i < wi; i++) { await page.keyboard.press("ArrowDown"); await page.waitForTimeout(150); }

@@ -343,7 +343,7 @@ async function tvPage(d) {
 }
 async function openSettings(p) { await p.evaluate(() => window.tv.settingsKey()); await p.waitForTimeout(250); await press(p, "Enter", 500); }
 async function closeSettings(p) { for (let k = 0; k < 6 && await p.evaluate(() => document.getElementById("settings").classList.contains("on")); k++) await press(p, "Escape", 1000); await p.waitForTimeout(3000); }
-const secs = (p) => p.evaluate(() => [...document.querySelectorAll("#set-secs .ssec")].map((e) => e.textContent.trim()));
+const secs = (p) => p.evaluate(() => { window.tv.settingsMore(); return [...document.querySelectorAll("#set-secs .ssec")].map((e) => e.textContent.trim()); });
 const rowsText = (p) => p.evaluate(() => [...document.querySelectorAll("#set-rows .srow")].map((e) => e.textContent.trim()));
 async function goSec(p, name) {
   const list = await secs(p), i = list.indexOf(name);
