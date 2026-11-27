@@ -2,9 +2,20 @@
 
 Everything that changed in couch-tv, newest first.
 
-The newest release is **0.13.15**. The TV apps come from [the Releases page](https://github.com/Seagey/couch-tv/releases). The bridge, and with option B the home's own screen, run from your copy of this repo, so `git pull` brings their changes.
+The newest release is **0.13.16**. The TV apps come from [the Releases page](https://github.com/Seagey/couch-tv/releases). The bridge, and with option B the home's own screen, run from your copy of this repo, so `git pull` brings their changes.
 
 ## November 2026
+
+### 27 November 2026: release 0.13.16, linking inside Couch TV Setup with no codes, finished sends, sharp icons and slimmer TV settings
+
+0.13.16 is on [the Releases page](https://github.com/Seagey/couch-tv/releases). Option C: Home settings, Updates, Update to; it carries the same key as 0.13.15, so a TV on 0.13.15, 0.13.14 or 0.13.13 updates as normal. Other Android TVs: Home settings, Updates, check now.
+
+- **Link inside Couch TV Setup, no codes:** sign in on the Setup screen, press Yes, and the TV is linked. A link on the same network as your TV, from a Setup you have already trusted, needs only one tap.
+- **Send arrives finished:** a design you send to a trusted TV lands complete, with the people, photos, town and Wi-Fi your account holds, and no extra steps on the TV.
+- **Sharp app icons:** the app icons are drawn at 512 px, so they stay crisp on a big screen.
+- **Slimmer TV settings:** the settings screen is titled Settings and shows fewer rows, with the rest under More.
+- **Clearer Mac download help:** the picture guide shows what the Mac says when it checks Couch TV Setup, and which button to press.
+- **Speed check:** the speed check button is hidden for now.
 
 ### 25 November 2026: release 0.13.15, a redesigned Couch TV Setup that links your TV to your account, Tidy up your TV, and Make it yours
 

@@ -113,6 +113,11 @@ class ReleaseChannelTest {
         assertTrue(ReleaseChannel.newer("v0.13.15", "0.13.13"))
         assertFalse(ReleaseChannel.newer("v0.13.15", "0.13.15"))
         assertFalse(ReleaseChannel.newer("v0.13.14", "0.13.15"))
+        // 0.13.16 (linking inside Setup with no codes, Send arrives finished) reaches 0.13.15 and 0.13.14 TVs
+        assertTrue(ReleaseChannel.newer("v0.13.16", "0.13.15"))
+        assertTrue(ReleaseChannel.newer("v0.13.16", "0.13.14"))
+        assertFalse(ReleaseChannel.newer("v0.13.16", "0.13.16"))
+        assertFalse(ReleaseChannel.newer("v0.13.15", "0.13.16"))
         assertFalse(ReleaseChannel.newer("v0.13.10", "0.13.11"))
         assertFalse(ReleaseChannel.newer("v0.13.8", "0.13.9"))
     }
