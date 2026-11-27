@@ -108,6 +108,10 @@ def make_tv(cfg):
 
 
 TVS = {c["id"]: make_tv(c) for c in TV_CONFIG["tvs"]}
+# Start from the installed list last read, so a bridge restarted while a TV is off does not offer
+# the whole catalogue as maybe-installed; it is read again (and saved) once the TV answers.
+for _id, _t in TVS.items():
+    _t.state["installed"]["packages"] = store.installed_packages(_id)
 DEFAULT_TV = TV_CONFIG["default"]
 _current = contextvars.ContextVar("tv", default=DEFAULT_TV)
 
@@ -618,6 +622,9 @@ async def _refresh_installed():
     except Exception:
         pk = None
     if pk:
+        pk = set(pk)
+        if pk != installed["packages"]:
+            store.save_installed(_current.get(), pk)
         installed["packages"], installed["checked"] = pk, time.time()
 
 
@@ -919,7 +926,9 @@ async def h_launch(request):
     record_action(request, "launch", {"app": target}, bool(got))
     if not got:
         await installed_packages(max_age=0)
-        if installed["packages"] is not None and pkg_of(app) not in installed["packages"]:
+        # Only a list read just now counts: one saved before a restart may predate an install.
+        fresh = time.time() - installed["checked"] < 60
+        if fresh and installed["packages"] is not None and pkg_of(app) not in installed["packages"]:
             raise ApiError(
                 404,
                 f"{app['name']} is not installed on the TV",
@@ -5279,7 +5288,7 @@ async def keep_disabled_loop():
 
 
 def _maybe_refresh_installed():
-    if tv.adb_ok and installed["packages"] is None:
+    if tv.adb_ok and not installed["checked"]:
         asyncio.ensure_future(installed_packages(wait=False))
 
 
