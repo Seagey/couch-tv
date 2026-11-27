@@ -210,4 +210,31 @@ class AccountLinkTest {
         repeat(40) { StartRules.seen(kv, "s$it") }
         assertTrue(kv.get("starts")!!.split(",").size <= 12)
     }
+
+    // the pool (lane C): only a readings ask or one of three switches goes to Studio; the answer never grows past what was read
+    @Test fun poolSendsOnlyKnownActions() {
+        assertEquals("{}", AccountLink.poolBody("").toString())
+        assertEquals("{}", AccountLink.poolBody(null).toString())
+        val a = AccountLink.poolBody("{\"id\":\"a1\",\"kind\":\"heater\",\"dev\":1,\"value\":1,\"extra\":\"x\"}")!!.getJSONObject("action")
+        assertEquals("heater", a.getString("kind"))
+        assertEquals(1, a.getInt("dev"))
+        assertEquals(1, a.getInt("value"))
+        assertFalse(a.has("extra"))
+        assertFalse(AccountLink.poolBody("{\"kind\":\"pump\",\"dev\":0,\"value\":null}")!!.getJSONObject("action").has("value"))
+        for (bad in listOf("{\"kind\":\"lock\",\"dev\":1}", "{\"kind\":\"pump\"}", "{\"kind\":\"pump\",\"dev\":999}", "{\"kind\":\"light\",\"dev\":1,\"value\":9}", "not json"))
+            assertNull(bad, AccountLink.poolBody(bad))
+    }
+
+    @Test fun poolAnswers() {
+        assertEquals("unlinked", AccountLink.readPool(401, null, null).getString("error"))
+        assertEquals("throttle", AccountLink.readPool(429, null, "a1").getString("error"))
+        assertEquals("a1", AccountLink.readPool(429, null, "a1").getString("id"))
+        assertFalse(AccountLink.readPool(200, "x".repeat(20000), null).getBoolean("ok"))
+        assertFalse(AccountLink.readPool(200, "{\"ok\":true}", "../bad").has("id"))
+        assertTrue(AccountLink.readPool(200, "{\"ok\":true,\"pool\":{\"ok\":true,\"temp\":27}}", null).getBoolean("ok"))
+    }
+
+    @Test fun poolWithoutALinkIsUnlinked() {
+        assertEquals("unlinked", AccountLink.pool(Mem(), "").getString("error"))
+    }
 }

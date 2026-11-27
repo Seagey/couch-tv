@@ -1007,6 +1007,19 @@ class MainActivity : Activity() {
             return true
         }
 
+        // The pool's readings or a switch, through the account (AccountLink.pool, lane C). The link never reaches the page;
+        // the answer comes back through tv.accountPool. False: no link, or the page asked for something else.
+        @JavascriptInterface
+        fun accountPool(arg: String?): Boolean {
+            val kv = AccountLink.kv(this@MainActivity)
+            if (!AccountLink.linked(kv) || AccountLink.poolBody(arg) == null) return false
+            io.execute {
+                val r = AccountLink.pool(kv, arg)
+                main.post { js("window.tv && tv.accountPool && tv.accountPool(" + JSONObject.quote(r.toString()) + ")") }
+            }
+            return true
+        }
+
         /** Home settings, About, Restart home: what a force-stop and Home would do, from the remote. */
         @JavascriptInterface
         fun restartHome() {

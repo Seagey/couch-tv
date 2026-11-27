@@ -3687,6 +3687,76 @@
   window.CouchQueueNow = function () { return QUEUE; };
   setInterval(function () { var age = Date.now() - queueAt; if ((QUEUE === undefined && age > 6000) || age > 20000) refreshQueue(); }, 2000);
 
+  // ---- Lane C (28 Nov 2026): AirPlay 2 speakers for the Speakers widget, and the Connect 10 pool ----
+  // AirPlay: the home computer's /api/airplay (bridge/airplay.py), names and volumes only, read while a Speakers widget shows.
+  var AIRPLAY, airplayAt = 0;
+  function refreshAirPlay() {
+    if (document.hidden || OFFLINE || !document.querySelector(".cd-layer .cw-k-speakers")) return;
+    airplayAt = Date.now();
+    api("GET", "/api/airplay", null, 8000).then(function (j) {
+      AIRPLAY = j && j.airplay && typeof j.airplay === "object" ? j.airplay : null;
+      if (typeof CouchDesign !== "undefined" && CouchDesign.dataChanged) CouchDesign.dataChanged("airplay", AIRPLAY ? [AIRPLAY.active, AIRPLAY.selected, (AIRPLAY.speakers || []).map(function (x) { return [x.name, x.volume, x.selected, x.available]; })] : "off");
+    }, function () { AIRPLAY = null; });
+  }
+  window.CouchAirPlayNow = function () { return AIRPLAY; };
+  setInterval(function () { var age = Date.now() - airplayAt; if ((AIRPLAY === undefined && age > 6000) || age > 15000) refreshAirPlay(); }, 2000);
+  // Connect 10: the launcher asks Couch TV Studio with this TV's account link (AccountLink.kt pool); the server opens the pool's
+  // approval code, asks ConnectMyPool (at most once a minute for the whole account) and answers with the readings only. The code
+  // never reaches this page. Only while a pool widget set to Connect 10 shows (widgets.js marks it data-pool="c10").
+  var POOL, poolAt = 0, poolBusy = false;
+  function refreshPool(force) {
+    if (document.hidden || !document.querySelector(".cd-layer [data-pool=c10]")) return;
+    if (!(TV && typeof TV.accountPool === "function")) {
+      // a TV whose home the computer runs (Samsung, LG, VIDAA and the rest): the computer asks ConnectMyPool (bridge/pool.py)
+      if (OFFLINE) { if (!POOL) { POOL = { ok: false, error: "no_tv" }; poolChanged(); } return; }
+      if (poolBusy && !force) return;
+      poolAt = Date.now(); poolBusy = true;
+      api("POST", "/api/pool", {}, 20000).then(function (j) { poolBusy = false; POOL = j && j.pool && typeof j.pool === "object" ? j.pool : { ok: false, error: "error" }; poolChanged(); },
+        function () { poolBusy = false; if (!POOL) POOL = { ok: false, error: "no_tv" }; poolChanged(); });
+      return;
+    }
+    if (poolBusy && !force) return;
+    poolAt = Date.now();
+    try { poolBusy = TV.accountPool("") !== false; } catch (e) { poolBusy = false; }
+    if (!poolBusy && !POOL) { POOL = { ok: false, error: "unlinked" }; poolChanged(); }
+  }
+  function poolChanged() { if (typeof CouchDesign !== "undefined" && CouchDesign.dataChanged) CouchDesign.dataChanged("pool", POOL ? JSON.stringify(POOL).slice(0, 400) : "none"); }
+  var POOL_WAITS = {};
+  function poolAnswer(raw) {
+    poolBusy = false;
+    var j = null;
+    try { j = typeof raw === "string" ? JSON.parse(raw) : raw; } catch (e) { j = null; }
+    if (!j || typeof j !== "object") j = { ok: false, error: "error" };
+    // an action's own answer goes to whoever sent it (the detail layer); the readings that come with it go to the widget
+    if (j.id && POOL_WAITS[j.id]) { var w = POOL_WAITS[j.id]; delete POOL_WAITS[j.id]; w({ ok: j.ok === true, error: j.error }); }
+    if (j.pool && typeof j.pool === "object") POOL = j.pool;
+    else if (!j.id) POOL = j;
+    poolChanged();
+  }
+  function poolAction(kind, dev, value) {
+    if (!(TV && typeof TV.accountPool === "function")) {
+      if (OFFLINE) return Promise.resolve({ ok: false, error: "no_tv" });
+      return api("POST", "/api/pool", { action: { kind: kind, dev: dev, value: value } }, 30000).then(function (j) {
+        var p = j && j.pool;
+        if (p && p.ok) { POOL = p; poolChanged(); return { ok: true }; }
+        return { ok: false, error: (p && p.error) || "error" };
+      }, function () { return { ok: false, error: "error" }; });
+    }
+    var id = "a" + Date.now().toString(36) + Math.floor(Math.random() * 1e6).toString(36);
+    return new Promise(function (resolve) {
+      POOL_WAITS[id] = resolve;
+      setTimeout(function () { if (POOL_WAITS[id]) { delete POOL_WAITS[id]; resolve({ ok: false, error: "timeout" }); } }, 30000);
+      var sent = false;
+      try { sent = TV.accountPool(JSON.stringify({ id: id, kind: kind, dev: dev, value: value })) !== false; } catch (e) { sent = false; }
+      if (!sent) { delete POOL_WAITS[id]; resolve({ ok: false, error: "busy" }); }
+    });
+  }
+  window.CouchPoolNow = function () { return POOL; };
+  // ConnectMyPool answers a pool's readings at most once a minute: asked every 90 seconds while it shows
+  setInterval(function () { var age = Date.now() - poolAt; if ((POOL === undefined && age > 6000) || age > 90000) refreshPool(); }, 3000);
+  // the account's details (Your details in Couch TV Studio) for widgets that read them by widget id (the pool's parts)
+  window.CouchAccountDetails = function () { return ACCOUNT && ACCOUNT.details ? ACCOUNT.details : null; };
+
   function refreshMusic() {
     if (SPOTIFY.enabled) {
       refreshSpotify();
@@ -7222,7 +7292,8 @@
   function accountNewNotice() {
     if (typeof CouchDesignCode === "undefined" || !CouchDesignCode.undoFresh || MOCK || PREVIEW) return;
     var u = CouchDesignCode.undoFresh();
-    if (u) toast("New design from your account" + (u.title ? ": " + u.title : "") + ". To undo it, open Home settings, Designs.");
+    // the two lines as i18n.js has them (tw_acct_new_title, tw_acct_new), so tv-words.js shows them in the TV's language
+    if (u) toast(u.title ? "New design from your account: " + u.title + ". To undo it, open Home settings, Designs." : "New design from your account. To undo it, open Home settings, Designs.");
   }
   function undoAccountDesign() {
     var choice = CouchDesignCode.undoNew();
@@ -10473,6 +10544,8 @@
     calendarText: function (id, ok, text) { calendarText(id, ok, text); },
     setupDesign: function () { setupDesign(); ACCT_INBOX.stopped = false; inboxArm(); makeitLinkArrived(); makeitWindowStart(); },   // Setup brings its own design; the inbox keeps its times
     accountInbox: function (raw) { accountInbox(raw); },
+    // the Connect 10 pool's readings, or an action's answer (AccountLink.kt pool), lane C
+    accountPool: function (raw) { poolAnswer(raw); },
     // words typed on the phone remote (Type on the TV) when the TV app cannot press keys (the on-TV app
     // with no ADB): they go into the typing box Home settings has open, at the cursor. False: no box open.
     typeText: function (s) { return typeIn(s); },
@@ -11310,6 +11383,14 @@
           wset: wsData(), unit: WX_F ? "f" : "c", wxAt: WX_SHOW && data.weather && data.weather.at ? data.weather.at : {}, wxBy: wxForData(),
           commuteBy: commuteByData(), country: homeCountry() };
       },
+      // the Speakers layer's AirPlay group, through the home computer (bridge/airplay.py)
+      airplay: function (action, body) {
+        if (OFFLINE) return Promise.resolve({ ok: false, error: "off" });
+        var ask = action === "state" ? api("GET", "/api/airplay", null, 8000) : api("POST", "/api/airplay/" + (action === "play" || action === "stop" || action === "volume" ? action : "none"), body || {}, 25000);
+        return ask.then(function (j) { if (j && j.airplay) { AIRPLAY = j.airplay; } return { ok: action === "state" ? true : !!(j && j.result && j.result.ok), error: j && j.result && j.result.error, airplay: j && j.airplay }; }, function () { return { ok: false, error: "off" }; });
+      },
+      // the Pool layer's Connect 10 switches, through the account (AccountLink.kt pool)
+      pool: function (kind, dev, value) { return poolAction(kind, dev, value).then(function (r) { if (r && r.ok) setTimeout(function () { refreshPool(true); }, 4000); return r; }); },
       // the detail layers (widget-detail.js) ask Home Assistant through smarthome.js, never directly
       ha: function (action, entity, value) {
         if (!window.smartHome || !window.smartHome.request || !(window.smartHome.enabled || window.smartHome.available)()) return Promise.resolve({ ok: false, error: "off" });

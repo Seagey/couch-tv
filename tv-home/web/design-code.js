@@ -258,7 +258,7 @@
         if (!plainObj(r) || !/^[0-9a-f-]{36}$/.test(tv)) return;
         var one = { label: oneLine(r.label, 30) };
         ["climate", "speakers", "zones", "lights"].forEach(function (k) {
-          if (Array.isArray(r[k])) { var l = r[k].filter(function (e) { return typeof e === "string" && e.length <= 80 && (k === "zones" ? /^[A-Za-z0-9_.:-]{1,40}$/ : ENT).test(e); }).slice(0, 16); if (l.length) one[k] = l; }
+          if (Array.isArray(r[k])) { var l = r[k].filter(function (e) { return typeof e === "string" && e.length <= 80 && (k === "zones" ? /^[A-Za-z0-9_.:-]{1,40}$/.test(e) : ENT.test(e) || (k === "speakers" && AIRPLAY_ID.test(e))); }).slice(0, 16); if (l.length) one[k] = l; }
         });
         rooms[tv] = one; rn++;
       });
@@ -267,7 +267,7 @@
     if (plainObj(d.smart) && plainObj(d.smart.picks)) {
       var pk = {}, kn = 0;
       Object.keys(d.smart.picks).slice(0, 24).forEach(function (id) {
-        var l = Array.isArray(d.smart.picks[id]) ? d.smart.picks[id].filter(function (e) { return typeof e === "string" && e.length <= 80 && ENT.test(e); }).slice(0, 16) : [];
+        var l = Array.isArray(d.smart.picks[id]) ? d.smart.picks[id].filter(function (e) { return typeof e === "string" && e.length <= 80 && (ENT.test(e) || AIRPLAY_ID.test(e)); }).slice(0, 16) : [];
         if (WID.test(id) && l.length) { pk[id] = l; kn++; }
       });
       if (kn) o.smart = { picks: pk };
@@ -288,9 +288,23 @@
       });
       if (shn) o.show = shw;
     }
+    // which picked thing is which part of a pool widget (lane C): entity ids of the right kind only
+    if (plainObj(d.smart) && plainObj(d.smart.roles)) {
+      var RR = { water: /^sensor\.[a-z0-9_]{1,64}$/, chlor: /^sensor\.[a-z0-9_]{1,64}$/, pump: /^(switch|fan)\.[a-z0-9_]{1,64}$/, heater: /^(switch|climate|water_heater)\.[a-z0-9_]{1,64}$/, light: /^(light|switch)\.[a-z0-9_]{1,64}$/ };
+      var ro = {}, rn2 = 0;
+      Object.keys(d.smart.roles).slice(0, 24).forEach(function (id) {
+        var r = d.smart.roles[id], one = {}, n1 = 0;
+        if (!WID.test(id) || !plainObj(r)) return;
+        Object.keys(RR).forEach(function (k) { if (typeof r[k] === "string" && RR[k].test(r[k])) { one[k] = r[k]; n1++; } });
+        if (n1) { ro[id] = one; rn2++; }
+      });
+      if (rn2) { o.smart = o.smart || {}; o.smart.roles = ro; }
+    }
     if (plainObj(d.card)) { var cd = typeof d.card.url === "string" && d.card.url.length <= V2.url && /^https?:\/\/[A-Za-z0-9.:-]+(\/[^\s]*)?$/.test(d.card.url.trim()) ? d.card.url.trim() : ""; if (cd) o.card = { url: cd }; }
     return o;
   }
+  // an AirPlay 2 speaker by its own name (lane C; server/lib/home-v2.mjs AIRPLAY_ID)
+  var AIRPLAY_ID = /^airplay:[A-Za-z0-9 ._'()&-]{1,60}$/;
   function readKeys(k) {
     var o = {};
     if (!plainObj(k)) return o;

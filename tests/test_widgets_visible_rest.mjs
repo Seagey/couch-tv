@@ -51,7 +51,7 @@ const SAME = {
   "bins tile bin_b Food": "a tile shows only the lid colours (its help says so)"
 };
 const NSAME = 14;   // how many cases SAME names (pinned, so a new one is a decision)
-const KINDS = ["aircon", "controls", "camera", "doorbell", "sensor", "energy", "solar", "battery", "speakers", "scenes", "bins", "stack"];
+const KINDS = ["aircon", "controls", "camera", "doorbell", "sensor", "energy", "solar", "battery", "speakers", "scenes", "bins", "pool", "stack"];
 const TYPES = { ".html": "text/html", ".js": "text/javascript", ".css": "text/css", ".json": "application/json", ".svg": "image/svg+xml", ".woff2": "font/woff2", ".jpg": "image/jpeg", ".png": "image/png", ".webp": "image/webp" };
 const PAGE = '<!doctype html><html><head><meta charset="utf-8"><link rel="stylesheet" href="widgets.css"></head><body style="margin:0;width:1920px;height:1080px;background:#26303f">' +
   ["icon-sets.js", "design-icons.js", "app-catalogue.js", "widget-words.js", "widgets.js", "widget-caps.js", "widget-web.js", "widget-detail.js"].map((s) => '<script src="' + s + '"></script>').join("") + "</body></html>";
@@ -178,6 +178,9 @@ try {
         speakers: [{}, [["default", {}], ["players deck", { players: ["media_player.deck"] }], ["players kitchen", { players: ["media_player.kitchen"] }], ["players deck vs kitchen", { players: ["media_player.deck"] }, false, "players kitchen"]]],
         scenes: [{}, [["default", {}], ["scenes lights off, good morning", { scenes: ["scene.lights_off", "script.good_morning"] }], ["scenes movie night", { scenes: ["scene.movie_night"] }],
           ["scenes lights off", { scenes: ["scene.lights_off"] }, false, "scenes movie night"]]],
+        // the pool (lane C): its parts named on the TV; the water found by its name when none is named
+        pool: [{}, [["default", {}], ["light lounge", { light: "light.lounge" }], ["pump outdoor lights", { pump: "switch.outdoor_lights" }], ["chlor rain gauge", { chlor: "sensor.rain_today" }],
+          ["water pool (same: found by its name)", { water: "sensor.pool" }, true], ["light lamp vs lounge", { light: "light.lamp" }, false, "light lounge"]]],
         // a Bin night widget whose design says Tuesday (a design with no night is its setup card, checked below)
         bins: [{ weekday: 2 }, [["default", {}], ["weekday Friday", { weekday: 5 }], ["weekday Tuesday (same as the design)", { weekday: 2 }, true], ["alt on", { alt: true }],
           ["thisweek b (alt on)", { alt: true, thisweek: "b" }, false, "alt on"], ["bin_a Paper", { bin_a: "Paper" }], ["bin_b Food", { bin_b: "Food" }],
@@ -215,7 +218,8 @@ try {
       for (const kind of Object.keys(V)) {
         const s = C.get(kind).sizes.s.filter((x) => PX[x])[1] || C.get(kind).sizes.s[0] || "wtile", [w, h] = PX[s];
         const d = await draw(kind, w, h, {}, {}, true);
-        const hits = DEMO_WORDS.filter((x) => d.text.indexOf(x) >= 0);
+        // "Pool" is a demo sensor's name and also the pool widget's own name (its setup card says it)
+        const hits = DEMO_WORDS.filter((x) => d.text.indexOf(x) >= 0 && !(kind === "pool" && x === "Pool"));
         demo[kind] = { s, empty: d.empty, text: d.text.slice(0, 160), hits };
       }
       window.TVOS = T;

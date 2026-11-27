@@ -56,6 +56,8 @@ import bookings
 import direct
 import rooms
 import matter
+import airplay
+import pool
 import say
 import phonepage
 
@@ -3656,6 +3658,84 @@ def push_matter(_devices=None):
 MATTER = matter.Matter(config.DATA, config.CONFIG.get("matter"), on_change=push_matter)
 
 
+# ---------- AirPlay 2 speaker groups for the Speakers widget (bridge/airplay.py, lane C 28 Nov 2026) ----------
+# A Mac's Music app plays to several AirPlay 2 speakers in sync (home-hub's Whole House). The TV reads the speakers and
+# their volume, starts a group, stops it and sets each speaker's volume. Names only: never an address. Only the TV (or a
+# paired phone) may start or change anything, the same rule as Home Assistant's /api/ha.
+AIRPLAY = airplay.AirPlay(config.DATA, config.CONFIG.get("airplay"))
+
+
+async def h_airplay_get(request):
+    if AIRPLAY.enabled:
+        try:
+            await AIRPLAY.read_devices()
+        except Exception:
+            AIRPLAY.error = "music"
+    return ok(airplay=AIRPLAY.state())
+
+
+def _airplay_fail(e):
+    if isinstance(e, ValueError):
+        return ok(result={"ok": False, "error": "group" if str(e) == "group" else "speakers"})
+    if str(e) == "off":
+        return ok(result={"ok": False, "error": "off"})
+    log.warning("airplay: %s", e)
+    return ok(result={"ok": False, "error": "music"})
+
+
+@tv_or_paired
+async def h_airplay_play(request):
+    data = await body(request)
+    sp = data.get("speakers")
+    if sp is not None and (not isinstance(sp, list) or len(sp) > airplay.MAX_SPEAKERS):
+        raise ApiError(400, "speakers must be a list of up to 12 names", key="err_body_must_be_json_object")
+    try:
+        await AIRPLAY.activate(speakers=sp, group=data.get("group"))
+    except Exception as e:
+        return _airplay_fail(e)
+    return ok(result={"ok": True}, airplay=AIRPLAY.state())
+
+
+@tv_or_paired
+async def h_airplay_stop(request):
+    try:
+        await AIRPLAY.release()
+    except Exception as e:
+        return _airplay_fail(e)
+    return ok(result={"ok": True}, airplay=AIRPLAY.state())
+
+
+@tv_or_paired
+async def h_airplay_volume(request):
+    data = await body(request)
+    v = data.get("value")
+    if not isinstance(v, (int, float)) or isinstance(v, bool) or not 0 <= v <= 100:
+        raise ApiError(400, "value must be 0 to 100", key="err_body_must_be_json_object")
+    try:
+        await AIRPLAY.set_volume(data.get("name"), v)
+    except Exception as e:
+        return _airplay_fail(e)
+    return ok(result={"ok": True}, airplay=AIRPLAY.state())
+
+
+# ---------- AstralPool Connect 10 for the web TVs this computer runs (bridge/pool.py, lane C) ----------
+# The approval code is in .env (CONNECTMYPOOL_CODE), never in config.json and never sent to a TV: the TV gets the readings only.
+POOL = pool.Pool(config.CONFIG.get("pool"), os.environ.get("CONNECTMYPOOL_CODE"))
+
+
+@tv_or_paired
+async def h_pool(request):
+    data = await body(request)
+    if not POOL.enabled:
+        return ok(pool={"ok": False, "error": "computer_key"})
+    try:
+        if data.get("action") is not None:
+            await POOL.act(data.get("action"))
+        return ok(pool=await POOL.status())
+    except pool.PoolError as e:
+        return ok(pool={"ok": False, "error": e.code})
+
+
 @tv_or_paired
 async def h_matter_devices(request):
     return ok(**MATTER.answer())
@@ -6069,6 +6149,11 @@ def make_app():
     r.add_post("/api/matter/command", h_matter_command)
     r.add_post("/api/matter/remove", h_matter_remove)
     r.add_post("/api/matter/rename", h_matter_rename)
+    r.add_get("/api/airplay", h_airplay_get)
+    r.add_post("/api/airplay/play", h_airplay_play)
+    r.add_post("/api/airplay/stop", h_airplay_stop)
+    r.add_post("/api/airplay/volume", h_airplay_volume)
+    r.add_post("/api/pool", h_pool)
     r.add_get("/api/settings", h_settings_get)
     r.add_post("/api/settings", h_settings_set)
     # the phone's Home settings page (phonepage.py) and the TV home's side of it
@@ -6144,9 +6229,11 @@ def make_app():
                 app["loops"] += [for_tv(tv_id, keep_disabled_loop), for_tv(tv_id, media_watch_loop)]
         app["bonjour"] = await advertise_for_appletv()
         await MATTER.start()
+        await AIRPLAY.start()
 
     async def on_cleanup(_):
         await MATTER.stop()
+        await AIRPLAY.stop()
         if finder._session and not finder._session.closed:
             await finder._session.close()
         if app.get("bonjour"):

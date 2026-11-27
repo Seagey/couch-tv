@@ -360,7 +360,7 @@
     "keep", "keeprow", "upnext", "picks",
     "app", "folder", "dock", "appgrid", "games",
     "nowplaying", "soundscape", "queue", "speakers",
-    "aircon", "scenes", "controls", "camera", "doorbell", "energy", "sensor", "battery",
+    "aircon", "scenes", "controls", "camera", "doorbell", "energy", "sensor", "battery", "pool",
     "bins", "people", "agenda", "note", "list",
     "card", "quote", "word", "news", "sports", "stocks", "commute",
     "welcome", "quick", "wifi", "guide", "screentime", "ask", "agent", "stack", "tvsettings"];
@@ -377,7 +377,7 @@
   var WACT = ["keep", "keeprow", "upnext", "picks", "app", "folder", "dock", "appgrid", "games", "nowplaying", "soundscape", "aircon", "scenes", "controls", "people", "quick", "stack",
     "clock", "tallclock", "glassclock", "analog", "flipclock", "wordclock", "timer", "solar", "worldclock", "date", "month", "agenda",
     "weather", "bigtemp", "hourly", "week", "rain", "uv", "sun", "moon", "air", "surf", "photo", "slideshow", "mosaic", "artframe",
-    "camera", "doorbell", "card", "news", "sports", "memory", "queue", "speakers", "energy", "sensor", "battery", "note", "list", "stocks", "commute", "wifi", "guide", "screentime", "ask", "agent", "tvsettings"];
+    "camera", "doorbell", "card", "news", "sports", "memory", "queue", "speakers", "energy", "sensor", "battery", "pool", "note", "list", "stocks", "commute", "wifi", "guide", "screentime", "ask", "agent", "tvsettings"];
   var WSIZES = ["line", "wline", "tile", "wtile", "small", "tall", "medium", "wide", "large", "xl", "hero", "full", "row8", "row12", "row18"];
   // Box behind it (Phase 3 item 15): Glass, Solid or None in Couch TV Studio. "colour" and "paper" stay in the
   // list because every TV out there reads them: Studio shows both as Solid (a colour, or the Paper texture with
@@ -478,6 +478,16 @@
   OPT.cam = haId(/^camera\.[a-z0-9_]{1,64}$/);
   OPT.reading = haId(/^sensor\.[a-z0-9_]{1,64}$/);
   OPT.players = function (v) { return SAN.list(v, 6, haId(/^media_player\.[a-z0-9_]{1,64}$/)); };
+  // the pool widget (lane C, 28 Nov 2026): where its readings come from (Home Assistant, or AstralPool Connect 10 through the
+  // account), and which Home Assistant thing is which part of the pool. Entity ids only, like the others; the Connect 10 approval
+  // code is never here (it is locked in the account and used only by Couch TV Studio's server).
+  OPT.via = function (v) { return SAN.pick(v, ["ha", "connect10"]); };
+  OPT.water = haId(/^sensor\.[a-z0-9_]{1,64}$/);
+  OPT.chlor = haId(/^sensor\.[a-z0-9_]{1,64}$/);
+  OPT.pump = haId(/^(switch|fan)\.[a-z0-9_]{1,64}$/);
+  OPT.heater = haId(/^(switch|climate|water_heater)\.[a-z0-9_]{1,64}$/);
+  OPT.light = haId(/^(light|switch)\.[a-z0-9_]{1,64}$/);
+  WOPT.pool = "label via water pump chlor heater light align";
   // the Welcome widget: where the guest's name comes from. "calendar" means this TV's own bookings
   // calendar (Home settings, Designs, At home, Guests); the design never carries a name, a
   // link or a time. times: false hides the check in and check out line.
@@ -1697,7 +1707,8 @@
   }
   function pollRooms(objs) {
     var want = objs.some(function (o) { o = obj(o); return (o.type === "smart" && o.kind === "aircon") || (o.type === "group" && list(o.controls).some(function (c) { return obj(c).kind === "aircon"; })) ||
-      (o.type === "widget" && [o].concat(list(o.items)).some(function (it) { return obj(it).kind === "aircon"; })); });
+      // a pool widget whose heater is a thermostat reads the rooms too (lane C)
+      (o.type === "widget" && [o].concat(list(o.items)).some(function (it) { it = obj(it); return it.kind === "aircon" || (it.kind === "pool" && /^climate\./.test(String(obj(it.opts).heater || ""))); })); });
     if (!want || !window.smartHome || !window.smartHome.climate || !window.smartHome.available()) return;
     if (Date.now() - LIVE.asked < 60000) return;
     LIVE.asked = Date.now();
@@ -2713,6 +2724,9 @@
       return { designer: DESIGNER,
         act: function (what, arg) { if (DESIGNER) { try { window.parent.postMessage({ type: "couchtv:open", name: String(arg || what) }, location.origin); } catch (x) {} return; } if (hooks.act) hooks.act(what, arg); },
         ha: hooks.ha && !DESIGNER ? function (a, e, v) { return hooks.ha(a, e, v); } : null,
+        // the Speakers layer's AirPlay group and the Pool layer's Connect 10 switches (lane C, app.js hooks)
+        airplay: hooks.airplay && !DESIGNER ? function (a, b) { return hooks.airplay(a, b); } : null,
+        pool: hooks.pool && !DESIGNER ? function (k, d, v) { return hooks.pool(k, d, v); } : null,
         // Hold OK on an app inside a folder's full screen layer: the same menu as on the widget, for that app
         hold: DESIGNER ? null : function (slot) { FORCE_SLOT = slot; holdMenu(); FORCE_SLOT = null; },
         // a widget's setup layer: the phone page's code at its step, and "No phone? Set it up here"
