@@ -1084,7 +1084,7 @@
   $("debug-off").addEventListener("click", function () { text("debug-status", ""); show("debug"); });
   $("debug-go").addEventListener("click", function () {
     api("/api/debug-off").then(function () {
-      ["debug-off", "remote-go", "health-look", "tidy-go"].forEach(function (id) { $(id).hidden = true; });
+      ["debug-off", "remote-go", "health-look", "tidy-go", "perms-go"].forEach(function (id) { if ($(id)) $(id).hidden = true; });
       show("done");
       text("done-line", "Debugging is off. Couch TV keeps working."); $("done-line").hidden = false;
     }, fail);

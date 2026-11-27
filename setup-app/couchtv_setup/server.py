@@ -635,6 +635,9 @@ def api(method, path, body):
         tv = need_tv()
         return {"items": steps.plan(tv, S.facts, ambient_off=bool(body.get("ambient_off", False)),
                                     ontv_home_off=bool(body.get("ontv_home_off", True))), "facts": S.facts}
+    if path.startswith("/api/perms/"):
+        from . import widgetperms
+        return widgetperms.route(path[len("/api/perms/"):], body, need_tv(), run_job)
     if path.startswith("/api/tidy/"):
         return tidy.route(path[len("/api/tidy/"):], body, need_tv(), run_job)
     if path == "/api/place":
