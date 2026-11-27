@@ -371,6 +371,18 @@ the TV off and on comes back to couch-tv when Autorun Last App is on, because co
 last app. Without `sky_hdmi` there is no tile. Tested on a 2023 CU8500 (Tizen 9.0) with a Sky Q Mini
 on HDMI 2, reported by philehaynes.
 
+## Your own name for an app
+
+`"app_names"` in the TV's entry renames an app's tile, for a household that knows it by another
+name. Then rebuild and reinstall the app:
+
+```json
+{ "id": "lounge", "name": "Lounge", "kind": "samsung", "ip": "<tv address>",
+  "app_names": { "com.netflix.ninja": "Movies" } }
+```
+
+The key is the app's package in `bridge/apps.py`.
+
 ## Turning it on
 
 When a Samsung is properly off it leaves the network, and only a Wake-on-LAN packet can reach it,
