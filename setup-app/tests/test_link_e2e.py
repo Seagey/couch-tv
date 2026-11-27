@@ -536,6 +536,8 @@ class AgainstTheRealRoutes(LinkEndToEnd, unittest.TestCase):
         code, ans, tv = self.link_by_device(True)
         self.assertEqual((code, ans["trusted"]), (200, True))
         self.assertTrue(self.tv_row(tv)["link_trusted"])
+        self.assertTrue(self.api("/api/account")["account"]["trusted"], "Setup knows, so its words are true")
+        self.assertEqual(server.S.link.tv["home"]["people"][0]["name"], "Sam", "a trusted link gets the home pack at set up")
         j = self.send(tv)
         self.assertEqual((j["queued"], j["home"], j["pack"]), (True, "sent", True), "no tick needed for a trusted link")
         self.assertFalse(j["token_in_answer"], "no long token for a QR")
@@ -560,11 +562,22 @@ class AgainstTheRealRoutes(LinkEndToEnd, unittest.TestCase):
         code, ans, tv = self.link_by_device(False, self.OTHER)
         self.assertEqual((code, ans["trusted"]), (200, False))
         self.assertFalse(self.tv_row(tv)["link_trusted"])
+        self.assertFalse(self.api("/api/account")["account"]["trusted"])
+        self.assertIsNone(server.S.link.tv["home"], "a typed link gets no names, kids flags or town at set up")
         j = self.send(tv)
         self.assertEqual((j["queued"], j["home"], j["pack"]), (True, None, False), "an untrusted link needs the tick")
         self.assertFalse(j["token_in_answer"])
         j = self.send(tv, home=True)
         self.assertEqual((j["home"], j["pack"]), ("sent", True), "with the tick it goes")
+
+    def test_an_unknown_address_never_counts_as_the_same_network(self):
+        unknown = {"x-test-unknown": "1"}
+        code, d = self.http("POST", "/v1/setup/device", {}, unknown)
+        self.assertEqual(code, 201, d)
+        code, ans = self.allow(d["user_code"], True, unknown)
+        self.assertEqual((code, ans["error"]), (409, "other_network"), "two unknown addresses are not the same")
+        code, ans = self.allow(d["user_code"], True)            # and a known address is not the unknown one either
+        self.assertEqual(code, 409)
 
     def test_a_typed_code_on_the_same_network_is_not_trusted_either(self):
         code, ans, tv = self.link_by_device(False)
@@ -579,6 +592,7 @@ class AgainstTheRealRoutes(LinkEndToEnd, unittest.TestCase):
         self.assertTrue(self.run_job("/api/link-tv")["account"]["linked"])
         tv = server.S.link.tv["tv_id"]
         self.assertTrue(self.tv_row(tv)["link_trusted"])
+        self.assertTrue(self.api("/api/account")["account"]["trusted"])
         self.assertEqual(self.send(tv)["pack"], True)
 
     def test_mine_says_which_linked_tv_is_trusted(self):

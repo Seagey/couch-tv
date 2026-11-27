@@ -624,8 +624,9 @@
 
   function planAccount() {
     if (state.account) {
-      $("plan-account").textContent = signedInWords(state.account.name || state.account.email) + ". Couch TV gets your home details" +
-        (state.account.design ? " and \"" + state.account.design + "\"" : "") + " as it goes on.";
+      $("plan-account").textContent = signedInWords(state.account.name || state.account.email) + ". " + (state.account.trusted
+        ? "Couch TV gets your home details" + (state.account.design ? " and \"" + state.account.design + "\"" : "") + " as it goes on."
+        : "Couch TV gets " + (state.account.design ? "\"" + state.account.design + "\"" : "your design") + " as it goes on. Your people, photos and town stay off until you tick Send my home details on the website.");
     }
     $("plan-account").hidden = !state.account;
   }
@@ -644,14 +645,17 @@
     $("lk-go").hidden = on; $("lk-go").disabled = false; $("lk-skip-row").hidden = on;
     $("lk-wait").hidden = true; $("lk-status").hidden = true; $("lk-code-row").hidden = true;
     $("lk-next").hidden = !on; $("lk-done").hidden = !on;
-    if (on) text("lk-done", signedInWords(state.account.name || state.account.email) + ". Your designs, people, photos and town arrive on this TV as it is set up.");
+    if (on) text("lk-done", signedInWords(state.account.name || state.account.email) + (state.account.trusted
+      ? ". Your designs, people, photos and town arrive on this TV as it is set up."
+      : ". Your design arrives on this TV as it is set up. Your people, photos and town stay off until you tick Send my home details on the website."));
   }
   // Starts the website's "Is this your TV?" for this computer and waits for the Yes. done(account) when it comes;
   // failed(message) when it ran out or could not start. Nothing is typed or copied.
-  function browserLink(done, failed) {
+  function browserLink(done, failed, onCode) {
     api("/api/device/start", { silent: true, tv_name: tvName() }).then(function (d) {
       var a = $("lk-open"); a.href = d.open;
       if ($("lk-code")) { text("lk-code", d.user_code); $("lk-code-row").hidden = false; }
+      if (onCode) onCode(d.user_code);
       try { window.open(d.open, "_blank", "noopener"); } catch (e) {}
       clearInterval(lkTimer);
       lkTimer = setInterval(function () {
@@ -924,8 +928,11 @@
     if (state.account) return linkRun();
     $("link-cta").disabled = true;
     text("link-status", "Waiting for you to say Yes in your browser\u2026"); $("link-status").hidden = false;
+    // the code shows here too: from another network the website asks for it to be typed
     browserLink(function () { linkRun(); }, function (m) {
       $("link-cta").disabled = false; text("link-status", m); $("link-status").hidden = false;
+    }, function (code) {
+      text("link-status", "Waiting for you to say Yes in your browser\u2026 The website should show this code: " + code + ". If it asks you to type it, type it there. If it shows a different one, press No.");
     });
   });
 
