@@ -21,6 +21,9 @@ Couch TV Setup now links your TV to your account without any codes to type. A de
 - **Sharp 512 px app icons.** App icons are drawn at 512 px, so they stay crisp on a large TV.
 - **Slimmer TV settings.** The TV settings screen is called Settings and shows fewer rows, with the rest tucked under More.
 - **Speed check button hidden.** The speed check button is not shown for now.
+- **Now playing clears the dock.** In the Night look, the row lifts so Spotify's card no longer sits under the dock (PR #333).
+- **Your own picture for input tiles.** Input tiles can use your own picture through app-icons.sh, like an app's (PR #337).
+- **Samsung setup wording.** The Samsung setup says which Samsung pages come before Signed in (PR #334).
 
 ### Not in this release
 
