@@ -3539,17 +3539,19 @@
   // ---------------- one widget, a stack, the API ----------------
   // the height (TV px) under which a kind draws its small layout (CR): the full one needs this much room
   var CR_UNDER = { hourly: 300 };
-  // the biggest box (TV px) a kind's own layout is made for: bigger boxes zoom it up to fill them (one())
+  // the biggest box (TV px) a kind's own layout is made for: bigger boxes scale it up to fill them (one())
   var GROW = { date: [1160, 100], commute: [1160, 560], quick: [760, 160], timer: [360, 160], word: [760, 560], list: [560, 360], welcome: [1160, 260], agenda: [560, 360] };
   function one(o, b, env) {
     // what was set for this widget on this TV goes over the design's opts (the detail layer gets the same)
     try { o = withSettings(o, env); } catch (e) {}
     // any size (owner, 28 Nov 2026: white space only as a style choice): a kind whose layout is made for a box up to
-    // GROW[kind] is drawn at that box and the whole widget zoomed up to fill a bigger one, words and all
+    // GROW[kind] is drawn at that box and the whole widget scaled up to fill a bigger one, words and all
     var z = GROW[o.kind] ? clamp(Math.min(b.w / GROW[o.kind][0], b.h / GROW[o.kind][1]), 1, 3) : 1, bOut = b;
     if (z > 1.05) { b = {}; for (var bk in bOut) if (Object.prototype.hasOwnProperty.call(bOut, bk)) b[bk] = bOut[bk]; b.w = Math.round(bOut.w / z); z = bOut.w / b.w; b.h = Math.floor(bOut.h / z); } else z = 1;
     var sh = shell(o, b, env), root = sh.root, st = o.style || {};
-    if (z > 1) { root.style.zoom = String(Math.round(z * 1000) / 1000); root.setAttribute("data-zoom", String(z)); }
+    // a transform, not CSS zoom: an older TV WebView (Chrome 91, tested on the low end emulator, 28 Nov 2026) measures a
+    // zoomed box in its own unzoomed pixels, which put the remote's stops in the wrong place; a transform measures right
+    if (z > 1) { root.style.transformOrigin = "0 0"; root.style.webkitTransformOrigin = "0 0"; root.style.transform = root.style.webkitTransform = "scale(" + Math.round(z * 1000) / 1000 + ")"; root.setAttribute("data-zoom", String(z)); }
     CTX = { icons: st.icons || (env.look && env.look.icons) || "line" };
     // any size (owner, 28 Nov 2026): a kind whose full layout needs more height draws its small one below that height, and
     // a box under 300 wide (one tile across, however tall) draws the small one too

@@ -3186,9 +3186,14 @@
     if (NIGHT && !LOOP && np && grid && np.classList.contains("on") && !root.classList.contains("np-mini-mode") &&
         !root.classList.contains("spotify-row")) {
       if (root.classList.contains("expanded")) return;   // the dock is open as a grid: measure it again later
-      var rem = parseFloat(getComputedStyle(root).fontSize) || 16;
+      var rem = parseFloat(getComputedStyle(root).fontSize) || 16, gr = grid.getBoundingClientRect();
+      // the dock not in its place yet (a design still being drawn, Couch TV Studio's picture): measure again
+      // shortly, never lift against it (it once lifted the row 800 px, off the top of the screen)
+      if (gr.height < 1 || gr.top < innerHeight * 0.45) { clearTimeout(npLiftFit.t); npLiftFit.t = setTimeout(npLiftFit, 500); return; }
       var bottom = np.getBoundingClientRect().bottom + (npLift || 0);   // where the card would end unlifted
-      lift = Math.max(0, Math.ceil(bottom - (grid.getBoundingClientRect().top - 2.375 * rem))) || 0;
+      lift = Math.max(0, Math.ceil(bottom - (gr.top - 2.375 * rem))) || 0;
+      // and never past the top of the screen's safe area
+      lift = Math.min(lift, Math.max(0, Math.floor(sec.getBoundingClientRect().top + (npLift || 0) - 3.75 * rem)));
     }
     if (lift === npLift) return;
     npLift = lift;
