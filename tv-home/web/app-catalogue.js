@@ -14,6 +14,8 @@
 //   names     other titles a TV may list it under (matched when no package matches)
 //   icon      a picture under tv-home/web/app-icons/ ("app-icons/netflix.png"), or "" (the TV and the
 //             designer then draw the name on a coloured tile)
+//   icon512   the same picture at 512 x 512 ("app-icons/netflix-512.png"), or "" when there is none. A TV or
+//             a screen that draws the app larger than about 120 real pixels uses this one (CouchApps.iconFor)
 //   colour    the tile colour when there is no icon
 //   verified  true: every package here is in couch-tv's own tables (bridge/apps.py, app.js) and was
 //             seen on a real TV; false: from public store listings, not yet seen on a TV (the name
@@ -32,7 +34,7 @@
     more = more || {};
     APPS.push({ id: id, name: name, group: group, regions: regions, verified: !!verified,
       packages: { android: android || [], fire: more.fire || [], samsung: more.samsung || "", lg: more.lg || "", roku: more.roku || "" },
-      names: more.names || [], icon: ICONS[id] ? "app-icons/" + id + ".png" : "", colour: more.colour || "#2a2a32" });
+      names: more.names || [], icon: ICONS[id] ? "app-icons/" + id + ".png" : "", icon512: ICONS[id] ? "app-icons/" + id + "-512.png" : "", colour: more.colour || "#2a2a32" });
   }
   var AU = ["AU"], ANZ = ["AU", "NZ"], IN = ["IN"], US = ["US"], UK = ["GB"], WORLD = ["AU", "IN", "US", "GB", "CA", "NZ"];
 
@@ -178,9 +180,17 @@
     var p = x.packages, all = [].concat(p.android, p.fire, p.samsung ? [p.samsung] : [], p.lg ? [p.lg] : [], p.roku ? [p.roku] : []);
     all.forEach(function (k) { if (k && !BY_PKG[k]) BY_PKG[k] = x.id; });
   });
+  // the picture to draw an app at `px` real screen pixels wide: the 512 one from about 120 real pixels up, so a
+  // 4K TV (a 1920 wide page drawn at twice the size) is never handed a 160 pixel picture stretched to twice its size
+  function iconFor(x, px) {
+    if (!x) return "";
+    return x.icon512 && (!px || px >= 120) ? x.icon512 : x.icon;
+  }
   function own(o, k) { return Object.prototype.hasOwnProperty.call(o, k); }
   function norm(s) { return String(s || "").toLowerCase().replace(/[^a-z0-9+]/g, ""); }
   var HELP = {
+    // the app's picture for a width in real screen pixels (see iconFor above); "" when it has no picture
+    iconFor: function (id, px) { return iconFor(HELP.get(id), px); },
     get: function (id) { return typeof id === "string" && own(BY_ID, id) ? BY_ID[id] : null; },
     // the catalogue id for a package or TV app id ("com.netflix.ninja" -> "netflix"), or null
     idOf: function (pkg) { return typeof pkg === "string" && own(BY_PKG, pkg) ? BY_PKG[pkg] : null; },

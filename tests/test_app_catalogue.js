@@ -29,6 +29,8 @@ C.apps.forEach((x) => {
   ok(p && Array.isArray(p.android) && Array.isArray(p.fire) && ["samsung", "lg", "roku"].every((k) => typeof p[k] === "string"), x.id + ": packages { android: [], fire: [], samsung, lg, roku }");
   ok(Array.isArray(x.names) && typeof x.verified === "boolean" && /^#[0-9a-f]{6}$/i.test(x.colour), x.id + ": names, verified, colour");
   ok(x.icon === "" || (/^app-icons\/[a-z0-9]+\.png$/.test(x.icon) && fs.existsSync(path.join(web, x.icon))), x.id + ": icon is a file under app-icons/ or empty");
+  ok(x.icon === "" ? x.icon512 === "" : x.icon512 === "app-icons/" + x.id + "-512.png" && fs.existsSync(path.join(web, x.icon512)), x.id + ": icon512 is the 512 pixel file next to icon, or empty");
+  if (x.icon512) { const b = fs.readFileSync(path.join(web, x.icon512)); ok(b.readUInt32BE(16) === 512 && b.readUInt32BE(20) === 512, x.id + ": icon512 is really 512 x 512"); }
   ok(p.android.length + p.fire.length + (p.samsung ? 1 : 0) + (p.lg ? 1 : 0) + (p.roku ? 1 : 0) + x.names.length > 0, x.id + ": some way to find it on a TV");
 });
 ["netflix", "youtube", "prime", "disney", "stan", "binge", "kayo", "iview", "sbs", "7plus", "9now", "10play", "foxtel", "paramount", "appletv", "spotify", "youtubemusic",
@@ -40,6 +42,10 @@ C.apps.filter((x) => x.verified).forEach((x) => [].concat(x.packages.android, x.
 ok(C.apps.some((x) => !x.verified), "apps not yet seen on a TV say so");
 
 // 2. helpers
+ok(A.iconFor("netflix", 100) === "app-icons/netflix.png" && A.iconFor("netflix", 300) === "app-icons/netflix-512.png" && A.iconFor("netflix") === "app-icons/netflix-512.png", "iconFor: 160 picture when small, 512 when large");
+const wsrc = fs.readFileSync(path.join(web, "widgets.js"), "utf8");
+ok(/function realPx\(a\)[^\n]*devicePixelRatio/.test(wsrc) && /iconFor\(c\.id, realPx\(a\)\)/.test(wsrc) && /iconUrl\(pkg, env, a\)/.test(wsrc), "widgets.js picks each app picture by the tile's real screen size");
+ok(A.iconFor("plex", 600) === "" && A.iconFor("nope", 600) === "", "iconFor: no picture gives empty");
 ok(A.idOf("com.netflix.ninja") === "netflix" && A.idOf("au.net.abc.iview") === "iview" && A.idOf("nope") === null && A.idOf("__proto__") === null, "idOf maps packages to ids");
 ok(A.get("__proto__") === null && A.get("constructor") === null, "no prototype keys");
 ok(A.resolve("netflix", [{ package: "com.netflix.ninja", name: "Netflix" }]).package === "com.netflix.ninja", "resolve by package");

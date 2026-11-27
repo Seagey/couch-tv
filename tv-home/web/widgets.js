@@ -119,9 +119,15 @@
   // the app catalogue (app-catalogue.js): a design names apps by catalogue id ("netflix")
   function cat() { return window.CouchApps || null; }
   function catApp(k) { var A = cat(); return A ? A.get(k) : null; }
-  function iconUrl(pkg, env) {
+  // a width in the page's own 1920 wide units -> real screen pixels: the page is drawn innerWidth / 1920 times
+  // its size, and a 4K TV draws a 1920 page at devicePixelRatio 2, so the same tile is twice as many real pixels
+  function realPx(a) { return a * ((window.innerWidth || 1920) / 1920) * (window.devicePixelRatio || 1); }
+  function iconUrl(pkg, env, a) {
     var d = dataOf(env), c = catApp(pkg);
-    if (c) return c.icon ? CW.base + c.icon : null;   // a catalogue id: its own picture (the designer, a missing app)
+    if (c) {   // a catalogue id: its own picture, the 512 one when the tile is large on this screen (the designer, a missing app)
+      var A = cat(), pic = a && A ? A.iconFor(c.id, realPx(a)) : c.icon;
+      return pic ? CW.base + pic : null;
+    }
     if (!env.demo && d.iconUrl) { try { return d.iconUrl(pkg); } catch (e) { return null; } }
     if (d.iconUrl) { try { var u = d.iconUrl(pkg); if (u) return u; } catch (e2) {} }
     return APPS[pkg] ? CW.logoBase + pkg + ".png" : null;
@@ -179,7 +185,7 @@
       m.appendChild(E("div", "", "position:absolute;left:0;right:0;bottom:0;padding:4px;background:rgba(0,0,0,.72);color:#fff;font-size:" + px(clamp(a * 0.11, 23, 28)) + ";text-align:center;line-height:1.15", ["Not on this TV"]));
       return stop(m, "missing", key, appName(key, env));
     }
-    var name = appName(pkg, env), url = iconUrl(pkg, env), c = catApp(pkg);
+    var name = appName(pkg, env), url = iconUrl(pkg, env, a), c = catApp(pkg);
     var n = E("div", "cw-app", "width:" + px(a) + ";height:" + px(a) + ";padding:" + px(a * 0.08) + ";border-radius:" + px(a * 0.24) + ";font-size:" + px(clamp(a * 0.17, 23, 40)) + (c && !c.icon && /^#[0-9a-f]{6}$/i.test(c.colour) ? ";background:" + c.colour : ""), [name]);
     if (url && (env.imgOk ? (env.imgOk(url) || /^(https?:|\.\.\/|\/|demo\/|backgrounds\/|app-icons\/)/.test(url)) : true)) {
       var img = document.createElement("img");
@@ -1500,7 +1506,7 @@
     return card;
   }
   function appIcon(pkg, a, env) {
-    var u = iconUrl(pkg, env);
+    var u = iconUrl(pkg, env, a);
     return u ? E("span", "", "display:block;width:" + px(a) + ";height:" + px(a) + ";border-radius:" + px(a * 0.24) + ";background:#222 center/cover;flex:none;background-image:" + cssImg(u)) : null;
   }
   R.keep = function (root, o, b, env) {
