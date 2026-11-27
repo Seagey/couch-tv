@@ -78,8 +78,8 @@ object HomeAssistant {
     fun readExtras(ctx: Context, i: Intent) {
         val v = i.getStringExtra("ha_b64")?.trim() ?: return
         // apply.sh sends "none" when config.json has no section: a set up made on the TV itself stays
-        if ((v.isEmpty() || v == "none") && store(ctx).getBoolean("made_on_tv", false)) return
-        val e = store(ctx).edit().remove("made_on_tv")
+        if ((v.isEmpty() || v == "none") && (store(ctx).getBoolean("made_on_tv", false) || store(ctx).getBoolean("from_account", false))) return
+        val e = store(ctx).edit().remove("made_on_tv").remove("from_account")
         val json = if (v.isEmpty() || v == "none") null else try {
             String(android.util.Base64.decode(v, android.util.Base64.DEFAULT), Charsets.UTF_8)
                 .takeIf { parse(JSONObject(it)) != null }
@@ -568,15 +568,49 @@ object HomeAssistant {
     /** Keeps a section made on the TV, with the address and token it was checked with. False when it does not check out. */
     fun keep(ctx: Context, picks: JSONObject, base: String, token: String): Boolean {
         val o = rebuilt(picksOf(picks.toString()).put("url", base).put("token", token), settings(ctx)) ?: return false
-        store(ctx).edit().putString(KEY, o.toString()).putBoolean("made_on_tv", true).commit()
+        store(ctx).edit().putString(KEY, o.toString()).putBoolean("made_on_tv", true).remove("from_account").commit()
         cached = null; cachedFrom = null
         changed?.invoke(ctx)
         return true
     }
 
+    /**
+     * Couch TV Studio's account gave this TV its Home Assistant address and token (Phase 2). Only when nothing is set up here, or what is set up
+     * came from the account too: a set up made on this TV (by hand or by a phone sign in) is never replaced. The ticks already kept stay (the
+     * account's picks are added to them, never swapped in), so no widget goes blank. Marked "from_account" (not "made_on_tv").
+     */
+    fun keepFromAccount(ctx: Context, picks: JSONObject, base: String, token: String): Boolean {
+        val p = store(ctx)
+        val oldRaw = p.getString(KEY, null)
+        if (oldRaw != null && !p.getBoolean("from_account", false)) return false
+        val merged = mergedTicks(oldRaw, picks, cleanBase(base))
+        val o = rebuilt(merged.put("url", base).put("token", token), settings(ctx)) ?: return false
+        p.edit().putString(KEY, o.toString()).putBoolean("from_account", true).remove("made_on_tv").commit()
+        cached = null; cachedFrom = null
+        changed?.invoke(ctx)
+        return true
+    }
+
+    /** The ticks of what is kept (when it is the same Home Assistant) with the new picks added by entity. Pure, for tests. */
+    internal fun mergedTicks(oldRaw: String?, picks: JSONObject, base: String?): JSONObject {
+        val oldO = try { JSONObject(oldRaw ?: "{}") } catch (e: Exception) { JSONObject() }
+        val same = base != null && cleanBase(oldO.optString("url")) == base
+        val out = picksOf(picks.toString())
+        if (!same) return out
+        val prev = picksOf(oldRaw)
+        for (g in listOf("climate", "scenes", "controls", "cameras", "sensors", "speakers")) {
+            val have = prev.optJSONArray(g) ?: continue
+            val mine = out.optJSONArray(g) ?: JSONArray().also { out.put(g, it) }
+            val seen = (0 until mine.length()).map { mine.optJSONObject(it)?.optString("entity") }.toSet()
+            for (i in 0 until have.length()) { val e = have.optJSONObject(i) ?: continue; if (e.optString("entity") !in seen) mine.put(e) }
+        }
+        for (k in listOf("doorbell", "energy")) if (!out.has(k) && prev.has(k)) out.put(k, prev.get(k))
+        return out
+    }
+
     /** Smart home off on this TV: the section, address and token are gone. */
     fun forget(ctx: Context) {
-        store(ctx).edit().remove(KEY).remove("made_on_tv").commit()
+        store(ctx).edit().remove(KEY).remove("made_on_tv").remove("from_account").commit()
         cached = null; cachedFrom = null
         access.clear(); refused.clear(); listed = null
         changed?.invoke(ctx)
@@ -608,7 +642,7 @@ object HomeAssistant {
         val o = signedInSection(store(ctx).getString(KEY, null), base, r, client)
         if (parse(o) == null) return false
         remember(r, t)
-        store(ctx).edit().putString(KEY, o.toString()).putBoolean("made_on_tv", true).commit()
+        store(ctx).edit().putString(KEY, o.toString()).putBoolean("made_on_tv", true).remove("from_account").commit()
         cached = null; cachedFrom = null
         changed?.invoke(ctx)
         return true
@@ -621,7 +655,7 @@ object HomeAssistant {
         val o = picksOf(picks.toString())
         listOf("url", "token", "refresh_token", "client_id").forEach { k -> keys.optString(k).takeIf { it.isNotEmpty() }?.let { o.put(k, it) } }
         val section = rebuilt(o, settings(ctx)) ?: return false
-        store(ctx).edit().putString(KEY, section.toString()).putBoolean("made_on_tv", true).commit()
+        store(ctx).edit().putString(KEY, section.toString()).putBoolean("made_on_tv", true).remove("from_account").commit()
         cached = null; cachedFrom = null
         changed?.invoke(ctx)
         return true
@@ -682,7 +716,7 @@ object HomeAssistant {
         val count = s.climate.size + s.scenes.size + s.controls.size + s.cameras.size + s.sensors.size + s.speakers.size +
             (if (s.doorbell != null) 1 else 0) + (if (s.energy != null) 1 else 0)
         return JSONObject().put("set", true).put("host", try { URL(s.base).host } catch (e: Exception) { "" })
-            .put("made_on_tv", store(ctx).getBoolean("made_on_tv", false))
+            .put("made_on_tv", store(ctx).getBoolean("made_on_tv", false)).put("from_account", store(ctx).getBoolean("from_account", false))
             .put("signed_in", s.refresh != null).put("count", count)
             .put("signin_again", signInAgain(s))
             .put("climate", ids(s.climate)).put("scenes", ids(s.scenes)).put("controls", ids(s.controls)).put("cameras", ids(s.cameras))

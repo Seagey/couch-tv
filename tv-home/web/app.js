@@ -631,37 +631,63 @@
     var held = keptKeys(), changed = false;
     Object.keys(ks).forEach(function (kind) {
       if (ks[kind]) {
-        held[kind] = { url: ks[kind].url || ks[kind].base || "", sig: (ks[kind].token || ks[kind].key || "").slice(-6) };
-        changed = true;
-        useAccountKey(kind, ks[kind]);
-      } else if (held[kind]) { dropAccountKey(kind, held[kind]); delete held[kind]; changed = true; }
+        var rec = { url: ks[kind].url || ks[kind].base || "", sig: (ks[kind].token || ks[kind].key || "").slice(-6) };
+        // each pack carries the keys again: act only when the key or its address is new (a model or ticks changed on this TV stay)
+        var same = held[kind] && held[kind].sig === rec.sig && held[kind].url === rec.url;
+        // a Home Assistant token waits in the private store until the launcher has taken it (the page may restart first): see resumeAccountKeys
+        if (kind === "ha") rec.pending = ks[kind].token;
+        held[kind] = rec;
+        if (!same) { changed = true; useAccountKey(kind, ks[kind]); }
+      } else if (held[kind]) {
+        dropAccountKey(kind, held[kind]); changed = true;
+        // a Home Assistant drop waits in the record until the launcher has answered (the page may restart first): see resumeAccountKeys
+        if (kind === "ha") held[kind] = { url: held[kind].url, dropping: true }; else delete held[kind];
+      }
     });
     if (changed) keepKeys(held);
   }
-  function useAccountKey(kind, k) {
+  function useAccountKey(kind, k, tries) {
     try {
+      // the launcher's smart home bridge may not be there yet when the first pack is applied at start: look again a few times
+      if (kind === "ha" && !(window.smartHome && window.smartHome.setup && window.smartHome.setup.canFromAccount && window.smartHome.setup.canFromAccount())) {
+        if ((tries || 0) < 6) setTimeout(function () { useAccountKey(kind, k, (tries || 0) + 1); }, 1000);
+        return;
+      }
       // Ask AI: the key and where it goes (ask.js keeps them locked to that address); only over https
       if (kind === "ai" && typeof CouchAsk !== "undefined" && CouchAsk.save && (!k.base || /^https:\/\//i.test(k.base))) CouchAsk.save({ route: "own", provider: k.provider || "", base: k.base || undefined, model: k.model || undefined, key: k.key });
-      // Home Assistant: the launcher checks the address and token, then keeps them with the ticks the account's details name
-      else if (kind === "ha" && window.smartHome && window.smartHome.setup && window.smartHome.setup.can()) {
+      // Home Assistant: the launcher checks the address and token, then keeps them "from the account". Never over a set up made on this TV, and the
+      // ticks already kept stay (the account's picks are added, never swapped in).
+      else if (kind === "ha" && window.smartHome && window.smartHome.setup && window.smartHome.setup.canFromAccount && window.smartHome.setup.canFromAccount()) {
         var st = null; try { st = window.smartHome.setup.status(); } catch (e) {}
-        // a Home Assistant set up on this TV by hand is left alone
-        if (st && st.set && st.made_on_tv && hostOfUrl(k.url) !== (st.host || "").toLowerCase()) return;
+        if (st && st.set && !st.from_account) return;
         window.smartHome.setup.check(k.url || "", k.token).then(function (r) {
-          if (r && r.ok) window.smartHome.setup.save(haPicks(ACCOUNT && ACCOUNT.details));
+          if (r && r.ok) window.smartHome.setup.saveFromAccount(haPicks(ACCOUNT && ACCOUNT.details)).then(function () { haTaken(); });
+          else if (r && r.error === "token") haTaken();   // a token Home Assistant refuses is not tried again
         });
       }
     } catch (e) {}
   }
-  // the account took a key back: this TV forgets it, but only if what is kept here is still the account's (a key typed on the TV stays)
-  function dropAccountKey(kind, rec) {
+  function haTaken() { var h = keptKeys(); if (h.ha && h.ha.pending) { delete h.ha.pending; keepKeys(h); } }
+  // at start: a Home Assistant key the launcher has not taken yet (the page restarted before the check finished) is applied now
+  function resumeAccountKeys() {
+    var h = keptKeys();
+    if (h.ha && h.ha.pending) useAccountKey("ha", { url: h.ha.url, token: h.ha.pending });
+    else if (h.ha && h.ha.dropping) dropAccountKey("ha", h.ha);
+  }
+  function haDropDone() { var h = keptKeys(); if (h.ha && h.ha.dropping) { delete h.ha; keepKeys(h); } }
+  // the account took a key back: this TV forgets it, but only what came from the account (a key typed on the TV, or a Home Assistant set up on it, stays)
+  function dropAccountKey(kind, rec, tries) {
     try {
+      if (kind === "ha" && !(window.smartHome && window.smartHome.setup && window.smartHome.setup.canFromAccount && window.smartHome.setup.canFromAccount())) {
+        if ((tries || 0) < 6) setTimeout(function () { dropAccountKey(kind, rec, (tries || 0) + 1); }, 1000);
+        return;
+      }
       if (kind === "ai" && typeof CouchAsk !== "undefined" && CouchAsk.keyEnds && CouchAsk.forget) {
         // only the last 6 characters of the key are kept here, to know it is still the one the account gave
         if (rec && rec.sig && CouchAsk.keyEnds(rec.sig)) CouchAsk.forget();
-      } else if (kind === "ha" && window.smartHome && window.smartHome.setup && window.smartHome.setup.can()) {
+      } else if (kind === "ha" && window.smartHome && window.smartHome.setup && window.smartHome.setup.canFromAccount && window.smartHome.setup.canFromAccount()) {
         var st = window.smartHome.setup.status();
-        if (st && st.set && rec && rec.url && hostOfUrl(rec.url) === (st.host || "").toLowerCase()) window.smartHome.setup.forget();
+        if (st && st.set && st.from_account) window.smartHome.setup.forgetFromAccount().then(function () { haDropDone(); }); else haDropDone();
       }
     } catch (e) {}
   }
@@ -7016,7 +7042,7 @@
       if (zone === "settings") renderSettings();
     }
     makeitAnswered(a);
-    if (a.state === "unlinked") { inboxStop(); return; }   // the app forgot the link; a typed code still works
+    if (a.state === "unlinked") { dropAccountKeys(); inboxStop(); return; }   // the app forgot the link (this TV was removed or unlinked): the account's keys go too; a typed code still works
     if (a.state === "item") takeAccountDesign(a);
     if (!PAGE_PAUSED && !ACCT_INBOX.stopped) inboxArm();
   }
@@ -9498,6 +9524,7 @@
   function ahChanged() { if (typeof CouchDesign !== "undefined" && CouchDesign.dataChanged) CouchDesign.dataChanged("athome", Date.now()); }
   function ahRead(key) { try { var v = AH.io.get(key); return v ? JSON.parse(v) : null; } catch (e) { return null; } }
   function ahWrite(key, v) { try { AH.io.set(key, JSON.stringify(v)); } catch (e) {} }
+  resumeAccountKeys();
   // a home with no computer took its pack before At home was ready (takeAccountHome waits for it): take it now
   if ((OFFLINE || ALONE) && AH && typeof CouchDesignCode !== "undefined" && CouchDesignCode.takeHome && CouchDesignCode.takeHome(true))
     setTimeout(function () { if (takeAccountHome()) { try { restart(); } catch (e) {} } }, 0);

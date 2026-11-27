@@ -1205,7 +1205,7 @@ class MainActivity : Activity() {
         @JavascriptInterface
         fun fetchAccountPhoto(id: String, url: String) {
             if (!Regex("[0-9a-f]{24}").matches(id)) return
-            if (!Regex("https://[a-z0-9.-]+/storage/v1/object/sign/tvd-photos/[0-9a-f-]{36}/[0-9a-f]{24}\\.jpg\\?token=[A-Za-z0-9._-]+").matches(url)) return
+            if (!Regex("https://[a-z0-9-]{8,40}\\.supabase\\.co/storage/v1/object/sign/tvd-photos/[0-9a-f-]{36}/[0-9a-f]{24}\\.jpg\\?token=[A-Za-z0-9._-]+").matches(url)) return
             Thread {
                 var ok = false
                 val name = "acc_$id.jpg"

@@ -548,6 +548,10 @@
     check: function (url, token) { return setupAsk(function (id) { native().setupCheck(id, String(url || ""), String(token || "")); }); },
     save: function (picks) { return setupAsk(function (id) { native().setupSave(id, JSON.stringify(picks || {})); }).then(function (r) { if (r.ok) reload(); return r; }); },
     forget: function () { return setupAsk(function (id) { native().setupForget(id); }).then(function (r) { reload(); return r; }); },
+    // the account's own Home Assistant (Phase 2): only on a launcher that knows "from the account" (HaPage.kt). Never replaces a set up made here.
+    canFromAccount: function () { var n = native(); return !!(n && n.setupSaveFromAccount); },
+    saveFromAccount: function (picks) { return setupAsk(function (id) { native().setupSaveFromAccount(id, JSON.stringify(picks || {})); }).then(function (r) { if (r.ok) reload(); return r; }); },
+    forgetFromAccount: function () { return setupAsk(function (id) { native().setupForgetFromAccount(id); }).then(function (r) { reload(); return r; }); },
     // set up from a phone (HaPhone.kt): the launcher, or the on-TV app's server. A computer's bridge
     // does not serve the phone page, so there the TV keeps its own screens.
     canPhone: function () { var n = native(); return !!(n && n.phone) && (n !== BRIDGE || BRIDGE_PHONE); },

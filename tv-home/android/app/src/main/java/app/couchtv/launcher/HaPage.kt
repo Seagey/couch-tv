@@ -99,6 +99,37 @@ class HaPage(ctx: Context, private val web: WebView) {
         }
     }
 
+    /**
+     * The account's own Home Assistant (Phase 2): the address and token checked last, kept as "from the account", and only when nothing is
+     * set up here or what is set up came from the account. The ticks already kept stay (HomeAssistant.keepFromAccount).
+     */
+    @JavascriptInterface
+    fun setupSaveFromAccount(id: String, picks: String) {
+        if (!ids.matches(id)) return
+        main.post {
+            if (!trusted(web.url)) { setupReply(id, JSONObject().put("ok", false).put("error", "refused")); return@post }
+            io.execute {
+                val p = pending
+                val ok = try { p != null && HomeAssistant.keepFromAccount(app, JSONObject(picks), p.first, p.second) } catch (e: Exception) { false }
+                main.post { setupReply(id, JSONObject().put("ok", ok).apply { if (!ok) put("error", if (p == null) "check" else "own") }) }
+            }
+        }
+    }
+
+    /** Forget a Home Assistant that came from the account; a set up made on this TV stays. */
+    @JavascriptInterface
+    fun setupForgetFromAccount(id: String) {
+        if (!ids.matches(id)) return
+        main.post {
+            if (!trusted(web.url)) { setupReply(id, JSONObject().put("ok", false).put("error", "refused")); return@post }
+            io.execute {
+                val mine = HomeAssistant.status(app).optBoolean("from_account", false)
+                if (mine) { pending = null; HomeAssistant.disconnect(app) }
+                main.post { setupReply(id, JSONObject().put("ok", mine)) }
+            }
+        }
+    }
+
     @JavascriptInterface
     fun setupForget(id: String) {
         if (!ids.matches(id)) return

@@ -410,7 +410,13 @@
   // ?hasetup=1: a launcher with nothing set up yet, for Home settings, Smart home (HomeAssistant.kt
   // setupCheck, setupSave, setupForget). The token "test-token-for-the-preview-only" is the right one.
   if (arg("hasetup")) {
-    var kept = null, sreply = function (id, r) { setTimeout(function () { if (window.smartHome) window.smartHome.setupReply(id, r); }, 120); };
+    var kept = null, fromAcct = false, haStats = { saves: 0, forgotten: 0 };
+    // the pretend launcher keeps its state in page storage, so a restart of the page keeps it (tests: ?haown=1 starts with a set up made by hand)
+    try { var hs = JSON.parse(localStorage.getItem("mock:ha.state") || "null"); if (hs) { kept = hs.kept; fromAcct = !!hs.fromAcct; haStats = hs.stats || haStats; } } catch (e) {}
+    if (arg("haown") && !kept) { kept = { scenes: [{ entity: "scene.movie_night", name: "Movie night" }] }; fromAcct = false; }
+    var persist = function () { try { localStorage.setItem("mock:ha.state", JSON.stringify({ kept: kept, fromAcct: fromAcct, stats: haStats })); } catch (e) {} window.MOCK_HA_STATS = haStats; };
+    persist();
+    var sreply = function (id, r) { setTimeout(function () { if (window.smartHome) window.smartHome.setupReply(id, r); }, 120); };
     var ENTS = [{ entity: "climate.lounge", name: "Lounge aircon" }, { entity: "scene.movie_night", name: "Movie night" },
       { entity: "light.lounge", name: "Lounge lamp" }, { entity: "cover.blinds", name: "Blinds" }, { entity: "camera.front", name: "Front door" },
       { entity: "sensor.pool", name: "Pool", unit: "°C", cls: "temperature" }, { entity: "sensor.solar_today", name: "Solar today", unit: "kWh", cls: "energy" },
@@ -422,15 +428,25 @@
         return JSON.stringify({ climate: nm(kept.climate), scenes: nm(kept.scenes), controls: nm(kept.controls), cameras: nm(kept.cameras), sensors: nm(kept.sensors), speakers: nm(kept.speakers), energy: !!kept.energy, doorbell: !!kept.doorbell });
       },
       request: function (id) { setTimeout(function () { if (window.smartHome) window.smartHome.reply(id, { ok: false, error: "failed" }); }, 100); },
-      setupStatus: function () { return JSON.stringify(kept ? { set: true, host: "homeassistant.local", made_on_tv: true } : { set: false }); },
+      setupStatus: function () { return JSON.stringify(kept ? { set: true, host: "homeassistant.local", made_on_tv: !fromAcct, from_account: fromAcct } : { set: false }); },
       setupCheck: function (id, url, token) {
         if (!/^https?:\/\/[a-z0-9.-]+(:\d+)?\/?$/i.test(url)) return sreply(id, { ok: false, error: "address" });
         if (token !== "test-token-for-the-preview-only" && !(token === "" && kept)) return sreply(id, { ok: false, error: "token" });
         sreply(id, { ok: true, entities: ENTS });
       },
-      setupSave: function (id, picks) { kept = JSON.parse(picks); window.MOCK_HA_SAVED = kept; sreply(id, { ok: true }); },
-      setupForget: function (id) { kept = null; sreply(id, { ok: true }); }
+      setupSave: function (id, picks) { kept = JSON.parse(picks); fromAcct = false; window.MOCK_HA_SAVED = kept; persist(); sreply(id, { ok: true }); },
+      setupForget: function (id) { kept = null; fromAcct = false; persist(); sreply(id, { ok: true }); },
+      // the account's own (HaPage.kt setupSaveFromAccount): only when nothing is set up or it came from the account; the ticks kept stay
+      setupSaveFromAccount: function (id, picks) {
+        if (kept && !fromAcct) return sreply(id, { ok: false, error: "own" });
+        var add = JSON.parse(picks), old = kept || {};
+        Object.keys(add).forEach(function (g) { var have = (old[g] || []).map(function (x) { return x.entity; }); old[g] = (old[g] || []).concat((add[g] || []).filter(function (x) { return have.indexOf(x.entity) < 0; })); });
+        kept = old; fromAcct = true; window.MOCK_HA_SAVED = kept; haStats.saves++; persist(); sreply(id, { ok: true });
+      },
+      setupForgetFromAccount: function (id) { if (kept && fromAcct) { kept = null; fromAcct = false; haStats.forgotten++; persist(); return sreply(id, { ok: true }); } sreply(id, { ok: false }); }
     };
+    // test helper: a set up made on this TV itself (by hand), with these ticks
+    window.MOCK_HA_OWN = function (ticks) { kept = ticks || {}; fromAcct = false; };
     // ?hasetup=phone: the launcher with its phone set up (HaPage.kt phone(), HaPhone.kt): the QR address,
     // and MOCK_HA_PHONE_SIGN_IN() plays a phone that signed in and saved the lamp
     if (arg("hasetup") === "phone") {
