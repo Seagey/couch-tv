@@ -1672,7 +1672,8 @@
   }
   function pollRooms(objs) {
     var want = objs.some(function (o) { o = obj(o); return (o.type === "smart" && o.kind === "aircon") || (o.type === "group" && list(o.controls).some(function (c) { return obj(c).kind === "aircon"; })) ||
-      (o.type === "widget" && [o].concat(list(o.items)).some(function (it) { return obj(it).kind === "aircon"; })); });
+      // a pool widget whose heater is a thermostat reads the rooms too (lane C)
+      (o.type === "widget" && [o].concat(list(o.items)).some(function (it) { it = obj(it); return it.kind === "aircon" || (it.kind === "pool" && /^climate\./.test(String(obj(it.opts).heater || ""))); })); });
     if (!want || !window.smartHome || !window.smartHome.climate || !window.smartHome.available()) return;
     if (Date.now() - LIVE.asked < 60000) return;
     LIVE.asked = Date.now();
@@ -2678,6 +2679,9 @@
       return { designer: DESIGNER,
         act: function (what, arg) { if (DESIGNER) { try { window.parent.postMessage({ type: "couchtv:open", name: String(arg || what) }, location.origin); } catch (x) {} return; } if (hooks.act) hooks.act(what, arg); },
         ha: hooks.ha && !DESIGNER ? function (a, e, v) { return hooks.ha(a, e, v); } : null,
+        // the Speakers layer's AirPlay group and the Pool layer's Connect 10 switches (lane C, app.js hooks)
+        airplay: hooks.airplay && !DESIGNER ? function (a, b) { return hooks.airplay(a, b); } : null,
+        pool: hooks.pool && !DESIGNER ? function (k, d, v) { return hooks.pool(k, d, v); } : null,
         // Hold OK on an app inside a folder's full screen layer: the same menu as on the widget, for that app
         hold: DESIGNER ? null : function (slot) { FORCE_SLOT = slot; holdMenu(); FORCE_SLOT = null; },
         // a widget's setup layer: the phone page's code at its step, and "No phone? Set it up here"

@@ -421,9 +421,10 @@
   function poll() {
     if (!enabled() || document.hidden) return;
     var i = info();
-    if (i.controls.length && shown("controls") && due("controls", EVERY.controls))
+    // the pool widget (lane C) reads both: its pump, heater and lights are switches, its water and chlorinator sensors
+    if (i.controls.length && (shown("controls") || shown("pool")) && due("controls", EVERY.controls))
       read("controls", "controls", "", function (r) { LIVE.controls = r.ok ? r.controls || [] : (LIVE.controls || []).map(function (c) { return { entity: c.entity, name: c.name, ok: false }; }); changed("controls", LIVE.controls); });
-    if (i.sensors.length && shown("sensor") && due("sensors", EVERY.sensors))
+    if (i.sensors.length && (shown("sensor") || shown("pool")) && due("sensors", EVERY.sensors))
       read("sensors", "sensors", "", function (r) { if (r.ok) { LIVE.sensors = r.sensors || []; changed("sensors", LIVE.sensors); } else if (!LIVE.sensors) { LIVE.sensors = []; LIVE.down = true; changed("sensors", "down"); } });
     // each sensor a widget shows (data-ha-hist, set by widgets.js): its last 24 hours
     var want = {};

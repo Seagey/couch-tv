@@ -2439,7 +2439,7 @@
     if (heatC) part("heater", "heat", "Heater", heatC);
     else if (heatR) { var hon = roomOn(heatR); out.parts.push({ key: "heater", icon: "heat", name: "Heater", on: hon, word: heatR.ok === false ? "Not answering" : hon ? "On" : "Off", entity: heatR.entity, kind: "climate" }); if (hon && heatR.target != null) { out.target = tconv(heatR.target, heatR, env); out.heating = true; } }
     part("light", "light", "Lights", light);
-    if (chlor && chlor.ok !== false) { var t = sensorText(chlor, env); out.chlor = { name: chlor.name || "Chlorinator", text: t[0] + (t[1] ? " " + t[1] : "") }; }
+    if (chlor && chlor.ok !== false) { var t = sensorText(chlor, env); out.chlor = { name: "Chlorinator", text: t[0] + (t[1] ? " " + t[1] : "") }; }
     if (out.temp == null && !out.parts.length && !out.chlor) return { none: true };
     return out;
   }
@@ -2479,7 +2479,10 @@
     var deg = poolDeg(p.temp, p.unit), pump = p.parts.filter(function (x) { return x.key === "pump"; })[0];
     if (b.w < 300 || (b.h < 300 && b.w < 560)) {
       // a tile: the water, and the pump
-      add(root, [fitLab(root, "pool", title, W), E("div", "cw-grow"), fitNum(root, deg, W, b.h < 300 ? 72 : 96), pump ? E("div", "cw-row", "flex:none;max-width:100%", [fitWords(root, pump.name, W * 0.6, 24, 1, 560, "color:var(--sub)"), fitWords(root, pump.word, W * 0.38, 24, 1, 650, "margin-left:10px")]) : null]);
+      // a tile: the water, and one more thing under it: the pump, else the lights, else the heater (its icon and state), else the chlorinator
+      var one = pump || p.parts[0], line = one ? [ic(one.icon, 26, "currentColor"), fitWords(root, one.word, W - 36, 24, 1, 650, "margin-left:10px")]
+        : p.chlor ? [ic("humidity", 26, "currentColor"), fitWords(root, p.chlor.text, W - 36, 24, 1, 650, "margin-left:10px")] : null;
+      add(root, [fitLab(root, "pool", title, W), E("div", "cw-grow"), fitNum(root, deg, W, b.h < 300 ? 72 : 96), line ? E("div", "cw-row", "flex:none;max-width:100%;color:var(--sub);margin-top:6px", line) : null]);
     } else if (b.h < 300) {
       // a wide strip: the water on the left, each part as a chip on the right (those that fit, never cut)
       var leftW = Math.min(W * 0.42, 340), room = W - leftW, chips = [];
@@ -2499,11 +2502,14 @@
       var sub1 = side > 120 ? fitWords(root, p.spa ? "Spa" : "Water", side, 29, 1, 650) : null, sub2 = side > 120 && p.heating && p.target != null ? fitWords(root, tl("Heating to {temp}", { temp: Math.round(p.target) + "°" }), side, 24, 1, 560, "color:var(--sub)") : null;
       var top = E("div", "cw-row", "flex:none;width:100%;margin-top:14px;align-items:flex-end;" + justify(al), [fitNum(root, deg, W, bigPx), sub1 || sub2 ? E("div", "cw-col", "margin:0 0 " + px(bigPx * 0.09) + " 22px;min-width:0;align-items:flex-start", [sub1, sub2]) : null]);
       var n = p.parts.length, gap = 20, mw = n ? Math.floor((W - gap * (n - 1)) / n) : 0, mh = clamp(Math.floor(H * 0.32), 110, 200);
-      var spare = H - 46 - 14 - bigPx * 0.92 - (p.chlor ? 50 : 0) - 20;
+      var spare = H - 46 - 14 - bigPx * 0.92 - (p.chlor ? 50 : 0) - 24;
       if (mh > spare) mh = Math.max(0, Math.floor(spare));
-      var mods = n && mh >= 100 && mw >= 120 ? E("div", "cw-row", "flex:none;width:100%;justify-content:space-between", p.parts.map(function (x) { return poolMod(root, x, mw, mh); })) : null;
+      var mods = n && mh >= 100 && mw >= 100 ? E("div", "cw-row", "flex:none;width:100%;justify-content:space-between", p.parts.map(function (x) { return poolMod(root, x, mw, mh); })) : null;
       var foot = p.chlor ? E("div", "cw-row", "flex:none;width:100%;margin-top:14px;justify-content:space-between", [fitWords(root, p.chlor.name, W * 0.45, 24, 1, 560, "color:var(--sub)"), fitWords(root, p.chlor.text, W * 0.53, 25, 1, 650)]) : null;
-      add(root, [fitLab(root, "pool", title, W), top, E("div", "cw-grow"), mods, foot]);
+      // the label, the water, the parts and the chlorinator as one group in the middle of the box
+      root.style.justifyContent = "center";
+      if (mods) mods.style.marginTop = "24px";
+      add(root, [fitLab(root, "pool", title, W), top, mods, foot]);
     }
     stop(root, "detail", "pool", title);
   };

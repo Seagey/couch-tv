@@ -571,6 +571,21 @@
           var daily = [0, 1, 2, 3, 4, 5, 6].map(function (i) { var d = new Date(nw.getTime() + i * 86400000); return { date: iso(d), code: [c0, 95, 61, 2, 0, 0, 3][i], hi: t0 + [3, 1, -2, 0, 2, 4, 2][i], lo: t0 - [7, 6, 7, 8, 9, 7, 6][i], sunrise: iso(d) + "T04:41", sunset: iso(d) + "T18:22", uv: 11 }; });
           return resolve({ ok: true, temp: t0, code: c0, text: "", is_day: true, hourly: hourly, daily: daily, hi: daily[0].hi, lo: daily[0].lo, uv: 11, rain15: [0, 0, 0.1, 0.4, 1.2, 2.8, 3, 1, 0.4, 0, 0, 0] });
         }
+        // AirPlay speakers (?airplay=1: a pretend Mac with three speakers, the same as the bridge's FAKE_AIRPLAY; none: no AirPlay here)
+        if (path.indexOf("/api/airplay") === 0) {
+          if (!arg("airplay")) return resolve({ ok: true, airplay: { available: false, reason: "off" } });
+          var AP = window.__mockAirplay || (window.__mockAirplay = { available: true, name: "Whole House", active: false, playing: false, spotify: false, selected: [], groups: [{ name: "Downstairs", speakers: ["Lounge", "Kitchen"] }],
+            speakers: [{ name: "Lounge", available: true, selected: false, volume: 40 }, { name: "Kitchen", available: true, selected: false, volume: 30 }, { name: "Deck", available: false, selected: false, volume: 55 }] });
+          var apPath = path.split("?")[0];
+          if (apPath === "/api/airplay/play") {
+            var want = (body && body.speakers) || [], got = AP.speakers.filter(function (x) { return x.available && want.indexOf(x.name) >= 0; });
+            if (!got.length) return resolve({ ok: true, result: { ok: false, error: "speakers" }, airplay: AP });
+            AP.selected = got.map(function (x) { return x.name; }); AP.active = AP.playing = true;
+            AP.speakers.forEach(function (x) { x.selected = AP.selected.indexOf(x.name) >= 0; });
+          } else if (apPath === "/api/airplay/stop") { AP.active = AP.playing = false; AP.speakers.forEach(function (x) { x.selected = false; }); }
+          else if (apPath === "/api/airplay/volume") { AP.speakers.forEach(function (x) { if (body && x.name === body.name) x.volume = Math.max(0, Math.min(100, body.value | 0)); }); }
+          return resolve({ ok: true, result: { ok: true }, airplay: JSON.parse(JSON.stringify(AP)) });
+        }
         // Up next (?queue=1: three made up songs; ?queue=empty: connected, nothing queued; none: Spotify not connected)
         if (path.indexOf("/api/music/queue") === 0) return resolve({ ok: true, configured: !!arg("queue"), queue: arg("queue") === "empty" ? [] : arg("queue") ? SONGS.map(function (x) { return { title: x[0], artist: x[1], art: null }; }) : null });
         if (path.indexOf("/api/music") === 0) return resolve({ ok: true, music: arg("music") ? mockSong() : null });

@@ -895,7 +895,7 @@
         var inG = (ap.selected || []).slice(), avail = ap.speakers.filter(function (x) { return x.available !== false; }).map(function (x) { return x.name; });
         body.appendChild(E("div", "cwd-row", "margin-bottom:22px;padding:18px 26px;border-radius:30px;background:" + (ap.active ? "#fff;color:#18171c" : "rgba(255,255,255,.08)"), [
           E("div", "cwd-sic", "margin-right:20px", [ic("airplay", 44, ap.active ? "#18171c" : "#fff", "solid")]),
-          E("div", "cwd-col cwd-grow", "min-width:0", [E("div", "cwd-mid cwd-ell", "", [ap.name || "Whole House"]), E("div", "cwd-small cwd-ell", "", [inG.length ? inG.join(", ") : "Pick speakers below"])]),
+          E("div", "cwd-col cwd-grow", "min-width:0", [E("div", "cwd-mid cwd-ell", "", [ap.name || "Whole House"]), E("div", "cwd-small cwd-ell", ap.active ? "color:rgba(24,23,28,.62)" : "", [inG.length ? inG.join(", ") : "Pick speakers below"])]),
           F(btn(ap.active ? "pause" : "play", ap.active ? "Stop" : "Play together", "cwd-sm"), function () {
             if (ap.active) apSend("stop", {}, "Letting the speakers go");
             else apSend("play", { speakers: inG.length ? inG : avail }, tl("Playing on {n} speakers", { n: (inG.length ? inG : avail).length }));
