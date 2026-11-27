@@ -129,7 +129,7 @@ async function tvPage(d, q) {
 }
 async function closeSettings(page) { for (let k = 0; k < 6 && await page.evaluate(() => document.getElementById("settings").classList.contains("on")); k++) await press(page, "Escape", 250); await page.waitForTimeout(900); await page.waitForFunction(() => window.tv && document.getElementById("settings")); }
 async function openSettings(page) { await page.evaluate(() => window.tv.settingsKey()); await page.waitForTimeout(250); await press(page, "Enter", 500); }
-const secs = (page) => page.evaluate(() => { window.tv.settingsMore(); return [...document.querySelectorAll("#set-secs .ssec")].map((e) => e.textContent.trim()); });
+const secs = (page) => page.evaluate(() => { window.tv.settingsMore(); return [...document.querySelectorAll("#set-secs .ssec")].map((e) => e.textContent.replace(/\s*▾\s*$/, "").replace(/\(Updates, help, reset\)$/, "").trim()); });
 const rowsText = (page) => page.evaluate(() => [...document.querySelectorAll("#set-rows .srow")].map((e) => e.textContent.trim()));
 async function goSec(page, name) {
   const list = await secs(page), i = list.indexOf(name);
