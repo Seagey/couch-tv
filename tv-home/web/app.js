@@ -6428,9 +6428,9 @@
   // ---- rows ----
   // Couch TV Studio is a name, the same in every language
   function secName(id) {
-    var n = { phone: "Set up from your phone", picture: "Picture and sound", remote: "Remote and buttons",
-      thistv: "This TV", more: "More", about: "Help and reset" };
-    return id === "designer" ? "Designs" : n[id] || t("sec_" + id);
+    // the new left list (28 Nov 2026: in every language the TV speaks); about is now Help and reset
+    var n = { about: "sec_help" };
+    return id === "designer" ? "Designs" : t(n[id] || "sec_" + id);
   }
   function rowsNow() { return SET.sub ? SET.sub.rows() : sectionRows(secsNow()[SET.sec][0]); }
   function focusable(r) { return !!r && r.kind !== "head" && r.kind !== "info" && r.kind !== "code" && r.kind !== "qr"; }
@@ -8904,7 +8904,7 @@
     if (!SET.more && secsNow()[SET.sec] && secsNow()[SET.sec][0] === "more") SET.more = true;
     $("set-secs").innerHTML = secsNow().map(function (sc, i) {
       var cls = "ssec" + (i === SET.sec ? (SET.col === "secs" ? " focus" : " on") : "");
-      if (sc[0] === "more") return '<div class="' + cls + ' more"><span>' + esc(secName("more")) + " \u25BE" + (SET.more ? "" : "<small>(Updates, help, reset)</small>") + "</span></div>";
+      if (sc[0] === "more") return '<div class="' + cls + ' more"><span>' + esc(secName("more")) + " \u25BE" + (SET.more ? "" : "<small>" + esc(t("set_more_hint")) + "</small>") + "</span></div>";
       return '<div class="' + cls + '"><i>' + ICONS[sc[1]] + "</i><span>" + esc(secName(sc[0])) + "</span></div>";
     }).join("");
     var curSecEl = $("set-secs").querySelector(".ssec.focus, .ssec.on");
