@@ -8693,6 +8693,7 @@
     if (!SET.more && secsNow()[SET.sec] && secsNow()[SET.sec][0] === "more") SET.more = true;
     $("set-secs").innerHTML = secsNow().map(function (sc, i) {
       var cls = "ssec" + (i === SET.sec ? (SET.col === "secs" ? " focus" : " on") : "");
+      if (sc[0] === "more") return '<div class="' + cls + ' more"><span>' + esc(secName("more")) + " \u25BE" + (SET.more ? "" : "<small>(Updates, help, reset)</small>") + "</span></div>";
       return '<div class="' + cls + '"><i>' + ICONS[sc[1]] + "</i><span>" + esc(secName(sc[0])) + "</span></div>";
     }).join("");
     var curSecEl = $("set-secs").querySelector(".ssec.focus, .ssec.on");

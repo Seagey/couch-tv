@@ -114,28 +114,33 @@ async function settingsOpen(q) {
 {
   const page = await settingsOpen("&ontv=1&update=1");
   ok(await page.evaluate(() => document.getElementById("settings").classList.contains("on")), "Home settings is open");
-  ok(await page.evaluate(() => document.getElementById("set-phone").classList.contains("on")), "on the on-TV app, Home settings shows Change this on your phone");
-  ok(/Change this on your phone/.test(await page.evaluate(() => document.getElementById("set-phone").textContent)), "in plain words");
+  ok(await page.evaluate(() => document.getElementById("set-phone").classList.contains("on")), "on the on-TV app, Home settings shows the Use your phone card");
+  ok(/Use your phone/.test(await page.evaluate(() => document.getElementById("set-phone").textContent)), "in plain words");
   ok(await page.evaluate(() => !!document.querySelector("#set-phone-qr svg")), "with a QR");
   ok(await page.evaluate(() => document.getElementById("set-phone-pc").textContent) === "Or on a computer: tv.example:5400/setup, code 482 913",
     "and, for a computer, the plain address and the code to type: " + await page.evaluate(() => document.getElementById("set-phone-pc").textContent));
   if (jsQR) {
-    // decode from the QR's own modules: draw the svg on a canvas in the page and read its pixels
-    const pix = await page.evaluate(async () => {
-      const svg = document.querySelector("#set-phone-qr svg"), xml = new XMLSerializer().serializeToString(svg);
-      const img = new Image(); img.src = "data:image/svg+xml;base64," + btoa(xml); await img.decode();
-      const c = document.createElement("canvas"); c.width = c.height = 400; const g = c.getContext("2d"); g.imageSmoothingEnabled = false; g.drawImage(img, 0, 0, 400, 400);
-      return Array.from(g.getImageData(0, 0, 400, 400).data);
-    });
-    const code = jsQR(Uint8ClampedArray.from(pix), 400, 400);
-    ok(code && code.data === "http://tv.example:5400/setup#pin=482913", "the QR reads back as the TV's /setup with the pairing code: " + (code && code.data));
+    // decode what is on screen, the Couch TV logo in the middle included: a picture of the QR's own box, read in the page
+    const shot = await page.locator("#set-phone-qr").screenshot();
+    const pix = await page.evaluate(async (b64) => {
+      const img = new Image(); img.src = "data:image/png;base64," + b64; await img.decode();
+      const K = 4, P = 48, W = img.width * K + 2 * P, H = img.height * K + 2 * P;   // 4 times up, the white card round the code is its quiet zone
+      const c = document.createElement("canvas"); c.width = W; c.height = H; const g = c.getContext("2d"); g.fillStyle = "#fff"; g.fillRect(0, 0, W, H); g.imageSmoothingEnabled = false; g.drawImage(img, P, P, img.width * K, img.height * K);
+      return { w: W, h: H, d: Array.from(g.getImageData(0, 0, W, H).data) };
+    }, shot.toString("base64"));
+    ok(await page.evaluate(() => !!document.querySelector("#set-phone-qr .set-phone-logo")), "the Couch TV logo is in the middle of the QR");
+    if (SHOTS) fs.writeFileSync(path.join(SHOTS, "qr-crop.png"), shot);
+    const code = jsQR(Uint8ClampedArray.from(pix.d), pix.w, pix.h);
+    console.log("QR decode from the screen (logo in): " + (code && code.data));
+    ok(code && code.data === "http://tv.example:5400/setup#pin=482913", "the QR, with the logo in the middle, reads back as the TV's /setup with the pairing code: " + (code && code.data));
   } else console.log("  (jsQR not found: the QR's words were not read back)");
-  ok(/Language/.test(await page.evaluate(() => (document.querySelector(".ssec.focus") || {}).textContent || "")), "the focus starts on the first section, as before (the QR takes no press)");
+  if (SHOTS) await page.screenshot({ path: path.join(SHOTS, "3-tvsettings-built.png") });
+  ok(/Set up from your phone/.test(await page.evaluate(() => (document.querySelector(".ssec.focus") || {}).textContent || "")), "the focus starts on the first section, as before (the QR takes no press)");
   await press(page, "ArrowDown");
-  ok(/Location/.test(await page.evaluate(() => (document.querySelector(".ssec.focus") || {}).textContent || "")), "one Down is the next section");
+  ok(/Picture and sound/.test(await page.evaluate(() => (document.querySelector(".ssec.focus") || {}).textContent || "")), "one Down is the next section");
   const fit = await page.evaluate(() => { const a = Array.from(document.querySelectorAll(".ssec")); const last = a[a.length - 1].getBoundingClientRect(); return { n: a.length, bottom: last.bottom, h: innerHeight }; });
   ok(fit.bottom <= fit.h, "every section, Updates too, still fits on screen with the QR (" + fit.n + " sections, last ends at " + Math.round(fit.bottom) + " of " + fit.h + ")");
-  if (SHOTS) await page.screenshot({ path: path.join(SHOTS, "home-settings-qr.png") });
+  if (SHOTS) { await page.screenshot({ path: path.join(SHOTS, "home-settings-qr.png") }); }
   ok(!page.errors.length, "no page errors: " + page.errors.join("; "));
   await page.close();
 }
@@ -146,7 +151,7 @@ for (const lang of ["en", "es", "es-MX", "it", "de", "tr", "fr", "nl", "sr-Latn-
     const a = Array.from(document.querySelectorAll(".ssec")), last = a[a.length - 1].getBoundingClientRect(), pc = document.getElementById("set-phone-pc");
     return { n: a.length, bottom: last.bottom, h: innerHeight, pc: pc.textContent, raw: /\{(addr|code)\}|set_phone/.test(document.getElementById("set-phone").textContent) };
   });
-  ok(f.n === 10 && f.bottom <= f.h, lang + ": all ten sections fit under the QR (last ends at " + Math.round(f.bottom) + " of " + f.h + ")");
+  ok(f.n === 5 && f.bottom <= f.h, lang + ": all five sections fit beside the QR (last ends at " + Math.round(f.bottom) + " of " + f.h + ")");
   ok(/tv\.example:5400\/setup/.test(f.pc) && /482 913/.test(f.pc) && !f.raw, lang + ": the computer line has the address and the code, no untranslated words");
   if (SHOTS && (lang === "de" || lang === "ar")) await page.screenshot({ path: path.join(SHOTS, "home-settings-qr-" + lang + ".png") });
   await page.close();
