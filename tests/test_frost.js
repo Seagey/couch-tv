@@ -56,6 +56,7 @@ assert.strictEqual(load(['theme-night', 'cd', 'settled']).F.allowed(), true, 'Co
 assert.strictEqual(F.edgeMode("Mozilla/5.0 (Linux; Android 12; wv) AppleWebKit/537.36 Version/4.0 Chrome/91.0.4472.114 Mobile Safari/537.36"), "clamp", "WebView 91 (the low end emulator) repeats the edge");
 assert.strictEqual(F.edgeMode("Chrome/128.0.0.0"), "clamp");
 assert.strictEqual(F.edgeMode("Chrome/129.0.0.0"), "mirror");
+assert.strictEqual(F.edgeMode("Mozilla/5.0 HeadlessChrome/131.0.0.0 Safari/537.36"), "mirror", "headless Chrome in the tests");
 assert.strictEqual(F.edgeMode("Mozilla/5.0 (Web0S; Linux/SmartTV) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/87.0.4280.88 Safari/537.36 WebAppManager"), "clamp", "webOS");
 assert.strictEqual(F.edgeMode("Mozilla/5.0 (Macintosh) AppleWebKit/605.1.15 Version/17.0 Safari/605.1.15"), null);
 assert.strictEqual(load(["theme-night"], "Mozilla/5.0 Safari/605.1.15").F.allowed(), false, "no Chrome version: the live blur");

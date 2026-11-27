@@ -14,7 +14,11 @@
 (function () {
   "use strict";
   var root = document.documentElement;
-  var PANELS = "#grid, #shelf .ncard";
+  // The dock only, for now. The Keep watching cards are drawn the same way when window.COUCHTV_FROST_CARDS is true (a
+  // test switch): on an Android TV 12 emulator (WebView 91) that takes the focus moving along the dock from 46 to 55
+  // frames a second, but the small app logo on each card is then resampled a little differently (its thin strokes
+  // alias another way), so it waits for the owner's yes (coord/mockups-1128/L). The glass itself matches.
+  var PANELS = window.COUCHTV_FROST_CARDS === true ? "#grid, #shelf .ncard" : "#grid";
   var gen = 0, timer = 0, drawn = [], fading = false, panels = 0;
 
   // Off where the live blur must stay: not the Night look, or something under the glass moves or is not drawn here
@@ -91,7 +95,7 @@
   // picture (the CSS spec, blink-dev "Update CSS backdrop-filter to use mirror edgeMode"); older ones repeat the edge
   // pixels. Anything else (no Chrome version to read): null, the live blur stays.
   function edgeMode(ua) {
-    var m = /\b(?:Chrome|Chromium)\/(\d+)/.exec(ua || "");
+    var m = /Chrom(?:e|ium)\/(\d+)/.exec(ua || "");   // also HeadlessChrome
     return m ? (+m[1] >= 129 ? "mirror" : "clamp") : null;
   }
   var EDGE = edgeMode(navigator.userAgent);
