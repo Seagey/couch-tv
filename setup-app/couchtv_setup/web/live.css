@@ -1,0 +1,14 @@
+/* The finish screen's Ask AI, own AI, apps and Live sheets (live.js, lane D 28 Nov 2026) */
+section.live select { display: block; width: 100%; height: 56px; margin-top: 8px; border: 0; border-radius: 14px; padding: 0 16px; font: 600 18px/1 var(--body); background: #F3F0EA; color: var(--ink); }
+section.live .money { margin: 18px 0; }
+section.live .lines { background: #F3F0EA; border-radius: 14px; padding: 14px 16px; margin: 0; font: 600 14px/1.5 ui-monospace, Menlo, monospace; white-space: pre-wrap; word-break: break-all; }
+section.live .lines + .actions { margin-top: 12px; }
+section.live .applist { columns: 3; column-gap: 26px; padding: 0; list-style: none; margin: 14px 0; }
+section.live .applist li { break-inside: avoid; display: flex; gap: 10px; align-items: center; margin: 0 0 10px; font-weight: 600; }
+section.live .applist i { width: 28px; height: 28px; border-radius: 8px; flex: none; display: inline-grid; place-items: center; font: 800 12px/1 var(--body); color: #fff; font-style: normal; background: var(--ink2); }
+section.live .live-rows { margin: 16px 0; }
+section.live .live-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 14px 0; border-top: 1px solid rgba(20,19,26,.12); }
+section.live .live-row:last-child { border-bottom: 1px solid rgba(20,19,26,.12); }
+section.live .live-row h3 { font-size: 19px; }
+section.live .live-row p { margin: 2px 0 0; color: var(--ink3); font-size: 15px; }
+@media (max-width: 700px) { section.live .applist { columns: 2; } section.live .live-row { align-items: flex-start; flex-direction: column; } }

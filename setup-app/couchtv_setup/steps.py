@@ -711,7 +711,8 @@ def undo(tv, progress=lambda f, msg=None: None):
             tv.shell(f"pm enable {p}")
     done.append("switched back on")
     tv.shell(f"appops set {HOME_PKG} SYSTEM_ALERT_WINDOW default; appops set {HOME_PKG} WRITE_SETTINGS default; "
-             f"pm revoke {HOME_PKG} android.permission.WRITE_SECURE_SETTINGS")
+             f"pm revoke {HOME_PKG} android.permission.WRITE_SECURE_SETTINGS; "
+             f"cmd notification disallow_listener {HOME_PKG}/{HOME_PKG}.SpotifySessionAccess")
     progress(0.3, "Switching off the Home button watch")
     cur = tv.shell("settings get secure enabled_accessibility_services").strip()
     parts = [s for s in cur.split(":") if s and s != "null"]

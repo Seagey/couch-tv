@@ -631,21 +631,6 @@
     }
    ]
   },
-  "queue": {
-   "name": "Up next queue",
-   "settings": [
-    {
-     "key": "label",
-     "label": "Heading",
-     "type": "text"
-    },
-    {
-     "key": "count",
-     "label": "How many songs",
-     "type": "choice"
-    }
-   ]
-  },
   "speakers": {
    "name": "Speakers",
    "settings": [

@@ -122,7 +122,7 @@
     // the Couch TV home app alone reads Android's own Continue watching list (MainActivity.kt readWatchNext,
     // app.js refreshNow when there is no computer), the same for everyone; the on-TV app or a home computer
     // keeps each person's own
-    android: ["Nothing more to set up: Couch TV's home shows the shows Android keeps under Continue watching. If the TV asks, allow it once.", "For each person's own list, add the Couch TV app on this TV or a home computer that stays on.", "Start a show, then come back to the home: the show is waiting here."],
+    android: ["Nothing more to set up: Couch TV's home shows the shows Android keeps under Continue watching.", OPEN, "Make Show Keep watching On, if it is Off.", "Start a show in Netflix, YouTube or most apps, then come back to the home: the show is waiting here."],
     web: ["Keep the home computer on: it runs Couch TV for this TV.", "Start a show from Couch TV's home (Netflix, YouTube and some others).", "Come back to the home: the show is waiting here."],
     vidaa: ["Needs a home computer that stays on, running Couch TV. The website home cannot do this.", "Start a show from Couch TV's home.", "Come back to the home: the show is waiting here."]
   };
@@ -164,13 +164,12 @@
   var TOWN_NEED = "Your town, set on the TV";
   var PHOTOS_NEED = "Your photos on the TV, or one photo put in the widget";
   var WATCH_NEED = "The Couch TV app on this TV or a home computer that stays on";
+  // Now playing with no computer: the TV lets Couch TV see its media sessions, switched on once from Couch TV Setup (lane D, 28 Nov 2026)
+  var MUSIC_NEED = "Now playing switched on from Couch TV Setup on your computer";
   var HA_NEED = "Home Assistant (a smart home app) running at home";
   // the smart home widgets (group C): set up on the TV (Home settings, Designs, Smart home)
   function haSteps(what) { return shSteps(what, [].slice.call(arguments, 1)); }
   var HA_PLAT = function () { return plat("setup", "computer", "computer", { android: "Set up on the TV: Home settings, Designs, Smart home. No computer needed.", web: "The home computer talks to Home Assistant for this TV.", vidaa: "Needs a home computer: the website home cannot reach Home Assistant." }); };
-  // the Up next queue: Spotify's queue, read with the person's own Spotify sign in
-  var QUEUE_NEED = "Spotify connected on the home computer, or on the website home on a Hisense";
-  var SPOTIFY_ON = "On that computer, connect Spotify once: open the Couch TV Spotify page on it and sign in (setup guide, Spotify Now playing).";
 
   var C = {
     // ---------- time ----------
@@ -308,22 +307,16 @@
       ok: "OK on a game opens it", platforms: plat("works", "computer", "computer", { vidaa: "Needs a home computer: the website home cannot open apps." }), sizes: sz(["small", "medium", "wide"], [4, 3]) },
 
     // ---------- music ----------
-    nowplaying: { name: "Now playing", status: "setup", what: "The song playing on this TV: cover, song and artist", needs: [WATCH_NEED],
+    nowplaying: { name: "Now playing", status: "setup", what: "The song playing on this TV: cover, song and artist", needs: [MUSIC_NEED],
       // any music app through the on-TV app or a home computer; Couch TV's home alone reads only Spotify's
       // media session (SpotifyPlayer.kt, home.spotify_player), so the computer is not the one way
-      setup: setup("tv", { android: ["Any music app shows with the Couch TV app on this TV or a home computer. With neither, only Spotify shows, if it was switched on when Couch TV was set up.", OPEN, "Go down to Look and scenes, then Now playing card, and make it On.", "Play music in Spotify or any music app."],
+      setup: setup("tv", { android: ["On your computer, open Couch TV Setup and connect to this TV.", "Pick Live from this TV, then Turn on Now playing. It lets Couch TV see the song playing in any music app on this TV.", "Play music in Spotify or any music app: the song shows here."],
         web: ["Not possible on this TV: it does not say what is playing."], vidaa: ["Not possible on this TV: it does not say what is playing."] }),
       until: "\"Nothing playing\" while nothing plays", build: "",
       ok: "Opens the player: back, play or pause, next, volume", platforms: plat("setup", "no", "no", { web: "This TV does not say what is playing.", vidaa: "This TV does not say what is playing." }), sizes: sz(["tile", "wtile", "small", "medium", "large"], [2, 2]) },
     soundscape: { name: "Soundscape", status: "works", what: "Rain, fire, waves or soft noise, played by the home", needs: ["Nothing: the sounds come with Couch TV"],
       setup: setup("nothing", ["Nothing to set up.", "Move to the widget and press OK to start or stop the sound."]), until: "Always ready", build: "",
       ok: "Starts or stops the sound", platforms: EVERY(), sizes: sz(["tile", "wtile"], [2, 2]) },
-    queue: { name: "Up next queue", status: "setup", what: "The next songs in your Spotify queue", needs: [QUEUE_NEED, "Only Spotify: TVs and other music apps do not share their queue"],
-      setup: setup("computer", { android: ["Needs a home computer that stays on, running Couch TV.", SPOTIFY_ON, "Play music in Spotify on any phone, computer or speaker: the next songs in your queue show here."],
-        web: ["Keep the home computer on: it runs Couch TV for this TV.", SPOTIFY_ON, "Play music in Spotify on any phone, computer or speaker: the next songs in your queue show here."],
-        vidaa: ["With a home computer that stays on: connect Spotify once on it (open the Couch TV Spotify page on it and sign in).", "With the website home and no computer: sign in to Spotify once on your own Couch TV site (setup guide, Hisense VIDAA, Spotify).", "Play music in Spotify: the next songs in your queue show here."] }),
-      until: "\"Needs Spotify connected\", and where it is set up", build: "",
-      ok: "Opens the next ten songs, big", platforms: plat("computer", "computer", "setup", { android: "Needs a home computer with Spotify connected. Only Spotify shares its queue.", web: "Works while the home computer is on, with Spotify connected on it.", vidaa: "Works with the home computer, or the website home with Spotify signed in." }), sizes: sz(["small", "tall", "large"], [4, 4]) },
     speakers: { name: "Speakers", status: "setup", what: "Each speaker, what it plays and its volume, and AirPlay speakers playing together", needs: [HA_NEED + ", or AirPlay 2 speakers and a Mac at home that stays on, running Couch TV", "Your speakers picked on the TV"],
       setup: setup("tv", haSteps("speakers (up to 6, any Home Assistant knows)", "Press Home: each speaker and its volume show here." + PICK_HERE)),
       until: "\"Needs Home Assistant\", and where it is set up", build: "",
@@ -769,8 +762,6 @@
     soundscape: [st("sound", "Sound", "choice", "rain", "OK on the widget plays it, and OK again stops it.", "design", ALL, true,
       { options: [["rain", "Rain"], ["fire", "Fire"], ["waves", "Waves"], ["brown", "Brown noise"]] }),
       st("volume", "Volume", "number", 50, "How loud this widget plays its sound.", "design", ALL, true, { min: 10, max: 100, step: 10 })],
-    queue: [HEADING("Empty shows Up next."),
-      st("count", "How many songs", "choice", "auto", "At most this many.", "design", ALL, true, { options: [["auto", "As many as fit"], [3, "3"], [5, "5"], [8, "8"]] })],
     games: [APPS_IN("Games", "Hold OK on a game to change, move or remove it."), HEADING("Empty shows Play.")],
     app: [APPS_IN("App", "Hold OK on it and pick Change app.")],
     folder: [st("label", "Folder name", "text", "", "Shown above the apps. On a tile it shows when the folder is opened. Empty shows no name.", "design", ALL, true, { max: 40 }),
@@ -879,9 +870,9 @@
   // docs/LG.md option A). The app reads the weather itself (Open-Meteo), keeps notes, lists and photos by web
   // address, and opens apps itself (samsung/app/tizen.js tizen.application, lg/app/webos.js luna
   // applicationManager), so these work without the computer, as on a VIDAA with no computer. News, markets,
-  // the smart home, the agenda, Keep watching, the Spotify queue and the AI agent still need it.
+  // the smart home, the agenda, Keep watching and the AI agent still need it.
   var APP_ALONE = { works: "Works in the Couch TV app, with or without a home computer.", setup: "Works in the Couch TV app once it is set up, with or without a home computer." };
-  var OPENS_APPS = ["app", "folder", "dock", "appgrid", "games"], KEEP_PC = ["queue"];
+  var OPENS_APPS = ["app", "folder", "dock", "appgrid", "games"], KEEP_PC = [];
   ["Tizen", "webOS"].forEach(function (p) {
     Object.keys(C).forEach(function (k) {
       var x = C[k].platforms[p], v = C[k].platforms.VIDAA;
@@ -901,8 +892,8 @@
   SHORT[TOWN_NEED] = ["Set your town", "Home settings, Location", "Set your town"];
   SHORT[PHOTOS_NEED] = ["Add your photos", "Home settings, Look and scenes, Your photos", "Add photos"];
   SHORT[WATCH_NEED] = ["Needs the Couch TV app on this TV or a home computer", "OK here shows how", "Needs setting up"];
+  SHORT[MUSIC_NEED] = ["Turn on Now playing from your computer", "Couch TV Setup, Live from this TV. OK here shows how", "Needs setting up"];
   SHORT[HA_NEED] = ["Needs Home Assistant", "Home settings, Designs, Smart home", "Needs Home Assistant"];
-  SHORT[QUEUE_NEED] = ["Needs Spotify connected", "On the home computer. OK here shows how", "Needs Spotify"];
   SHORT[C.card.needs[0]] = ["Type your words in Couch TV Studio", "Or a live number from the home computer. OK here shows how", "Type your words"];
   SHORT[C.surf.needs[0]] = ["Set your town by the beach", "Home settings, Location", "Set your town"];
   var AT = "Settings (hold OK), Home settings, Designs, At home";
@@ -968,7 +959,7 @@
   var NEED = {
     town: ["solar", "weather", "bigtemp", "hourly", "week", "rain", "uv", "sun", "air", "surf", "date"],
     photos: ["photo", "slideshow", "mosaic", "artframe", "memory"],
-    calendar: ["agenda"], spotify: ["queue"], wifi: ["wifi"], text: ["note", "list", "guide"], team: ["sports"],
+    calendar: ["agenda"], wifi: ["wifi"], text: ["note", "list", "guide"], team: ["sports"],
     ha: ["speakers", "aircon", "scenes", "controls", "camera", "doorbell", "energy", "sensor", "pool"]
   };
   var NEED_OF = {};
@@ -978,7 +969,7 @@
     solar: "Sunrise and sunset", sun: "Sunrise and sunset", weather: "Your town's weather", bigtemp: "Your town's weather", hourly: "The next few hours",
     week: "The next 7 days", rain: "Rain in the next three hours", uv: "Today's UV", air: "How clean the air is", surf: "The swell at your beach",
     date: "Today's date and weather", photo: "One of your photos", artframe: "One of your photos", slideshow: "Your photos, one after another",
-    mosaic: "A few of your photos", memory: "Photos from this day", agenda: "Your next events", queue: "Your Spotify queue",
+    mosaic: "A few of your photos", memory: "Photos from this day", agenda: "Your next events",
     speakers: "Your speakers", aircon: "Your aircon", scenes: "Your scenes", controls: "Your lights and switches", camera: "Your camera",
     doorbell: "Your doorbell", energy: "Your solar and power", sensor: "A reading from your home", pool: "Your pool", wifi: "A code guests scan to join",
     note: "A note for everyone", list: "Shopping or to do", guide: "What guests need to know", sports: "Your team's games"

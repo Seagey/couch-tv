@@ -819,6 +819,10 @@ class MainActivity : Activity() {
         @JavascriptInterface
         fun spotifyKey(command: String): Boolean = spotifyPlayer.key(command)
 
+        /** Media session access given (Couch TV Setup grants it from the computer): Now playing for any music app, no computer after. */
+        @JavascriptInterface
+        fun musicAccess(): Boolean = spotifyPlayer.access()
+
         @JavascriptInterface
         fun dailyBingPhoto(): String = bingDailyPhoto.current()
         @JavascriptInterface

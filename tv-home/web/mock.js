@@ -596,8 +596,6 @@
           else if (apPath === "/api/airplay/volume") { AP.speakers.forEach(function (x) { if (body && x.name === body.name) x.volume = Math.max(0, Math.min(100, body.value | 0)); }); }
           return resolve({ ok: true, result: { ok: true }, airplay: JSON.parse(JSON.stringify(AP)) });
         }
-        // Up next (?queue=1: three made up songs; ?queue=empty: connected, nothing queued; none: Spotify not connected)
-        if (path.indexOf("/api/music/queue") === 0) return resolve({ ok: true, configured: !!arg("queue"), queue: arg("queue") === "empty" ? [] : arg("queue") ? SONGS.map(function (x) { return { title: x[0], artist: x[1], art: null }; }) : null });
         if (path.indexOf("/api/music") === 0) return resolve({ ok: true, music: arg("music") ? mockSong() : null });
         if (path.indexOf("/api/custom-cards") === 0) return resolve({ ok: true, cards: arg("cards") ? [
           { title: "Solar today", subtitle: "Roof panels", value: "18.4 kWh", app: "com.google.android.youtube.tv" },

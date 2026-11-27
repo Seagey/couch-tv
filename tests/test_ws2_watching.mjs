@@ -1,5 +1,5 @@
 // Widget settings, round 2, the watching, apps and music widgets (keep, keeprow, upnext, picks, nowplaying,
-// queue, soundscape, games, app, appgrid, dock, folder, quick, stack), in a real browser:
+// soundscape, games, app, appgrid, dock, folder, quick, stack), in a real browser:
 //  A. every setting changes the drawn widget, and clearing it goes back to the default (widgets.js, the
 //     settings set on this TV in env.wset, the design's own in opts);
 //  B. on the real TV home (?mock=1 with a design): each widget's settings show in Home settings, Widgets on
@@ -206,18 +206,43 @@ const WATCH = { who: "sam", shows: MINE, apps: INSTALLED, bridge: true,
   ok(d.sound === "fire|50", "soundscape: the design's fire");
   ok((await draw(o, WATCH, {})).sound === "rain|50", "soundscape: cleared, rain at 50 again");
 }
-// queue: heading, how many songs
+// no computer on an Android TV (emulator test 28 Nov 2026): the TV reads Watch Next and its media sessions itself, so Keep watching,
+// Keep watching row, Up next, Picks and Now playing wait for a show or a song; they ask for setup only when the TV cannot read them
 {
-  const o = { id: "q", kind: "queue", w: 900, h: 1060 };
-  const Q = Object.assign({}, WATCH, { queue: { ok: true, items: ["One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight"].map((t) => ({ title: t + " song", artist: "Band" })) } });
-  let a = await draw(o, Q), b = await draw(o, Q, { count: 3 }), c = await draw(o, Q, { label: "Next songs" });
-  const songs = (r) => (r.text.match(/ song/g) || []).length;
-  ok(songs(a) >= 5 && songs(b) === 3, "queue, How many songs 3: " + songs(a) + " then " + songs(b)); tested("queue", "count");
-  ok(/Up next/.test(a.text) && /Next songs/.test(c.text), "queue, Heading"); tested("queue", "label");
-  ok(songs(await draw(o, Q, {})) === songs(a), "queue: cleared");
-  const off = await draw(o, Object.assign({}, WATCH, { queue: { ok: false } }));
-  ok(off.empty && !/song/.test(off.text), "queue with Spotify not connected: the setup card, no songs: " + off.text);
+  const none = { who: "sam", shows: [], apps: INSTALLED, bridge: false, people: [{ id: "sam", name: "Sam" }], household: [] };
+  for (const kind of ["keep", "keeprow", "upnext", "picks"]) {
+    const r = await draw({ id: "k", kind, w: 760, h: 360 }, Object.assign({}, none, { watchNext: true }));
+    ok(!/Needs the Couch TV app|Needs setting up/.test(r.text) && /Nothing to keep watching yet|No picks yet/.test(r.text), kind + " with Watch Next and no computer waits for a show: " + r.text);
+    const off = await draw({ id: "k", kind, w: 760, h: 360 }, none);
+    ok(/Needs the Couch TV app|Needs setting up|OK here shows how/.test(off.text), kind + " with nothing to read asks for setup: " + off.text);
+  }
+  const np = await draw({ id: "n", kind: "nowplaying", w: 760, h: 360 }, Object.assign({}, none, { musicHere: true }));
+  ok(/Nothing playing/.test(np.text) && !/Turn on/.test(np.text), "nowplaying with media access and no computer: Nothing playing: " + np.text);
+  const npOff = await draw({ id: "n", kind: "nowplaying", w: 760, h: 360 }, none);
+  ok(/Turn on Now playing from your computer/.test(npOff.text) && !/Couch TV app on this TV/.test(npOff.text), "nowplaying not turned on says what to do from the computer: " + npOff.text);
+  // OK on the setup card opens numbered steps, not the same line again (shot 39 of the emulator test)
+  for (const [kind, want] of [["keep", /Make Show Keep watching On/], ["nowplaying", /Couch TV Setup/]]) {
+    const d = await page.evaluate(([kind, none]) => {
+      document.querySelectorAll(".ws-host").forEach((h) => h.remove());
+      const host = document.createElement("div"); host.className = "ws-host cw-o"; document.body.appendChild(host);
+      const had = window.TVOS; window.TVOS = had || {};   // an Android TV home
+      const env = { data: none };
+      const root = window.CouchWidgets.render({ id: "k", kind, w: 760, h: 360 }, env);
+      host.appendChild(root);
+      const stop = root.hasAttribute("data-act") ? root : root.querySelector("[data-act]") || root;
+      window.CouchDetail.open(stop, env, {});
+      const t = (document.querySelector(".cwd-panel") || {}).textContent || "";
+      const n = document.querySelectorAll(".cwd-panel .cwd-li").length;
+      window.CouchDetail.close(true);
+      if (!had) delete window.TVOS;
+      return { t: t.replace(/\s+/g, " "), n };
+    }, [kind, none]);
+    ok(d.n >= 2 && want.test(d.t), kind + ": OK on the setup card shows numbered steps: " + d.n + " " + d.t.slice(0, 300));
+  }
+  const steps = await page.evaluate(() => window.CouchWidgetCaps.steps("nowplaying", "android").join(" "));
+  ok(/Couch TV Setup/.test(steps) && /Turn on Now playing/.test(steps), "nowplaying's steps name Couch TV Setup, Live from this TV: " + steps);
 }
+// queue: dropped 28 Nov 2026; an old one becomes Now playing (checked in test_design_widgets.js)
 // the app widgets: their apps (the design's, then Hold OK's edits on this TV) and their own settings
 {
   const g = { id: "g", kind: "games", w: 1200, h: 460, opts: { apps: ["netflix"] } };
@@ -290,12 +315,12 @@ ok(!errors.length, "no page errors: " + errors.join("; "));
 await page.close();
 
 // ================= B. the real home: shown only while on the design =================
-const KINDS = ["keep", "keeprow", "upnext", "picks", "nowplaying", "queue", "soundscape", "games", "app", "appgrid", "dock", "folder", "quick", "stack"];
-const KEYS = { keep: ["person"], keeprow: ["label", "shows", "person"], upnext: ["sport", "apps"], picks: ["label", "mix"], nowplaying: ["buttons", "cover"], queue: ["label", "count"],
+const KINDS = ["keep", "keeprow", "upnext", "picks", "nowplaying", "soundscape", "games", "app", "appgrid", "dock", "folder", "quick", "stack"];
+const KEYS = { keep: ["person"], keeprow: ["label", "shows", "person"], upnext: ["sport", "apps"], picks: ["label", "mix"], nowplaying: ["buttons", "cover"],
   soundscape: ["sound", "volume"], games: ["apps", "label"], app: ["apps"], appgrid: ["apps", "cols", "names"], dock: ["apps", "more"], folder: ["label", "apps", "cols"], quick: ["quick"], stack: ["turn"] };
-const NAMES = { keep: "Keep watching", keeprow: "Keep watching row", upnext: "Up next", picks: "Picks for you", nowplaying: "Now playing", queue: "Up next queue", soundscape: "Soundscape",
+const NAMES = { keep: "Keep watching", keeprow: "Keep watching row", upnext: "Up next", picks: "Picks for you", nowplaying: "Now playing", soundscape: "Soundscape",
   games: "Games", app: "One app", appgrid: "App grid", dock: "Dock", folder: "App folder", quick: "Quick buttons", stack: "Smart stack" };
-const POS = { keep: [40, 40, 360, 360], keeprow: [420, 40, 760, 300], upnext: [1220, 40, 660, 360], picks: [40, 440, 760, 300], nowplaying: [840, 440, 520, 300], queue: [1400, 440, 480, 300],
+const POS = { keep: [40, 40, 360, 360], keeprow: [420, 40, 760, 300], upnext: [1220, 40, 660, 360], picks: [40, 440, 760, 300], nowplaying: [840, 440, 520, 300],
   soundscape: [40, 780, 200, 200], games: [260, 780, 460, 200], app: [740, 780, 200, 200], appgrid: [960, 780, 300, 260], dock: [1280, 780, 600, 120], folder: [1280, 920, 300, 140], quick: [1600, 920, 300, 100], stack: [420, 360, 360, 60] };
 const objects = KINDS.map((k) => { const p = POS[k]; const o = { id: "o" + k, type: "widget", kind: k, x: p[0], y: p[1], w: p[2], h: p[3] };
   if (k === "stack") { o.items = [{ kind: "clock" }, { kind: "date" }]; o.y = 1000; o.x = 40; o.w = 360; o.h = 70; }

@@ -24,7 +24,7 @@
     keep: "keep", keeprow: "keep", upnext: "keep", folder: "folder", nowplaying: "player",
     aircon: "aircon", scenes: "scenes", controls: "controls", camera: "camera", doorbell: "camera",
     card: "cards", news: "news", sports: "sports",
-    picks: "setup", queue: "setup", speakers: "setup", energy: "setup", sensor: "setup", battery: "setup",
+    picks: "setup", speakers: "setup", energy: "setup", sensor: "setup", battery: "setup",
     note: "note", list: "list", stocks: "setup", commute: "setup", wifi: "wifi", guide: "guide", screentime: "screentime"
   };
   var TITLE = { timers: "Timers", forecast: "Forecast", world: "World clocks", calendar: "Calendar", moon: "Moon", air: "Air quality", surf: "Surf",
@@ -32,8 +32,8 @@
     camera: "Camera", cards: "Custom cards", news: "Headlines", sports: "Scores", setup: "Set up",
     note: "Family note", list: "List", wifi: "Guest Wi-Fi", guide: "House guide", screentime: "Screen time" };
   // the smart home and music widgets' own layers (group C): set here, beside the table above
-  LAYER.energy = "energy"; LAYER.sensor = "sensor"; LAYER.speakers = "speakers"; LAYER.queue = "queue";
-  TITLE.energy = "Energy"; TITLE.sensor = "Sensor"; TITLE.speakers = "Speakers"; TITLE.queue = "Up next";
+  LAYER.energy = "energy"; LAYER.sensor = "sensor"; LAYER.speakers = "speakers";
+  TITLE.energy = "Energy"; TITLE.sensor = "Sensor"; TITLE.speakers = "Speakers";
   // the web widgets' own layers (widget-web.js)
   LAYER.stocks = "stocks"; TITLE.stocks = "Markets";
   LAYER.commute = "commute"; TITLE.commute = "Commute";
@@ -106,10 +106,18 @@
     S.body.appendChild(head(NEED_ICON[need] || "info", f ? f.name : c.name, f ? f.line : ""));
     var here = function () { if (api.tvEdit) api.tvEdit(id); };
     if (!need) {
-      // nothing to set on the phone (a permission on the TV, a widget not on this TV): its one line
+      // nothing to set on the phone (a permission on the TV, a step on the computer): its line, then the numbered steps for this
+      // TV (emulator test 28 Nov 2026: "OK here shows how" opened the same line again and no steps)
       var cd = C.card ? C.card(kind, false) : { line: "", sub: "" };
-      S.body.appendChild(E("div", "cwd-col cwd-grow cwd-center", "", [E("div", "cwd-mid", "text-align:center;max-width:1300px", [cd.line]),
-        cd.sub ? E("div", "cwd-small", "margin-top:16px;text-align:center;max-width:1300px", [cd.sub]) : null]));
+      var plat = window.COUCH_STANDALONE ? "vidaa" : window.COUCH_WEBOS || window.COUCH_TIZEN ? "web" : window.TVOS ? "android" : "web";
+      var st = C.steps ? C.steps(kind, plat) : [];
+      if (!st.length) {
+        S.body.appendChild(E("div", "cwd-col cwd-grow cwd-center", "", [E("div", "cwd-mid", "text-align:center;max-width:1300px", [cd.line]),
+          cd.sub ? E("div", "cwd-small", "margin-top:16px;text-align:center;max-width:1300px", [cd.sub]) : null]));
+        return;
+      }
+      S.body.appendChild(E("div", "cwd-col cwd-grow", "margin-top:24px", [label(cd.line),
+        E("div", "cwd-list cwd-steps", "", st.map(function (t, i) { return E("div", "cwd-li", "", [E("b", "", "flex:none;width:44px", [String(i + 1) + "."]), E("span", "", "", [t])]); }))]));
       return;
     }
     var box = E("div", "cwd-qr", "width:420px;height:420px;border-radius:32px;background:#fff;display:flex;align-items:center;justify-content:center;flex:none");
@@ -990,19 +998,6 @@
     };
     draw();
     S.redraw = draw;
-  };
-
-  // Up next: the next songs on the Spotify account (to look at: Spotify itself changes the queue)
-  B.queue = function (o, env) {
-    var H = kit().ha, q = H.queueOf(env), items = q && q.ok ? (q.items || []).filter(function (s) { return s && s.title; }) : [];
-    if (q && !q.ok) return B.setup(o, env);
-    if (!q) { S.body.appendChild(head("music", op(o).label || "Up next", "Checking Spotify", "#1db954")); return; }
-    S.body.appendChild(head("music", op(o).label || "Up next", items.length ? items.length + (items.length === 1 ? " song" : " songs") + " in the Spotify queue" : "Nothing up next in Spotify", "#1db954"));
-    S.body.appendChild(E("div", "cwd-grid cwd-grow", "align-content:flex-start;margin-top:36px", items.slice(0, 10).map(function (s, i) {
-      var art = H.coverOk(s.art, env);
-      return E("div", "cwd-row", "width:820px;height:120px", [E("div", "", "width:120px;height:120px;border-radius:18px;flex:none;background:#333 center/cover;" + (art ? "background-image:" + kit().cssImg(s.art) : "")),
-        E("div", "cwd-col", "margin-left:26px;min-width:0;flex:1", [E("div", "cwd-mid cwd-ell", "", [(i + 1) + ". " + String(s.title).slice(0, 80)]), E("div", "cwd-small cwd-ell", "", [String(s.artist || "").slice(0, 80)])])]);
-    })));
   };
   B.cards = function (o, env) {
     var cards = env.demo ? [{ title: "Solar today", value: "18.4 kWh" }, { title: "Pool", value: "26°" }, { title: "Rain gauge", value: "12 mm" }] : (kit().dataOf(env).cards || []);

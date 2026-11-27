@@ -40,6 +40,19 @@ def run_bridge():
     runpy.run_path(os.path.join(d, "server.py"), run_name="__main__")
 
 
+def run_mcp():
+    """--mcp: the TV's MCP server (bridge/mcp_server.py) for the person's own AI app, on stdio. BRIDGE_URL and BRIDGE_KEY come
+    from the AI app's settings (the lines Setup prints, live.py agent_lines). Never the bridge's own config: it only calls the API."""
+    d = str(bridge_dir())
+    if not os.path.isfile(os.path.join(d, "mcp_server.py")):
+        sys.stderr.write("This Couch TV Setup was built without the TV's AI tools. Get the newest one from the website.\n")
+        return 2
+    os.environ.pop("COUCH_CONFIG", None)
+    sys.path.insert(0, d)
+    runpy.run_path(os.path.join(d, "mcp_server.py"), run_name="__main__")
+    return 0
+
+
 def backoff(failures):
     return min(60, 2 ** max(1, failures))
 

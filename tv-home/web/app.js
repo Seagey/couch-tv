@@ -928,7 +928,17 @@
     keep("tvhome.people.list", { people: r.people, pending: true });
     keep("tvhome.people.order", { ids: r.people.map(function (p) { return p.id; }), pending: false });
     keepHome(r);
+    applyAccountNowPlaying(pack.details);
     return true;
+  }
+  // The account's Now playing card switch (watching.md nowplaying, route a). Applied when the account's choice changes; a change made
+  // on this TV afterwards (Home settings, Look, Now playing card) stays until the account's choice changes again.
+  function applyAccountNowPlaying(d) {
+    var v = d && d.watch ? d.watch.now_playing : undefined;
+    if (typeof v !== "boolean" || ST.now_playing_acct === v) return;
+    ST.now_playing_acct = v; ST.now_playing = v; NP_ON = v;
+    saveSettings();
+    if (typeof refreshMusic === "function") refreshMusic();
   }
   // Home settings, People: take everything the account sent off this TV now (as a wipe from the account
   // does): its people, their photos, its town and its guest Wi-Fi. What was added here stays. The next
@@ -1037,7 +1047,9 @@
     // glass app icons (#25): set in Home settings, else home.glass_icons; off unless switched on
     GLASS_ICONS = typeof ST.glass_icons === "boolean" ? ST.glass_icons : HOME.glass_icons === true;
     NP_ON = typeof ST.now_playing === "boolean" ? ST.now_playing : HOME.now_playing !== false;
-    LOCAL_SPOTIFY = !!(OFFLINE && !STANDALONE && HOME.spotify_player === true && TV && TV.spotifyMusic);
+    // the song playing on this TV with no computer: Spotify when config.json asks (spotify_player), or any music app once the TV has
+    // given Couch TV media session access (Couch TV Setup grants it from the computer; TV.musicAccess, lane D 28 Nov 2026)
+    LOCAL_SPOTIFY = !!(OFFLINE && !STANDALONE && TV && TV.spotifyMusic && (HOME.spotify_player === true || musicAccess()));
     document.documentElement.classList.toggle("spotify-row", LOCAL_SPOTIFY);
     // config.json's spotify block, with each key Home settings saved on top: one saved row (Card alignment, say)
     // never hides the rest of config.json's block, such as enabled
@@ -2899,6 +2911,7 @@
   var audioOutput = { type: "speaker", name: "" }, audioOutAt = 0;
   var npTintCache = {};
   var LOCAL_SPOTIFY = false, SPOTIFY_TV = "com.spotify.tv.android";
+  function musicAccess() { try { return !!(TV && TV.musicAccess && TV.musicAccess()); } catch (e) { return false; } }
 
   function extractArtworkTint(dataUrl, cb) {
     if (!dataUrl || dataUrl.indexOf("data:image/") !== 0) { cb(null); return; }
@@ -3672,21 +3685,6 @@
     }
   }
 
-  var QUEUE, queueAt = 0;
-  function refreshQueue() {
-    if (document.hidden || (OFFLINE && !STANDALONE) || !document.querySelector(".cd-layer .cw-k-queue")) return;
-    queueAt = Date.now();
-    var ask = STANDALONE ? fetch(window.CouchSpotify ? window.CouchSpotify.url("api/now?queue=1") : "api/now?queue=1", { cache: "no-store" })
-      .then(function (r) { return r.json(); })
-      : api("GET", "/api/music/queue", null, 8000);
-    ask.then(function (j) {
-      QUEUE = j && Array.isArray(j.queue) ? { ok: true, items: j.queue.slice(0, 10) } : { ok: false };
-      if (typeof CouchDesign !== "undefined" && CouchDesign.dataChanged) CouchDesign.dataChanged("queue", QUEUE.ok ? QUEUE.items.map(function (s) { return s && s.title; }) : "off");
-    }, function () {});
-  }
-  window.CouchQueueNow = function () { return QUEUE; };
-  setInterval(function () { var age = Date.now() - queueAt; if ((QUEUE === undefined && age > 6000) || age > 20000) refreshQueue(); }, 2000);
-
   // ---- Lane C (28 Nov 2026): AirPlay 2 speakers for the Speakers widget, and the Connect 10 pool ----
   // AirPlay: the home computer's /api/airplay (bridge/airplay.py), names and volumes only, read while a Speakers widget shows.
   var AIRPLAY, airplayAt = 0;
@@ -3770,9 +3768,10 @@
     if (LOCAL_SPOTIFY) {
       var local = null;
       try { local = JSON.parse(TV.spotifyMusic()); } catch (e) {}
-      ask = Promise.resolve({ music: local && local.title ? local : {
+      // nothing playing: the Open Spotify card only where config.json asked for the Spotify player; else nothing (Nothing playing)
+      ask = Promise.resolve({ music: local && local.title ? local : HOME.spotify_player === true ? {
         title: t("spotify_open"), state: "idle", source: "spotify-tv", app: { name: "Spotify", package: SPOTIFY_TV }
-      } });
+      } : null });
     } else if (STANDALONE) {
       ask = fetch(window.CouchSpotify ? window.CouchSpotify.url("api/now") : "api/now", { cache: "no-store" })
         .then(function (r) { return r.json(); });
@@ -11367,6 +11366,9 @@
           people: NOBODY ? [] : PEOPLE.map(function (p) { var o = { id: p.id, name: p.name }, ph = photoOfPerson(p); if (ph) o.photo = ph; return o; }), who: who, quick: quickVisible(), quickCan: QUICK_ALL.filter(quickCan), cards: CARDS.slice(0, 8), iconUrl: iconUrl,
           // no bridge at all (option A, or the standalone home): widgets that need one say so
           bridge: !OFFLINE,
+          // with no bridge, what this TV reads by itself (lane D, 28 Nov 2026): Android's Watch Next for Keep watching, Up next and
+          // Picks, and the media sessions for Now playing. Then those widgets wait for a show or a song instead of asking for setup.
+          watchNext: !!(TV && TV.watchNext && KW_ON), musicHere: !OFFLINE || ON_TV || LOCAL_SPOTIFY,
           // the scenes the launcher's Home Assistant allows (names and entities only, never its address)
           scenes: window.smartHome && window.smartHome.scenes ? window.smartHome.scenes() : [],
           // things typed at home (Home settings, Designs, At home): kept on this TV only

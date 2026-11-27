@@ -39,18 +39,6 @@ const SAME = {
   "nowplaying tile buttons off": "a tile has no room for the buttons (the help says so)",
   "nowplaying wtile buttons off": "a wide tile has no room for the buttons (the help says so)",
   "nowplaying small buttons off": "a small widget has no room for the buttons (the help says so)",
-  // Up next queue: At most this many; As many as fit is 3 on a small widget, 5 on a tall or large one
-  "queue small count 3": "a small widget fits 3 songs, which is what it shows already",
-  "queue small count 5": "a small widget fits 3 songs",
-  "queue small count 8": "a small widget fits 3 songs",
-  "queue small count 5 vs 3": "a small widget fits 3 songs",
-  "queue small count 8 vs 5": "a small widget fits 3 songs",
-  "queue tall count 5": "a tall widget fits 5 songs, which is what it shows already",
-  "queue tall count 8": "a tall widget fits 5 songs",
-  "queue tall count 8 vs 5": "a tall widget fits 5 songs",
-  "queue large count 5": "a large widget fits 5 songs at their big size, which is what it shows already",
-  "queue large count 8": "a large widget fits 5 songs at their big size",
-  "queue large count 8 vs 5": "a large widget fits 5 songs at their big size",
   // Soundscape: a tile shows the sound only; the volume is how loud OK plays it (checked in test_ws2_watching)
   "soundscape tile volume 10": "a tile shows the sound only; the volume sets how loud OK plays it",
   "soundscape tile volume 80": "a tile shows the sound only; the volume sets how loud OK plays it",
@@ -116,7 +104,6 @@ try {
       const base = { who: "sam", shows: MINE, apps: INSTALLED, bridge: true, people: [{ id: "sam", name: "Sam" }, { id: "ben", name: "Ben" }],
         household: [{ id: "sam", name: "Sam", shows: MINE }, { id: "ben", name: "Ben", shows: BENS }],
         music: { title: "Riptide", artist: "Vance Joy", art: "backgrounds/scene-golden.jpg", state: "playing", package: "com.spotify.tv.android", source: "Spotify", position: 30, duration: 200 },
-        queue: { ok: true, items: ["One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine", "Ten"].map((t) => ({ title: t + " song", artist: "Band" })) },
         quick: ["sleep", "picture", "input"], quickCan: ["sleep", "picture", "input", "look", "soundscape", "screen_off", "headphones", "tvsettings"] };
       const PX = { tile: [160, 160], wtile: [360, 160], small: [360, 360], tall: [360, 560], medium: [760, 360], wide: [1160, 360], large: [760, 760], xl: [1160, 760], line: [360, 60], wline: [760, 60], hero: [1760, 660], full: [1760, 960], row8: [760, 160], row12: [1160, 160], row18: [1760, 160] };
       const C = window.CouchWidgetCaps;
@@ -172,8 +159,6 @@ try {
           ["apps iview", { set: { apps: ["iview"] } }], ["apps netflix (same: first show is Netflix)", { set: { apps: ["netflix"] } }, true]]],
         picks: [{ kind: "picks" }, [["default", {}], ["label For Sam", { set: { label: "For Sam" } }], ["mix others", { set: { mix: "others" } }], ["mix mine", { set: { mix: "mine" } }], ["mix all (same)", { set: { mix: "all" } }, true]]],
         nowplaying: [{ kind: "nowplaying" }, [["default", {}], ["buttons off", { set: { buttons: false } }], ["cover off", { set: { cover: false } }], ["both off", { set: { buttons: false, cover: false } }]]],
-        queue: [{ kind: "queue" }, [["default", {}], ["label Next songs", { set: { label: "Next songs" } }], ["count 3", { set: { count: 3 } }], ["count 5", { set: { count: 5 } }], ["count 8", { set: { count: 8 } }],
-          ["count 5 vs 3", { set: { count: 5 } }, false, "count 3"], ["count 8 vs 5", { set: { count: 8 } }, false, "count 5"]]],
         soundscape: [{ kind: "soundscape" }, [["default", {}], ["sound fire", { set: { sound: "fire" } }], ["sound waves", { set: { sound: "waves" } }], ["sound brown", { set: { sound: "brown" } }], ["sound rain (same)", { set: { sound: "rain" } }, true],
           ["volume 10", { set: { volume: 10 } }], ["volume 80", { set: { volume: 80 } }], ["volume 100", { set: { volume: 100 } }]]],
         games: [{ kind: "games", opts: { apps: ["netflix", "stan"] } }, [["default", {}], ["label Arcade", { set: { label: "Arcade" } }], ["apps (Hold OK) youtube, iview", { edits: { "x|games": ["youtube", "iview"] } }], ["apps (design) youtube", { opts: { apps: ["youtube"] } }]]],
