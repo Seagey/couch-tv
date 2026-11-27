@@ -68,6 +68,22 @@ class FireWatch : AccessibilityService() {
         return true
     }
 
+    /**
+     * TCL (issue #94): after a restart, onServiceConnected arrives 4-5 s after this service is created,
+     * because the system's main thread is busy with TCL's and MediaTek's own start-up work, and all
+     * that time the Google home is on screen. An accessibility service is bound with leave to start
+     * activities from the background, and that leave is the process's from the moment it is created,
+     * so couch-tv goes on top here, without waiting for the connection.
+     */
+    override fun onCreate() {
+        super.onCreate()
+        if (TclPlaceholderInput.isTcl() && SystemClock.elapsedRealtime() < BOOT_WINDOW_MS && !CrashGuard.standingAside(this)) {
+            Log.i("couchtv.firewatch", "created just after a restart: putting couch-tv in front")
+            runCatching { startActivity(Intent(this, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
+                .onFailure { Log.w("couchtv.firewatch", "could not open couch-tv yet: $it") }
+        }
+    }
+
     override fun onServiceConnected() {
         connected = true
         // Key filtering is switched on at run time and only on Xiaomi and KTC/JVC, so no other TV sees key presses here.
@@ -88,7 +104,8 @@ class FireWatch : AccessibilityService() {
         if ((android.os.Build.MANUFACTURER.equals("Amazon", ignoreCase = true) || TclPlaceholderInput.isTcl()) &&
             SystemClock.elapsedRealtime() < BOOT_WINDOW_MS && !CrashGuard.standingAside(this)) {
             Log.i("couchtv.firewatch", "bound just after a restart: putting couch-tv in front")
-            runCatching { startActivity(Intent(this, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
+            // TCL: usually already opened from onCreate, 4-5 s earlier (see there); only again if it is not in front
+            if (!MainActivity.isInFront()) runCatching { startActivity(Intent(this, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
         }
         wakeMask?.close()
         wakeMask = WakeMask.start(this, handler)

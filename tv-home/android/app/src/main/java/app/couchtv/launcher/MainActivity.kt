@@ -74,6 +74,8 @@ class MainActivity : Activity() {
     private var web: WebView? = null
     private var fallback: View? = null
     private var pageReady = false
+    /** The live page has drawn its first frame (onPageCommitVisible), before its scripts and pictures have all loaded. */
+    private var pageDrawn = false
         set(value) {
             field = value
             if (!value) wakeFrame = null
@@ -612,6 +614,7 @@ class MainActivity : Activity() {
         loadFailed = false
         offline = false
         pageReady = false
+        pageDrawn = false
         val tv = prefs.getString("tv", null)
         val key = prefs.getString("pairing_key", null)
         val q = mutableListOf<String>()
@@ -619,8 +622,12 @@ class MainActivity : Activity() {
         if (!key.isNullOrEmpty()) q.add("key=$key")
         val qs = if (q.isEmpty()) "" else "?" + q.joinToString("&")
         w.loadUrl("$base/tv/$qs")
-        // Never a blank screen: if the page is slow, show the app grid until it arrives.
-        main.postDelayed({ if (!pageReady) showFallback() }, SLOW_MS)
+        // Never a blank screen: if the page is slow, show the app grid until it arrives. In the first
+        // minutes after a restart the page is slow only because the WebView and the network are still
+        // starting, so the grid would flash up for a few seconds just before the page: wait longer then.
+        // The page counts as arrived then once it has drawn (its scripts and photos can take a while longer).
+        val boot = android.os.SystemClock.elapsedRealtime() < BOOT_SLOW_WINDOW_MS
+        main.postDelayed({ if (!pageReady && !(boot && pageDrawn)) showFallback() }, if (boot) BOOT_SLOW_MS else SLOW_MS)
     }
 
     private fun makeWebView(): WebView = WebView(this).apply {
@@ -644,6 +651,10 @@ class MainActivity : Activity() {
         addJavascriptInterface(MatterPage(this@MainActivity, this), "TVMATTER")   // Matter devices, see MatterPage.kt
         addJavascriptInterface(Updater.Page(this@MainActivity, this), "TVUP")   // updates from GitHub releases, see Updater.kt
         webViewClient = object : WebViewClient() {
+            override fun onPageCommitVisible(view: WebView, url: String) {
+                if (!loadFailed && url.startsWith("http")) pageDrawn = true
+            }
+
             override fun onPageFinished(view: WebView, url: String) {
                 if (!loadFailed && url.startsWith("http")) {
                     pageReady = true
@@ -2303,6 +2314,9 @@ class MainActivity : Activity() {
         private const val OFFLINE_HOST = "home.tvos.invalid"
         private const val BUNDLED = "www/tv"   // the built-in copy, in the app's assets
         private const val SLOW_MS = 2_500L
+        /** Right after a restart (the first [BOOT_SLOW_WINDOW_MS] of uptime) the page gets this long before the app grid shows. */
+        private const val BOOT_SLOW_MS = 20_000L
+        private const val BOOT_SLOW_WINDOW_MS = 2 * 60_000L
         private const val NET_WAIT_MS = 15_000L   // at power-on, how long the first load waits for Wi-Fi
         private const val PICK_PHOTOS = 41
         private const val LISTEN = 43   // reminders: Android's speech screen
