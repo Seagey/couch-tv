@@ -95,7 +95,7 @@ const context = {
   esc: (v) => String(v == null ? '' : v), slim: (u) => u, iconUrl: (pkg) => (pkg ? 'icon:' + pkg : null),
   renderPeople() {}, addCards() {}, kids: false, kidsOn: () => context.kids, idleAmbientActive: false, npVisible: () => false, gridKey: (a) => 'app:' + a.package,
   whoIndex: () => 0, peopleCount: () => 1, scrollShelf() {},
-  API: '', HOME: {}, ST: {}, TV: null, MOCK: false, LIGHTER: false, SUN_SYNC: false, LOOP: false, NIGHT: true, KW_POSTER: false, LOCAL_SPOTIFY: false, SPOTIFY: {}, OLED: false, THEME: 'night',
+  API: '', HOME: {}, ST: {}, TV: null, MOCK: false, LIGHTER: false, SUN_SYNC: false, LOOP: false, NIGHT: true, KW_POSTER: false, LOCAL_SPOTIFY: false, SPOTIFY: {}, appLogo: () => null, OLED: false, THEME: 'night',
   KEEP_MAX: 10, KW_ON: true, CARDS: [], SHELF_FOLLOW: false, lift: null, touched: true,
   PEOPLE: [{ id: 'p1', name: 'Person 1' }], who: 'p1',
   data: { shows: [], showsBy: { p1: [] }, videosBy: { p1: [] }, apps: [], weather: null },
