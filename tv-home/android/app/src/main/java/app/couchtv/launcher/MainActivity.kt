@@ -760,7 +760,16 @@ class MainActivity : Activity() {
         }
     }
 
+    // a debug build made with -PstudioTestUrl points the page's design_store at the same test site (AccountLink.testStoreBase)
     private fun offlineFile(path: String): WebResourceResponse {
+        val r = offlineFileRaw(path)
+        val line = AccountLink.testStoreLine(AccountLink.testStoreBase())
+        if (line.isEmpty() || path.removePrefix("/tv/") != "config.js" || r.statusCode != 200) return r
+        val text = r.data.bufferedReader().readText() + line
+        return WebResourceResponse("application/javascript", "utf-8", ByteArrayInputStream(text.toByteArray()))
+    }
+
+    private fun offlineFileRaw(path: String): WebResourceResponse {
         val rel = path.removePrefix("/tv/").ifEmpty { "index.html" }
         val notFound = { WebResourceResponse("text/plain", "utf-8", 404, "Not found", emptyMap(), ByteArrayInputStream(ByteArray(0))) }
         if (rel.contains("..")) return notFound()

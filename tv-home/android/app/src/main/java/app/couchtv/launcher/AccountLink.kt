@@ -108,6 +108,20 @@ object AccountLink {
     /** Where the inbox and leave calls go: always [STUDIO], except a DEBUG build made with -PstudioTestUrl=<local site>
      *  (emulator tests of Send to a linked TV against a local site; a release build never reads it). */
     fun studio(): String = BuildConfig.STUDIO_TEST.takeIf { BuildConfig.DEBUG && Regex("https?://[A-Za-z0-9.:-]+").matches(it) } ?: STUDIO
+    /** What the TV page's design_store is in a DEBUG build made with -PstudioTestUrl (null for every release and every normal debug
+     *  build, which keep the config they have). The page takes only https, or plain http to this computer, so the emulator's
+     *  10.0.2.2 address (and localhost) becomes http://127.0.0.1:<same port>, which the tests reach with adb reverse; any other
+     *  plain http address gives null (the page would refuse it). A debug build with a test site never asks the live store. */
+    fun testStoreBase(studio: String = studio()): String? {
+        if (studio == STUDIO) return null
+        val m = Regex("(https?)://([A-Za-z0-9.-]+)(:\\d{1,5})?").matchEntire(studio) ?: return null
+        val (scheme, host, port) = m.destructured
+        if (scheme == "https") return studio
+        return if (host == "10.0.2.2" || host == "localhost" || host == "127.0.0.1") "http://127.0.0.1$port" else null
+    }
+    /** The line added to the TV page's config.js in such a build, after whatever config it had. */
+    fun testStoreLine(base: String?): String =
+        if (base == null) "" else "\nwindow.COUCH_CONFIG = Object.assign(window.COUCH_CONFIG || {}, { design_store: \"$base\" });\n"
     /** The pool readings call (S8): the same switch as the inbox and leave calls, so the emulator test URL reaches it too. */
     fun poolUrl(): String = "${studio()}/v1/setup/pool"
     private const val INBOX_MAX = 64 * 1024

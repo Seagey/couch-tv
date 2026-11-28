@@ -7279,12 +7279,21 @@
     }
     makeitAnswered(a);
     if (a.state === "unlinked") { dropAccountKeys(); inboxStop(); return; }   // the app forgot the link (this TV was removed or unlinked): the account's keys go too; a typed code still works
-    if (a.state === "item") takeAccountDesign(a);
+    if (a.state === "item") {
+      // Studio has handed this send out and will not again: keep its code (no personal details, just the code and
+      // title) before the fetch starts, so a fetch that fails, or a home that closes in the middle, still has it
+      // for the next Get my new design and the next normal look
+      inboxPending({ code: a.code, title: a.title || "", at: Date.now() });
+      takeAccountDesign(a);
+    }
     if (!PAGE_PAUSED && !ACCT_INBOX.stopped) inboxArm();
   }
   function takeAccountDesign(a) {
+    if (ACCT_INBOX.fetching) return;   // this send is already being fetched
+    ACCT_INBOX.fetching = true;
     var snap = CouchDesignCode.snapshot(typeof CouchDesigner !== "undefined" ? kept(CouchDesigner.KEY) : null);
     CouchDesignCode.get(a.code).then(function (d) {
+      ACCT_INBOX.fetching = false;
       CouchDesignCode.holdUndo(snap, a.title);
       if (typeof CouchDesigner !== "undefined") keep(CouchDesigner.KEY, "on");
       try { localStorage.removeItem("couchtv.design.off"); } catch (e) {}
@@ -7294,6 +7303,7 @@
       inboxPending(null);
       setTimeout(restart, 300);
     }, function (e) {
+      ACCT_INBOX.fetching = false;
       // Studio hands each send out once: when only the fetch failed (no internet, busy, no room), keep its code
       // (a send's code lasts 7 days) and get it at the next look instead of losing it. A code the store says is
       // used, gone or not a design is dropped.

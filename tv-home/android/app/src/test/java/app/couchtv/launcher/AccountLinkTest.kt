@@ -101,6 +101,16 @@ class AccountLinkTest {
         assertEquals("https://couchtv.joshuaseage.com", AccountLink.STUDIO)
         // a build made without -PstudioTestUrl (every release and every normal debug build) asks Couch TV Studio itself
         if (BuildConfig.STUDIO_TEST.isEmpty()) assertEquals(AccountLink.STUDIO, AccountLink.studio())
+        // a normal build keeps its config; a debug build with a test site points design_store at it (never the live store)
+        if (BuildConfig.STUDIO_TEST.isEmpty()) assertNull(AccountLink.testStoreBase())
+        assertNull(AccountLink.testStoreBase(AccountLink.STUDIO))
+        assertEquals("http://127.0.0.1:5571", AccountLink.testStoreBase("http://10.0.2.2:5571"))
+        assertEquals("http://127.0.0.1:5571", AccountLink.testStoreBase("http://localhost:5571"))
+        assertEquals("http://127.0.0.1", AccountLink.testStoreBase("http://10.0.2.2"))
+        assertEquals("https://test.example.org", AccountLink.testStoreBase("https://test.example.org"))
+        assertNull(AccountLink.testStoreBase("http://192.168.1.5:5571"))
+        assertEquals("", AccountLink.testStoreLine(null))
+        assertTrue(AccountLink.testStoreLine("http://127.0.0.1:5571").contains("design_store: \"http://127.0.0.1:5571\""))
         // the pool call follows the same switch (S8)
         assertEquals(AccountLink.studio() + "/v1/setup/pool", AccountLink.poolUrl())
     }

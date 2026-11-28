@@ -56,6 +56,7 @@ const PROFILE = { platform: "Google TV", sdk: 34, memMb: 1843, res: "1920x1080",
 // the bridge's side, kept in node so it lives across the home's restarts
 const app = { linked: true, inboxAsks: 0, answer: { state: "item", code: CODE, title: TITLE, poll: 30 }, unlinks: 0 };
 const fetched = [];
+let storeDelay = 0;  // ms the store takes to answer a fetch
 let storeFail = 0;   // answer the next fetches 503 (Studio busy)
 
 const browser = await chromium.launch();
@@ -88,12 +89,13 @@ try {
     };
     window.__linkedAtStart = window.__linked().then((v) => { linked = v; });
   }, PROFILE);
-  await page.route(STORE + "/**", (r) => {
+  await page.route(STORE + "/**", async (r) => {
     const u = r.request().url(), body = r.request().postData() || "";
     const json = (status, j) => r.fulfill({ status, contentType: "application/json", headers: { "access-control-allow-origin": "*" }, body: JSON.stringify(j) });
     if (r.request().method() === "OPTIONS") return r.fulfill({ status: 204, headers: { "access-control-allow-origin": "*", "access-control-allow-headers": "content-type", "access-control-allow-methods": "POST" } });
     if (/\/v1\/designs\/fetch$/.test(u)) {
       fetched.push({ body: JSON.parse(body), headers: r.request().headers() });
+      if (storeDelay) await new Promise((res) => setTimeout(res, storeDelay));
       if (storeFail > 0) { storeFail--; return json(503, {}); }
       return json(200, { design: DESIGN });
     }
@@ -220,6 +222,20 @@ try {
   ok(fetched.length === f1 + 1 && fetched[fetched.length - 1].body.code === CODE2, "its design is fetched");
   ok(!(await page.evaluate(() => localStorage.getItem("couchtv.inbox.pending"))), "and then forgotten");
   ok(await page.evaluate(() => !!localStorage.getItem("couchtv.design.fetched") && !/Use this design\?/.test(document.body.textContent)), "the design is on, with no question");
+
+  // 4a4. A send is kept the moment it is handed out, before its fetch finishes (a home that closes mid fetch loses nothing)
+  const CODE3 = "CTV1-" + "Qq7-_".repeat(8) + "Cd5";
+  app.answer = { state: "item", code: CODE3, title: "Late supper", poll: 60 };
+  storeDelay = 2500;
+  await toDesigns();
+  ok(await toRow(/Get my new design/), "Check again, for the late send");
+  await page.evaluate(() => localStorage.setItem("couchtv.inbox.last", String(Date.now() - 60000)));
+  await press("Enter", 600);
+  const early = await page.evaluate(() => JSON.parse(localStorage.getItem("couchtv.inbox.pending") || "null"));
+  ok(early && early.code === CODE3 && Object.keys(early).sort().join() === "at,code,title", "the send is kept while its fetch is still running (code, title and time only)");
+  storeDelay = 0;
+  await page.waitForTimeout(4000); await ready();
+  ok(!(await page.evaluate(() => localStorage.getItem("couchtv.inbox.pending"))), "and forgotten once the design arrived");
 
   // 4b. Unlink: asks once, then forgets the link; the inbox stops
   await toDesigns();
