@@ -134,6 +134,52 @@ class Page(unittest.TestCase):
         pg.wait_for_selector('section[data-step="done"]:not([hidden])', timeout=30000)
         self.assertTrue(pg.is_enabled("#back"))
 
+    def ha_choice(self, installed, section=True):
+        """S7: the plan screen with this computer's Home Assistant set for the TV (pretend) and the TV already having `installed`.
+        Returns the page and the replace_ha values make_home was asked with."""
+        from unittest import mock
+        asked = []
+        real = uh.steps.make_home
+
+        def make_home(*a, **kw):
+            asked.append(kw.get("replace_ha"))
+            return real(*a, **kw)
+        for patch in (mock.patch.object(uh.server.smarthome, "tv_section", lambda tv_id: {"url": "http://homeassistant.local:8123"} if section else None),
+                      mock.patch.object(uh.server, "_rows", lambda: {"": "tv_abc123"}),
+                      mock.patch.object(uh.server.steps, "make_home", make_home)):
+            patch.start()
+            self.addCleanup(patch.stop)
+        pg = self.open(uh.Harness(installed=installed))
+        self.to_plan(pg)
+        pg.wait_for_function("document.getElementById('plan-list').children.length > 0")
+        return pg, asked
+
+    def test_ha_choice_shows_for_a_tv_with_our_app_and_something_to_send(self):
+        pg, _ = self.ha_choice(("app.couchtv.launcher",))
+        self.assertTrue(pg.is_visible("#ha-row"))
+        self.assertIn("Send this computer's Home Assistant to it?", pg.inner_text("#ha-row"))
+
+    def test_ha_choice_is_not_asked_of_a_tv_with_none_of_our_apps(self):
+        pg, _ = self.ha_choice(())                      # sent it without asking
+        self.assertFalse(pg.is_visible("#ha-row"))
+
+    def test_ha_choice_is_not_asked_when_there_is_nothing_to_send(self):
+        pg, _ = self.ha_choice(("dev.couchtv.ontv",), section=False)
+        self.assertFalse(pg.is_visible("#ha-row"))
+
+    def test_ha_choice_keep_is_the_default(self):
+        pg, asked = self.ha_choice(("app.couchtv.launcher",))
+        self.assertTrue(pg.is_checked("#ha-send-keep"))
+        self.assertFalse(pg.is_checked("#ha-send-yes"))
+        self.install(pg)
+        self.assertEqual(asked, [False])                # untouched: keep what the TV has
+
+    def test_ha_choice_send_it_sends_replace_ha(self):
+        pg, asked = self.ha_choice(("app.couchtv.launcher",))
+        pg.check("#ha-send-yes")
+        self.install(pg)
+        self.assertEqual(asked, [True])
+
     def test_back_from_finish_does_not_install_again(self):
         pg = self.open(uh.Harness())
         self.to_plan(pg)

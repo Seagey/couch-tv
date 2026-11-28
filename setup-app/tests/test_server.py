@@ -29,6 +29,12 @@ class Server(unittest.TestCase):
     def tearDownClass(cls):
         cls.httpd.shutdown()
 
+    def setUp(self):
+        # the page server's state is one module wide object: a test that ran before (the browser tests leave their pretend TV
+        # connected) must not decide what "not connected" means here (it failed only in a full discover run)
+        server.S.tv = server.S.ip = server.S.route = server.S.facts = server.S.profile = None
+        server.S.job = {"running": False}
+
     def call(self, path, headers=None, body=b"{}", method="POST"):
         req = urllib.request.Request(self.base + path, data=body if method == "POST" else None, method=method, headers=headers or {})
         try:

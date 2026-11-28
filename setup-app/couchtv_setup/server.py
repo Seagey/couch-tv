@@ -109,20 +109,24 @@ def run_job(name, fn):
             if name == "scan" and S.job.get("name") == "scan":
                 return {"started": name}   # the page asked again while a scan is running: it joins that one
             raise TvError("Still busy with the last step.", "busy")
-        S.job = {"name": name, "running": True, "progress": 0, "message": ""}
+        job = S.job = {"name": name, "running": True, "progress": 0, "message": ""}
 
+    # this job's own record, not whatever S.job is by then: a job that ends late (a step still running when a test
+    # or a restart replaced S.job) must never write its result or its "done" into the next job's record
     def progress(frac, msg=None):
-        S.job["progress"] = round(frac, 3)
+        job["progress"] = round(frac, 3)
         if msg:
-            S.job["message"] = msg
+            job["message"] = msg
+
+    progress.job = job
 
     def work():
         try:
-            S.job["result"] = fn(progress)
+            job["result"] = fn(progress)
         except Exception as e:
-            S.job.update(error_payload(e))
+            job.update(error_payload(e))
         finally:
-            S.job["running"] = False
+            job["running"] = False
 
     threading.Thread(target=work, daemon=True).start()
     return {"started": name}
@@ -520,7 +524,7 @@ def api(method, path, body):
 
             def early(rows):
                 # the TVs' own announcements are in: show them while the knocking goes on
-                S.job["partial"] = {"tvs": S.tv_seen.apply(enrich(rows), partial=True)}
+                p.job["partial"] = {"tvs": S.tv_seen.apply(enrich(rows), partial=True)}
             diag = {}
             if fake:
                 # development and screenshots: recorded answers ({"heard", "knocks", "dial", "confirmed"}),

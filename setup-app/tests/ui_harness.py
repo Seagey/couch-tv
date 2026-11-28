@@ -40,7 +40,8 @@ THREE = [row("192.0.2.21", "Lounge TV 2", "ready", "AI PONT"), row("192.0.2.22",
 
 
 class Harness:
-    def __init__(self, rows=None, stub=None, kind="google", slow=0.0, features=None, partial=0.0, known=None):
+    def __init__(self, rows=None, stub=None, kind="google", slow=0.0, features=None, partial=0.0, known=None, installed=()):
+        self.installed = installed     # packages the pretend TV already has (an earlier Couch TV)
         self.known = known or {}       # known-tvs.json as Setup has it (the asleep cards come from it)
         self.partial = partial         # seconds the full scan takes after the TVs' own announcements are in
         self.rows = rows if rows is not None else list(THREE)
@@ -74,7 +75,7 @@ class Harness:
             return [dict(r) for r in h.rows]
 
         def make_tv(ip, ident, route="tcp", port=5555, allow_wait_s=45):
-            tv = FakeTv(h.kind)
+            tv = FakeTv(h.kind, installed=h.installed)
             tv.ip = ip
             tv.close = lambda: None
             h.tvs.append(tv)
@@ -155,8 +156,19 @@ def stub_account(name="Sam", design="Couch Original"):
             "/v1/setup/device/poll": {"token": "T" * 40, "account": {"email": "s***@example.test", "name": name, "design": design}}}
 
 
+_SHARED = []
+
+
 def chromium():
-    """A browser for the tests, or None. Uses Playwright's own copy."""
+    """A browser for the tests, or None. Uses Playwright's own copy. One per process: test_ui and test_live_ui
+    both ask at import, and a second sync_playwright().start() in the same thread dies with "Sync API inside the
+    asyncio loop", which is why the Setup tests only failed in a full discover run (28 Nov 2026)."""
+    if not _SHARED:
+        _SHARED.append(_chromium())
+    return _SHARED[0]
+
+
+def _chromium():
     try:
         from playwright.sync_api import sync_playwright
     except ImportError:
