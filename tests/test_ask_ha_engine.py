@@ -33,6 +33,13 @@ class FakeHA(BaseHTTPRequestHandler):
             return self.send(404, {"message": "not found"})
         if FakeHA.mode == "slow":
             threading.Event().wait(1.5)
+        if FakeHA.mode == "html":
+            raw = b"<html>log in</html>"
+            self.send_response(200)
+            self.send_header("Content-Type", "text/html")
+            self.send_header("Content-Length", str(len(raw)))
+            self.end_headers()
+            return self.wfile.write(raw)
         failed = FakeHA.mode == "error"
         text = "Sorry, I had a problem talking to the AI" if failed else REPLY
         self.send(200, {"response": {"response_type": "error" if failed else "action_done",
@@ -92,13 +99,17 @@ class HAEngine(unittest.IsolatedAsyncioTestCase):
         self.assertIn("did not accept the token", await self.say())
         self.token = TOKEN
         with patch.object(config, "ASK_AGENT_ID", "conversation.nope"):
-            self.assertIn("no conversation agent", await self.say())
+            self.assertIn("no conversation agent conversation.nope", await self.say())
+        FakeHA.mode = "html"
+        asks = {}
+        said = (await claude.ask("hi", None, asks))["say"]
+        self.assertIn("did not answer the way", said)
+        self.assertEqual(asks, {})
         FakeHA.mode = "error"
         self.assertIn("problem talking", await self.say())
         FakeHA.mode = "slow"
-        with patch.object(claude, "ASK_TIMEOUT", 0.3):
-            with self.assertRaises(RuntimeError) as cm:
-                await claude.run_ha("x", timeout=0.3)
+        with self.assertRaises(RuntimeError) as cm:
+            await claude.run_ha("x", timeout=0.3)
         self.assertIn("too long", str(cm.exception))
         FakeHA.mode = "ok"
         with patch.object(config, "ha_location", lambda env=None: ("http://127.0.0.1:9/api", TOKEN)):

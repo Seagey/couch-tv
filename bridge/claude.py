@@ -230,14 +230,17 @@ async def run_ha(prompt, lang=None, timeout=ASK_TIMEOUT):
                               headers={"Authorization": "Bearer " + token}) as r:
                 status = r.status
                 data = await r.json(content_type=None) if status == 200 else None
+    except (aiohttp.ClientConnectorError, aiohttp.ConnectionTimeoutError):
+        # first: a connect timeout is also a TimeoutError, and it means unreachable, not slow
+        raise RuntimeError("I could not reach Home Assistant")
     except asyncio.TimeoutError:
         raise RuntimeError("Home Assistant took too long")
-    except (aiohttp.ClientError, OSError):
-        raise RuntimeError("I could not reach Home Assistant")
+    except (aiohttp.ClientError, OSError, ValueError):  # ValueError: a 200 that is not JSON (a proxy or login page)
+        raise RuntimeError("Home Assistant did not answer the way it should")
     if status == 401:
         raise RuntimeError("Home Assistant did not accept the token")
-    if status == 404:
-        raise RuntimeError("Home Assistant has no conversation agent with that name (ask.agent_id)")
+    if status in (404, 500):  # an unknown agent is a 404 or a 500, depending on the Home Assistant version
+        raise RuntimeError(f"Home Assistant has no conversation agent {config.ASK_AGENT_ID}, or it failed: check ask.agent_id")
     if status != 200 or not isinstance(data, dict):
         raise RuntimeError(f"Home Assistant answered {status}")
     resp = data.get("response") if isinstance(data.get("response"), dict) else {}
@@ -359,7 +362,7 @@ async def ask(text, who, asks, tv_id=None, lang=None):
             if via_ha:
                 return (await run_ha(prompt, lang)).strip()
             return (await run_claude(prompt, system, cfg)).strip()
-        except RuntimeError as e:
+        except Exception as e:  # never let a failure skip the clean up in ask()
             log.warning("ask failed: %s", e)
             reply_key = "ask_did_not_work"
             reply_vars = {"error": str(e)}
