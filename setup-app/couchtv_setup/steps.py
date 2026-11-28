@@ -474,8 +474,11 @@ def _scrubbed(e, secret):
 
 
 def make_home(tv, apk_path, ambient_off=True, people=None, weather=None, progress=lambda f, msg=None: None,
-              ontv_home_switch_off=True, account=None, smart=None):
-    """smart (N12): the Home Assistant section for this TV's room (smarthome.tv_section), sent as ha_b64 with the other settings. None: "none"."""
+              ontv_home_switch_off=True, account=None, smart=None, replace_ha=False):
+    """smart (N12): the Home Assistant section for this TV's room (smarthome.tv_section), sent as ha_b64 with the other settings. None: "none".
+    S7: a TV that already had a Couch TV app on it may hold a Home Assistant set up made on the TV itself (it is in the app's private store, which
+    Setup cannot read), so the section is only sent to a TV with none of our apps on it, or when the person chose to replace it (replace_ha).
+    Otherwise "none" is sent, which leaves a set up made on the TV as it is, and the answer says so (smart_kept)."""
     done = []
     ontv = ontv_home(tv)
     alias_left = False
@@ -497,6 +500,7 @@ def make_home(tv, apk_path, ambient_off=True, people=None, weather=None, progres
             rec["home"] = prev
     _write_record(tv, rec)
 
+    had_app = bool(_packages(tv) & {HOME_PKG, ONTV_PKG})   # S7: an app of ours was here before this install
     progress(0.05, "Copying Couch TV to the TV")
     tv.install(apk_path, lambda f: progress(0.05 + 0.6 * f, "Copying Couch TV to the TV" if f < 1 else "Installing it"))
     done.append("installed")
@@ -542,6 +546,9 @@ def make_home(tv, apk_path, ambient_off=True, people=None, weather=None, progres
     from . import widgetperms        # the doorbell card the person turned on in Widget permissions stays on
     if widgetperms.keep_after_install(tv):
         done.append("widget permissions kept")
+    smart_kept = bool(smart) and had_app and not replace_ha
+    if smart_kept:
+        smart = None
     cfg = home_config(people, weather)
     ha = base64.b64encode(json.dumps(smart, separators=(",", ":")).encode()).decode() if smart else "none"
     sets = f' --es bridge none --es config_b64 {cfg} --es ha_b64 {ha} --es key ""'
@@ -559,6 +566,8 @@ def make_home(tv, apk_path, ambient_off=True, people=None, weather=None, progres
         raise
     if smart:
         done.append("smart home sent")
+    elif smart_kept:
+        done.append("smart home left as it is on the TV")
     link, link_error = None, None
     if account and account.get("link"):
         time.sleep(3)                                 # the home is up, so its answer comes from the running app
@@ -600,7 +609,7 @@ def make_home(tv, apk_path, ambient_off=True, people=None, weather=None, progres
     return {"changed": done, "front": result["ok"], "home_key_opens": "Couch TV" if resolved.startswith(HOME_PKG + "/") else resolved,
             "watch": watch, "watch_bound": bound, "fire": fire, "disabled": rec["disabled"],
             "warning": watch_warning(other_watches(tv)), "other_front": result.get("other_front"),
-            "ontv_alias_left": alias_left, "link": link, "link_error": link_error}
+            "ontv_alias_left": alias_left, "link": link, "link_error": link_error, "smart_kept": smart_kept}
 
 
 WATCH_LABEL = "Home button watch"   # FireWatch's android:label in tv-home's AndroidManifest.xml

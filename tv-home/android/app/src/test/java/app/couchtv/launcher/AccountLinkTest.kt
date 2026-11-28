@@ -101,6 +101,8 @@ class AccountLinkTest {
         assertEquals("https://couchtv.joshuaseage.com", AccountLink.STUDIO)
         // a build made without -PstudioTestUrl (every release and every normal debug build) asks Couch TV Studio itself
         if (BuildConfig.STUDIO_TEST.isEmpty()) assertEquals(AccountLink.STUDIO, AccountLink.studio())
+        // the pool call follows the same switch (S8)
+        assertEquals(AccountLink.studio() + "/v1/setup/pool", AccountLink.poolUrl())
     }
 
     // "Remove my keys" on the website: the store says drop_keys once in the inbox answer, and the page drops the account's keys

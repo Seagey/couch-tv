@@ -118,6 +118,11 @@ class ReleaseChannelTest {
         assertTrue(ReleaseChannel.newer("v0.13.16", "0.13.14"))
         assertFalse(ReleaseChannel.newer("v0.13.16", "0.13.16"))
         assertFalse(ReleaseChannel.newer("v0.13.15", "0.13.16"))
+        // 0.13.17 (Matter first use, the pool and TV settings, new Fast TV looks) reaches 0.13.16 and 0.13.15 TVs
+        assertTrue(ReleaseChannel.newer("v0.13.17", "0.13.16"))
+        assertTrue(ReleaseChannel.newer("v0.13.17", "0.13.15"))
+        assertFalse(ReleaseChannel.newer("v0.13.17", "0.13.17"))
+        assertFalse(ReleaseChannel.newer("v0.13.16", "0.13.17"))
         assertFalse(ReleaseChannel.newer("v0.13.10", "0.13.11"))
         assertFalse(ReleaseChannel.newer("v0.13.8", "0.13.9"))
     }

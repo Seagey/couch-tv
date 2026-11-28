@@ -108,6 +108,8 @@ object AccountLink {
     /** Where the inbox and leave calls go: always [STUDIO], except a DEBUG build made with -PstudioTestUrl=<local site>
      *  (emulator tests of Send to a linked TV against a local site; a release build never reads it). */
     fun studio(): String = BuildConfig.STUDIO_TEST.takeIf { BuildConfig.DEBUG && Regex("https?://[A-Za-z0-9.:-]+").matches(it) } ?: STUDIO
+    /** The pool readings call (S8): the same switch as the inbox and leave calls, so the emulator test URL reaches it too. */
+    fun poolUrl(): String = "${studio()}/v1/setup/pool"
     private const val INBOX_MAX = 64 * 1024
     // When the TV asks is the page's (design-code.js, app.js: after 30 minutes away, a press, or once a week; Studio's
     // poll only when longer). Here the numbers are only kept sane: poll 30 s to 20 days (a week when missing),
@@ -225,7 +227,7 @@ object AccountLink {
         val sent = poolBody(arg) ?: return readPool(400, null, id)
         val token = token(kv) ?: return readPool(401, null, id)
         val r = try {
-            val c = java.net.URL("$STUDIO/v1/setup/pool").openConnection() as java.net.HttpURLConnection
+            val c = java.net.URL(poolUrl()).openConnection() as java.net.HttpURLConnection
             try {
                 c.instanceFollowRedirects = false
                 c.connectTimeout = 10000

@@ -223,9 +223,10 @@ def _fail(out, log):
     """Plain words for a failed npm run; the scrubbed tail goes to the log (a file in matter-service), never to the person."""
     tail = scrub("\n".join((out or "").strip().splitlines()[-25:]))
     try:
-        with open(log, "w", encoding="utf-8") as f:
+        fd = os.open(log, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)   # mode 600 from the first byte, never wider
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
             f.write(tail + "\n")
-        os.chmod(log, 0o600)
+        os.chmod(log, 0o600)   # a log left by an older run keeps its old mode until now
     except OSError:
         pass
     if OFFLINE.search(out or ""):

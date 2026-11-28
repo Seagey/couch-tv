@@ -1363,6 +1363,10 @@ class Matter:
             log.info("matter: a code arrived before Matter is installed: the Helper was asked to set it up")
             return True
         except OSError:
+            try:
+                os.unlink(path + ".part")   # a failed write leaves no half file (it held the code)
+            except OSError:
+                pass
             return False
 
     async def _commission(self, code, address=None):
