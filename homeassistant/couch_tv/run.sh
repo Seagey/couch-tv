@@ -99,7 +99,7 @@ BRIDGE_PID=$!
 
 # The MCP server for Home Assistant's MCP integration (loopback, port 5401). If it stops it is
 # started again after a pause that grows to 30 seconds; the bridge carries on either way. A couch-tv
-# without the HTTP mode just runs the plain version and exits at once, so it shows up as repeats.
+# without the HTTP mode does not start it.
 if [ "$(opt allow_power_off)" = "true" ]; then export COUCH_MCP_ALLOW_POWER_OFF=1; fi
 mcp_loop() {
   delay=2
@@ -114,8 +114,13 @@ mcp_loop() {
     delay=$((delay * 2)); [ "$delay" -le 30 ] || delay=30
   done
 }
-mcp_loop &
-MCP_PID=$!
+MCP_PID=
+if grep -q COUCH_MCP_HTTP bridge/mcp_server.py; then
+  mcp_loop &
+  MCP_PID=$!
+else
+  say "this couch-tv has no MCP HTTP mode yet, so the MCP server is not started"
+fi
 
 TRAPPED=0
 stop() { TRAPPED=1; kill "$BRIDGE_PID" 2>/dev/null || true; kill "$MCP_PID" 2>/dev/null || true; }
