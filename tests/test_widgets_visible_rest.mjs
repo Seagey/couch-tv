@@ -51,7 +51,7 @@ const SAME = {
   "bins tile bin_b Food": "a tile shows only the lid colours (its help says so)"
 };
 const NSAME = 14;   // how many cases SAME names (pinned, so a new one is a decision)
-const KINDS = ["aircon", "controls", "camera", "doorbell", "sensor", "energy", "solar", "battery", "speakers", "scenes", "bins", "pool", "stack"];
+const KINDS = ["aircon", "controls", "camera", "doorbell", "sensor", "energy", "solar", "battery", "speakers", "scenes", "bins", "pool", "tvsettings", "stack"];
 const TYPES = { ".html": "text/html", ".js": "text/javascript", ".css": "text/css", ".json": "application/json", ".svg": "image/svg+xml", ".woff2": "font/woff2", ".jpg": "image/jpeg", ".png": "image/png", ".webp": "image/webp" };
 const PAGE = '<!doctype html><html><head><meta charset="utf-8"><link rel="stylesheet" href="widgets.css"></head><body style="margin:0;width:1920px;height:1080px;background:#26303f">' +
   ["icon-sets.js", "design-icons.js", "app-catalogue.js", "widget-words.js", "widgets.js", "widget-caps.js", "widget-web.js", "widget-detail.js"].map((s) => '<script src="' + s + '"></script>').join("") + "</body></html>";
@@ -190,6 +190,8 @@ try {
       // the coming bin night, in whole days, one week less for the second bin
       const anchorFor = (wd, v) => { const d = new Date(), night = new Date(d.getFullYear(), d.getMonth(), d.getDate() + (wd - d.getDay() + 7) % 7); return Math.round(Date.UTC(night.getFullYear(), night.getMonth(), night.getDate()) / 86400000) - 1 - (v === "b" ? 7 : 0); };
       V.bins[1].splice(4, 1, ["thisweek a (alt on)", { alt: true, thisweek: "a", anchor: anchorFor(2, "a") }], ["thisweek b (alt on)", { alt: true, thisweek: "b", anchor: anchorFor(2, "b") }, false, "thisweek a (alt on)"]);
+      // the TV settings tile (Phase 3 looks, P3c): its words under the gear
+      V.tvsettings = [{}, [["default", {}], ["words short", { words: "short" }], ["words none", { words: "none" }], ["words full (same)", { words: "full" }, true]]];
       // a stack is the size of the widgets in it (its sizes list is empty): the two sizes these four share
       V.stack = [{}, [["default", {}], ["turn 10", { turn: 10 }], ["turn 30", { turn: 30 }], ["turn 60", { turn: 60 }], ["turn 0 (by time of day)", { turn: 0 }], ["turn 20 (same)", { turn: 20 }, true]]];
       const res = [];

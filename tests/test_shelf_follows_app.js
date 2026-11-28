@@ -41,7 +41,7 @@ const context = {
   renderPeople() {}, addCards() {}, kidsOn: () => false, npVisible: () => false, gridKey: (a) => 'app:' + a.package,
   whoIndex: () => 0, peopleCount: () => 1,
   scrollCalls: 0, scrollShelf() { context.scrollCalls++; },
-  KEEP_MAX: 10, KW_ON: true, NIGHT: false, CARDS: [], SHELF_FOLLOW: true, lift: null, touched: true,
+  KEEP_MAX: 10, KW_ON: true, NIGHT: false, SPOTIFY: {}, CARDS: [], SHELF_FOLLOW: true, lift: null, touched: true,
   PEOPLE: [{ id: 'p1', name: 'Person 1' }], who: 'p1',
   data: { shows: [], showsBy: { p1: [] }, videosBy: { p1: [] }, apps: [] },
   zone: 'grid', s: 0, g: 0, shelfEls: [], gridItems: [],

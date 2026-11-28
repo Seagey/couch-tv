@@ -54,7 +54,8 @@ const NOT_DRAWN = {
   "Persian Gulf Pro League": "a football competition's own name on the scores card (origin/main #299), kept like an app's name",
   "Coppa Italia": "a football competition's own name on the scores card (origin/main #299), kept like an app's name",
   "Copa del Rey": "a football competition's own name on the scores card (origin/main #299), kept like an app's name",
-  "FA Cup": "a football competition's own name on the scores card (origin/main #299), kept like an app's name"
+  "FA Cup": "a football competition's own name on the scores card (origin/main #299), kept like an app's name",
+  "Cormorant Garamond": "a font family name in a CSS font stack (Phase 3 looks, P3c), never words"
 };
 const files = ["tv-home/web/app.js", "tv-home/web/design.js", "tv-home/web/design-code.js"];
 // The greeting and short line under the clock (origin/main, home.greeting): shown only while the home

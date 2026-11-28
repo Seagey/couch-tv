@@ -95,7 +95,7 @@ const context = {
   esc: (v) => String(v == null ? '' : v), slim: (u) => u, iconUrl: (pkg) => (pkg ? 'icon:' + pkg : null),
   renderPeople() {}, addCards() {}, kids: false, kidsOn: () => context.kids, idleAmbientActive: false, npVisible: () => false, gridKey: (a) => 'app:' + a.package,
   whoIndex: () => 0, peopleCount: () => 1, scrollShelf() {},
-  API: '', HOME: {}, ST: {}, TV: null, MOCK: false, LIGHTER: false, SUN_SYNC: false, LOOP: false, NIGHT: true, KW_POSTER: false, LOCAL_SPOTIFY: false, OLED: false, THEME: 'night',
+  API: '', HOME: {}, ST: {}, TV: null, MOCK: false, LIGHTER: false, SUN_SYNC: false, LOOP: false, NIGHT: true, KW_POSTER: false, LOCAL_SPOTIFY: false, SPOTIFY: {}, OLED: false, THEME: 'night',
   KEEP_MAX: 10, KW_ON: true, CARDS: [], SHELF_FOLLOW: false, lift: null, touched: true,
   PEOPLE: [{ id: 'p1', name: 'Person 1' }], who: 'p1',
   data: { shows: [], showsBy: { p1: [] }, videosBy: { p1: [] }, apps: [], weather: null },
@@ -830,7 +830,7 @@ console.log('Loop look version tests passed.');
   np.getBoundingClientRect = () => rect(96, 76, 565, 32);
   const ctx = {
     document: { documentElement: { dir: 'ltr' } }, touched: false,
-    LOOP: true, NIGHT: true, footballEnabled: false, LOCAL_SPOTIFY: false, expanded: false, AMBIENT_MUSIC: false, music: { state: 'playing' }, lift: null,
+    LOOP: true, NIGHT: true, footballEnabled: false, LOCAL_SPOTIFY: false, SPOTIFY: {}, npSub: "btns", npScrubPos: 0, expanded: false, AMBIENT_MUSIC: false, music: { state: 'playing' }, lift: null,
     zone: 'shelf', s: 0, g: 0, qi: 0, pi: 0, npI: 1, currentNpBtns: [], GRID_COLS: 12, people: 1, quick: 2, reach: true,
     shelfEls: [1, 2, 3, 4, 5], gridItems: [], PEOPLE: [{ id: 'a' }, { id: 'b' }],
     gridEls: Array.from({ length: 6 }, (_, i) => ({ getBoundingClientRect: () => rect(564 + i * 136, 912, 112, 112) })),
@@ -912,7 +912,7 @@ console.log('Loop look version tests passed.');
   ctx.npFit('a'); ctx.npFit('a'); ctx.npFit(''); ctx.npFit('');
   assert.strictEqual(calls.length, 2, 'once per change, not on every key press');
   ctx.LOOP = false; ctx.npFit('b'); assert.strictEqual(calls.length, 2, 'only in the Loop look');
-  assert(/if \(!on\) \{[^}]*el\.innerHTML = "";[^}]*npFit\(""\);\s*return;\s*\}/.test(source) && /npFit\(\[music\.title, music\.artist \|\| music\.album \|\| "", btns\.length\]\.join\("\\n"\)\);\n  \}/.test(source), 'renderNp refits the date line');
+  assert(/if \(!on\) \{[^}]*el\.innerHTML = "";[^}]*npFit\(""\);\s*(?:npLiftFit\(\);\s*)?return;\s*\}/.test(source) && /npFit\(\[music\.title, music\.artist \|\| music\.album \|\| "", btns\.length\]\.join\("\\n"\)\);\n(?:    npLiftFit\(\);\n)?  \}/.test(source), 'renderNp refits the date line (and, since P3a, the lift of the now playing card)');
   assert(/renderPop\(\);\n\s*if \(LOOP && npVisible\(\)\) fitDate\(\);/.test(source), 'so does renderPeople');
   console.log('Loop date line and Now playing tests passed.');
 }
