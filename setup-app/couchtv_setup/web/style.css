@@ -442,3 +442,8 @@ section.tidy .actions button.primary { box-shadow: 0 16px 34px -14px rgba(168,43
   .btn.huge { height: 84px; }
   .pills { margin-top: 20px; }
 }
+
+/* S7: the Home Assistant choice on the plan screen, only for a TV that already has Couch TV */
+fieldset.ha-choice { border: 0; margin: 14px 0 0; padding: 0; display: grid; gap: 10px; }
+fieldset.ha-choice legend { font-weight: 700; padding: 0; margin-bottom: 8px; }
+fieldset.ha-choice[hidden] { display: none; }

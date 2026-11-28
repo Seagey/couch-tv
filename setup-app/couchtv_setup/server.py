@@ -280,6 +280,19 @@ def _register(strict=False):
     return reg
 
 
+def _smart_choice(tv):
+    """S7: ask only when this computer has a Home Assistant to send to this TV AND the TV already has Couch TV (a set up again, where the
+    TV may hold a Home Assistant made on the TV itself, which neither Setup nor the account can see). A TV with none of our apps is sent it
+    without asking. Never raises: no answer means no question, and the safe side (keep what the TV has) holds in make_home."""
+    try:
+        tv_id = (S.link.tv or {}).get("tv_id") or _rows().get(_row_name() or "")
+        if not tv_id or smarthome.tv_section(tv_id) is None or not steps.had_couch_app(tv):
+            return {"ask": False}
+        return {"ask": True}
+    except Exception:
+        return {"ask": False}
+
+
 def _account(fn):
     """A call with the account's sign in. When that ran out (2 hours, signed out on the website, a TV unlinked there)
     Setup is signed out here too and says so, so the page can offer the code again instead of failing for ever."""
@@ -685,7 +698,8 @@ def api(method, path, body):
     if path == "/api/plan":
         tv = need_tv()
         return {"items": steps.plan(tv, S.facts, ambient_off=bool(body.get("ambient_off", False)),
-                                    ontv_home_off=bool(body.get("ontv_home_off", True))), "facts": S.facts}
+                                    ontv_home_off=bool(body.get("ontv_home_off", True))), "facts": S.facts,
+                "smart_choice": _smart_choice(tv)}
     if path.startswith("/api/live/"):
         return live.route(path[len("/api/live/"):], body, S, need_tv)
     if path.startswith("/api/perms/"):

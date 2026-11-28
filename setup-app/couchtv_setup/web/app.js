@@ -735,6 +735,8 @@
     api("/api/plan", { ambient_off: $("ambient").checked, ontv_home_off: $("ontv-off").checked }).then(function (p) {
       var ul = $("plan-list"); ul.textContent = "";
       p.items.forEach(function (t) { var li = document.createElement("li"); li.textContent = t; ul.appendChild(li); });
+      // S7: only when this computer has a Home Assistant for this TV and the TV already has Couch TV
+      $("ha-row").hidden = !(p.smart_choice && p.smart_choice.ask);
     }, fail);
   }
   $("ambient").addEventListener("change", refreshPlan);
@@ -835,7 +837,8 @@
     var named = room ? api("/api/name-tv", { ip: state.ip, room: room }).catch(function () {}) : Promise.resolve();
     named.then(function () {
       // names and a weather place are not asked here any more: an account's home details still go on the TV
-      return job("/api/setup", { ambient_off: $("ambient").checked, ontv_home_off: $("ontv-off").checked, people: [], weather: null },
+      return job("/api/setup", { ambient_off: $("ambient").checked, ontv_home_off: $("ontv-off").checked, people: [], weather: null,
+        replace_ha: !$("ha-row").hidden && $("ha-send-yes").checked },
         working("Setting up " + name, "setup"));
     })
       .then(function (r) { finish(r, name); }, function (e) { show("plan"); fail(e); });
@@ -860,6 +863,7 @@
     if (r.speed && r.speed.cls) {
       lines.push("Measured how smoothly it draws: " + ({ a: "Slow", b: "Everyday", c: "Quick", d: "Fast" })[r.speed.cls] + (linked ? " (Couch TV Studio uses this)" : ""));
     }
+    if (r.smart_kept) lines.push("Kept the Home Assistant the TV already had");
     if (r.apk && !r.kept_ontv) lines.push("Version " + r.apk.version + ", checked against " + r.apk.checked);
     lines.forEach(function (l) { var li = document.createElement("li"); li.textContent = l; ul.appendChild(li); });
     ul.hidden = !lines.length;
@@ -1077,11 +1081,12 @@
     openRow = null; rows = {}; detailsOpen = {};
     ["tv-room", "ip", "code", "pair-port", "tls-port", "fl-code", "undo-details-x"].forEach(function (id) { if ($(id)) $(id).value = ""; });
     $("ambient").checked = false; $("ontv-off").checked = true; $("undo-debug").checked = false;
+    $("ha-send-keep").checked = true;
     $("helper-tv-autostart").checked = true;
     ["plan-list", "done-account", "undo-list", "guide-steps", "found", "fl-device-code", "session-list-x"].forEach(function (id) { if ($(id)) $(id).textContent = ""; });
     text("plan-name", "this TV"); text("done-line", ""); text("link-status", ""); text("fl-status", ""); text("pair-status", ""); text("tls-status", "");
     text("health-text", ""); text("health-status", ""); text("undo-details", "");
-    ["done-line", "done-account", "link-status", "link-fix", "fl-panel", "guide", "ontv-row", "tcl-note", "plan-account", "fl-device-code"].forEach(function (id) { $(id).hidden = true; });
+    ["done-line", "done-account", "link-status", "link-fix", "fl-panel", "guide", "ontv-row", "ha-row", "tcl-note", "plan-account", "fl-device-code"].forEach(function (id) { $(id).hidden = true; });
     $("health-send").hidden = false;
     ["remote-go", "health-look", "debug-off"].forEach(function (id) { $(id).hidden = false; });
     $("link-cta").disabled = false;

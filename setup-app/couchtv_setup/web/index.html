@@ -393,6 +393,11 @@
       <details class="sub"><summary>Every step, in detail</summary><ul id="plan-list" class="plan"></ul></details>
     </details>
     <label class="tick" id="ontv-row" hidden><input type="checkbox" id="ontv-off" checked> Switch off the phone remote app's home and watch (it stays installed). Untick to keep it as the home: nothing is installed then.</label>
+    <fieldset class="ha-choice" id="ha-row" hidden>
+      <legend>This TV already has Couch TV. Send this computer's Home Assistant to it?</legend>
+      <label class="tick"><input type="radio" name="ha-send" id="ha-send-yes" value="send"> Send it</label>
+      <label class="tick"><input type="radio" name="ha-send" id="ha-send-keep" value="keep" checked> Keep what the TV has</label>
+    </fieldset>
     <label class="tick" hidden><input type="checkbox" id="ambient"> Switch off ambient mode</label>
     <p class="notice" id="plan-account" hidden></p>
     <p class="small" id="tcl-note" hidden><b>TCL:</b> after setting up, open the TV's <b>Settings, Accessibility</b> and check both Couch TV services are switched on. On TCL TVs that keeps Couch TV as the home after a restart.</p>

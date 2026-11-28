@@ -473,6 +473,11 @@ def _scrubbed(e, secret):
     return TvError(words, e.code)
 
 
+def had_couch_app(tv):
+    """True when one of our apps is already on the TV (a set up again). Its Home Assistant, if it has one, is in the app's private store."""
+    return bool(_packages(tv) & {HOME_PKG, ONTV_PKG})
+
+
 def make_home(tv, apk_path, ambient_off=True, people=None, weather=None, progress=lambda f, msg=None: None,
               ontv_home_switch_off=True, account=None, smart=None, replace_ha=False):
     """smart (N12): the Home Assistant section for this TV's room (smarthome.tv_section), sent as ha_b64 with the other settings. None: "none".
@@ -500,7 +505,7 @@ def make_home(tv, apk_path, ambient_off=True, people=None, weather=None, progres
             rec["home"] = prev
     _write_record(tv, rec)
 
-    had_app = bool(_packages(tv) & {HOME_PKG, ONTV_PKG})   # S7: an app of ours was here before this install
+    had_app = had_couch_app(tv)   # S7: an app of ours was here before this install
     progress(0.05, "Copying Couch TV to the TV")
     tv.install(apk_path, lambda f: progress(0.05 + 0.6 * f, "Copying Couch TV to the TV" if f < 1 else "Installing it"))
     done.append("installed")

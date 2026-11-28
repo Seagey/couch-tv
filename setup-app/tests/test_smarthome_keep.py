@@ -60,5 +60,47 @@ class Keep(unittest.TestCase):
         self.assertIn('replace_ha=body.get("replace_ha") is True', src)
 
 
+
+class Choice(unittest.TestCase):
+    """The plain choice on the plan screen: only when this computer has a Home Assistant for this TV and the TV already has Couch TV."""
+
+    def plan(self, tv, section, tv_id="33333333-3333-4333-8333-333333333333"):
+        from unittest import mock
+        from couchtv_setup import server, smarthome
+        old = server.S.tv, server.S.facts
+        server.S.tv, server.S.facts = tv, steps.facts(tv)
+        try:
+            with mock.patch.object(smarthome, "tv_section", return_value=section), \
+                 mock.patch.object(server, "_rows", return_value={"x": tv_id} if tv_id else {}), \
+                 mock.patch.object(server, "_row_name", return_value="x"):
+                return server.api("POST", "/api/plan", {})["smart_choice"]
+        finally:
+            server.S.tv, server.S.facts = old
+
+    def test_asks_only_for_a_tv_that_already_has_couch_tv_and_a_home_assistant_to_send(self):
+        self.assertEqual(self.plan(FakeTv("google", installed=["app.couchtv.launcher"]), SECTION), {"ask": True})
+        self.assertEqual(self.plan(FakeTv("google", installed=["dev.couchtv.ontv"]), SECTION), {"ask": True})
+
+    def test_a_tv_with_none_of_our_apps_is_sent_it_without_asking(self):
+        self.assertEqual(self.plan(FakeTv("google"), SECTION), {"ask": False})
+
+    def test_nothing_to_send_or_no_row_means_no_question(self):
+        self.assertEqual(self.plan(FakeTv("google", installed=["app.couchtv.launcher"]), None), {"ask": False})
+        self.assertEqual(self.plan(FakeTv("google", installed=["app.couchtv.launcher"]), SECTION, tv_id=None), {"ask": False})
+
+    def test_the_screen_asks_in_plain_words_and_sends_the_answer(self):
+        web = os.path.join(HERE, "..", "couchtv_setup", "web")
+        html = open(os.path.join(web, "index.html"), encoding="utf-8").read()
+        js = open(os.path.join(web, "app.js"), encoding="utf-8").read()
+        self.assertIn("This TV already has Couch TV. Send this computer's Home Assistant to it?", html)
+        self.assertIn("Send it</label>", html)
+        self.assertIn("Keep what the TV has</label>", html)
+        self.assertRegex(html, r'id="ha-send-keep" value="keep" checked', "keeping what the TV has is the default")
+        self.assertIn('id="ha-row" hidden', html)
+        self.assertIn('replace_ha: !$("ha-row").hidden && $("ha-send-yes").checked', js)
+        self.assertIn('$("ha-row").hidden = !(p.smart_choice && p.smart_choice.ask)', js)
+        self.assertNotIn("\u2014", html + js)
+
+
 if __name__ == "__main__":
     unittest.main()
