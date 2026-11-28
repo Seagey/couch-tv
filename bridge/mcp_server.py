@@ -455,8 +455,10 @@ HTTP_INSTRUCTIONS = (
     "pass its id (from tv_list) as tv.")
 
 
-def _within_wait(fn):
-    """Run fn in a thread; if it is not done in COUCH_MCP_WAIT seconds, answer PENDING and let it finish alone."""
+def _within_wait(fn, srv):
+    """Run fn in a thread; if it is not done in COUCH_MCP_WAIT seconds, answer PENDING and let it finish alone.
+    Meanwhile a log line goes down the request's own stream every 2 s: Home Assistant's client gives up on a
+    stream that is silent for 5 s ("SSE stream ended without a response")."""
     @functools.wraps(fn)
     async def run(*a, **k):
         loop = asyncio.get_running_loop()
@@ -472,10 +474,20 @@ def _within_wait(fn):
             except RuntimeError:   # the server has stopped
                 pass
         threading.Thread(target=work, daemon=True).start()
-        try:
-            out = await asyncio.wait_for(asyncio.shield(done), float(os.environ.get("COUCH_MCP_WAIT") or 24))
-        except asyncio.TimeoutError:
-            return PENDING
+        ctx = srv.get_context()
+        end = loop.time() + float(os.environ.get("COUCH_MCP_WAIT") or 24)
+        while not done.done():
+            left = end - loop.time()
+            if left <= 0:
+                return PENDING
+            try:
+                await asyncio.wait_for(asyncio.shield(done), min(2, left))
+            except asyncio.TimeoutError:
+                try:
+                    await ctx.info("Working on it on the TV.")
+                except Exception:   # the client has gone: the thread still finishes
+                    return PENDING
+        out = done.result()
         if isinstance(out, Exception):
             raise out
         return out
@@ -483,7 +495,10 @@ def _within_wait(fn):
 
 
 def http_server(port):
-    srv = FastMCP("tv", instructions=HTTP_INSTRUCTIONS, host="127.0.0.1", port=port, transport_security=TransportSecuritySettings(
+    # stateless: Home Assistant opens a new session for every call, so there is none to keep (and no
+    # "standalone SSE writer" error when it closes)
+    srv = FastMCP("Couch TV", instructions=HTTP_INSTRUCTIONS, host="127.0.0.1", port=port, stateless_http=True,
+                  transport_security=TransportSecuritySettings(
         enable_dns_rebinding_protection=True, allowed_hosts=["127.0.0.1:*", "localhost:*"],
         allowed_origins=["http://127.0.0.1:*", "http://localhost:*"]))
     tools = mcp._tool_manager.list_tools()
@@ -496,7 +511,7 @@ def http_server(port):
         for old, new in names.items():   # names that are not plain words, so the text points at the HTTP names
             if "_" in old or old == "tvs":
                 text = re.sub(r"\b%s\b" % old, new, text)
-        srv.add_tool(_within_wait(t.fn), name=names[t.name], description=text,
+        srv.add_tool(_within_wait(t.fn, srv), name=names[t.name], description=text,
                      annotations=ToolAnnotations(readOnlyHint=True) if t.name in HTTP_READ_ONLY else None)
     return srv
 

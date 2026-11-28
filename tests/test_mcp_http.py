@@ -12,6 +12,7 @@ import os
 import socket
 import subprocess
 import sys
+import tempfile
 import threading
 import time
 import unittest
@@ -63,37 +64,44 @@ class HttpMode(unittest.TestCase):
     def setUpClass(cls):
         cls.bridge = http.server.ThreadingHTTPServer(("127.0.0.1", 0), FakeBridge)
         threading.Thread(target=cls.bridge.serve_forever, daemon=True).start()
-        cls.port = free_port()
-        env = dict(os.environ, COUCH_MCP_HTTP="1", COUCH_MCP_PORT=str(cls.port), COUCH_MCP_WAIT="1.5",
+        cls.log = tempfile.TemporaryFile()
+        cls.proc, cls.port = cls.start("1.5", cls.log)
+        cls.proc2, cls.port2 = cls.start("12", subprocess.DEVNULL)
+
+    @classmethod
+    def start(cls, wait, log):
+        port = free_port()
+        env = dict(os.environ, COUCH_MCP_HTTP="1", COUCH_MCP_PORT=str(port), COUCH_MCP_WAIT=wait,
                    BRIDGE_URL="http://127.0.0.1:%d" % cls.bridge.server_address[1], BRIDGE_KEY=KEY,
                    COUCH_CONFIG=os.path.join(HERE, "no-such-config.json"))
         env.pop("COUCH_MCP_ALLOW_POWER_OFF", None)
-        cls.proc = subprocess.Popen([sys.executable, os.path.join(ROOT, "bridge", "mcp_server.py")], env=env,
-                                    stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        proc = subprocess.Popen([sys.executable, os.path.join(ROOT, "bridge", "mcp_server.py")], env=env,
+                                stdout=subprocess.DEVNULL, stderr=log)
         for _ in range(100):
-            with socket.socket() as s:
-                if s.connect_ex(("127.0.0.1", cls.port)) == 0:
-                    return
+            with socket.socket() as c:
+                if c.connect_ex(("127.0.0.1", port)) == 0:
+                    return proc, port
             time.sleep(0.1)
         raise RuntimeError("the MCP server did not start")
 
     @classmethod
     def tearDownClass(cls):
-        cls.proc.terminate()
-        cls.proc.wait(timeout=10)
+        for p in (cls.proc, cls.proc2):
+            p.terminate()
+            p.wait(timeout=10)
         cls.bridge.shutdown()
 
     def setUp(self):
         SEEN.clear()
         FakeBridge.done.clear()
 
-    def run_tools(self, work):
+    def run_tools(self, work, port=None, **client):
         async def go():
-            async with streamablehttp_client("http://127.0.0.1:%d/mcp" % self.port) as (r, w, _):
+            async with streamablehttp_client("http://127.0.0.1:%d/mcp" % (port or self.port), **client) as (r, w, _):
                 async with ClientSession(r, w) as s:
                     await s.initialize()
                     return await work(s)
-        return asyncio.run(go())
+        return asyncio.run(asyncio.wait_for(go(), 40))   # a silent stream must fail the test, not hang it
 
     def test_tool_set(self):
         names = {t.name for t in self.run_tools(lambda s: s.list_tools()).tools}
@@ -135,6 +143,35 @@ class HttpMode(unittest.TestCase):
         time.sleep(3)   # the request carries on in the background and the bridge finishes it
         self.assertIn(("GET", "/api/now"), [x[:2] for x in SEEN])
         self.assertIn("/api/now", FakeBridge.done)
+
+    def test_a_slow_answer_keeps_the_stream_alive(self):
+        # Home Assistant's client drops a response stream that is silent for 5 s
+        FakeBridge.delay = 8
+        try:
+            r = self.run_tools(lambda s: s.call_tool("tv_now", {}), self.port2, timeout=5, sse_read_timeout=5)
+        finally:
+            FakeBridge.delay = 0
+        self.assertFalse(r.isError)
+        self.assertEqual(json.loads(r.content[0].text), {"ok": True})
+
+    def test_server_name_and_quiet_log(self):
+        async def work(s):
+            return (await s.initialize()).serverInfo.name
+        self.assertEqual(self.run_tools(work), "Couch TV")
+        self.run_tools(lambda s: s.list_tools())
+        time.sleep(0.5)
+        self.log.seek(0)
+        self.assertNotIn(b"ClosedResourceError", self.log.read())
+
+    def test_a_client_that_asks_for_the_standalone_stream_is_handled(self):
+        req = urllib.request.Request("http://127.0.0.1:%d/mcp" % self.port, headers={"Accept": "text/event-stream"})
+        try:
+            with urllib.request.urlopen(req, timeout=5) as r:
+                self.assertEqual(r.status, 200)   # an idle stream, closed when the client leaves
+        except urllib.error.HTTPError as e:
+            e.close()
+            self.assertEqual(e.code, 405)
+        self.assertEqual(len(self.run_tools(lambda s: s.list_tools()).tools) > 5, True)   # and the server still answers
 
     def test_foreign_host_is_refused(self):
         req = urllib.request.Request("http://127.0.0.1:%d/mcp" % self.port, method="POST", data=b"{}",
