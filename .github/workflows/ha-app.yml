@@ -85,8 +85,9 @@ jobs:
           echo '{"pairing_key":"","ask_engine":"off","ask_agent_id":"","allow_power_off":false}' > "$RUNNER_TEMP/data/options.json"
           docker run -d --name app --network host \
             -v "$RUNNER_TEMP/config:/config" -v "$RUNNER_TEMP/data:/data" couch-tv-app:ci
-          for i in $(seq 1 30); do [ -s "$RUNNER_TEMP/config/pairing_key" ] && break; sleep 1; done
-          key=$(cat "$RUNNER_TEMP/config/pairing_key")
+          # root-owned and mode 600, as in the app
+          for i in $(seq 1 30); do sudo test -s "$RUNNER_TEMP/config/pairing_key" && break; sleep 1; done
+          key=$(sudo cat "$RUNNER_TEMP/config/pairing_key")
           for i in $(seq 1 60); do
             code=$(curl -s -o /dev/null -w '%{http_code}' -H "Authorization: Bearer $key" http://127.0.0.1:5400/api/tvs || true)
             [ "$code" = 200 ] && break
