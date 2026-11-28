@@ -2,9 +2,13 @@
 
 Everything that changed in couch-tv, newest first.
 
-The newest release is **0.13.17**. The TV apps come from [the Releases page](https://github.com/Seagey/couch-tv/releases). The bridge, and with option B the home's own screen, run from your copy of this repo, so `git pull` brings their changes.
+The newest release is **0.13.18**. The TV apps come from [the Releases page](https://github.com/Seagey/couch-tv/releases). The bridge, and with option B the home's own screen, run from your copy of this repo, so `git pull` brings their changes.
 
 ## November 2026
+
+### 28 November 2026: release 0.13.18, the Windows download of Couch TV Setup is back
+
+0.13.17 went out without its Couch TV Setup downloads because the automatic Windows check failed on seven tests that assumed Mac and Linux file modes and paths. 0.13.18 fixes the tests, so the Mac and Windows downloads of Couch TV Setup are on [the Releases page](https://github.com/Seagey/couch-tv/releases) again. The apps on the TV are the same as 0.13.17, with the same key.
 
 ### 28 November 2026: release 0.13.17, your account's home on the TV, a smart home step, a pool widget, Fast TV looks and every widget at any size
 
