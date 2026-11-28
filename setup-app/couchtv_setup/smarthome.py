@@ -815,16 +815,18 @@ def matter_add(code, progress=lambda f, msg=None: None):
     got = None
     if not ok:
         try:
-            got = nodejs.ensure(lambda f, m=None: progress(0.02 + 0.5 * f, m))
+            got = nodejs.ensure(lambda f, m=None: progress(0.02 + 0.2 * f, m))
         except TvError as e:
             if e.code == "node_platform" and v:
                 raise TvError("Matter on this computer needs Node.js 22.13 or newer (this computer has " + v + "). " + str(e), "matter_node") from e
             raise
+    from . import mattersrv
+    srv = mattersrv.ensure(lambda f, m=None: progress(0.25 + 0.3 * f, m))      # N13b: the Matter controller itself, once, into the Helper's folder
     from .helper import config as hcfg
     cfg = hcfg.load()
     base = "http://127.0.0.1:%d" % cfg["port"]
     hdr = {"Content-Type": "application/json", **({"Authorization": "Bearer " + cfg["pairing_key"]} if cfg["pairing_key"] else {})}
-    if got and got["how"] == "downloaded":
+    if (got and got["how"] == "downloaded") or srv["how"] == "installed":
         progress(0.55, "Starting Matter on this computer")
         _wait_matter_ready(base, hdr)
     progress(0.6, "Adding it on this computer")
@@ -851,7 +853,7 @@ def _wait_matter_ready(base, hdr, wait=75, poll=3.0):
             req = urllib.request.Request(base + "/api/matter/devices", headers=hdr)
             with urllib.request.urlopen(req, timeout=8) as r:
                 o = json.loads(r.read(1 << 20).decode("utf-8", "replace"))
-            if o.get("ready") or o.get("reason") not in ("node_missing", "node_old", "starting", None):
+            if o.get("ready") or o.get("reason") not in ("node_missing", "node_old", "starting", "not_installed", None):
                 return
         except (OSError, ValueError):
             pass

@@ -18,7 +18,7 @@ from unittest import mock
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.dirname(HERE))
 os.environ["COUCHTV_SETUP_HOME"] = tempfile.mkdtemp()
-from couchtv_setup import nodejs, smarthome as sh  # noqa: E402
+from couchtv_setup import mattersrv, nodejs, smarthome as sh  # noqa: E402
 from couchtv_setup.helper import config as hconfig, control  # noqa: E402
 from couchtv_setup.tv import TvError  # noqa: E402
 
@@ -27,11 +27,13 @@ FAKE_NODE = ("#!/bin/sh\necho v%s\n" % V).encode()
 FAKE_OLD = b"#!/bin/sh\necho v20.1.0\n"
 
 
-def tgz(name, payload, extra=()):
+def tgz(name, payload, extra=(), npm=True):
     base = name[:-len(".tar.gz")]
     b = io.BytesIO()
     with tarfile.open(fileobj=b, mode="w:gz") as t:
-        for member, data in [(base + "/bin/node", payload)] + list(extra):
+        npm_files = [(base + "/lib/node_modules/npm/bin/npm-cli.js", b"// pretend npm\n"),
+                     (base + "/lib/node_modules/npm/package.json", b"{}")] if npm else []
+        for member, data in [(base + "/bin/node", payload)] + npm_files + list(extra):
             i = tarfile.TarInfo(member)
             i.size = len(data)
             i.mode = 0o755
@@ -126,7 +128,9 @@ class Fetch(unittest.TestCase):
         dest = os.path.join(self.home, "helper-data", "node", "v" + V, "node")
         self.assertEqual(r["path"], dest)
         self.assertEqual(oct(os.stat(dest).st_mode & 0o777), "0o700")
-        self.assertEqual(sorted(os.listdir(os.path.dirname(dest))), ["node"], "no leftovers")
+        self.assertEqual(sorted(os.listdir(os.path.dirname(dest))), ["node", "npm"], "no leftovers")
+        self.assertTrue(os.path.isfile(os.path.join(os.path.dirname(dest), "npm", "bin", "npm-cli.js")))
+        self.assertEqual(str(nodejs.helper_npm()), os.path.join(os.path.dirname(dest), "npm", "bin", "npm-cli.js"))
         self.assertIn("about 57 MB", " ".join(m for f, m in said if m))
         self.assertEqual(Dist.hits, ["/v%s/SHASUMS256.txt" % V, "/v%s/node-v%s-linux-x64.tar.gz" % (V, V)])
         self.assertEqual(str(nodejs.helper_node("linux-x64")), dest)
@@ -192,6 +196,67 @@ class Fetch(unittest.TestCase):
         name = nodejs.PINNED["linux-x64"][0]
         data = tgz(name, FAKE_NODE, extra=[("../../escape", b"x"), (name[:-7] + "/lib/other", b"y")])
         self.assertEqual(nodejs._take(data, name, "linux-x64"), FAKE_NODE)
+
+    def test_npm_folder_takes_plain_files_only_and_nothing_outside_itself(self):
+        name = nodejs.PINNED["linux-x64"][0]
+        base = name[:-7]
+        b = io.BytesIO()
+        with tarfile.open(fileobj=b, mode="w:gz") as t:
+            for member, data in [(base + "/lib/node_modules/npm/bin/npm-cli.js", b"x"), (base + "/lib/node_modules/npm/lib/a.js", b"y"),
+                                 (base + "/lib/other", b"no")]:
+                i = tarfile.TarInfo(member)
+                i.size = len(data)
+                t.addfile(i, io.BytesIO(data))
+            link = tarfile.TarInfo(base + "/lib/node_modules/npm/bin/evil")
+            link.type, link.linkname = tarfile.SYMTYPE, "/etc/passwd"
+            t.addfile(link)
+        out = os.path.join(tempfile.mkdtemp(), "npm")
+        nodejs._take_npm(b.getvalue(), name, out)
+        self.assertEqual(sorted(os.listdir(os.path.join(out, "bin"))), ["npm-cli.js"], "the link was not taken")
+        self.assertFalse(os.path.exists(os.path.join(os.path.dirname(out), "other")))
+        bad = io.BytesIO()
+        with tarfile.open(fileobj=bad, mode="w:gz") as t:
+            i = tarfile.TarInfo(base + "/lib/node_modules/npm/../../../escape")
+            i.size = 1
+            t.addfile(i, io.BytesIO(b"x"))
+        with self.assertRaises(TvError) as c:
+            nodejs._take_npm(bad.getvalue(), name, os.path.join(tempfile.mkdtemp(), "npm"))
+        self.assertEqual(c.exception.code, "node_bad")
+
+    def test_force_helper_fetches_its_own_node_and_npm_even_when_the_computer_has_node(self):
+        srv, base, pins = serve(None)
+        try:
+            with mock.patch.dict(nodejs.PINNED, pins), mock.patch.object(nodejs, "system_node", return_value=("/usr/bin/node", (22, 14, 0))):
+                r = nodejs.ensure(dist=base, key="linux-x64", force_helper=True)
+                self.assertEqual(r["how"], "downloaded")
+                hits = len(Dist.hits)
+                again = nodejs.ensure(dist=base, key="linux-x64", force_helper=True)
+        finally:
+            srv.shutdown()
+        self.assertEqual((again["how"], len(Dist.hits)), ("helper", hits), "second call fetches nothing")
+
+    def test_npm_is_added_to_a_helper_node_that_has_none(self):
+        self.run_ensure()
+        import shutil
+        shutil.rmtree(str(nodejs.node_dir() / "npm"))
+        self.assertIsNone(nodejs.helper_npm())
+        srv, base, pins = serve(None)
+        try:
+            with mock.patch.dict(nodejs.PINNED, pins):
+                nodejs.ensure(dist=base, key="linux-x64", force_helper=True)
+        finally:
+            srv.shutdown()
+        self.assertIsNotNone(nodejs.helper_npm())
+
+    def test_system_npm_is_found_beside_the_computers_node(self):
+        d = tempfile.mkdtemp()
+        os.makedirs(os.path.join(d, "bin"))
+        os.makedirs(os.path.join(d, "lib", "node_modules", "npm", "bin"))
+        open(os.path.join(d, "bin", "node"), "w").close()
+        self.assertIsNone(nodejs.system_npm(os.path.join(d, "bin", "node")))
+        cli = os.path.join(d, "lib", "node_modules", "npm", "bin", "npm-cli.js")
+        open(cli, "w").close()
+        self.assertEqual(nodejs.system_npm(os.path.join(d, "bin", "node")), os.path.realpath(cli))
 
     def test_windows_zip(self):
         name = nodejs.PINNED["win-x64"][0]
@@ -268,12 +333,14 @@ class Hand(unittest.TestCase):
     def test_setup_fetches_node_only_when_the_computer_has_none(self):
         calls = []
         with mock.patch.object(sh, "node_ok", return_value=(True, "v24.0.0")), \
+                mock.patch.object(mattersrv, "ensure", return_value={"how": "already", "dir": "x", "version": "1"}), \
                 mock.patch.object(nodejs, "ensure", side_effect=lambda *a, **k: calls.append(1)), \
                 mock.patch("urllib.request.urlopen", side_effect=OSError("no helper")):
             with self.assertRaises(TvError) as c:
                 sh.matter_add("12345678901")
         self.assertEqual((calls, c.exception.code), ([], "matter_helper"))
         with mock.patch.object(sh, "node_ok", return_value=(False, "")), \
+                mock.patch.object(mattersrv, "ensure", return_value={"how": "already", "dir": "x", "version": "1"}), \
                 mock.patch.object(nodejs, "ensure", side_effect=lambda *a, **k: calls.append(1) or {"how": "helper", "path": "x", "version": V}), \
                 mock.patch("urllib.request.urlopen", side_effect=OSError("no helper")):
             with self.assertRaises(TvError):
@@ -283,6 +350,7 @@ class Hand(unittest.TestCase):
     def test_setup_waits_for_the_restart_after_a_fresh_fetch(self):
         waited = []
         with mock.patch.object(sh, "node_ok", return_value=(False, "")), \
+                mock.patch.object(mattersrv, "ensure", return_value={"how": "already", "dir": "x", "version": "1"}), \
                 mock.patch.object(nodejs, "ensure", return_value={"how": "downloaded", "path": "x", "version": V}), \
                 mock.patch.object(sh, "_wait_matter_ready", side_effect=lambda *a, **k: waited.append(1)), \
                 mock.patch("urllib.request.urlopen", side_effect=OSError("no helper")):

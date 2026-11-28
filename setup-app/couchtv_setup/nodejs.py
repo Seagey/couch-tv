@@ -6,8 +6,10 @@ the official Node.js release the first time Matter is added on a computer that h
 (helper-data/node/<version>/), never anywhere else on the computer:
 - one exact pinned version (NODE_VERSION), from nodejs.org/dist only (https);
 - the archive's SHA-256 must equal the pin in this file AND the line for that file in nodejs.org's own SHASUMS256.txt for that version;
-- only the one program is taken out of the archive (a fixed member name), nothing else is unpacked, nothing is run until it checks out;
-- it is made in a temporary name and moved into place whole, then asked its version before it is used.
+- only the one program is taken out of the archive (a fixed member name), plus (N13b) npm's own folder (lib/node_modules/npm, plain files
+  only, no links, every path checked to stay inside it), which mattersrv.py needs to install the Matter controller; nothing else is
+  unpacked and nothing is run until the archive checks out;
+- the node program is made in a temporary name and moved into place whole, then asked its version before it is used.
 A Node the computer already has (22.13 or newer) is always used first and nothing is downloaded.
 """
 import hashlib
@@ -59,6 +61,26 @@ def helper_node(key=None):
     key = key or platform_key()
     p = node_dir() / ("node.exe" if (key or "").startswith("win") else "node")
     return p if p.is_file() else None
+
+
+def helper_npm():
+    """The Helper's own npm (npm-cli.js, taken from the same verified archive as its node), if it is there."""
+    p = node_dir() / "npm" / "bin" / "npm-cli.js"
+    return p if p.is_file() else None
+
+
+def system_npm(node):
+    """npm-cli.js that belongs to a node program (official installers, Homebrew, nvm all keep it beside the node), or None."""
+    try:
+        real = os.path.realpath(node)
+    except OSError:
+        return None
+    prefix = os.path.dirname(os.path.dirname(real))
+    for cand in (os.path.join(prefix, "lib", "node_modules", "npm", "bin", "npm-cli.js"),          # macOS, Linux, Homebrew, nvm
+                 os.path.join(os.path.dirname(real), "node_modules", "npm", "bin", "npm-cli.js")):   # Windows: beside node.exe
+        if os.path.isfile(cand):
+            return cand
+    return None
 
 
 def version_of(node):
@@ -135,12 +157,88 @@ def _take(data, name, key):
         return f.read(m.size)
 
 
-def ensure(progress=lambda f, msg=None: None, dist=None, opener=None, key=None):
+def _take_npm(data, name, dest):
+    """npm's own folder out of the verified archive into `dest` (made fresh): plain files and folders only, no links, no path that leaves
+    the folder, a cap on count and size. Raises TvError node_bad."""
+    base = name[:-len(".tar.gz")] if name.endswith(".tar.gz") else name[:-len(".zip")]
+    top = base + ("/node_modules/npm/" if name.endswith(".zip") else "/lib/node_modules/npm/")
+    cap_files, cap_total, cap_one = 20000, 80 * 1024 * 1024, 30 * 1024 * 1024
+    out_root = os.path.realpath(dest)
+    count = total = 0
+
+    def target(member_name):
+        rel = member_name[len(top):]
+        parts = [x for x in rel.split("/") if x]
+        if ".." in parts or "\\" in rel or rel.startswith("/"):
+            raise TvError("The Node.js download did not hold what was expected, so it was not used.", "node_bad")
+        t = os.path.normpath(os.path.join(out_root, *parts))
+        if t != out_root and os.path.commonpath([out_root, t]) != out_root:
+            raise TvError("The Node.js download did not hold what was expected, so it was not used.", "node_bad")
+        return t
+
+    os.makedirs(out_root, exist_ok=True)
+    if name.endswith(".zip"):
+        with zipfile.ZipFile(io.BytesIO(data)) as z:
+            members = [(i.filename, i.is_dir(), i.file_size, i) for i in z.infolist() if i.filename.startswith(top)]
+            for fname, isdir, size, info in members:
+                count += 1
+                total += size
+                if count > cap_files or total > cap_total or size > cap_one:
+                    raise TvError("The Node.js download did not hold what was expected, so it was not used.", "node_bad")
+                t = target(fname)
+                if isdir:
+                    os.makedirs(t, exist_ok=True)
+                else:
+                    os.makedirs(os.path.dirname(t), exist_ok=True)
+                    with open(t, "wb") as f:
+                        f.write(z.read(info))
+        return
+    with tarfile.open(fileobj=io.BytesIO(data), mode="r:gz") as t:
+        for m in t:
+            if not m.name.startswith(top):
+                continue
+            if not (m.isfile() or m.isdir()):      # links, devices and the like are never taken
+                continue
+            count += 1
+            total += m.size
+            if count > cap_files or total > cap_total or m.size > cap_one:
+                raise TvError("The Node.js download did not hold what was expected, so it was not used.", "node_bad")
+            p = target(m.name)
+            if m.isdir():
+                os.makedirs(p, exist_ok=True)
+                continue
+            os.makedirs(os.path.dirname(p), exist_ok=True)
+            f = t.extractfile(m)
+            with open(p, "wb") as out:
+                out.write(f.read(m.size))
+            os.chmod(p, 0o644 | (0o100 if m.mode & 0o100 else 0))
+
+
+def _rmtree(path):
+    import shutil
+
+    def fix(func, p, _exc):
+        try:
+            os.chmod(p, stat.S_IRWXU)
+            func(p)
+        except OSError:
+            pass
+    shutil.rmtree(path, onerror=fix)
+
+
+def ensure(progress=lambda f, msg=None: None, dist=None, opener=None, key=None, force_helper=False):
     """A Node the bridge can use: the computer's own, the Helper's already downloaded one, or one downloaded now (checked as the module
-    words say). Returns {"path", "how": computer|helper|downloaded, "version"}. Raises TvError in plain words."""
-    u = usable()
-    if u:
-        return {"path": u[0], "how": u[1], "version": ".".join(map(str, version_of(u[0])))}
+    words say). Returns {"path", "how": computer|helper|downloaded, "version"}. Raises TvError in plain words.
+    force_helper (N13b): the Helper's own node and npm even when the computer has a node (its npm is missing), downloading them if needed."""
+    if not force_helper:
+        u = usable()
+        if u:
+            return {"path": u[0], "how": u[1], "version": ".".join(map(str, version_of(u[0])))}
+    else:
+        h = helper_node()
+        v = version_of(h) if h else None
+        if h and v and v[:2] >= NODE_MIN and helper_npm():
+            return {"path": str(h), "how": "helper", "version": ".".join(map(str, v))}
     key = key or platform_key()
     if key is None:
         raise TvError("Matter needs Node.js 22.13 or newer, and this computer type cannot fetch it by itself. Get it from nodejs.org, then try again.",
@@ -162,12 +260,6 @@ def ensure(progress=lambda f, msg=None: None, dist=None, opener=None, key=None):
     got = hashlib.sha256(data).hexdigest()
     if got != want or sums.get(name) != want:
         raise TvError("The Node.js download did not match its checksum, so it was thrown away and nothing was installed.", "node_checksum")
-    try:
-        exe = _take(data, name, key)
-    except TvError:
-        raise
-    except Exception as e:
-        raise TvError("The Node.js download did not hold what was expected, so it was not used.", "node_bad") from e
     d = node_dir()
     d.mkdir(parents=True, exist_ok=True)
     try:
@@ -175,13 +267,57 @@ def ensure(progress=lambda f, msg=None: None, dist=None, opener=None, key=None):
     except OSError:
         pass
     dest = d / ("node.exe" if key.startswith("win") else "node")
-    tmp = d / ("node-new.exe" if key.startswith("win") else "node.part")
-    tmp.write_bytes(exe)
-    tmp.chmod(stat.S_IRWXU)
-    v = version_of(tmp) if not key.startswith("win") or sys.platform == "win32" else None
-    if v is None or ".".join(map(str, v)) != NODE_VERSION:
-        tmp.unlink(missing_ok=True)
-        raise TvError("The downloaded Node.js would not start on this computer, so it was not kept.", "node_run")
-    os.replace(tmp, dest)
+    have = version_of(dest) if dest.is_file() else None
+    if have and ".".join(map(str, have)) == NODE_VERSION:
+        pass        # already the pinned one (and perhaps running: not replaced)
+    else:
+        try:
+            exe = _take(data, name, key)
+        except TvError:
+            raise
+        except Exception as e:
+            raise TvError("The Node.js download did not hold what was expected, so it was not used.", "node_bad") from e
+        tmp = d / ("node-new.exe" if key.startswith("win") else "node.part")
+        tmp.write_bytes(exe)
+        tmp.chmod(stat.S_IRWXU)
+        v = version_of(tmp) if not key.startswith("win") or sys.platform == "win32" else None
+        if v is None or ".".join(map(str, v)) != NODE_VERSION:
+            tmp.unlink(missing_ok=True)
+            raise TvError("The downloaded Node.js would not start on this computer, so it was not kept.", "node_run")
+        os.replace(tmp, dest)
+    if not helper_npm():
+        part = d / "npm.part"
+        if part.exists():
+            _rmtree(part)
+        try:
+            _take_npm(data, name, str(part))
+            if not (part / "bin" / "npm-cli.js").is_file():
+                raise TvError("The Node.js download did not hold what was expected, so it was not used.", "node_bad")
+            if (d / "npm").exists():
+                _rmtree(d / "npm")
+            os.replace(part, d / "npm")
+        except TvError:
+            if part.exists():
+                _rmtree(part)
+            raise
+        except Exception as e:
+            if part.exists():
+                _rmtree(part)
+            raise TvError("The Node.js download did not hold what was expected, so it was not used.", "node_bad") from e
     progress(1.0, "Node.js is ready")
     return {"path": str(dest), "how": "downloaded", "version": NODE_VERSION}
+
+
+def npm_runner(progress=lambda f, msg=None: None, **kw):
+    """(node program, npm-cli.js) to install npm packages with: the computer's own node and the npm beside it, else the Helper's own pair
+    (fetched now if need be). Raises TvError in plain words."""
+    u = usable()
+    if u:
+        cli = system_npm(u[0])
+        if cli:
+            return u[0], cli
+    got = ensure(progress, force_helper=True, **kw)
+    cli = helper_npm()
+    if not cli:
+        raise TvError("Node.js is here but its package tool is not. Get Node.js from nodejs.org, then try again.", "node_npm")
+    return got["path"], str(cli)

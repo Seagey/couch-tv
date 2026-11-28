@@ -46,7 +46,9 @@ log = logging.getLogger("couch.matter")
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 SERVICE_DIR = os.path.join(HERE, "matter")
-ENTRY = os.path.join(SERVICE_DIR, "node_modules", "matter-server", "dist", "esm", "bin.js")
+ENTRY_PARTS = ("node_modules", "matter-server", "dist", "esm", "bin.js")
+ENTRY = os.path.join(SERVICE_DIR, *ENTRY_PARTS)
+SERVICE_DIR_ENV = "COUCH_MATTER_DIR"   # N13b: where the Helper keeps the installed Matter service (the app itself is read only)
 NODE_MIN = (22, 13)
 SOCKET = "ws.sock"
 SOCKET_MAX = 100     # a unix socket path must fit in 104 bytes on macOS (108 on Linux)
@@ -777,6 +779,25 @@ def already(dev, action, value):
     return False
 
 
+def service_paths(section=None, env=None):
+    """(service dir, entry file) of the Matter service. Today's place (bridge/matter/, scripts/matter-setup.sh) unless told otherwise:
+    config.json matter.service_dir (or the COUCH_MATTER_DIR environment variable), where node_modules/matter-server is installed. The
+    Couch TV Helper uses it (N13b): inside its app the bridge's own folder is a read only unpack, so Setup installs the service into the
+    Helper's writable data folder on first use. matter.entry names the file directly. Only absolute paths count; anything else is ignored."""
+    section = section if isinstance(section, dict) else {}
+    env = os.environ if env is None else env
+    def pick(v):
+        return os.path.normpath(v.strip()) if isinstance(v, str) and v.strip() and os.path.isabs(v.strip()) else None
+    for key, val in (("matter.service_dir", section.get("service_dir")), (SERVICE_DIR_ENV, env.get(SERVICE_DIR_ENV))):
+        if val not in (None, "") and not pick(val):
+            log.warning("matter: %s is not an absolute folder path, so it is ignored", key)
+    d = pick(section.get("service_dir")) or pick(env.get(SERVICE_DIR_ENV)) or SERVICE_DIR
+    e = pick(section.get("entry"))
+    if section.get("entry") not in (None, "") and not e:
+        log.warning("matter: matter.entry is not an absolute file path, so it is ignored")
+    return d, e or (ENTRY if d == SERVICE_DIR else os.path.join(d, *ENTRY_PARTS))
+
+
 class Matter:
     """This computer's Matter controller. `on_change(devices)` is called (at most every quarter second)
     when a device is added, removed, renamed or changes state.
@@ -792,6 +813,7 @@ class Matter:
         self.test_devices = _on(section.get("test_devices"))   # development boards and the SDK's sample apps
         node = section.get("node")
         self.node_bin = node.strip() if isinstance(node, str) and node.strip() else (shutil.which("node") or "node")
+        self._section = section
         for old in ("server", "port"):
             if old in section:
                 log.warning("matter: config.json matter.%s is no longer used: the bridge runs its own Matter service "
@@ -889,6 +911,14 @@ class Matter:
                 log.exception("matter: pushing a change failed")
         self._push = loop.call_later(0.25, fire)
 
+    @property
+    def service_dir(self):
+        return service_paths(self._section)[0]
+
+    @property
+    def entry(self):
+        return service_paths(self._section)[1]
+
     # ---------------- start and stop
     def why_not(self):
         """(reason key, plain words) for why Matter cannot start here, or None. The keys are for the screens,
@@ -897,7 +927,7 @@ class Matter:
             return "off", "Matter is switched off on the home computer (config.json, matter, enabled)."
         if not self.spawn:
             return None
-        if not os.path.isfile(ENTRY):
+        if not os.path.isfile(self.entry):
             return "not_installed", "Matter needs a one time set up on the home computer: run scripts/matter-setup.sh in the couch-tv folder there."
         v = node_version(self.node_bin)
         if not v:
@@ -963,7 +993,7 @@ class Matter:
         except (OSError, ValueError):
             return False
         cmd = await self._command_line(pid)
-        if not (ENTRY in cmd and self._storage() in cmd):
+        if not (self.entry in cmd and self._storage() in cmd):
             return False
         log.info("matter: ending a Matter service left running (pid %s)", pid)
         try:
@@ -1019,7 +1049,7 @@ class Matter:
         return self._sock
 
     def service_args(self):
-        args = [self.node_bin, ENTRY, "--storage-path", self._storage(), "--listen-address", self.socket_path(),
+        args = [self.node_bin, self.entry, "--storage-path", self._storage(), "--listen-address", self.socket_path(),
                 "--disable-dashboard", "--disable-ota", "--disable-thread-diagnostics",
                 "--default-fabric-label", FABRIC_LABEL, "--log-level", "warn"]
         if self.test_devices:
@@ -1054,7 +1084,7 @@ class Matter:
             try:
                 with open(logpath, "ab") as lf:
                     self.proc = await asyncio.create_subprocess_exec(*self.service_args(), stdin=asyncio.subprocess.DEVNULL,
-                                                                     stdout=lf, stderr=lf, cwd=SERVICE_DIR)
+                                                                     stdout=lf, stderr=lf, cwd=self.service_dir)
                 log.info("matter: the Matter service started (pid %s, %s)", self.proc.pid, self.socket_path())
                 with open(self._pidfile(), "w") as f:
                     f.write(str(self.proc.pid))

@@ -31,10 +31,10 @@ class Controller:
         self.quit_event = threading.Event()
         self.on_quit = None
         try:
-            from .. import nodejs
-            self._node = str(nodejs.helper_node() or "")   # what was there when the bridge was started
+            from .. import nodejs, mattersrv
+            self._node = (str(nodejs.helper_node() or ""), mattersrv.for_bridge() or "")   # what was there when the bridge was started
         except Exception:
-            self._node = ""
+            self._node = ("", "")
 
     def _known(self):
         import json
@@ -93,16 +93,16 @@ class Controller:
         self.follow_node()
 
     def follow_node(self):
-        """N13: when Setup has fetched Node.js into this folder for Matter, the bridge is told where it is (its config) and restarted once.
-        A cheap look each time (is the file there); never raises."""
+        """N13 and N13b: when Setup has fetched Node.js, or installed the Matter controller, into this folder, the bridge is told where they
+        are (its config) and restarted once. A cheap look each time (are the files there); never raises."""
         try:
-            from .. import nodejs
+            from .. import nodejs, mattersrv
             here = nodejs.helper_node()
-            here = str(here) if here else ""
+            here = (str(here) if here else "", mattersrv.for_bridge() or "")
             if here == self._node or self.sup is None:
                 return
             self._node = here
-            if here and nodejs.for_bridge():
+            if (here[0] and nodejs.for_bridge()) or here[1]:
                 hconfig.write_bridge_config(self.known, self.cfg, self.data)
                 self.sup._kill()           # its loop starts it again with the new config within seconds
         except Exception:

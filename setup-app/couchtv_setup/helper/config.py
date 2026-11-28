@@ -147,10 +147,24 @@ def bridge_config(known, cfg):
     out = {"bridge": {"port": cfg["port"], "pairing_key": cfg["pairing_key"]},
            "default_tv": tvs[0]["id"] if tvs else "tv", "tvs": tvs or [{"id": "tv", "name": "TV", "label": "TV", "ip": "SET_YOUR_TV_IP"}],
            "home": {"look": "night"}, "phone_remote": True, "ask": {"enabled": False}}
+    matter = {}
     node = _own_node()
     if node:
-        out["matter"] = {"node": node}      # N13: the Node.js Setup fetched into this folder, when the computer has no usable one
+        matter["node"] = node               # N13: the Node.js Setup fetched into this folder, when the computer has no usable one
+    svc = _own_service()
+    if svc:
+        matter["service_dir"] = svc         # N13b: the Matter controller Setup installed into this folder (the app's own is read only)
+    if matter:
+        out["matter"] = matter
     return out
+
+
+def _own_service():
+    try:
+        from .. import mattersrv
+        return mattersrv.for_bridge()
+    except Exception:
+        return None
 
 
 def _own_node():

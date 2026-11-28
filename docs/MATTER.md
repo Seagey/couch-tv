@@ -131,6 +131,13 @@ All optional; Matter is on when it is installed.
 - `enabled`: false switches Matter off.
 - `node`: which Node.js to use, when the first `node` on the PATH is too old (a launchd job has a
   bare PATH: the example plist adds Homebrew's).
+- `service_dir` (or the `COUCH_MATTER_DIR` environment variable): where the Matter service is installed
+  (the folder that holds `node_modules/matter-server`). Left out, it is `bridge/matter/`, as
+  `scripts/matter-setup.sh` installs it. The Couch TV Helper sets it: inside the Helper app that folder is
+  read only, so on first use Setup runs `npm ci` from the app's `package-lock.json` (exact versions and
+  checksums, `--ignore-scripts`, nothing compiled, about 170 MB, once) into the Helper's own data folder
+  and the Helper hands the bridge that folder. `entry` names the service's `bin.js` directly (rarely
+  needed). Only absolute paths count.
 - `server` and `port` are no longer used (above): the bridge logs one line and carries on. A value of
   the wrong type anywhere in this section never stops the bridge from starting.
 - `test_devices`: also accept development boards and the SDK's sample apps, whose certificates are
