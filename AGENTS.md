@@ -614,6 +614,31 @@ Ask: "Ready for me to set it up? You can undo all of it." Wait for a clear yes.
    Updates checks for one and installs it (Android asks first, and once asks to let Home install
    apps), and the weekly look can be switched on or off there.
 
+## Home Assistant app (option B, when they have Home Assistant OS)
+
+If, in 2.1, they say they run Home Assistant on its own computer (Home Assistant OS or Supervised: a
+Green, Yellow, a Raspberry Pi, a mini PC), offer that computer as the "computer that stays on" for
+option B: the bridge runs there as the **Couch TV** app ([docs/HOME-ASSISTANT.md](docs/HOME-ASSISTANT.md)),
+and nothing else has to stay on. It works for Google TV and Android TV (an NVIDIA Shield has been
+tried); a Fire TV should work and has not been tried; Samsung, LG, Roku and the other app-on-the-TV
+brands are not in it yet. Without the App store (Home Assistant Core or Container), use docs/DOCKER.md.
+
+- **Before the yes:** only ask. Their Home Assistant's address (a number address is best), and whether
+  they can open the app's config folder (File editor, Samba or VS Code). Do not install or start
+  anything in their Home Assistant: adding the repository, installing the app and starting it are
+  theirs to do, from the Home Assistant screens, after the yes. Say what the plan adds: the
+  app, a pairing key (on by default, made by the app), and that each TV is still set up once from
+  this computer.
+- **After the yes:** step 4 as usual, with `bridge.host` set to the Home Assistant address and no
+  `bridge.pairing_key` in `config.json` (the app refuses to start if both are set; its Pairing key
+  option or the key it prints in its Log tab is the one). Pair here, copy `config.json`,
+  `bridge/data/` and `~/.android/adbkey` into the app's config folder as the guide says, and run
+  `apply.sh` with `BRIDGE_KEY=<the key> BRIDGE_URL=http://<home assistant address>:5400`. Ask them to
+  read you the key from the app's Log tab; keep it out of chat logs and issues like any other key.
+- Home Assistant's MCP integration and "Ask through a conversation agent" are the guide's optional
+  extras. Offer them, never switch them on for them, and tell them anyone who can reach Home
+  Assistant's MCP integration can use the TV tools (the app leaves "turn the TV off" out by default).
+
 ## Two TVs in sync (only if they ask)
 
 If someone asks for two TVs to play the same show together, read [docs/SYNC.md](docs/SYNC.md) and

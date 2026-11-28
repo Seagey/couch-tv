@@ -1,0 +1,23 @@
+configuration:
+  pairing_key:
+    name: Pairing key
+    description: >-
+      The password phones type once to use the remote. Leave it empty and the app makes a long one
+      for you the first time and prints a link for it in the Log tab. Use 12 to 128 letters,
+      digits, - or _ if you pick your own.
+  ask_engine:
+    name: Ask assistant
+    description: >-
+      Who answers when someone asks the TV for something in plain words. "off" switches Ask off.
+      "home_assistant" uses a conversation agent from your Home Assistant (needs a couch-tv
+      version that has it).
+  ask_agent_id:
+    name: Conversation agent
+    description: >-
+      Only for "home_assistant": which Home Assistant conversation agent answers. It must be set
+      for "home_assistant": empty does not fall back to a default.
+  allow_power_off:
+    name: Let Home Assistant's assistant turn the TV off
+    description: >-
+      Home Assistant's MCP integration can reach couch-tv's tools. Off keeps "turn the TV off"
+      out of them, so a chat assistant cannot do it by mistake.

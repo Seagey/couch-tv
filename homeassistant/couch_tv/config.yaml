@@ -1,0 +1,29 @@
+# The couch-tv bridge (option B) as a Home Assistant app. Plain words: docs/HOME-ASSISTANT.md.
+# The image is built by .github/workflows/ha-app.yml from the repo root and published per
+# architecture. The owner in "image" below is the one place to change if you publish your own fork.
+name: Couch TV
+version: "0.13.18"
+slug: couch_tv
+description: The couch-tv bridge, the phone remote and the TV home's server, on your Home Assistant computer.
+url: https://github.com/Seagey/couch-tv
+arch:
+  - aarch64
+  - amd64
+image: ghcr.io/seagey/couch-tv-app-{arch}
+startup: application
+boot: auto
+# Wake-on-LAN, finding TVs on the network and the phone remote on port 5400 all need the real network.
+host_network: true
+homeassistant_api: true
+map:
+  - app_config:rw
+options:
+  pairing_key: ""
+  ask_engine: "off"
+  ask_agent_id: ""
+  allow_power_off: false
+schema:
+  pairing_key: password?
+  ask_engine: list(home_assistant|off)
+  ask_agent_id: str?
+  allow_power_off: bool
