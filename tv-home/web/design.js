@@ -1224,6 +1224,8 @@
       out.push(H + ".cd-bg #scenes .gclock.under{display:none}");
       out.push(H + ".cd-bg #scenes .gclock{clip-path:none !important}");
       out.push(H + ".cd-bg #scenes .gclock .fill{filter:brightness(1.32) saturate(1.08)}");
+      // a plain colour has no scene picture behind the digits (none is loaded): the clock is frosted white, as over a video
+      if (col) out.push(H + " #scenes .gclock .fill{background-image:none !important;color:rgba(255, 255, 255, 0.8) !important;filter:none !important}");
     }
 
     // the words of v1 designs (design.texts); newer designs use objects of type "text"

@@ -1755,8 +1755,14 @@
   // draw a scene (load its pictures, place its clock) so it can fade in
   function readyScene(i) {
     var s = SCENES[i], el = sceneEls[i];
-    if (designBackground()) return;
-    if (!el.classList.contains("ready")) {
+    if (designBackground()) {
+      // no pictures load, but the scene still shows and draws its clock: a design with no clock widget
+      // of its own keeps the home's glass clock over its background (Fast TV x origspeed join, 28 Nov)
+      if (!el.classList.contains("ready")) { el.dataset.nopics = "1"; el.classList.add("ready"); drawClocks(el, s, glassShown); }
+      return;
+    }
+    if (!el.classList.contains("ready") || el.dataset.nopics) {
+      delete el.dataset.nopics;
       var sbg = el.querySelector(".sbg");
       if (s.dailyBing) s.src = bingPhotoUrl() || s.src;
       if (s.src) sbg.src = s.src;
@@ -2747,7 +2753,7 @@
   function active() { return !covered() && !screenOffActive; }
   function nextScene() {
     if (designBackground()) return;
-    if (sceneEls[scene] && !sceneEls[scene].classList.contains("ready")) readyScene(scene);   // a design's background just went
+    if (sceneEls[scene] && (!sceneEls[scene].classList.contains("ready") || sceneEls[scene].dataset.nopics)) readyScene(scene);   // a design's background just went
     if (zone !== "settings" && active() && sceneMayChange()) {
       if (SUN_SYNC) applySunSync();
       else showScene(nextFrom(scene));

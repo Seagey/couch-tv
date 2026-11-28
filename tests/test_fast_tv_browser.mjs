@@ -34,14 +34,14 @@ const browser = await chromium.launch();
 const errors = [];
 if (SHOTS) fs.mkdirSync(SHOTS, { recursive: true });
 
-async function open(design) {
+async function open(design, noWidgets) {
   const page = await browser.newPage({ viewport: { width: 1920, height: 1080 } });
   page.on("pageerror", (e) => errors.push(String(e)));
   await page.goto(BASE + "?mock=1&reset=1");
   await page.evaluate((d) => { localStorage.clear(); localStorage.setItem("tvdesigner.design", JSON.stringify(d)); localStorage.setItem("couchtv.wtip.used", "1"); }, design);
   asked.length = 0;
   await page.goto(BASE + "?mock=1&people=2&wx=24,2&place=Bellingen&design=local");
-  await page.waitForFunction(() => document.querySelector(".cw-o"), null, { timeout: 10000 });
+  if (!noWidgets) await page.waitForFunction(() => document.querySelector(".cw-o"), null, { timeout: 10000 });
   await page.waitForTimeout(2500);
   return page;
 }
@@ -52,6 +52,17 @@ const look = (page) => page.evaluate(() => {
 });
 
 console.log("Running Fast TV browser tests...");
+
+// A plain colour with no clock widget of its own keeps the home's glass clock (it drew nothing for a while after
+// scenes stopped loading under a design background), and still fetches no picture
+{
+  const page = await open({ v: 1, background: { colour: "#000000" } }, true);
+  const c = await page.evaluate(() => { const n = document.querySelector("#scenes .scene.on .gclock:not(.under) .fill"); if (!n) return null; const r = n.getBoundingClientRect(), cs = getComputedStyle(n); return { w: r.width, h: r.height, color: cs.color, image: cs.backgroundImage }; });
+  ok(c && c.w > 200 && c.h > 50, "a colour-only design still draws the home's clock (" + JSON.stringify(c) + ")");
+  ok(c && /255, 255, 255/.test(c.color) && c.image === "none", "that clock is frosted white, no picture behind it");
+  ok(!asked.some((u) => /backgrounds\//.test(u)), "and no scene picture is fetched for it");
+  await page.close();
+}
 const fast = JSON.parse(fs.readFileSync(path.join(ROOT, "tests/fixtures/fast-tv-designs.json"), "utf8"));
 for (const f of fast) {
   const page = await open(f.design);
