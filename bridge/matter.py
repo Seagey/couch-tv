@@ -48,6 +48,8 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 SERVICE_DIR = os.path.join(HERE, "matter")
 ENTRY_PARTS = ("node_modules", "matter-server", "dist", "esm", "bin.js")
 ENTRY = os.path.join(SERVICE_DIR, *ENTRY_PARTS)
+REQUEST_ENV = "COUCH_MATTER_REQUEST"   # N13b: a file the Helper watches: a code typed before Matter is installed is left there
+INSTALLING_NOTE = "Getting Matter ready, about 2 minutes, one time only. Your code is kept and added when it is done."
 SERVICE_DIR_ENV = "COUCH_MATTER_DIR"   # N13b: where the Helper keeps the installed Matter service (the app itself is read only)
 NODE_MIN = (22, 13)
 SOCKET = "ws.sock"
@@ -1344,6 +1346,25 @@ class Matter:
         finally:
             self._adding = False
 
+    def _leave_for_helper(self, code, ip):
+        """N13b: inside the Couch TV Helper the Helper installs the Matter service when a code arrives before it is there. The code goes into
+        a file only this user can read (mode 600, replaced whole), which the Helper reads and deletes, installs, then adds the device with.
+        False when this bridge has no Helper to hand it to (a bridge run from source: scripts/matter-setup.sh)."""
+        path = os.environ.get(REQUEST_ENV)
+        if not path or not os.path.isabs(path):
+            return False
+        try:
+            os.makedirs(os.path.dirname(path), mode=0o700, exist_ok=True)
+            tmp = path + ".part"
+            fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+            with os.fdopen(fd, "w") as f:
+                json.dump({"code": code, "address": ip, "at": int(time.time())}, f)
+            os.replace(tmp, path)
+            log.info("matter: a code arrived before Matter is installed: the Helper was asked to set it up")
+            return True
+        except OSError:
+            return False
+
     async def _commission(self, code, address=None):
         c = clean_code(code)
         if not c:
@@ -1355,6 +1376,8 @@ class Matter:
             if not ip:
                 return {"ok": False, "device_ids": [], "error": "unreachable", "reason": why, "note": ADDRESS_NOTES[why]}
         if not self.ready:
+            if self.reason == "not_installed" and self._leave_for_helper(c, ip):
+                return {"ok": False, "device_ids": [], "error": "unreachable", "reason": "starting", "note": INSTALLING_NOTE}
             return {"ok": False, "device_ids": [], "error": "unreachable", "reason": self.reason or "starting",
                     "note": self.note or STARTING}
         try:

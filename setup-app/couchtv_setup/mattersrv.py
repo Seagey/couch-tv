@@ -54,6 +54,32 @@ def entry_of(d):
     return os.path.join(str(d), *ENTRY_PARTS)
 
 
+def request_path():
+    """The file the bridge leaves a Matter code in when it is typed before Matter is installed (bridge/matter.py REQUEST_ENV)."""
+    return paths.data() / "helper-data" / "matter-install-request.json"
+
+
+def take_request(max_age=3600):
+    """The waiting code, read and deleted at once (it is a pairing code: it is never kept or logged). {"code", "address"} or None.
+    A request older than an hour is thrown away: the code has run out by then."""
+    p = request_path()
+    try:
+        with open(p, encoding="utf-8") as f:
+            r = json.load(f)
+    except (OSError, ValueError):
+        r = None
+    try:
+        os.unlink(p)
+    except OSError:
+        pass
+    if not isinstance(r, dict) or not isinstance(r.get("code"), str) or time.time() - (r.get("at") or 0) > max_age:
+        return None
+    if not re.fullmatch(r"\d{11}|\d{21}|MT:[A-Z0-9.-]{10,40}", r["code"]):
+        return None
+    a = r.get("address")
+    return {"code": r["code"], "address": a if isinstance(a, str) and a else None}
+
+
 def bridge_matter_dir():
     """bridge/matter/ (package.json and package-lock.json) as the app carries it."""
     from .helper import bridge_proc

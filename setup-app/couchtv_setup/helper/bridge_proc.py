@@ -29,7 +29,9 @@ def child_command(frozen=None, exe=None):
 def child_env(config_path, data_dir, port, base=None):
     env = dict(base if base is not None else os.environ)
     env.update({"COUCH_CONFIG": str(config_path), "COUCH_DATA": str(data_dir), "PORT": str(port),
-                "COUCHTV_NO_BONJOUR": env.get("COUCHTV_NO_BONJOUR", "1")})
+                "COUCHTV_NO_BONJOUR": env.get("COUCHTV_NO_BONJOUR", "1"),
+                # N13b: where the bridge leaves a Matter code for the Helper when Matter is not installed yet (mattersrv.request_path)
+                "COUCH_MATTER_REQUEST": str(Path(data_dir) / "matter-install-request.json")})
     return env
 
 

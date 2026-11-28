@@ -36,6 +36,9 @@ class Controller:
         except Exception:
             self._node = ("", "")
 
+    _matter_busy = False
+    matter_words = ""
+
     def _known(self):
         import json
         try:
@@ -47,6 +50,8 @@ class Controller:
         st = status.snapshot(self.cfg, self.known, self.sup, self.autostart.is_enabled(), self.knock)
         st["update"] = dict(self.update_state)
         st["awake"] = {"needed": any(t["kind"] in hconfig.KINDS for t in self.cfg["tvs"]), "allow_sleep": self.cfg["allow_sleep"]}
+        if self.matter_words:
+            st["matter"] = self.matter_words        # N13b: what Matter's first set up is doing, or why it did not work
         return st
 
     def items(self):
@@ -91,6 +96,7 @@ class Controller:
         """Every half minute: hold or release the keep awake assertion (on power, with a Samsung, LG or Roku TV)."""
         self.awake.update(self.cfg)
         self.follow_node()
+        self.follow_matter_request()
 
     def follow_node(self):
         """N13 and N13b: when Setup has fetched Node.js, or installed the Matter controller, into this folder, the bridge is told where they
@@ -107,6 +113,46 @@ class Controller:
                 self.sup._kill()           # its loop starts it again with the new config within seconds
         except Exception:
             pass
+
+    def follow_matter_request(self):
+        """N13b: a Matter code was typed on the TV's phone page before Matter was installed: the bridge left it in a file. Install the
+        Matter controller now (the same code and words as Setup's Matter step), restart the bridge with it, then add the device with the
+        code. One at a time, in the background; never raises."""
+        try:
+            from .. import mattersrv
+            if self._matter_busy or not mattersrv.request_path().exists():
+                return
+            self._matter_busy = True
+            threading.Thread(target=self._matter_job, daemon=True).start()
+        except Exception:
+            self._matter_busy = False
+
+    def _matter_job(self):
+        from .. import mattersrv, nodejs, smarthome
+        from ..tv import TvError
+        try:
+            req = mattersrv.take_request()
+            if not req:
+                return
+            say = lambda f, m=None: setattr(self, "matter_words", m or self.matter_words)
+            self.matter_words = mattersrv.WORDS
+            if not nodejs.usable():
+                nodejs.ensure(say)
+            mattersrv.ensure(say)
+            self.matter_words = "Starting Matter on this computer"
+            self.follow_node()
+            base = "http://127.0.0.1:%d" % self.cfg["port"]
+            key = self.cfg.get("pairing_key")
+            hdr = {"Content-Type": "application/json", **({"Authorization": "Bearer " + key} if key else {})}
+            smarthome._wait_matter_ready(base, hdr)
+            smarthome.commission_post(base, hdr, req["code"], req["address"])
+            self.matter_words = ""
+        except TvError as e:
+            self.matter_words = str(e)          # plain words, never the code
+        except Exception:
+            self.matter_words = "Getting Matter ready did not work. Type the code again in a minute."
+        finally:
+            self._matter_busy = False
 
     def check_updates(self):
         """Looks for a newer release, downloads and checks it (signature, then checksum). Never raises."""

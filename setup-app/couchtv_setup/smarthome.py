@@ -830,7 +830,13 @@ def matter_add(code, progress=lambda f, msg=None: None):
         progress(0.55, "Starting Matter on this computer")
         _wait_matter_ready(base, hdr)
     progress(0.6, "Adding it on this computer")
-    req = urllib.request.Request(base + "/api/matter/commission", data=json.dumps({"code": c}).encode(), method="POST", headers=hdr)
+    return commission_post(base, hdr, c)
+
+
+def commission_post(base, hdr, c, address=None):
+    """Hands a Matter code to the Helper's bridge. Returns its answer; raises TvError in plain words."""
+    body = {"code": c} if not address else {"code": c, "address": address}
+    req = urllib.request.Request(base + "/api/matter/commission", data=json.dumps(body).encode(), method="POST", headers=hdr)
     try:
         with urllib.request.urlopen(req, timeout=120) as r:
             return json.loads(r.read(65536).decode("utf-8", "replace"))

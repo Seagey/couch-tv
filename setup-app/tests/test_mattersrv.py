@@ -327,5 +327,112 @@ class Wiring(Base):
         self.assertEqual(c.exception.code, "matter_offline")
 
 
+class Request(Base):
+    """N13b: the code left by the bridge, and the Helper installing Matter and adding the device with it."""
+
+    def leave(self, code="12345678901", at=None, **extra):
+        p = ms.request_path()
+        os.makedirs(p.parent, exist_ok=True)
+        import time
+        json.dump(dict({"code": code, "address": None, "at": at or int(time.time())}, **extra), open(p, "w"))
+        return p
+
+    def test_take_request_reads_and_deletes_and_checks(self):
+        p = self.leave()
+        self.assertEqual(ms.take_request(), {"code": "12345678901", "address": None})
+        self.assertFalse(p.exists())
+        self.assertIsNone(ms.take_request())
+        self.leave(code="not a code")
+        self.assertIsNone(ms.take_request())
+        self.leave(at=1)
+        self.assertIsNone(ms.take_request(), "an hour old: the code ran out")
+        p = ms.request_path()
+        p.write_text("{broken")
+        self.assertIsNone(ms.take_request())
+        self.assertFalse(p.exists())
+
+    def test_child_env_names_the_request_file(self):
+        from couchtv_setup.helper import bridge_proc
+        env = bridge_proc.child_env("/c.json", "/d", 5400, base={})
+        self.assertEqual(env["COUCH_MATTER_REQUEST"], os.path.join("/d", "matter-install-request.json"))
+
+    def run_job(self, installer_raises=None, node_usable=True):
+        said, posts, waits = [], [], []
+        c = control.Controller(data=tempfile.mkdtemp(), sup=None, known={}, awake=mock.Mock())
+        npm = FakeNpm()
+        real = ms.ensure
+
+        def ensure(progress=lambda f, m=None: None, **kw):
+            if installer_raises:
+                raise installer_raises
+            return real(progress, src=self.src, run=npm, runner=self.runner)
+        with mock.patch.object(ms, "ensure", side_effect=ensure), \
+                mock.patch.object(nodejs, "usable", return_value=("/fake/node", "computer") if node_usable else None), \
+                mock.patch.object(nodejs, "ensure", side_effect=lambda *a, **k: said.append("node fetched")), \
+                mock.patch.object(c, "follow_node", side_effect=lambda: said.append("bridge restarted")), \
+                mock.patch.object(sh, "_wait_matter_ready", side_effect=lambda *a, **k: waits.append(1)), \
+                mock.patch.object(sh, "commission_post", side_effect=lambda base, hdr, code, address=None: posts.append((base, code, address)) or {"ok": True}):
+            c._matter_busy = True
+            c._matter_job()
+        return c, said, posts, waits, npm
+
+    def test_the_helper_installs_restarts_and_adds_the_device_with_the_kept_code(self):
+        self.leave()
+        c, said, posts, waits, npm = self.run_job()
+        self.assertEqual(len(npm.calls), 3)
+        self.assertEqual(said, ["bridge restarted"])
+        self.assertEqual(waits, [1])
+        self.assertEqual([(b, code, a) for b, code, a in posts], [("http://127.0.0.1:%d" % c.cfg["port"], "12345678901", None)])
+        self.assertFalse(ms.request_path().exists(), "the code is not kept")
+        self.assertEqual((c._matter_busy, c.matter_words), (False, ""))
+        self.assertIsNotNone(ms.for_bridge())
+
+    def test_it_fetches_node_first_when_the_computer_has_none(self):
+        self.leave()
+        c, said, posts, waits, npm = self.run_job(node_usable=False)
+        self.assertEqual(said[0], "node fetched")
+        self.assertEqual(len(posts), 1)
+
+    def test_a_failure_is_said_in_plain_words_the_code_is_gone_and_nothing_is_sent(self):
+        self.leave()
+        c, said, posts, waits, npm = self.run_job(installer_raises=TvError("Could not reach the internet to get Matter.", "matter_offline"))
+        self.assertEqual(posts, [])
+        self.assertEqual(c.matter_words, "Could not reach the internet to get Matter.")
+        self.assertNotIn("12345678901", c.matter_words)
+        self.assertFalse(ms.request_path().exists())
+        c.sup = mock.Mock(alive=lambda: False, paused=False)
+        self.assertEqual(c.state()["matter"], c.matter_words)
+
+    def test_an_unexpected_error_does_not_leak_and_frees_the_job(self):
+        self.leave()
+        c, said, posts, waits, npm = self.run_job(installer_raises=RuntimeError("boom 12345678901"))
+        self.assertNotIn("12345678901", c.matter_words)
+        self.assertFalse(c._matter_busy)
+
+    def test_the_tick_starts_one_job_only_when_a_request_is_waiting(self):
+        c = control.Controller(data=tempfile.mkdtemp(), sup=None, known={}, awake=mock.Mock())
+        started = []
+        with mock.patch("threading.Thread", side_effect=lambda **k: started.append(k) or mock.Mock()):
+            c.follow_matter_request()
+            self.assertEqual(started, [], "no request, no job")
+            self.leave()
+            c.follow_matter_request()
+            c.follow_matter_request()
+        self.assertEqual(len(started), 1, "one at a time")
+
+    def test_words_shown_while_it_works(self):
+        self.leave()
+        c = control.Controller(data=tempfile.mkdtemp(), sup=None, known={}, awake=mock.Mock())
+        seen = []
+        orig = ms.ensure
+        with mock.patch.object(ms, "ensure", side_effect=lambda say, **k: (seen.append(c.matter_words), orig(say, src=self.src, run=FakeNpm(), runner=self.runner))[1]), \
+                mock.patch.object(nodejs, "usable", return_value=("/fake/node", "computer")), \
+                mock.patch.object(c, "follow_node"), mock.patch.object(sh, "_wait_matter_ready"), \
+                mock.patch.object(sh, "commission_post", return_value={"ok": True}):
+            c._matter_busy = True
+            c._matter_job()
+        self.assertEqual(seen, ["Getting Matter ready, about 2 minutes, one time only"])
+
+
 if __name__ == "__main__":
     unittest.main()
