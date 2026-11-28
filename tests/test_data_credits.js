@@ -33,10 +33,10 @@ const langs = JSON.parse(/^    "This week": (\{.*\}),$/m.exec(lines)[1]);
 ok(Object.keys(langs).every((k) => typeof tr[k] === "string"), "every language This week has, the credit has too");
 ok(Object.values(tr).every((s) => s.includes("Open-Meteo.com")), "every language keeps the name Open-Meteo.com");
 
-// Home settings, Location: the GeoNames credit in all 16 blocks, under the place note
+// Home settings, Location: the GeoNames credit in all 17 blocks, under the place note
 const i18n = read("tv-home/web/i18n.js");
 const notes = (i18n.match(/^    loc_note: /mg) || []).length, credits = i18n.match(/^    loc_credit: ".*GeoNames.*",$/mg) || [];
-ok(notes === 16 && credits.length === 16, "loc_credit in every language (" + credits.length + " of " + notes + ")");
+ok(notes === 17 && credits.length === 17, "loc_credit in every language (" + credits.length + " of " + notes + ")");
 ok(i18n.includes('    loc_credit: "Location data based on GeoNames",'), "the English line");
 ok(read("tv-home/web/app.js").includes('rows.push(info("loc-credit", t("loc_credit")));'), "Home settings, Location shows it");
 

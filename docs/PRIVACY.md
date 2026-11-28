@@ -178,6 +178,10 @@ Privacy clean is about the TV's own apps. For couch-tv's own apps, the README ha
   Weather data by Open-Meteo.com (CC BY 4.0); the TV credits it under the forecast, air quality and
   surf it opens. Town search uses Open-Meteo's place search: location data based on GeoNames
   (CC BY 4.0), credited under Home settings, Location.
+- Shabbat times (off unless switched on in Home settings, Weather): once an hour the home asks Hebcal
+  for this week's candle lighting and havdalah, sending only the latitude and longitude of the town you
+  set (rounded) and its time zone, with no account, cookies or referrer. Shabbat times by Hebcal.com
+  (CC BY 4.0), credited under the switch.
 
 ## Sources
 

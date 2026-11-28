@@ -242,7 +242,7 @@ look and scenes, your apps and their order, the people and the quick buttons, wi
 - **[Glass and video](docs/TV-HOME.md#glass-and-video)**: clear glass panels and icons, a liquid glass clock, or a looping video behind it all.
 - **[Quick buttons](docs/TV-HOME.md#quick-buttons)**: sleep timer, picture mode, inputs by name, screensaver and more, one press from the home.
 - **[Smart home](docs/TV-HOME.md#smart-home)**: air conditioning, scenes and a doorbell card from Home Assistant. Off unless you add it.
-- **[Sixteen languages](docs/TV-HOME.md#languages)**: English, Spanish, Mexican Spanish, Italian, German, French, Turkish, Serbian, Polish, Dutch, Hebrew, Czech, Brazilian Portuguese, Arabic, Romanian and Simplified Chinese.
+- **[Seventeen languages](docs/TV-HOME.md#languages)**: English, Spanish, Mexican Spanish, Italian, German, French, Turkish, Serbian, Polish, Dutch, Hebrew, Czech, Brazilian Portuguese, Arabic, Romanian, Simplified Chinese and Korean.
 - **[Your own photos](docs/TV-HOME.md#your-own-photos)**: from a USB drive, the TV or the web, taking turns with the scenes.
 - **[Two TVs, one show](docs/SYNC.md)**: start the same show on two TVs at once, so two rooms do not echo.
 - **[Move to another TV](docs/MOVE.md)**: carry on in another room. One tap on the phone pauses the show here and starts it there, as the same person. New, Android and Google TV with the bridge.
@@ -355,7 +355,9 @@ gains a permission these tables do not explain.
 
 - **Home button watch** (`FireWatch`, Home) and **home watch** (`WatchService`, Couch TV): accessibility
   services, off until a computer switches them on. They see which window came forward, by its app and
-  screen name, and put couch-tv's home back when the TV opens its own. They read no screen content.
+  screen name, and put couch-tv's home back when the TV opens its own. They read no screen content. On a
+  TCL with the Google TV home installed, the Home button watch also shows a black overlay for up to 6
+  seconds when the TV wakes, so the Google TV home does not flash.
   The Home one declares the screen reading capability only because some TVs (a TCL on Android 12)
   send window events to nothing else.
 - **Home button watch check** (`WatchRepair`, Home): a job Android runs about every 15 minutes, even

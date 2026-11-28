@@ -187,7 +187,7 @@ What you change shows when the list closes.
 
 ### Language
 
-English, Español, Español (México), Italiano, Deutsch, Français, Türkçe, Srpski (latinica), Polski (since 0.13), Português (Brasil) (since 0.13), Čeština (since 0.13), Hebrew (עברית with full RTL layout, since 0.13), Arabic (العربية with full RTL layout, since 0.13) Romanian (Română, 24-hour clock) and Simplified Chinese (简体中文, 24-hour clock). Until one is picked here (or in
+English, Español, Español (México), Italiano, Deutsch, Français, Türkçe, Srpski (latinica), Polski (since 0.13), Português (Brasil) (since 0.13), Čeština (since 0.13), Hebrew (עברית with full RTL layout, since 0.13), Arabic (العربية with full RTL layout, since 0.13) Romanian (Română, 24-hour clock), Simplified Chinese (简体中文, 24-hour clock) and Korean (한국어). Until one is picked here (or in
 `config.json`), the home speaks the TV's own language if it is one of these, else English. More on
 each language: [Languages](#languages).
 
@@ -208,6 +208,18 @@ Italian the places in Italy come first, in German the places in Germany.
 
 Open-Meteo is the only weather provider for now. Since 0.13: **Ambient weather
 effects** (light rain, snow and fog over the scenes), off to start.
+
+**Shabbat times** (off to start): a card at the start of the Keep watching row with this week's candle
+lighting, then havdalah and the parsha (or the Yom Tov, in a week without one). It uses the town set
+under Location, so there is nothing else to set up, and the TV asks
+[Hebcal](https://www.hebcal.com/shabbat) itself once an hour (18 minutes before
+sunset; no computer needed). The times are the town's own, whatever zone the TV is in, and follow the
+12 or 24 hour clock. Or `home.shabbat: true` in `config.json`. Shabbat times by Hebcal.com (CC BY 4.0).
+
+**Shabbat look** (on with Shabbat times, or `home.shabbat_look: false` to keep only the card): from candle
+lighting to havdalah the whole home takes on candlelight. A warm glow comes up from below the scene, the
+scene and the glass panels turn gold, and two flickering candles with "Shabbat Shalom · Havdalah 5:16 pm"
+sit over the date. At havdalah it goes back by itself. Lighter home keeps the flames still.
 
 ### Look and scenes
 
@@ -530,11 +542,12 @@ They win over `config.json` on that TV; About, Reset home settings goes back to 
 | Arabic, with full right-to-left layout | `ar` | 12 hour | Yes, since 0.13 | Not yet |
 | Romanian | `ro` | 24 hour | Yes | Not yet |
 | Simplified Chinese | `zh-CN` | 24 hour | Yes | Yes |
+| Korean | `ko` | 12 hour (오전/오후) | Yes | Yes |
 
 The TV home and the phone remote both speak English, Spanish (`es`, for Spain and everyone else),
 Mexican Spanish (`es-MX`: computadora, celular, presionar, clima and the rest), Italian (`it`),
 German (`de`), Turkish (`tr`), Serbian Latin (`sr-Latn-RS`), Czech (`cs`, 24 hour clock, since 0.13), Polish (`pl`, since 0.13), Brazilian Portuguese (`pt`, since 0.13), Dutch (`nl`, TV home only for now, since 0.13) and Hebrew (`he`, with full right-to-left layout and 24 hour clock, TV
-home only for now), Arabic (`ar`, with full right-to-left layout, TV home only for now, since 0.13) and Romanian (`ro`, TV home only for now), and Simplified Chinese (`zh-CN`, 24 hour clock). The TV home also speaks French (`fr`, 24 hour clock); the phone
+home only for now), Arabic (`ar`, with full right-to-left layout, TV home only for now, since 0.13) and Romanian (`ro`, TV home only for now), and Simplified Chinese (`zh-CN`, 24 hour clock). The TV home and the phone remote also speak Korean (`ko`). The TV home also speaks French (`fr`, 24 hour clock); the phone
 remote has no French yet. Italian, German, Turkish, Serbian, Czech, Polish, Brazilian Portuguese, Dutch, Hebrew, Romanian and Simplified Chinese use a 24 hour clock by
 default unless you pick 12 hour.
 

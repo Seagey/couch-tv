@@ -61,6 +61,7 @@ object Doorbell {
     private var wasOn: Boolean? = null
     private var lastEvent: String? = null
     private var card: View? = null
+    fun showing(): Boolean = card != null
     private var picture: ImageView? = null
 
     /** Called when the launcher starts and whenever apply.sh sends new settings. Safe to repeat. */
@@ -238,6 +239,7 @@ object Doorbell {
         try { wm.addView(frame, lp) } catch (e: Exception) { return }
         frame.requestFocus()
         card = frame; picture = img
+        WakeMask.doorbellShown { awake(c) }
         frame.alpha = 0f; frame.translationY = -20 * dp
         frame.animate().alpha(1f).translationY(0f).setDuration(380)
             .setInterpolator(android.view.animation.PathInterpolator(0.2f, 0.8f, 0.2f, 1f)).start()

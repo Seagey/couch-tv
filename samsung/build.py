@@ -168,13 +168,17 @@ def main():
             shutil.copy(os.path.join(LOGOS, name), os.path.join(stage, "logos", name))
             logos.add(name[:-4])
     # Your own logo for an app (git ignored): samsung/my-logos/<package>.png beats the bundled one and
-    # the TV's own icon, for an app whose Tizen icon looks wrong on the home.
+    # the TV's own icon, for an app whose Tizen icon looks wrong on the home. For an app couch-tv has
+    # no entry for and the bridge finds no icon for (Samsung's own Workspace), name the file after its
+    # Tizen app id, package id or its name as the TV shows it (Workspace.png).
     mine = os.path.join(HERE, "my-logos")
+    own_logos = []
     if os.path.isdir(mine) and not a.release:
         for name in sorted(os.listdir(mine)):
             if name.endswith(".png"):
                 shutil.copy(os.path.join(mine, name), os.path.join(stage, "logos", name))
                 logos.add(name[:-4])
+                own_logos.append(name[:-4])
 
     # config.xml: the app's version is couch-tv's (update.js compares it with the latest release)
     cfg_xml = os.path.join(stage, "config.xml")
@@ -223,6 +227,12 @@ def main():
     if sky is not None and (not isinstance(sky, int) or isinstance(sky, bool) or not 1 <= sky <= 4):
         raise SystemExit(f"{tv_cfg['id']}: sky_hdmi must be a port number from 1 to 4, or left out")
     key = "" if a.release else (a.key or config.PAIRING_KEY)
+    # "app_names": {"<package>": "<name>"} in this TV's entry: the name on an app's tile, for a
+    # household that knows it by another name
+    names = tv_cfg.get("app_names", {})
+    if not (isinstance(names, dict) and all(isinstance(k, str) and isinstance(v, str) and v.strip()
+                                            for k, v in names.items())):
+        raise SystemExit(f"{tv_cfg['id']}: app_names must map app packages to names")
     settings = {"bridge": a.bridge.rstrip("/"), "tv": a.tv, "log": a.log_url.rstrip("/"), "sky_hdmi": sky, "key": key,
                 "version": version}
     with open(os.path.join(stage, "settings.js"), "w") as f:
@@ -231,10 +241,11 @@ def main():
     for app in apps.APPS:
         t = apps.TIZEN.get(app["id"])
         if t:
-            table[app["package"]] = {"id": app["id"], "name": app["name"], "ids": t["ids"],
+            table[app["package"]] = {"id": app["id"], "name": names.get(app["package"], app["name"]).strip(), "ids": t["ids"],
                                      "app": t.get("app"), "logo": app["package"] in logos}
     with open(os.path.join(stage, "tizen-apps.js"), "w") as f:
         f.write("window.COUCH_TIZEN_APPS = " + json.dumps(table, indent=1) + ";\n")
+        f.write("window.COUCH_TIZEN_OWN_LOGOS = " + json.dumps(own_logos) + ";\n")
 
     wgt = os.path.join(OUT, "CouchTV.wgt")
     if os.path.exists(wgt):

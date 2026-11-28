@@ -25,6 +25,7 @@ import android.provider.Settings
 import android.view.Gravity
 import android.view.KeyEvent
 import android.view.View
+import android.view.ViewTreeObserver
 import android.view.WindowManager
 import android.view.ViewGroup
 import android.view.WindowInsets
@@ -73,10 +74,19 @@ class MainActivity : Activity() {
     private var web: WebView? = null
     private var fallback: View? = null
     private var pageReady = false
+        set(value) {
+            field = value
+            if (!value) wakeFrame = null
+        }
     private var loadFailed = false
     private var probing = false
     private var offline = false   // showing the saved copy because the computer is off
     private var resumed = false
+    private class WakeFrame(val token: Any, val web: WebView) {
+        var drawn = false
+    }
+    private var wakeFrame: WakeFrame? = null
+    private var wakeFrameRequest = 0L
     private var waitingForNet = false   // just switched on, no Wi-Fi yet: the first load waits for it
     private val retry = Runnable { if (!pageReady || offline) connect() }
 
@@ -227,6 +237,7 @@ class MainActivity : Activity() {
     override fun onResume() {
         super.onResume()
         resumed = true
+        WakeMask.homeChanged()
         // the page's timers and script were paused while another app or the screensaver was in front
         web?.resumeTimers(); web?.onResume()
         restoreTimeout(resume = true)   // back in front: the normal screen timeout goes back (not for the first moments of a press, see ambientAt)
@@ -272,6 +283,7 @@ class MainActivity : Activity() {
     override fun onPause() {
         super.onPause()
         resumed = false
+        wakeFrame = null
         try {
             val lp = window.attributes
             if (lp.screenBrightness == 0.0f) {
@@ -288,6 +300,57 @@ class MainActivity : Activity() {
         // Not while the page is still loading (the TV's own home flashes up at boot): a paused load
         // would only show the app grid.
         if (pageReady) { web?.onPause(); web?.pauseTimers() }
+    }
+
+    private fun wakeContentReady(token: Any, ownDialog: Boolean): Boolean {
+        if (!resumed || isFinishing || isDestroyed) return false
+        if (ownDialog || fallback?.isShown == true) return true
+        val w = web ?: return false
+        if (!pageReady || !w.isShown) return false
+        val frame = wakeFrame
+        if (frame?.token !== token || frame.web !== w) {
+            requestWakeFrame(WakeFrame(token, w))
+            return false
+        }
+        return frame.drawn
+    }
+
+    /** A loaded page can still be a frame behind after resume, even when it never lost focus in standby. */
+    private fun requestWakeFrame(frame: WakeFrame) {
+        val w = frame.web
+        wakeFrame = frame
+        val request = ++wakeFrameRequest
+        fun stillShowing() = wakeFrame === frame && resumed &&
+            pageReady && web === w && w.isShown && !isFinishing && !isDestroyed
+        val drawn = Runnable {
+            if (stillShowing()) {
+                frame.drawn = true
+                WakeMask.homeChanged()
+            } else if (wakeFrame === frame) wakeFrame = null
+        }
+        w.postVisualStateCallback(request, object : WebView.VisualStateCallback() {
+            override fun onComplete(requestId: Long) {
+                if (!stillShowing()) {
+                    if (wakeFrame === frame) wakeFrame = null
+                    return
+                }
+                // The visual-state callback runs before the draw. Wait for that frame to be submitted.
+                val observer = w.viewTreeObserver
+                if (Build.VERSION.SDK_INT >= 29 && w.isHardwareAccelerated) {
+                    observer.registerFrameCommitCallback { main.post(drawn) }
+                } else {
+                    observer.addOnDrawListener(object : ViewTreeObserver.OnDrawListener {
+                        override fun onDraw() {
+                            main.post {
+                                if (observer.isAlive) observer.removeOnDrawListener(this)
+                                drawn.run()
+                            }
+                        }
+                    })
+                }
+                w.invalidate()
+            }
+        })
     }
 
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
@@ -587,6 +650,7 @@ class MainActivity : Activity() {
                     removeFallback()
                     view.visibility = View.VISIBLE
                     view.requestFocus()
+                    WakeMask.homeChanged()
                     // the live page is up: bring the saved copy up to date if the page changed
                     if (!offline) prefs.getString("bridge", null)?.let { b -> io.execute { syncOffline(b) } }
                 }
@@ -2236,6 +2300,7 @@ class MainActivity : Activity() {
         fallback = scroll
         root.addView(scroll, MATCH)
         grid.getChildAt(0)?.requestFocus()
+        WakeMask.homeChanged()
     }
 
     private fun label(text: String, pad: Int) = TextView(this).apply {
@@ -2281,6 +2346,9 @@ class MainActivity : Activity() {
 
         /** True while the home is resumed (in front). FireWatch checks this after a move to front on Android 10 (issue #202). */
         fun isInFront(): Boolean = shown?.get()?.resumed == true
+
+        internal fun wakeContentReady(token: Any, ownDialog: Boolean): Boolean =
+            shown?.get()?.wakeContentReady(token, ownDialog) == true
 
         /** What onNewIntent does for a Home press, for when FireWatch brought the home back without a new intent. */
         fun backToFirstTile() {

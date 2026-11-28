@@ -204,4 +204,33 @@ function updater(version, mem, xhr) {
   assert.ok(blurred, "the keyboard closes");
 }
 
+// ---- tizen.js: the icon of an app couch-tv has no logo for ----
+{
+  const apps = [
+    { id: "AbCdEfGhIj.Other", packageId: "AbCdEfGhIj", name: "Other - Movies and Shows", show: true, iconPath: "/opt/usr/apps/AbCdEfGhIj/icon.png" },
+    { id: "WSRedi0001.WorkspaceRedi", packageId: "WSRedi0001", name: "Workspace", show: true, iconPath: "/opt/usr/apps/WSRedi0001/icon.png" }
+  ];
+  const s = {
+    location: { search: "" }, COUCH_TIZEN: {}, COUCH_TIZEN_APPS: {}, COUCH_TIZEN_OWN_LOGOS: ["Workspace"],
+    localStorage: storage({ "couch.tizen.apps": JSON.stringify(apps) }),
+    setTimeout() { return 0; }, clearTimeout() {}, JSON,
+    tizen: { application: { getAppsInfo() {} }, tvinputdevice: { registerKey() { throw new Error("no"); } } },
+    document: { hidden: false, addEventListener() {} },
+    addEventListener() {}
+  };
+  s.window = s;
+  run("tizen.js", s);
+  assert.strictEqual(s.TVOS.iconUrl("AbCdEfGhIj.Other"), "file:///opt/usr/apps/AbCdEfGhIj/icon.png", "the TV's icon without a bridge");
+  assert.strictEqual(JSON.parse(s.TVOS.apps())[0].label, "Other", "the tile leaves off a store tagline");
+
+  // with a bridge: the bridge finds the icon by the app's name (the TV hands over no other app's icon)
+  const b = Object.assign({}, s, { location: { search: "?api=http%3A%2F%2Fpi%3A5400&tv=lounge" }, COUCH_TIZEN: { key: "k y" },
+    XMLHttpRequest: function () { this.open = () => {}; this.setRequestHeader = () => {}; this.send = () => {}; } });
+  b.window = b;
+  run("tizen.js", b);
+  assert.strictEqual(b.TVOS.iconUrl("AbCdEfGhIj.Other"),
+    "http://pi:5400/api/tizen/icon?name=Other%20-%20Movies%20and%20Shows&tv=lounge&key=k%20y");
+  assert.strictEqual(b.TVOS.iconUrl("WSRedi0001.WorkspaceRedi"), "logos/Workspace.png", "an own logo, by the TV's app name, before the look-up");
+}
+
 console.log("Samsung app tests passed.");

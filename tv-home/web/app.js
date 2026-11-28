@@ -1017,6 +1017,8 @@
     WX_EVERY = [15, 30, 60].indexOf(ST.wx_every) >= 0 ? ST.wx_every : 30;
     WX_AMBIENT = typeof ST.ambient_weather === "boolean" ? ST.ambient_weather : HOME.ambient_weather === true;   // off unless chosen
     WX_SUN_GRADE = typeof ST.ambient_sun_grade === "boolean" ? ST.ambient_sun_grade : HOME.ambient_sun_grade === true;
+    SHAB_ON = typeof ST.shabbat === "boolean" ? ST.shabbat : HOME.shabbat === true;   // Shabbat times: off unless chosen
+    SHAB_LOOK = typeof ST.shabbat_look === "boolean" ? ST.shabbat_look : HOME.shabbat_look !== false;   // with the times, unless switched off
     var mine = TV_ID || CFG.default_tv;
     TVCFG = (CFG.tvs || []).filter(function (t) { return t.id === mine; })[0] || (CFG.tvs || [])[0] || {};
     // no "quick" from an older bridge: the sleep timer, and the picture switch where the TV has one
@@ -1694,7 +1696,7 @@
         if (isPhoto && SCENES[scene] === s && SCENES.length > 1) showScene(nextFrom(scene));
       }
     };
-    img.onload = function () { delete img.dataset.tries; };
+    img.onload = function () { img.removeAttribute("data-tries"); };   // old webOS throws on deleting from dataset (#150)
   }
 
   /** The scene's photo is in and drawable. */
@@ -1723,9 +1725,9 @@
     var el = sceneEls[k];
     if (!el || !el.classList.contains("ready")) return;
     el.classList.remove("ready");
-    Array.prototype.forEach.call(el.querySelectorAll("img"), function (img) { img.removeAttribute("src"); delete img.dataset.tries; });
+    Array.prototype.forEach.call(el.querySelectorAll("img"), function (img) { img.removeAttribute("src"); img.removeAttribute("data-tries"); });
     Array.prototype.forEach.call(el.querySelectorAll(".gclock .fill"), function (f) { f.style.backgroundImage = ""; });
-    delete el.dataset.hm;
+    el.removeAttribute("data-hm");
   }
 
   // An own scene whose photo is not on this TV (option A with an app built before the scene was
@@ -4880,7 +4882,22 @@
   // The household's own cards, at the end of the Keep watching row. Display only: every string goes in
   // with textContent, an image only from an http(s) link, and OK opens an installed app or an http(s)
   // link through the same /api/launch the app tiles use. Off (no cards, no fetching) unless set.
-  var CARDS = [];
+  var CARDS = [], CUSTOM = [];
+  // Shabbat times (shabbat.js): one card before the household's own, only while switched on
+  var SHAB_ON = false, SHAB_CARD = null, shabTimer = null, SHAB_LOOK = true, SHAB_SPAN = null, shabNow = null;
+  // Shabbat look: from candle lighting to havdalah, candlelight colours, two candles and Shabbat Shalom
+  function shabbatSync() {
+    var on = !!(SHAB_ON && SHAB_LOOK && window.Shabbat && window.Shabbat.during(SHAB_SPAN, Date.now()));
+    var g = $("shabbat-greet");
+    if (on && g) {
+      var words = t("shabbat_shalom") + (SHAB_SPAN.havdalah ? "\u00a0· " + t("shabbat_havdalah", { time: SHAB_SPAN.havdalah }) : "");
+      var w = g.querySelector(".sg-words");
+      if (w && w.textContent !== words) w.textContent = words;
+    }
+    if (on === shabNow) return;
+    shabNow = on;
+    document.documentElement.classList.toggle("shabbat-mode", on);
+  }
   function cardAt(i) { return i >= data.shows.length ? CARDS[i - data.shows.length] || null : null; }
   function addCards(track) {
     CARDS.forEach(function (c) {
@@ -4943,6 +4960,11 @@
   }
   function setCards(list) {
     if (!list) return;   // not JSON, or nothing came back: keep the last good cards
+    CUSTOM = list;
+    mergeCards();
+  }
+  function mergeCards() {
+    var list = (SHAB_ON && SHAB_CARD ? [SHAB_CARD] : []).concat(CUSTOM).slice(0, 9);
     var before = JSON.stringify(CARDS);
     CARDS = list;
     if (JSON.stringify(list) === before) return;
@@ -4971,6 +4993,41 @@
     if (OFFLINE || !own) { direct(); return; }   // the account's link is read by the TV itself, never through the home computer
     var q = force ? "?force=1" : "";
     api("GET", "/api/custom-cards" + q, null, 9000).then(function (j) { setCards(CC.clean(j.cards || [])); }, direct);
+  }
+
+  // Shabbat times: Hebcal, asked by the TV itself for the weather's own place (no computer needed)
+  function refreshShabbat() {
+    var SH = window.Shabbat;
+    if (!SH) return;
+    var src = SHAB_ON && WXCFG ? SH.url(WXCFG) : "";
+    if (!src || !window.fetch) {
+      if (SHAB_CARD) { SHAB_CARD = null; mergeCards(); }
+      SHAB_SPAN = null; shabbatSync();
+      return;
+    }
+    fetch(src, { credentials: "omit", cache: "no-store" })
+      .then(function (r) { return r.ok ? r.text() : null; })
+      .then(function (s) {
+        if (!SHAB_ON) return;
+        var j = null;
+        try { j = s == null || s.length > 262144 ? null : JSON.parse(s); } catch (e) { j = null; }
+        var c = j ? SH.card(j, CLOCK24, { candles: t("shabbat_candles"), havdalah: t("shabbat_havdalah", { time: "{time}" }) }) : null;
+        if (c) { SHAB_CARD = c; mergeCards(); }   // nothing usable: keep the last good card
+        var sp = j ? SH.span(j, CLOCK24) : null;
+        // keep a span that is still running (Hebcal moves on to next week once havdalah has passed)
+        if (sp || !SH.during(SHAB_SPAN, Date.now())) SHAB_SPAN = sp;
+        shabbatSync();
+      }, function () {});
+  }
+  var shabSyncTimer = null;
+  function startShabbat() {
+    clearInterval(shabTimer); clearInterval(shabSyncTimer);
+    shabTimer = shabSyncTimer = null;
+    refreshShabbat();
+    if (SHAB_ON && window.Shabbat) {
+      shabTimer = setInterval(refreshShabbat, window.Shabbat.EVERY_MIN * 60000);
+      shabSyncTimer = setInterval(shabbatSync, 15000);   // candle lighting and havdalah: within 15 seconds
+    }
   }
 
   // ---------------- apps ----------------
@@ -5008,6 +5065,16 @@
     return list;
   }
 
+  // Some TVs number their HDMI inputs far from the port numbers (a TCL: HW15, HW16, HW17 are HDMI 1 to 3).
+  // Only then, count them in HW order, as the bridge does.
+  function portByOrder(detected, port) {
+    var hw = function (d) { var m = /HW(\d+)/i.exec(d.id || ""); return m ? Number(m[1]) : null; };
+    var hdmi = detected.filter(function (d) { return d.type === "hdmi" && hw(d) !== null; })
+      .sort(function (a, b) { return hw(a) - hw(b); });
+    if (!hdmi.length || hw(hdmi[0]) <= hdmi.length) return null;
+    return hdmi[port - 1] || null;
+  }
+
   function resolveInputs() {
     // this TV's own input tiles (tvs[].inputs in config.json) win over the shared home.inputs
     var raw = Array.isArray(TVCFG.inputs) ? TVCFG.inputs
@@ -5025,11 +5092,12 @@
         var found = detected.filter(function (d) {
           if (cfg.id && d.id === cfg.id) return true;
           if (cfg.port && (d.label || "").toLowerCase().indexOf("hdmi " + cfg.port) >= 0) return true;
-          if (cfg.port && (d.id || "").toLowerCase().indexOf("hw" + cfg.port) >= 0) return true;
+          if (cfg.port && new RegExp("hw" + cfg.port + "(?!\\d)", "i").test(d.id || "")) return true;   // "hw1" is not "HW15"
           if (cfg.match && ((d.label || "").toLowerCase().indexOf(cfg.match.toLowerCase()) >= 0 || (d.id || "").toLowerCase().indexOf(cfg.match.toLowerCase()) >= 0)) return true;
           if (cfg.device && (d.devices || []).some(function (dev) { return dev.toLowerCase().indexOf(cfg.device.toLowerCase()) >= 0; })) return true;
           return false;
         })[0];
+        if (!found && cfg.port && !cfg.id) found = portByOrder(detected, cfg.port);
         if (found) matchId = found.id;
       }
       if (!matchId) matchId = cfg.id || (cfg.port ? "HDMI_" + cfg.port : "input_" + label);
@@ -6872,7 +6940,7 @@
     var rows = L ? L.langs.map(function (l) {
       return { kind: "choice", key: "lang:" + l.id, label: l.name, lang: l.locale, checked: L.lang() === l.id, act: function () {
         ST.lang = l.id; L.set(l.id); saveSettings(); staticText();
-        if (CLOCK24 !== clock24()) { CLOCK24 = !CLOCK24; glassShown = ""; clock(); }
+        if (CLOCK24 !== clock24()) { CLOCK24 = !CLOCK24; glassShown = ""; clock(); if (SHAB_ON) refreshShabbat(); }
       } };
     }) : [];
     if (inboxCan()) rows.unshift(inboxRow("top-inbox-now"));   // a linked TV: Get my new design, at the top
@@ -6985,6 +7053,7 @@
     SET.msg = t("loc_set", { place: p.name });
     data.weather = null;
     refreshWeather();
+    if (SHAB_ON) { SHAB_CARD = null; mergeCards(); refreshShabbat(); }
   }
 
   // ---- weather ----
@@ -7003,6 +7072,17 @@
       { kind: "toggle", key: "wx-sun-grade", label: t("wx_sun_grade"), sub: t("wx_sun_grade_sub"), value: WX_SUN_GRADE ? t("on") : t("off"), act: function () {
         WX_SUN_GRADE = !WX_SUN_GRADE; ST.ambient_sun_grade = WX_SUN_GRADE; saveSettings();
         ambientSync();
+      } },
+      { kind: "toggle", key: "wx-shabbat", label: t("shabbat_show"), sub: t("shabbat_show_sub"), value: SHAB_ON ? t("on") : t("off"), act: function () {
+        SHAB_ON = !SHAB_ON; ST.shabbat = SHAB_ON; saveSettings();
+        if (!SHAB_ON) { SHAB_CARD = null; SHAB_SPAN = null; }
+        startShabbat();
+        mergeCards();
+        shabbatSync();
+      } },
+      { kind: "toggle", key: "wx-shabbat-look", label: t("shabbat_look"), sub: t("shabbat_look_sub"), value: SHAB_LOOK ? t("on") : t("off"), act: function () {
+        SHAB_LOOK = !SHAB_LOOK; ST.shabbat_look = SHAB_LOOK; saveSettings();
+        shabbatSync();
       } },
       { kind: "cycle", key: "wx-unit", label: t("wx_units"), value: WX_F ? "°F (Fahrenheit)" : "°C (Celsius)", act: function () {
         WX_F = !WX_F; ST.wx_unit = WX_F ? "f" : "c"; saveSettings(); clock();
@@ -7555,7 +7635,7 @@
       ST.scene_seconds = n; SCENE_MS = n * 1000; saveSettings();
     } });
     rows.push({ kind: "cycle", key: "clock", label: t("clock"), value: CLOCK24 ? t("clock_24") : t("clock_12"), act: function () {
-      CLOCK24 = !CLOCK24; ST.clock = CLOCK24 ? "24h" : "12h"; saveSettings(); glassShown = ""; clock();
+      CLOCK24 = !CLOCK24; ST.clock = CLOCK24 ? "24h" : "12h"; saveSettings(); glassShown = ""; clock(); if (SHAB_ON) refreshShabbat();
     } });
     // g17: the clock on or off (a design picks its own, so the row is not there with one on)
     if (!(typeof CouchDesign !== "undefined" && CouchDesign.on())) rows.push({ kind: "toggle", key: "show-clock", label: t("show_clock"),
@@ -11538,6 +11618,8 @@
     showPhoto();
     startVideo();
     photoTimer = setInterval(nextPhoto, PHOTO_MS);
+    // Shabbat times (Home settings, Weather): every hour while on, never before the home is drawn
+    if (SHAB_ON) setTimeout(startShabbat, 1800);
     // custom cards (home.custom_cards): every 10 minutes, and never before the home is drawn
     // (or the account's link, which may arrive later in a pack: the timer always runs and reads nothing until there is a link)
     if (window.CustomCards) {

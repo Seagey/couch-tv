@@ -32,6 +32,7 @@ RECS = os.path.join(DATA, "recs.json")
 SLEEP = os.path.join(DATA, "sleep.json")
 HIDDEN = os.path.join(DATA, "hidden.json")  # Keep watching cards removed by hand: "tv|who|title" -> when
 VIDEO_IDS = os.path.join(DATA, "video-ids.json")  # "title|channel" (move._norm) -> {"id", "length_s", "when"}
+INSTALLED = os.path.join(DATA, "installed.json")  # tv id -> the TV's installed packages, as last read
 VIDEO_IDS_MAX = 500
 # How far apart two lengths can be and still be the same video: the tolerance move.youtube_pick uses.
 VIDEO_LENGTH_SLACK_S = 3
@@ -412,6 +413,20 @@ def save_sleep(ends, tv_id):
     data = _sleeps()
     data[tv_id] = ends
     _write(SLEEP, data)
+
+
+def installed_packages(tv_id):
+    """The installed list last read from this TV, or None. A bridge that starts while the TV is off
+    (or after a power cut) cannot ask it, and without this every catalogue app counts as unknown."""
+    pk = _read(INSTALLED, {}).get(tv_id)
+    return set(pk) if pk else None
+
+
+def save_installed(tv_id, packages):
+    with _lock:
+        data = _read(INSTALLED, {})
+        data[tv_id] = sorted(packages)
+        _write(INSTALLED, data)
 
 
 def recs():

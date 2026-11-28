@@ -23,6 +23,7 @@
 <!-- Ambient Weather & Solar Celestial Lighting Overlays -->
 <div class="ambient-lighting" id="ambient-lighting" aria-hidden="true"></div>
 <canvas class="weather-canvas" id="weather-canvas" aria-hidden="true"></canvas>
+<div class="shabbat-glow" id="shabbat-glow" aria-hidden="true"></div>
 <div class="scrim" aria-hidden="true"></div>
 
 <header class="top">
@@ -40,6 +41,8 @@
   <div class="clock">
     <div class="time" id="time"></div>
     <div class="date" id="date"></div>
+    <!-- the Shabbat look (shabbat.js): shown only on Shabbat, from candle lighting to havdalah -->
+    <div class="shabbat-greet" id="shabbat-greet" aria-hidden="true"><span class="sg-candles"><i class="sg-c"></i><i class="sg-c"></i></span><span class="sg-words"></span></div>
     <div class="place" id="place"></div>
     <div class="quick" id="quick">
       <!-- the quick buttons from tvs[].quick in config.json, drawn by app.js -->
@@ -200,6 +203,7 @@
 <script src="kids.js"></script>
 <script src="spotify-player.js"></script>
 <script src="cards.js"></script>
+<script src="shabbat.js"></script>
 <!-- couch-tv Studio is opt in: designer-gate.js decides, and with it off design.js is never started -->
 <script src="designer-gate.js"></script>
 <script src="app-catalogue.js"></script>

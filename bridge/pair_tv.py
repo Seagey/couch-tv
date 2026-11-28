@@ -31,8 +31,6 @@ import socket
 import sys
 import time
 
-from androidtvremote2 import AndroidTVRemote
-
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
 import config
@@ -120,6 +118,8 @@ def give_code(cfg, code):
 
 
 async def pair(cfg):
+    # Imported here, not at the top: the --code and --adb runs do not use it (couch-tv#336).
+    from androidtvremote2 import AndroidTVRemote
     code_file, waiting, result = files(cfg["id"])
     host = resolve(cfg)
     os.makedirs(config.DATA, exist_ok=True)  # a fresh clone has no bridge/data yet

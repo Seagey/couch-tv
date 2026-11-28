@@ -91,6 +91,14 @@ app.couchtv.launcher/.MainActivity`, start the app, `appops set app.couchtv.laun
 allow`, then write `enabled_accessibility_services` and `accessibility_enabled 1` again. On that TCL
 a real double press of Home also stays on Google TV; Back twice escapes.
 
+**A brief black screen when waking from standby.** On a TCL with the Google TV launcher installed and
+couch-tv set as the default home, the Home button watch puts up a black overlay when the screen turns
+off, if couch-tv or the Google TV home was in front (a TV that sleeps on HDMI or live TV is not covered). After the screen-on broadcast or the display turning on, the overlay waits at least 1.5 seconds
+for couch-tv to draw or for a window event from another app, such as live TV. Events from the Google
+TV launcher and System UI do not qualify. A doorbell card clears the overlay immediately once the
+screen is on. The overlay has a 6-second timeout from the wake event; a window event on a lit screen also counts as
+the wake, in case the screen-on broadcast and the display callback are both missed.
+
 ## Hisense Google TV: the Google home after every restart or wake
 
 On a Hisense Google TV ("SmartTV 4K", Android 11, board songshan) with the on-TV app (option C), the TV came

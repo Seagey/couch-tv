@@ -2953,3 +2953,57 @@ html.lighter .wpick.focus { box-shadow: 0 0 0 0.5rem #FFFFFF, 0 0 0 1rem var(--w
 .ssec.more i { display: none; }
 .ssec.more small { font-size: 1.125rem; font-weight: 500; opacity: 0.8; margin-left: 0.5rem; }
 .ssec.more.focus { opacity: 1; }
+
+/* ---------------- Shabbat look (shabbat.js, Home settings, Weather): candle lighting to havdalah ----------------
+   Candlelight over whatever scene or look is on: a warm glow from below, a soft gold wash, two candles and
+   Shabbat Shalom under the date. Nothing here shows unless app.js puts html.shabbat-mode on. */
+.shabbat-glow { display: none; position: fixed; inset: 0; z-index: 0; pointer-events: none; }
+html.shabbat-mode .shabbat-glow {
+  display: block;
+  background:
+    radial-gradient(ellipse 75% 60% at 50% 110%, rgba(255, 168, 64, 0.55), rgba(255, 136, 40, 0.18) 55%, transparent 78%),
+    radial-gradient(ellipse 40% 30% at 50% 4%, rgba(255, 200, 120, 0.22), transparent 70%),
+    linear-gradient(180deg, rgba(48, 20, 72, 0.34) 0%, rgba(84, 36, 10, 0.24) 55%, rgba(34, 14, 4, 0.48) 100%);
+  mix-blend-mode: normal;
+}
+html.shabbat-mode .bg, html.shabbat-mode .scenes, html.shabbat-mode .bgvid { filter: sepia(0.55) saturate(1.25) hue-rotate(-8deg) brightness(0.88); }
+.shabbat-greet { display: none; }
+html.shabbat-mode .shabbat-greet {
+  display: inline-flex; align-items: flex-end; gap: 1rem; margin-top: 0.75rem;
+  font-size: 1.875rem; line-height: 2.25rem; font-weight: 550; color: #ffe2b0;
+  text-shadow: 0 0 1.25rem rgba(255, 170, 60, 0.55), 0 1px 3px rgba(0, 0, 0, 0.6);
+}
+/* Night: centred over the date, in the clear band between the people and the moon */
+html.theme-night.shabbat-mode .shabbat-greet {
+  position: fixed; left: 0; right: 0; top: 2.25rem; margin: 0; justify-content: center; pointer-events: none;
+}
+/* the glass panels take the candlelight too */
+html.theme-night.shabbat-mode .ncard, html.theme-night.shabbat-mode .people, html.theme-night.shabbat-mode .qbtn {
+  background: rgba(70, 36, 12, 0.36);
+  box-shadow: inset 0 0 0 0.0625rem rgba(255, 205, 140, 0.22), inset 0 0.0625rem 0 rgba(255, 220, 170, 0.18), 0 1.5rem 3.75rem rgba(0, 0, 0, 0.28);
+}
+html.shabbat-mode .date { color: #fff1d6; }
+.sg-candles { display: inline-flex; gap: 0.5rem; align-items: flex-end; height: 2.75rem; }
+.sg-c {
+  position: relative; display: block; width: 0.5rem; height: 1.75rem; border-radius: 0.15rem;
+  background: linear-gradient(90deg, #f3eadb, #fffaf0 45%, #d9cdb8);
+  box-shadow: 0 0 0.75rem rgba(255, 190, 90, 0.5);
+}
+.sg-c::before {
+  content: ""; position: absolute; left: 50%; bottom: 100%; width: 0.6rem; height: 0.95rem; margin-left: -0.3rem;
+  border-radius: 50% 50% 45% 45% / 65% 65% 35% 35%;
+  background: radial-gradient(ellipse at 50% 70%, #fff7d6 0%, #ffd36b 35%, #ff9a2e 70%, rgba(255, 120, 20, 0) 100%);
+  box-shadow: 0 0 1rem 0.35rem rgba(255, 180, 70, 0.55);
+  transform-origin: 50% 100%;
+  animation: sg-flicker 2.6s ease-in-out infinite;
+}
+.sg-c + .sg-c::before { animation-delay: -1.3s; animation-duration: 3.1s; }
+@keyframes sg-flicker {
+  0%, 100% { transform: scale(1, 1) rotate(0deg); opacity: 1; }
+  30% { transform: scale(0.94, 1.06) rotate(-2deg); opacity: 0.93; }
+  60% { transform: scale(1.04, 0.96) rotate(1.5deg); opacity: 1; }
+}
+/* a slow TV (Lighter home) and reduced motion: still flames, and no filter over the scene */
+html.lighter .sg-c::before { animation: none; }
+html.lighter.shabbat-mode .bg, html.lighter.shabbat-mode .scenes, html.lighter.shabbat-mode .bgvid { filter: none; }
+@media (prefers-reduced-motion: reduce) { .sg-c::before { animation: none; } }
