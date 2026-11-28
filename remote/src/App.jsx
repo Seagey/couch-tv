@@ -141,9 +141,22 @@ export default function App() {
   const loadConfig = () => api.config().then((c) => { if (Array.isArray(c.people)) setPeople(c.people); }).catch(() => {});
   useEffect(() => { api.config().then((c) => { if (Array.isArray(c.people)) setPeople(c.people); if (c.ask && c.ask.enabled === false) setAskOn(false); glass.current.cfg = c.home?.glass_icons === true; glass.current.amtCfg = amount(c.home?.glass_amount) ?? 3; glass.current.focusCfg = c.home?.glass_focus ?? null; showGlass(); }).catch(() => {}); }, []);
   const [who, setWhoState] = useState(() => store.get('tv.who'));
-  // Which TV this phone drives, remembered per phone. null is the bridge's default (living room).
-  const [tvId, setTvIdState] = useState(() => { const id = store.get('tv.tv'); setTvId(id); return id; });
+  // Which TV this phone drives, remembered per phone. null is the bridge's default TV.
+  const [tvId, setTvIdState] = useState(() => {
+    let id = store.get('tv.tv');
+    // a link from one TV's Home settings (/setup?tv=bedroom, then Back to the remote) names the TV: keep it, drop it from the address
+    try {
+      const u = new URL(window.location.href); const q = u.searchParams.get('tv');
+      if (q !== null) {
+        if (/^[A-Za-z0-9_-]{1,40}$/.test(q)) { id = q; store.set('tv.tv', q); }
+        u.searchParams.delete('tv');
+        window.history.replaceState(window.history.state, '', u.pathname + u.search + u.hash);
+      }
+    } catch (e) { /* old browser */ }
+    setTvId(id); return id;
+  });
   const [tvs, setTvs] = useState([]);
+  const [defaultTv, setDefaultTv] = useState(null);
   const [tv, setTv] = useState(null);
   const [reach, setReach] = useState(null);
   const [apps, setApps] = useState(null);
@@ -188,7 +201,12 @@ export default function App() {
 
   useEffect(() => { setTv(null); return subscribeNow(setTv, setReach); }, [tvId]);
   useEffect(() => {
-    const load = () => api.tvs().then((d) => setTvs(d.tvs || [])).catch(() => {});
+    const load = () => api.tvs().then((d) => {
+      setTvs(d.tvs || []); setDefaultTv(d.default || null);
+      // a saved TV the bridge no longer has: back to its default
+      const saved = store.get('tv.tv');
+      if (saved && (d.tvs || []).length && !d.tvs.some((t) => t.id === saved)) chooseTv(null);
+    }).catch(() => {});
     load();
     // also every 10 minutes, so a Developer Mode warning shows without reopening the app
     const iv = setInterval(load, 600000);
@@ -257,11 +275,11 @@ export default function App() {
   const serviceName = (id) => appById[id]?.name || SERVICES[id] || id;
 
   const off = Boolean(tv) && (tv.power === 'off' || !tv.tv_connected);
-  const thisTv = tvs.find((t) => t.id === (tvId || 'living-room'));
+  const thisTv = tvs.find((t) => t.id === (tvId || defaultTv));
   const offState = reach === false ? 'unreachable' : thisTv && thisTv.paired === false ? 'unpaired'
     : !tv ? null : tv.waking ? 'waking' : off ? 'off' : null;
   const chooseTv = (id) => {
-    const next = !id || id === 'living-room' ? null : id;
+    const next = !id || id === defaultTv ? null : id;
     store.set('tv.tv', next || ''); setTvId(next); setTvIdState(next); setWakeError(null);
   };
   const [wakeError, setWakeError] = useState(null);
@@ -457,7 +475,7 @@ export default function App() {
       )}
       <AskSheet ref={askInput} open={sheet === 'ask'} onClose={() => setSheet(null)} who={who} recs={recs} onAsk={onAsk} onDone={(reply) => say(reply)} />
       <TypeSheet ref={typeInput} open={sheet === 'type'} onClose={() => setSheet(null)} onText={sendText} />
-      <MoreSheet ref={moreSheet} open={sheet === 'more'} tvs={tvs} tvId={tvId || 'living-room'} onTv={(id) => { tick(); chooseTv(id); }}
+      <MoreSheet ref={moreSheet} open={sheet === 'more'} tvs={tvs} tvId={tvId || defaultTv} onTv={(id) => { tick(); chooseTv(id); }}
         canMove={!offState && ['playing', 'paused', 'buffering'].includes(tv?.playing?.state) && Boolean(tv?.playing?.title)} onMove={onMove}
         picture={tv?.picture} pictureInfo={pictureInfo} onPicture={onPicture} onClose={() => setSheet(null)} sleepEnds={sleepEnds} sleepError={sleepError} onSleep={onSleep}
         onKey={onKey} onText={sendText} onArrange={() => setSheet('arrange')} onPeople={() => setSheet('people')} onKids={() => setSheet('kids')} onDesign={sendDesign} canSendDesign={canSend((thisTv || (tvs.length === 1 ? tvs[0] : null))?.kind)}

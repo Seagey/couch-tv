@@ -434,6 +434,12 @@
   // the TV this page is for, where a home computer runs more than one (its QR adds ?tv=)
   var TVQ = (/[?&]tv=([A-Za-z0-9_-]{1,40})(?:&|$)/.exec(location.search) || [])[1] || '';
   function withTv(path) { return TVQ ? path + (path.indexOf('?') < 0 ? '?' : '&') + 'tv=' + TVQ : path; }
+  // links from this page to the remote ("/" and "/#sheet=...") keep the TV, so the remote drives the same one
+  if (TVQ) document.addEventListener('click', function (e) {
+    var a = e.target.closest && e.target.closest('a[href^="/"]');
+    var h = a && a.getAttribute('href');
+    if (h && h.charAt(1) !== '/' && !/^\/(api|ha)\//.test(h)) a.setAttribute('href', h.replace(/^\/(#|$)/, '/?tv=' + TVQ + '$1'));
+  }, true);
   function api(method, path, body) {
     return fetch(withTv(path), { method: method, headers: body ? { 'content-type': 'application/json' } : undefined, body: body ? JSON.stringify(body) : undefined })
       .then(function (r) { return r.json().then(function (j) { if (!r.ok || j.ok === false) { var e = new Error(j.error || ('error ' + r.status)); e.status = r.status; e.reply = j; throw e; } return j; }); });
