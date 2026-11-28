@@ -2,9 +2,20 @@
 
 Everything that changed in couch-tv, newest first.
 
-The newest release is **0.13.16**. The TV apps come from [the Releases page](https://github.com/Seagey/couch-tv/releases). The bridge, and with option B the home's own screen, run from your copy of this repo, so `git pull` brings their changes.
+The newest release is **0.13.17**. The TV apps come from [the Releases page](https://github.com/Seagey/couch-tv/releases). The bridge, and with option B the home's own screen, run from your copy of this repo, so `git pull` brings their changes.
 
 ## November 2026
+
+### 28 November 2026: release 0.13.17, your account's home on the TV, a smart home step, a pool widget, Fast TV looks and every widget at any size
+
+0.13.17 is on [the Releases page](https://github.com/Seagey/couch-tv/releases). Option C: Home settings, Updates, Update to; it carries the same key as 0.13.16, so a TV on 0.13.16, 0.13.15 or 0.13.14 updates as normal. Other Android TVs: Home settings, Updates, check now.
+
+- **Send arrives with your details:** a design sent to a trusted TV lands with your people, places, photos and keys in place. A TV that is not trusted gets none of the private parts.
+- **A Smart home step in Couch TV Setup:** Home Assistant, Hue, AirTouch and Matter, with each room's TV seeing only its own room. Locks, alarms, garage doors and gates never show on a TV.
+- **A pool widget and AirPlay speaker groups.**
+- **Fast TV, Paper and Ink:** two plain colour looks for slower TVs.
+- **New looks and every widget at any size.**
+- **Also in this release:** Shabbat times and look (PR #350), Samsung app icons by name (PRs #343 to #346), a TCL waking from standby (PR #338), Korean (PR #341) and lighter loading of each TV kind's libraries (PR #339).
 
 ### 27 November 2026: release 0.13.16, linking inside Couch TV Setup with no codes, finished sends, sharp icons and slimmer TV settings
 

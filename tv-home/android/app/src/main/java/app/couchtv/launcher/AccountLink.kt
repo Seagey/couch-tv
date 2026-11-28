@@ -107,17 +107,16 @@ object AccountLink {
     const val STUDIO = "https://couchtv.joshuaseage.com"
     /** Where the inbox and leave calls go: always [STUDIO], except a DEBUG build made with -PstudioTestUrl=<local site>
      *  (emulator tests of Send to a linked TV against a local site; a release build never reads it). */
-    fun studio(): String = BuildConfig.STUDIO_TEST.takeIf { BuildConfig.DEBUG && Regex("https?://[A-Za-z0-9.:-]+").matches(it) } ?: STUDIO
+    fun studio(): String = BuildConfig.STUDIO_TEST.takeIf { BuildConfig.DEBUG && testSiteOk(it) } ?: STUDIO
+    /** A test site is accepted only as https, or as plain http to this computer's own address (127.0.0.1) with a port; the emulator
+     *  tests reach their local site with adb reverse of that port. Anything else is ignored. */
+    fun testSiteOk(url: String): Boolean = Regex("https://[A-Za-z0-9.:-]+|http://127\\.0\\.0\\.1:\\d{1,5}").matches(url)
     /** What the TV page's design_store is in a DEBUG build made with -PstudioTestUrl (null for every release and every normal debug
-     *  build, which keep the config they have). The page takes only https, or plain http to this computer, so the emulator's
-     *  10.0.2.2 address (and localhost) becomes http://127.0.0.1:<same port>, which the tests reach with adb reverse; any other
-     *  plain http address gives null (the page would refuse it). A debug build with a test site never asks the live store. */
+     *  build, which keep the config they have). The page takes only https, or plain http to this computer, so a test site is
+     *  used as it is when testSiteOk; anything else gives null. A debug build with a test site never asks the live store. */
     fun testStoreBase(studio: String = studio()): String? {
         if (studio == STUDIO) return null
-        val m = Regex("(https?)://([A-Za-z0-9.-]+)(:\\d{1,5})?").matchEntire(studio) ?: return null
-        val (scheme, host, port) = m.destructured
-        if (scheme == "https") return studio
-        return if (host == "10.0.2.2" || host == "localhost" || host == "127.0.0.1") "http://127.0.0.1$port" else null
+        return if (testSiteOk(studio)) studio else null
     }
     /** The line added to the TV page's config.js in such a build, after whatever config it had. */
     fun testStoreLine(base: String?): String =

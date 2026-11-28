@@ -31,6 +31,14 @@ Send a design to a TV you trust and it arrives with your people, places, photos 
 - **Faster Couch Original.** The glass and glint on the Night look are drawn once and moved, so it keeps up better on slower TVs. Keep watching cards use sharp app logos.
 - **TV settings in your language.** The Settings screen words are in every language the TV speaks.
 
+### Also in this release
+
+- **Shabbat times and a Shabbat look**, from Hebcal (PR #350).
+- **Samsung app icons by name**, and the Apple look-up noted in HOW-IT-WORKS (PRs #343 to #346).
+- **A TCL waking from standby** covers the Google TV home with black while it wakes (PR #338).
+- **Korean** on the TV home and the phone remote (PR #341).
+- **Each TV kind's libraries load only when needed** (PR #339).
+
 ### Not in this release
 
 - Nothing about a TV is sent anywhere unless you press Yes to link it.

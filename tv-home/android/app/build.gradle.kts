@@ -29,7 +29,7 @@ android {
         // a pre-release), "beta" only for a test build installed by hand: -PupdateChannel=beta.
         val channel = if ((project.findProperty("updateChannel") as String? ?: "").trim() == "beta") "beta" else "stable"
         buildConfigField("String", "UPDATE_CHANNEL", "\"" + channel + "\"")
-        // Emulator tests only: -PstudioTestUrl=http://<this computer as the emulator sees it>:<port> points a DEBUG build's TV inbox at a local site
+        // Emulator tests only: -PstudioTestUrl=http://127.0.0.1:<port> (or an https address; reach the port with adb reverse) points a DEBUG build's TV inbox at a local site
         // (AccountLink.studio()). Release builds ignore it; empty by default.
         val studioTest = (project.findProperty("studioTestUrl") as String? ?: "").trim().filter { it.isLetterOrDigit() || it in ":/.-" }
         buildConfigField("String", "STUDIO_TEST", "\"" + studioTest + "\"")
