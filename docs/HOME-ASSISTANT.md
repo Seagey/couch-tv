@@ -136,7 +136,9 @@ by themselves. Tick **Couch TV** in your backups, and it is still wise to keep a
 
 1. **Settings, Apps, Couch TV, Uninstall.** Tick to delete its data only if you want your config
    folder gone too.
-2. The TVs keep what was set up on them. Put each one back as in [UNINSTALL.md](UNINSTALL.md).
+2. If you added them: delete the Model Context Protocol integration that points at
+   `http://127.0.0.1:5401/mcp`, and the "Couch TV" conversation agent (Settings, Devices and services).
+3. The TVs keep what was set up on them. Put each one back as in [UNINSTALL.md](UNINSTALL.md).
 
 ## Known
 
