@@ -385,7 +385,7 @@ def _from_account(progress):
     if reg is None:
         return None
     people, town = studio.setup_inputs(reg["home"])
-    return {"people": people, "weather": _town_weather(town), "design": reg["design"],
+    return {"people": people, "weather": _town_weather(town), "design": reg["design"], "tv_id": reg.get("tv_id"),
             "extras": {"link": reg["link"], "code": reg["code"]}}
 
 
@@ -718,7 +718,8 @@ def api(method, path, body):
             try:
                 r = steps.make_home(tv, apk["path"], ambient_off=ambient_off, people=ppl, weather=wx,
                                     ontv_home_switch_off=ontv_off, progress=lambda f, m=None: progress(0.27 + 0.73 * f, m),
-                                    account=acct and acct["extras"])
+                                    account=acct and acct["extras"],
+                                    smart=smarthome.tv_section(acct and acct.get("tv_id")))   # N12: only this TV's room, only a TV set up here
             except Exception:
                 if acct:
                     studio.report_done(S.link, False, None, tvprofile.clean(S.profile), linked=acct["extras"].get("said", False))

@@ -464,8 +464,18 @@ def start_activity(tv, act, extras="", before=""):
     return out
 
 
+def _scrubbed(e, secret):
+    """The same TvError with its technical details dropped (a piece of the command could be in them), and its words too if any part of
+    the secret is in them."""
+    words = str(e)
+    if any(secret[i:i + 16] in words for i in range(0, max(1, len(secret) - 15), 8)):
+        words = "The TV did not take the smart home settings. Try again."
+    return TvError(words, e.code)
+
+
 def make_home(tv, apk_path, ambient_off=True, people=None, weather=None, progress=lambda f, msg=None: None,
-              ontv_home_switch_off=True, account=None):
+              ontv_home_switch_off=True, account=None, smart=None):
+    """smart (N12): the Home Assistant section for this TV's room (smarthome.tv_section), sent as ha_b64 with the other settings. None: "none"."""
     done = []
     ontv = ontv_home(tv)
     alias_left = False
@@ -533,14 +543,22 @@ def make_home(tv, apk_path, ambient_off=True, people=None, weather=None, progres
     if widgetperms.keep_after_install(tv):
         done.append("widget permissions kept")
     cfg = home_config(people, weather)
-    sets = f' --es bridge none --es config_b64 {cfg} --es ha_b64 none --es key ""'
+    ha = base64.b64encode(json.dumps(smart, separators=(",", ":")).encode()).decode() if smart else "none"
+    sets = f' --es bridge none --es config_b64 {cfg} --es ha_b64 {ha} --es key ""'
     stop = f"am force-stop {HOME_PKG}; "
     try:
-        start_activity(tv, FROM_COMPUTER, sets, stop)
+        try:
+            start_activity(tv, FROM_COMPUTER, sets, stop)
+        except TvError as e:
+            if e.code != "not_started":
+                raise
+            start_activity(tv, HOME_ACT, sets, stop)      # Couch TV 0.13.14 and older
     except TvError as e:
-        if e.code != "not_started":
-            raise
-        start_activity(tv, HOME_ACT, sets, stop)      # Couch TV 0.13.14 and older
+        if smart:
+            raise _scrubbed(e, ha) from None              # a key never goes into an error or a log
+        raise
+    if smart:
+        done.append("smart home sent")
     link, link_error = None, None
     if account and account.get("link"):
         time.sleep(3)                                 # the home is up, so its answer comes from the running app

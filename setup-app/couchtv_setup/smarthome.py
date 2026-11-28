@@ -313,6 +313,7 @@ class Smart:
         self.airtouch = None    # {address, zones: [{id, name}]}
         self.airtouch_found = []
         self.matter = {"waiting": 0, "joined": 0}
+        self.rooms = {}         # tv_id -> the room saved for it (save()), for the Android TV push over adb (tv_section)
 
 
 SM = Smart()
@@ -629,6 +630,8 @@ def save(link, tvs):
         saved.append("Hue")
     out = []
     ha_ids = {e["entity"] for e in (SM.ha or {}).get("entities", [])}
+    with SM.lock:
+        SM.rooms = {}
     for t in tvs if isinstance(tvs, list) else []:
         if not isinstance(t, dict) or not studio.TV_ID_RE.fullmatch(str(t.get("tv_id") or "")):
             continue
@@ -642,6 +645,8 @@ def save(link, tvs):
         if SM.airtouch and room.get("zones"):
             allow.append("airtouch")
         out.append({"tv_id": t["tv_id"], "allow": allow, "room": room})
+        with SM.lock:
+            SM.rooms[t["tv_id"]] = room
     r = studio.call("/v1/setup/rooms", {"tvs": out}, link.token) if out else {"ok": True}
     helper = write_helper()
     ticked = {i for o in out for k in ("climate", "lights", "speakers") for i in o["room"].get(k, [])}
@@ -688,10 +693,11 @@ GROUPS = {"climate": ("climate", 8), "scene": ("scenes", 10), "script": ("scenes
           "fan": ("controls", 16), "cover": ("controls", 16), "camera": ("cameras", 4), "sensor": ("sensors", 8), "media_player": ("speakers", 6)}
 
 
-def helper_section(ticked):
+def helper_section(ticked, room=None):
     """H3: the Home Assistant section for the Helper's bridge (bridge/smarthome.py parse): the address, the long-lived token and the ticks,
     what a TV ticked for its room first, then the rest of what Home Assistant lists, up to each group's limit (ha-picks.js). Each TV's room
-    still cuts it down on the bridge (bridge/rooms.py). Pure, for tests."""
+    still cuts it down on the bridge (bridge/rooms.py). With a room (N12, a TV set up over adb) the capped kinds are cut to that room here
+    too, before each group's limit. Pure, for tests."""
     ha = SM.ha
     if not ha:
         return None
@@ -700,12 +706,30 @@ def helper_section(ticked):
     rest = [e for e in ha["entities"] if e["entity"] not in ticked]
     for e in first + rest:
         g = GROUPS.get(e["domain"])
-        if not g or opens_house(e["entity"], {"friendly_name": e["name"]}):
+        if not g or opens_house(e["entity"], {"friendly_name": e["name"]}) or (room is not None and not room_allows(room, e["entity"])):
             continue
         lst = out.setdefault(g[0], [])
         if len(lst) < g[1]:
             lst.append({"entity": e["entity"], "name": e["name"]})
     return out
+
+
+def tv_section(tv_id):
+    """N12: the Home Assistant section (the TV's ha_b64) for one Android TV that Setup is setting up over adb, or None. Only when the person
+    connected Home Assistant on this computer and saved a room for this TV (save()) that holds something from Home Assistant: the same test as
+    the account's key (save()). The room rules are enforced here (only this room's air con, lights and speakers, never a lock, alarm, garage door
+    or gate), and the TV cuts it down again on its side (RoomCap, HomeAssistant.parse). Nothing is kept on this computer beyond Setup's memory."""
+    ha = SM.ha
+    room = SM.rooms.get(str(tv_id or "")) if ha else None
+    if not ha or not isinstance(room, dict):
+        return None
+    ids = room.get("climate", []) + room.get("lights", []) + room.get("speakers", [])
+    if not any(i in {e["entity"] for e in ha["entities"]} for i in ids):
+        return None
+    sec = helper_section(set(ids), room)
+    if sec:
+        sec.pop("from_setup", None)
+    return sec
 
 
 def write_helper_ha(ticked, data_dir=None):
