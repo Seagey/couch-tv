@@ -15,6 +15,8 @@ import sys
 import time
 import uuid
 
+import aiohttp
+
 import apps
 import config
 import finder
@@ -73,7 +75,7 @@ def resolve_lang(lang=None, tv_id=None):
         lang = _known_lang((config.CONFIG.get("home") or {}).get("language"))
     return lang or "en"
 
-ASK_SYSTEM = """You run the living room TV in a home (a Google TV). You control it only with the tv tools. The people asking are on the couch
+ASK_SYSTEM = """You run the TV called {tv_name} in a home (a Google TV). You control it only with the tv tools. The people asking are on the couch
 with a phone remote. You act on your own: never ask them to clarify, make the best guess, do the
 whole job, then say what you did. The one thing you may ask is whether they want the next step
 you are offering (see OPTIONS below).
@@ -149,14 +151,21 @@ Answer with ONLY a JSON array, no prose, each item:
 The reason is at most eight words.{reason_lang}"""
 
 
-def _ask_system(lang):
+def _tv_name(tv_id=None):
+    tv = next((t for t in config.TVS if t.get("id") == (tv_id or config.DEFAULT_TV)), None) or {}
+    return str(tv.get("name") or tv.get("id") or tv_id or "TV")
+
+
+def _ask_system(lang, tv_name="TV"):
     if lang == "en":
         return ASK_SYSTEM.format(
+            tv_name=tv_name,
             language_rule=f"the English spelling used in {config.COUNTRY_NAME}",
             language_extra="",
         )
     lang_name = LANG_NAMES.get(lang, "English")
     return ASK_SYSTEM.format(
+        tv_name=tv_name,
         language_rule=f"written in {lang_name}",
         language_extra=(
             f"\n\nReply in {lang_name} (including OPTIONS labels and texts, "
@@ -204,6 +213,38 @@ async def run_claude(prompt, system=None, mcp_config=None, timeout=ASK_TIMEOUT):
     if data.get("is_error"):
         raise RuntimeError(str(data.get("result") or data.get("subtype") or "Claude error")[:200])
     return data.get("result") or ""
+
+
+async def run_ha(prompt, lang=None, timeout=ASK_TIMEOUT):
+    """The Home Assistant engine: the household's own conversation agent answers (docs/HOME-ASSISTANT-ASSIST.md)."""
+    where = config.ha_location()
+    if not where or not config.ASK_AGENT_ID:
+        raise RuntimeError("Home Assistant is not set up for Ask (ask.agent_id and a Home Assistant address and token)")
+    root, token = where
+    body = {"text": prompt, "agent_id": config.ASK_AGENT_ID}
+    if lang:
+        body["language"] = lang
+    try:
+        async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=timeout, connect=5)) as s:
+            async with s.post(root + "/conversation/process", json=body,
+                              headers={"Authorization": "Bearer " + token}) as r:
+                status = r.status
+                data = await r.json(content_type=None) if status == 200 else None
+    except asyncio.TimeoutError:
+        raise RuntimeError("Home Assistant took too long")
+    except (aiohttp.ClientError, OSError):
+        raise RuntimeError("I could not reach Home Assistant")
+    if status == 401:
+        raise RuntimeError("Home Assistant did not accept the token")
+    if status == 404:
+        raise RuntimeError("Home Assistant has no conversation agent with that name (ask.agent_id)")
+    if status != 200 or not isinstance(data, dict):
+        raise RuntimeError(f"Home Assistant answered {status}")
+    resp = data.get("response") if isinstance(data.get("response"), dict) else {}
+    speech = ((resp.get("speech") or {}).get("plain") or {}).get("speech") if isinstance(resp.get("speech"), dict) else None
+    if resp.get("response_type") == "error":
+        raise RuntimeError(str(speech or "Home Assistant could not answer")[:200])
+    return str(speech or "")
 
 
 def _mcp_config(ask_id, tv_id=None):
@@ -275,10 +316,11 @@ async def ask(text, who, asks, tv_id=None, lang=None):
     from datetime import datetime
     from zoneinfo import ZoneInfo
     lang = resolve_lang(lang, tv_id)
-    system = _ask_system(lang)
+    via_ha = config.ASK_ENGINE == "home_assistant"
+    system = _ask_system(lang, _tv_name(tv_id))
     ask_id = uuid.uuid4().hex[:12]
     asks[ask_id] = []
-    cfg = _mcp_config(ask_id, tv_id)
+    cfg = None if via_ha else _mcp_config(ask_id, tv_id)
     start = time.monotonic()
     key = tv_id or "default"
     names = [p["name"] for p in config.PEOPLE]
@@ -286,6 +328,13 @@ async def ask(text, who, asks, tv_id=None, lang=None):
     asker["both"] = " and ".join(names) + " are watching together"
     asker = asker.get(who)
     prompt = f"({asker}) {text}" if asker else text
+    if via_ha:
+        # Home Assistant takes no system prompt, so the per question facts ride in the text. The
+        # agent's fixed rules are the block in docs/HOME-ASSISTANT-ASSIST.md.
+        lang_name = LANG_NAMES.get(lang, "English")
+        prompt += (f"\n\n[TV: {tv_id or config.DEFAULT_TV}] (called {_tv_name(tv_id)})"
+                   f"\n[Language: {lang_name}. Country: {config.COUNTRY_NAME}"
+                   + (f", so use English spelling from there" if lang == "en" else "") + "]")
     now = datetime.now(ZoneInfo(config.TIMEZONE))
     prompt += f"\n\n[Now: {now.strftime('%A %d %B %Y, %I:%M %p').replace(' 0', ' ')} local time]"
     last = _last.get(key)
@@ -307,6 +356,8 @@ async def ask(text, who, asks, tv_id=None, lang=None):
     async def job():
         nonlocal reply_key, reply_vars
         try:
+            if via_ha:
+                return (await run_ha(prompt, lang)).strip()
             return (await run_claude(prompt, system, cfg)).strip()
         except RuntimeError as e:
             log.warning("ask failed: %s", e)
@@ -315,7 +366,8 @@ async def ask(text, who, asks, tv_id=None, lang=None):
             return f"Sorry, that did not work: {e}"
         finally:
             try:
-                os.remove(cfg)
+                if cfg:
+                    os.remove(cfg)
             except OSError:
                 pass
 
@@ -424,7 +476,8 @@ async def refresh_recs(who=None, force=False, lang=None):
         hist = [h for h in store.history() if store.matches(h, who)][:60]
         likes = taste.summary(who)
         picks = []
-        if hist or likes:
+        # No picks from the Home Assistant engine: its agent has no taste or find tools, so popular picks.
+        if (hist or likes) and config.ASK_ENGINE == "claude_cli":
             lines = "\n".join(f"- {h['title']} ({h.get('year')}, {h.get('type')}, {h.get('service')})"
                               for h in hist) or "(nothing yet)"
             try:

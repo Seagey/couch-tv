@@ -776,8 +776,37 @@ def _claude_present():
     return bool((given and os.path.exists(given)) or shutil.which("claude") or os.path.exists("/opt/homebrew/bin/claude"))
 
 
+def ha_location(env=None):
+    """(api root, token) of the Home Assistant the Ask uses, or None. As a Home Assistant app:
+    the supervisor's. Otherwise the smart home section's url and HOME_ASSISTANT_TOKEN (or its token)."""
+    env = os.environ if env is None else env
+    if env.get("SUPERVISOR_TOKEN"):
+        return "http://supervisor/core/api", env["SUPERVISOR_TOKEN"]
+    import smarthome
+    sec = CONFIG.get("home_assistant") if isinstance(CONFIG.get("home_assistant"), dict) else {}
+    base = smarthome.clean_base(sec.get("url"))
+    token = str(sec.get("token") or env.get("HOME_ASSISTANT_TOKEN") or "").strip()
+    return (base + "/api", token) if base and token else None
+
+
+def _ask_engine(ask, env):
+    # Like bridge.pairing_key: config.json wins, the environment fills in when it is not set.
+    engine = str(ask.get("engine") or env.get("ASK_ENGINE") or "").strip()
+    agent = str(ask.get("agent_id") or env.get("ASK_AGENT_ID") or "").strip()
+    return ("home_assistant" if engine == "home_assistant" else "claude_cli"), agent
+
+
+def _ask_enabled(ask, engine, agent, env=None):
+    if isinstance(ask.get("enabled"), bool):
+        return ask["enabled"]
+    if engine == "home_assistant":
+        return bool(agent and ha_location(env))
+    return _claude_present()
+
+
 _ask = CONFIG.get("ask") if isinstance(CONFIG.get("ask"), dict) else {}
-ASK_ENABLED = bool(_ask["enabled"]) if isinstance(_ask.get("enabled"), bool) else _claude_present()
+ASK_ENGINE, ASK_AGENT_ID = _ask_engine(_ask, os.environ)
+ASK_ENABLED = _ask_enabled(_ask, ASK_ENGINE, ASK_AGENT_ID)
 
 
 # The Spotify card's skip step, in seconds: the one rule for config.json, Home settings (server.clean_settings)
