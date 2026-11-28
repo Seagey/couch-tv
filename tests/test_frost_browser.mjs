@@ -1,6 +1,6 @@
 // Lane L (28 Nov 2026): Couch Original faster on slow TVs, looking the same. In a real browser at 1920x1080 (the TV
 // home in its ?mock preview, Couch Original and the stock Night home):
-//  - frost.js draws the dock's glass once (the cards too behind a test switch) and the live blur is off, and the drawn
+//  - frost.js draws the dock's glass once, and the Keep watching cards' too (owner approved 28 Nov 2026) and the live blur is off, and the drawn
 //    glass matches the live glass pixel by pixel (to within a few levels at the rounded corners);
 //  - the glint on the focused tile slides by a transform and gives the same pixels as the old background move;
 //  - the live blur comes back while a scene fades, under Lighter home, and is never used in the Classic look.
@@ -41,7 +41,6 @@ const errors = [];
 async function open(design, query, cards) {
   const ctx = await browser.newContext({ viewport: { width: 1920, height: 1080 }, deviceScaleFactor: 1 });
   const page = await ctx.newPage();
-  if (cards) await page.addInitScript(() => { window.COUCHTV_FROST_CARDS = true; });
   page.on("pageerror", (e) => errors.push(String(e)));
   await page.clock.setFixedTime(new Date("2026-11-28T19:42:00"));
   await page.goto(BASE + "?mock=1&reset=1");
@@ -69,7 +68,7 @@ async function differ(page, a, b) {
 }
 const pauseAll = (page, at) => page.evaluate((at) => document.getAnimations().forEach((a) => { a.pause(); a.currentTime = at; }), at);
 
-for (const [label, design, cards] of [["Couch Original", COUCH_ORIGINAL, false], ["the stock Night home", null, false], ["Couch Original with the cards drawn too (waiting on a yes)", COUCH_ORIGINAL, true]]) {
+for (const [label, design, cards] of [["Couch Original", COUCH_ORIGINAL, true], ["the stock Night home", null, true]]) {
   const { ctx, page } = await open(design, "scene=night", cards);
   await page.waitForFunction(() => document.documentElement.classList.contains("frost"), null, { timeout: 20000 });
   ok(true, label + ": the glass is drawn once (html.frost)");

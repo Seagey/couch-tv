@@ -1,0 +1,54 @@
+{
+ "_note": "Made by tests/test_smarthome_adb.py: what Setup sends the guest room TV over adb (ha_b64) and the room it saved. Read by SetupSectionTest.kt.",
+ "section": {
+  "url": "http://homeassistant.local:8123",
+  "token": "llat.LLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLL",
+  "climate": [
+   {
+    "entity": "climate.guest",
+    "name": "Guest air con"
+   }
+  ],
+  "controls": [
+   {
+    "entity": "light.guest",
+    "name": "Guest lamp"
+   },
+   {
+    "entity": "switch.kettle",
+    "name": "Kettle"
+   }
+  ],
+  "speakers": [
+   {
+    "entity": "media_player.guest",
+    "name": "Guest speaker"
+   }
+  ],
+  "scenes": [
+   {
+    "entity": "scene.movie",
+    "name": "Movie night"
+   }
+  ],
+  "sensors": [
+   {
+    "entity": "sensor.pool",
+    "name": "Pool"
+   }
+  ]
+ },
+ "room": {
+  "label": "Guest room",
+  "only": true,
+  "climate": [
+   "climate.guest"
+  ],
+  "lights": [
+   "light.guest"
+  ],
+  "speakers": [
+   "media_player.guest"
+  ]
+ }
+}

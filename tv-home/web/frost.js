@@ -14,11 +14,10 @@
 (function () {
   "use strict";
   var root = document.documentElement;
-  // The dock only, for now. The Keep watching cards are drawn the same way when window.COUCHTV_FROST_CARDS is true (a
-  // test switch): on an Android TV 12 emulator (WebView 91) that takes the focus moving along the dock from 46 to 55
-  // frames a second, but the small app logo on each card is then resampled a little differently (its thin strokes
-  // alias another way), so it waits for the owner's yes (coord/mockups-1128/L). The glass itself matches.
-  var PANELS = window.COUCHTV_FROST_CARDS === true ? "#grid, #shelf .ncard" : "#grid";
+  // The dock and the Keep watching cards (the owner approved the cards on 28 Nov 2026): on an Android
+  // TV 12 emulator (WebView 91) that takes the focus moving along the dock from 41 to 52 frames a second. The glass itself
+  // matches; the small app logos on the cards are vectors (app-logos.js), so they stay sharp.
+  var PANELS = "#grid, #shelf .ncard";
   var gen = 0, timer = 0, drawn = [], fading = false, panels = 0;
 
   // Off where the live blur must stay: not the Night look, or something under the glass moves or is not drawn here
