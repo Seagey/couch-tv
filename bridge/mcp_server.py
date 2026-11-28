@@ -1,19 +1,30 @@
-"""MCP server (stdio) for the living room TV. Every tool is a thin call to the bridge HTTP API,
+"""MCP server for this home's TVs. Every tool is a thin call to the bridge HTTP API,
 so the bridge stays the only thing that talks to the TV.
 
-Registered for the workspace in .mcp.json as "tv". /api/ask also starts it for each request.
+Registered for the workspace in .mcp.json as "tv". /api/ask also starts it for each request (stdio).
+COUCH_MCP_HTTP=1 runs it as an HTTP server instead, for Home Assistant's MCP client (docs/AI-AGENT.md):
+a smaller, safer tool set with a tv_ prefix, on 127.0.0.1 only.
 """
+import asyncio
+import functools
 import json
 import os
+import re
+import threading
 import urllib.error
 import urllib.parse
 import urllib.request
 
 from mcp.server.fastmcp import FastMCP, Image
+from mcp.server.transport_security import TransportSecuritySettings
+from mcp.types import ToolAnnotations
 
 BRIDGE = os.environ.get("BRIDGE_URL", "http://127.0.0.1:5400")
 ASK_ID = os.environ.get("ASK_ID")
 TV_ID = os.environ.get("TV_ID")  # set by /api/ask: the TV the person asked from
+HTTP = os.environ.get("COUCH_MCP_HTTP") == "1"
+ALLOW_POWER_OFF = os.environ.get("COUCH_MCP_ALLOW_POWER_OFF") == "1"   # HTTP only
+WAIT = float(os.environ.get("COUCH_MCP_WAIT") or 24)   # HTTP only: Home Assistant gives a tool 30 s in all
 try:   # the bridge's pairing key (bridge.pairing_key in config.json, or BRIDGE_KEY), if it has one
     import config
     KEY = config.PAIRING_KEY
@@ -21,11 +32,15 @@ except (Exception, SystemExit):
     KEY = os.environ.get("BRIDGE_KEY", "").strip()
 
 mcp = FastMCP("tv", instructions=(
-    "Controls the living room Google TV through the bridge. "
+    "Controls this home's TVs (Android TV, Google TV) through the couch-tv bridge. "
     "Use play to put a show or film on, find to see where it streams in this home's country, key/volume/"
     "launch for remote control, now to see what is on. Never power the TV off unless asked. "
     "list_widgets and set_widget_setting read and change one widget on the TV home's design. "
     "There can be more than one TV (tvs); tools default to the TV the person asked from."))
+
+
+NO_POWER_OFF = {"ok": False, "error": "Turning the TV off from here is switched off. The person can use the TV remote, "
+                "or switch it on in the bridge's settings (COUCH_MCP_ALLOW_POWER_OFF=1)."}
 
 
 def call(method, path, payload=None, raw=False, tv=None, timeout=60, headers_out=None):
@@ -131,6 +146,8 @@ def volume(action: str = "up", steps: int = 1, tv: str | None = None) -> dict:
 @mcp.tool()
 def power(state: str, tv: str | None = None) -> dict:
     """Turn the TV on or off: state is on, off or toggle. Only turn it off when clearly asked."""
+    if HTTP and state != "on" and not ALLOW_POWER_OFF:
+        return NO_POWER_OFF
     return call("POST", "/api/power", {"state": state}, tv=tv)
 
 
@@ -143,7 +160,7 @@ def tvs() -> dict:
 
 @mcp.tool()
 def history(days: int | None = None, who: str | None = None) -> dict:
-    """What has been played on our TVs, newest first, with the date and time (Sydney) of each
+    """What has been played on our TVs, newest first, with the date and time (the home's time zone) of each
     play, the app, and season and episode when known. days limits it to the last N days (7 for
     "last week"); who is a person id from config.json, or both. Use it for "what was I watching" and to resume."""
     r = call("GET", "/api/history")
@@ -260,6 +277,8 @@ def input(name: str, remember_as: str | None = None, tv: str | None = None) -> d
 def off_after_episode(cancel: bool = False, tv: str | None = None) -> dict:
     """Turn the TV off when what is playing now ends (at the credits, or when the next episode
     starts). The home screen and phone show it as the sleep timer. cancel=true stops it."""
+    if HTTP and not cancel and not ALLOW_POWER_OFF:
+        return NO_POWER_OFF
     payload = {"cancel": True} if cancel else {}
     return call("POST", "/api/off-after", payload, tv=tv, timeout=40)
 
@@ -414,5 +433,73 @@ def tv_says(tv: str | None = None) -> dict:
     return call("GET", "/api/say", tv=tv)
 
 
+# ---- HTTP mode (COUCH_MCP_HTTP=1): Home Assistant's MCP client ----
+# It gives a tool 30 s in all, shows the model only text, and sends no token, so: a tool that is not done
+# in WAIT seconds answers "pending" and finishes in the background; no screenshot and no uninstall; names
+# start with tv_; the server listens on 127.0.0.1 only (and FastMCP checks the Host header).
+PENDING = {"ok": True, "pending": True, "said": "Still working on it on the TV. Check with tv_now in a minute."}
+HTTP_DROP = {"screenshot", "uninstall_app"}
+HTTP_READ_ONLY = {"now", "find", "apps", "tvs", "history", "taste", "recs", "screens", "ui", "inputs",
+                  "latest_episode", "both_like", "tv_says", "list_widgets"}
+HTTP_PENDING_NOTE = " In this mode the answer may come back as pending while it carries on: check with tv_now."
+HTTP_NOTES = {"install_app": HTTP_PENDING_NOTE, "restart_app": HTTP_PENDING_NOTE}
+HTTP_TV_NOTE = (" tv: the TV's id from tv_list. Pass it when the home has more than one TV and the person"
+                " named one; leave it out for the default TV.")
+HTTP_INSTRUCTIONS = (
+    "Controls this home's TVs (Android TV, Google TV) through the couch-tv bridge. "
+    "Use tv_play to put a show or film on (it finds the app itself), tv_find to see where it streams, "
+    "tv_key/tv_volume/tv_launch for remote control, tv_now to see what is on, tv_ui to read the screen. "
+    "Turning the TV off may be refused. There can be more than one TV (tv_list).")
+
+
+def _within_wait(fn):
+    """Run fn in a thread; if it is not done in WAIT seconds, answer PENDING and let it finish alone."""
+    @functools.wraps(fn)
+    async def run(*a, **k):
+        loop = asyncio.get_running_loop()
+        done = loop.create_future()
+
+        def work():
+            try:
+                out = fn(*a, **k)
+            except Exception as e:
+                out = e
+            try:
+                loop.call_soon_threadsafe(lambda: done.done() or done.set_result(out))
+            except RuntimeError:   # the server has stopped
+                pass
+        threading.Thread(target=work, daemon=True).start()
+        try:
+            out = await asyncio.wait_for(asyncio.shield(done), WAIT)
+        except asyncio.TimeoutError:
+            return PENDING
+        if isinstance(out, Exception):
+            raise out
+        return out
+    return run
+
+
+def http_server(port):
+    srv = FastMCP("tv", instructions=HTTP_INSTRUCTIONS, host="127.0.0.1", port=port, transport_security=TransportSecuritySettings(
+        enable_dns_rebinding_protection=True, allowed_hosts=["127.0.0.1:*", "localhost:*"],
+        allowed_origins=["http://127.0.0.1:*", "http://localhost:*"]))
+    tools = mcp._tool_manager.list_tools()
+    names = {t.name: (t.name if t.name.startswith("tv") else "tv_" + t.name) for t in tools}
+    names["tvs"] = "tv_list"
+    for t in tools:
+        if t.name in HTTP_DROP:
+            continue
+        text = t.description + HTTP_NOTES.get(t.name, "") + (HTTP_TV_NOTE if "tv" in t.parameters["properties"] else "")
+        for old, new in names.items():   # names that are not plain words, so the text points at the HTTP names
+            if "_" in old or old == "tvs":
+                text = re.sub(r"\b%s\b" % old, new, text)
+        srv.add_tool(_within_wait(t.fn), name=names[t.name], description=text,
+                     annotations=ToolAnnotations(readOnlyHint=True) if t.name in HTTP_READ_ONLY else None)
+    return srv
+
+
 if __name__ == "__main__":
-    mcp.run()
+    if HTTP:
+        http_server(int(os.environ.get("COUCH_MCP_PORT") or 5401)).run("streamable-http")
+    else:
+        mcp.run()

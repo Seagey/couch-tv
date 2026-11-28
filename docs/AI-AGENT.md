@@ -58,6 +58,36 @@ To design homes too, add couch-tv Studio's own MCP server as well: couch-tv Stud
 Then ask: "Design an autumn home for the lounge TV and put it on the TV." Studio's `send_to_tv` gives a code,
 and this server's `set_home_design` hands the code to the TV.
 
+## Home Assistant (MCP over HTTP)
+
+Home Assistant's own MCP client can use the TV tools. Run the same file as a small web server on the
+computer that runs the bridge:
+
+```sh
+COUCH_MCP_HTTP=1 BRIDGE_URL=http://127.0.0.1:5400 BRIDGE_KEY=... .venv/bin/python bridge/mcp_server.py
+```
+
+In Home Assistant, add the Model Context Protocol integration with the address `http://<the computer>:5401/mcp`.
+It listens on `127.0.0.1` only and takes no sign in, because Home Assistant cannot send one. So Home
+Assistant has to run on that same computer, or you put your own private link in front of it (an SSH tunnel,
+for example). Never open a router port to it. It also refuses a request whose `Host` is not `127.0.0.1` or
+`localhost`.
+
+| Setting | What it does |
+|---|---|
+| `COUCH_MCP_HTTP=1` | Run as an HTTP server. Left out, the server is the stdio one above, unchanged. |
+| `COUCH_MCP_PORT` | The port. 5401 if left out. |
+| `COUCH_MCP_ALLOW_POWER_OFF=1` | Let the tools turn the TV off. Off by default. |
+| `COUCH_MCP_WAIT` | Seconds to wait for the TV before answering "pending". 24 if left out. |
+
+The tool set differs from stdio on purpose:
+
+- Names start with `tv_` (`tv_play`, `tv_key`, `tv_now`). `tvs` is `tv_list`: with more than one TV, pass a TV's id from it as `tv`.
+- No `screenshot`: Home Assistant hands the model only text, so a picture would arrive as a wall of letters. `tv_ui` gives the screen as text.
+- No `uninstall_app`. A voice assistant should not remove apps.
+- Turning the TV off (`tv_power` with `off` or `toggle`, and `tv_off_after_episode`) is refused unless `COUCH_MCP_ALLOW_POWER_OFF=1`. Turning it on always works.
+- Home Assistant stops a tool after 30 seconds. A tool that is not done in 24 answers `pending` and carries on in the background (installing an app, restarting an app). Ask `tv_now` a little later.
+
 ## The tools for the TV home
 
 | Tool | What it does |
