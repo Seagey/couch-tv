@@ -1350,6 +1350,17 @@
     return window.MOCK_ICON ? window.MOCK_ICON(pkg) : null;
   }
 
+  // The small app logo on a Keep watching / Now playing card: the app's own logo drawn as a vector (app-logos/app-logos.js),
+  // sharp at any size, instead of its square picture shrunk to 26 px. "" for an app with no vector logo (it keeps the picture).
+  var LOGO_ONLY = true;   // a logo that spells the app's name (Stan, Binge) is drawn larger and the name text beside it is left out
+  function appLogo(pkg) {
+    if (!pkg || window.COUCHTV_APP_LOGOS === false || !window.APP_LOGOS || !window.CouchApps) return null;
+    var id = window.CouchApps.idOf(pkg);
+    if (!id || !window.APP_LOGOS.has(id)) return null;
+    var word = LOGO_ONLY && window.APP_LOGOS.word(id);
+    return { html: window.APP_LOGOS.svg(id, word ? 2.75 : 1.75, word ? 7.5 : 6), word: word };
+  }
+
   // ---------------- the photo, the clock and the big title ----------------
   // Free Creative Commons photos (backgrounds/CREDITS.md), in the order they rotate.
   var PHOTOS = [
@@ -4832,12 +4843,12 @@
     if (NIGHT && !nightPosters()) {
       // lock screen notifications: glass cards, three in view, the row slides past the third
       track.innerHTML = data.shows.map(function (it) {
-        var art = slim(it.backdrop || it.poster), pkg = it.app && it.app.package;
+        var art = slim(it.backdrop || it.poster), pkg = it.app && it.app.package, lg = appLogo(pkg);
         var ep = it.kind === "video" ? t("video_card") : it.season && it.episode ? "S" + it.season + " E" + it.episode : (it.episode_title || "");
         return '<div class="tile ncard">' +
           (art ? '<img class="thumb" src="' + esc(art) + '" alt="" decoding="async" data-err="kwretry" data-pkg="' + esc(pkg || "") + '">' : '<span class="thumb none"></span>') +
-          '<div class="t"><div class="nap">' + (pkg && iconUrl(pkg) ? '<img src="' + esc(iconUrl(pkg)) + '" alt="" data-err="remove">' : "") +
-          esc(it.app ? it.app.name : "") + "</div><b>" + esc(it.title) + "</b>" + (ep ? "<i>" + esc(ep) + "</i>" : "") +
+          '<div class="t"><div class="nap' + (lg ? " hasl" : "") + '">' + (lg ? lg.html : pkg && iconUrl(pkg) ? '<img src="' + esc(iconUrl(pkg)) + '" alt="" data-err="remove">' : "") +
+          (lg && lg.word ? "" : esc(it.app ? it.app.name : "")) + "</div><b>" + esc(it.title) + "</b>" + (ep ? "<i>" + esc(ep) + "</i>" : "") +
           (it.progress ? '<span class="nbar"><i style="width:' + Math.round(it.progress * 100) + '%"></i></span>' : "") + "</div></div>";
       }).join("");
       shelfEls = Array.prototype.slice.call(track.children);
