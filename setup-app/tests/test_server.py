@@ -20,7 +20,7 @@ from couchtv_setup import server  # noqa: E402
 class Server(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        cls.httpd = ThreadingHTTPServer(("127.0.0.1", 0), server.Handler)
+        cls.httpd = server.Httpd(("127.0.0.1", 0), server.Handler)
         server.S.httpd, server.S.port = cls.httpd, cls.httpd.server_address[1]
         cls.base = f"http://127.0.0.1:{server.S.port}"
         threading.Thread(target=cls.httpd.serve_forever, daemon=True).start()

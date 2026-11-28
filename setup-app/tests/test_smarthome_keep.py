@@ -67,15 +67,16 @@ class Choice(unittest.TestCase):
     def plan(self, tv, section, tv_id="33333333-3333-4333-8333-333333333333"):
         from unittest import mock
         from couchtv_setup import server, smarthome
-        old = server.S.tv, server.S.facts
+        old = server.S.tv, server.S.facts, server.S.link
         server.S.tv, server.S.facts = tv, steps.facts(tv)
+        server.S.link = server.studio.Link()      # a link another test left (its tv_id) must not answer for this TV
         try:
             with mock.patch.object(smarthome, "tv_section", return_value=section), \
                  mock.patch.object(server, "_rows", return_value={"x": tv_id} if tv_id else {}), \
                  mock.patch.object(server, "_row_name", return_value="x"):
                 return server.api("POST", "/api/plan", {})["smart_choice"]
         finally:
-            server.S.tv, server.S.facts = old
+            server.S.tv, server.S.facts, server.S.link = old
 
     def test_asks_only_for_a_tv_that_already_has_couch_tv_and_a_home_assistant_to_send(self):
         self.assertEqual(self.plan(FakeTv("google", installed=["app.couchtv.launcher"]), SECTION), {"ask": True})

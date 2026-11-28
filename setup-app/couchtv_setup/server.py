@@ -103,6 +103,13 @@ def error_payload(e):
     return {"error": msg, "code": code, "detail": det}
 
 
+class Httpd(ThreadingHTTPServer):
+    """The page server. A browser opens six or more connections at once to load the page and its scripts; the default queue of five
+    let macOS reset the extra ones, so a script (tidy.js, live.js) sometimes never loaded and the page was left half working.
+    A longer queue lets them all wait their turn (28 Nov 2026: why the Setup page tests failed now and then)."""
+    request_queue_size = 128
+
+
 def run_job(name, fn):
     with S.lock:
         if S.job.get("running"):
@@ -979,7 +986,7 @@ def main(argv=None):
     except OSError:
         pass   # the link button then falls back to the typed code
     port = int(os.environ.get("COUCHTV_SETUP_PORT") or 0)
-    httpd = ThreadingHTTPServer(("127.0.0.1", port), Handler)
+    httpd = Httpd(("127.0.0.1", port), Handler)
     S.httpd, S.port = httpd, httpd.server_address[1]
     linkin.write_running(S.port, SECRET)
     url = f"http://127.0.0.1:{S.port}/"

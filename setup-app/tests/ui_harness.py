@@ -124,7 +124,7 @@ class Harness:
         server.S.job = {"running": False}
         server.S.link = server.studio.Link()
         server.S.tv_seen = server.finder.Seen()   # what an earlier test's scans found must not show here
-        self.httpd = ThreadingHTTPServer(("127.0.0.1", 0), server.Handler)
+        self.httpd = server.Httpd(("127.0.0.1", 0), server.Handler)
         server.S.httpd, server.S.port = self.httpd, self.httpd.server_address[1]
         orig = server.api
 
