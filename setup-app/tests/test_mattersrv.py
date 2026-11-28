@@ -104,8 +104,9 @@ class Install(Base):
         self.ensure(FakeNpm())
         r = ms.root()
         self.assertEqual(sorted(os.listdir(r)), ["app", "npmrc-empty", "npmrc-empty-global"], "no staging folder, no lock, no npm cache left")
-        self.assertEqual(oct(os.stat(r).st_mode & 0o777), "0o700")
-        self.assertEqual(oct(os.stat(r.parent).st_mode & 0o777), "0o700")
+        if os.name != "nt":  # folder modes are POSIX only; Windows reports 0o777
+            self.assertEqual(oct(os.stat(r).st_mode & 0o777), "0o700")
+            self.assertEqual(oct(os.stat(r.parent).st_mode & 0o777), "0o700")
         m = json.load(open(ms.service_dir() / ms.MARKER))
         self.assertEqual(m["version"], "1.6.0")
         self.assertEqual(len(m["lock"]), 64)
@@ -190,7 +191,8 @@ class Trouble(Base):
         for secret in ("abc123SECRET", "xyz789SECRET", "a" * 36):
             self.assertNotIn(secret, log)
         self.assertIn("[hidden]", log)
-        self.assertEqual(oct(os.stat(ms.root() / "install.log").st_mode & 0o777), "0o600")
+        if os.name != "nt":  # file modes are POSIX only; Windows reports 0o666
+            self.assertEqual(oct(os.stat(ms.root() / "install.log").st_mode & 0o777), "0o600")
 
     def test_an_install_stopped_half_way_is_redone_clean_and_only_in_helper_data(self):
         with self.assertRaises(KeyboardInterrupt):
@@ -354,7 +356,7 @@ class Request(Base):
     def test_child_env_names_the_request_file(self):
         from couchtv_setup.helper import bridge_proc
         env = bridge_proc.child_env("/c.json", "/d", 5400, base={})
-        self.assertEqual(env["COUCH_MATTER_REQUEST"], os.path.join("/d", "matter-install-request.json"))
+        self.assertEqual(os.path.normpath(env["COUCH_MATTER_REQUEST"]), os.path.normpath(os.path.join("/d", "matter-install-request.json")))
 
     def run_job(self, installer_raises=None, node_usable=True):
         said, posts, waits = [], [], []

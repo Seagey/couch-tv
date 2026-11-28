@@ -22,8 +22,9 @@ class LogMode(unittest.TestCase):
                     ms._fail("npm error something", log)
         finally:
             os.umask(old)
-        self.assertEqual(oct(os.stat(log).st_mode & 0o777), "0o600")
-        self.assertIn("npm error something", open(log).read())
+        if os.name != "nt":  # file modes are POSIX only; Windows reports 0o666
+            self.assertEqual(oct(os.stat(log).st_mode & 0o777), "0o600")
+        self.assertIn("npm error something", open(log, encoding="utf-8").read())
 
 
 if __name__ == "__main__":

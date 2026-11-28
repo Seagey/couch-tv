@@ -142,6 +142,8 @@ class FakeHue(BaseHTTPRequestHandler):
         self.wfile.write(raw)
 
     def do_POST(self):
+        # read the request first: closing with it unread makes Windows reset the connection
+        self.rfile.read(int(self.headers.get("Content-Length") or 0))
         FakeHue.presses += 1
         if FakeHue.presses < 2:
             return self._json([{"error": {"type": 101, "description": "link button not pressed"}}])
@@ -159,12 +161,12 @@ def serve(handler):
 
 class RulesTest(unittest.TestCase):
     def test_house_ids_names_and_rooms_agree_with_every_copy(self):
-        ids = json.load(open(os.path.join(FIX, "opens_house_ids.json")))
+        ids = json.load(open(os.path.join(FIX, "opens_house_ids.json"), encoding="utf-8"))
         for e in ids["refuse"]:
             self.assertTrue(sh.opens_house(e), e)
         for e in ids["pass"]:
             self.assertFalse(sh.opens_house(e), e)
-        names = json.load(open(os.path.join(FIX, "opens_house_names.json")))
+        names = json.load(open(os.path.join(FIX, "opens_house_names.json"), encoding="utf-8"))
         for c in names["refuse"]:
             self.assertTrue(sh.opens_house(c["entity"], {"friendly_name": c["name"]}), c)
         for c in names["pass"]:
@@ -282,7 +284,8 @@ class FlowTest(unittest.TestCase):
         self.assertEqual(rooms[2]["allow"], [], "nothing ticked, no key")
         # the Helper on this computer: Hue, AirTouch and (H3) Home Assistant, each mode 600
         for f in ("direct.json", "home-assistant.json"):
-            self.assertEqual(oct(os.stat(os.path.join(helper, f)).st_mode & 0o777), "0o600")
+            if os.name != "nt":  # file modes are POSIX only; Windows reports 0o666
+                self.assertEqual(oct(os.stat(os.path.join(helper, f)).st_mode & 0o777), "0o600")
         hs = json.load(open(os.path.join(helper, "home-assistant.json")))
         self.assertEqual(hs["token"], LLAT)
         self.assertEqual([x["entity"] for x in hs["climate"]], ["climate.guest", "climate.lounge"])
