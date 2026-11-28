@@ -2359,7 +2359,7 @@ async def h_ask(request):
     if not config.ASK_ENABLED:
         raise ApiError(
             409,
-            "The Claude ask is switched off (ask.enabled in config.json).",
+            "Ask is switched off. Turn it on with ask.enabled, or ask.engine and ask.agent_id in config.json (docs/CONFIG.md).",
             key="err_ask_disabled",
         )
     data = await body(request)
