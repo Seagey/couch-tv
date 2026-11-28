@@ -13,3 +13,5 @@ remote/dist
 bridge/data
 bridge/matter/node_modules
 **/__pycache__
+**/._*
+**/.DS_Store

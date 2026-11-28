@@ -39,7 +39,8 @@ fi
 ln -sf "$CFG/.env" "$APP/.env"
 
 if [ ! -f "$CFG/config.json" ]; then
-  cp "$APP/config.example.json" "$CFG/config.json"
+  # The example switches Ask off ("ask": {"enabled": false}), which would beat the app's Ask option: drop it.
+  python3 -c 'import json,sys;c=json.load(open(sys.argv[1]));c.pop("ask",None);json.dump(c,open(sys.argv[2],"w"),indent=2)' "$APP/config.example.json" "$CFG/config.json"
   say "first start: I made $CFG/config.json from the example. Open the app's config folder"
   say "(File editor, Samba or VS Code) and set your TVs, people and apps, then restart the app."
   say "Set bridge.host to this Home Assistant computer's address. Steps: docs/HOME-ASSISTANT.md"
@@ -65,7 +66,12 @@ export BRIDGE_KEY="$KEY"
 if [ "$(opt ask_engine)" = "home_assistant" ]; then
   export ASK_ENGINE=home_assistant
   AGENT="$(opt ask_agent_id)"
-  if [ -n "$AGENT" ]; then export ASK_AGENT_ID="$AGENT"; fi
+  if [ -n "$AGENT" ]; then export ASK_AGENT_ID="$AGENT"; else
+    say "Ask is set to home_assistant but no Conversation agent is chosen: set one in the app's Configuration tab."
+  fi
+  if python3 -c 'import json,sys;sys.exit(0 if (json.load(open(sys.argv[1])).get("ask") or {}).get("enabled") is False else 1)' "$CFG/config.json" 2>/dev/null; then
+    say "config.json has ask.enabled set to false, so Ask stays off until you remove that line."
+  fi
 fi
 
 IP="$(hostname -I 2>/dev/null | cut -d' ' -f1)"

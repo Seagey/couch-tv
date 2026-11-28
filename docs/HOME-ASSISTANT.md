@@ -131,6 +131,12 @@ on it, and keep a copy of `config.json` and `adbkey` somewhere safe.
    folder gone too.
 2. The TVs keep what was set up on them. Put each one back as in [UNINSTALL.md](UNINSTALL.md).
 
+## Known
+
+Home Assistant's Supervisor logs "Can't read ... Invalid app config" for the `config.example.json`
+files in this repository every time it reloads the App store. They are couch-tv's example settings,
+not apps, and the warnings are harmless.
+
 ## If it does not work
 
 - The Log tab is the first place to look. "first start" lines mean it made a starter `config.json`.
