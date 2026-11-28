@@ -400,7 +400,7 @@ sign in, to find the exact video for its card.
 | [Every setup step](docs/SETUP.md) | [The TV home](docs/TV-HOME.md) | [Samsung](docs/SAMSUNG.md) |
 | [config.json, every setting](docs/CONFIG.md) | [The phone remote](docs/REMOTE.md) | [LG](docs/LG.md) |
 | [On-TV mode, no computer](on-tv/README.md) | [TV remotes and keys](docs/REMOTES.md) | [Roku](docs/ROKU.md) |
-| [The bridge in Docker](docs/DOCKER.md) | [Make your own scene](docs/MAKE-A-SCENE.md) | [Fire TV Stick](docs/FIRE-TV-STICK.md) |
+| [The bridge in Docker](docs/DOCKER.md), or [as a Home Assistant app](docs/HOME-ASSISTANT.md) | [Make your own scene](docs/MAKE-A-SCENE.md) | [Fire TV Stick](docs/FIRE-TV-STICK.md) |
 | [For your AI agent](AGENTS.md) | [Ask with any AI service](docs/ASK-PROVIDERS.md) | [Hisense VIDAA](docs/VIDAA.md) |
 | [Take couch-tv off](docs/UNINSTALL.md) | [All updates](docs/UPDATES.md) | [Apple TV](docs/APPLE-TV.md) |
 | [Troubleshooting](docs/TROUBLESHOOTING.md) | [Two TVs in sync](docs/SYNC.md) | [Every brand](docs/TV-BRANDS.md) |

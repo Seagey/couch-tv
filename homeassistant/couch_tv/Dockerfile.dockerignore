@@ -1,0 +1,15 @@
+# Keeps the build context of homeassistant/couch_tv/Dockerfile small: only what the image copies.
+*
+!bridge
+!remote
+!tv-home/web
+!on-tv/web
+!titan
+!lg/app/largeIcon.png
+!config.example.json
+!homeassistant/couch_tv/run.sh
+remote/node_modules
+remote/dist
+bridge/data
+bridge/matter/node_modules
+**/__pycache__

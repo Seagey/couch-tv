@@ -1,0 +1,5 @@
+# Home Assistant app repository. Add this address under Settings, Apps, App store, Repositories:
+#   https://github.com/Seagey/couch-tv
+name: couch-tv
+url: https://github.com/Seagey/couch-tv
+maintainer: couch-tv contributors

@@ -1,0 +1,139 @@
+# Builds the couch-tv Home Assistant app (homeassistant/couch_tv/) as one image per architecture,
+# and tests it.
+#   - On every push and pull request that touches the app or the bridge: build the amd64 image,
+#     start it the way Home Assistant does (a config folder and an options.json) and check that the
+#     bridge answers with its pairing key. Nothing is pushed.
+#   - When a couch-tv release is published (or this workflow is run by hand with a tag): build the
+#     aarch64 and amd64 images from the repo root on native runners (no QEMU) and push them to
+#     GitHub's container registry as ghcr.io/<owner>/couch-tv-app-<arch>:<version> and :latest. The
+#     version is the release tag without its leading "v". Home Assistant installs from these images:
+#     homeassistant/couch_tv/config.yaml names them in "image".
+# The first push makes each package private. Make both public once (the repository's Packages page,
+# Package settings, Change visibility), or Home Assistant cannot pull them.
+#
+# Shape adapted from setup-app.yml. Only GitHub's own actions are used, pinned to commits; the
+# docker command line does the rest.
+name: Home Assistant app
+
+on:
+  push:
+    paths: ["homeassistant/**", "bridge/**", "remote/**", ".github/workflows/ha-app.yml"]
+  pull_request:
+    paths: ["homeassistant/**", "bridge/**", "remote/**", ".github/workflows/ha-app.yml"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag to build and push, for example v0.13.17 (leave empty to only test)"
+        required: false
+        default: ""
+  release:
+    types: [published]
+
+permissions:
+  contents: read
+
+jobs:
+  smoke:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262   # v4.4.0
+        with:
+          persist-credentials: false
+
+      - name: Build the image (amd64, not pushed)
+        run: docker build -f homeassistant/couch_tv/Dockerfile -t couch-tv-app:ci .
+
+      - name: Start it like Home Assistant does
+        run: |
+          mkdir -p "$RUNNER_TEMP/config" "$RUNNER_TEMP/data"
+          echo '{"pairing_key":"ci-test-key-123456","ask_engine":"off","ask_agent_id":"","allow_power_off":false}' > "$RUNNER_TEMP/data/options.json"
+          docker run -d --name app --network host \
+            -v "$RUNNER_TEMP/config:/config" -v "$RUNNER_TEMP/data:/data" couch-tv-app:ci
+
+      - name: The bridge answers with its pairing key
+        run: |
+          for i in $(seq 1 60); do
+            code=$(curl -s -o /dev/null -w '%{http_code}' -H "Authorization: Bearer ci-test-key-123456" http://127.0.0.1:5400/api/tvs || true)
+            [ "$code" = 200 ] && break
+            sleep 1
+          done
+          echo "GET /api/tvs with the key: $code"
+          [ "$code" = 200 ] || { docker logs app; exit 1; }
+          # and it refuses without the key
+          code=$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:5400/api/tvs || true)
+          echo "GET /api/tvs without a key: $code"
+          [ "$code" = 401 ] || { docker logs app; exit 1; }
+          test -f "$RUNNER_TEMP/config/config.json"
+
+      - name: "The MCP server is up (soft, skipped until the bridge has its HTTP mode)"
+        run: |
+          code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 3 http://127.0.0.1:5401/mcp || true)
+          if [ "$code" = 000 ]; then
+            echo "::notice::Port 5401 did not answer, so this bridge has no MCP HTTP mode yet. Skipped."
+          else
+            echo "MCP answered with HTTP $code"
+          fi
+
+      - name: Container log
+        if: always()
+        run: docker logs app || true
+
+  publish:
+    # Only for a published release, or a hand run that names a tag. Waits for the smoke test.
+    if: github.event_name == 'release' || (github.event_name == 'workflow_dispatch' && inputs.tag != '')
+    needs: smoke
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: amd64
+            os: ubuntu-24.04
+            platform: linux/amd64
+          - arch: aarch64
+            os: ubuntu-24.04-arm      # native Arm runner, free for public repositories
+            platform: linux/arm64
+    runs-on: ${{ matrix.os }}
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Which version
+        id: v
+        env:
+          TAG: ${{ github.event.release.tag_name || inputs.tag }}
+        run: |
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "version=${TAG#v}" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262   # v4.4.0
+        with:
+          ref: ${{ steps.v.outputs.tag }}
+          persist-credentials: false
+
+      - name: The app's version matches the release
+        # Home Assistant only offers an update when config.yaml's version changes, so a release whose
+        # tag differs would build an image no one is told about.
+        env:
+          VERSION: ${{ steps.v.outputs.version }}
+        run: |
+          grep -qx "version: \"$VERSION\"" homeassistant/couch_tv/config.yaml || {
+            echo "config.yaml says another version than $VERSION"; exit 1; }
+
+      - name: Log in to the registry
+        env:
+          TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ACTOR: ${{ github.actor }}
+        run: echo "$TOKEN" | docker login ghcr.io -u "$ACTOR" --password-stdin
+
+      - name: Build and push
+        env:
+          OWNER: ${{ github.repository_owner }}
+          VERSION: ${{ steps.v.outputs.version }}
+          ARCH: ${{ matrix.arch }}
+          PLATFORM: ${{ matrix.platform }}
+        run: |
+          image="ghcr.io/$(echo "$OWNER" | tr 'A-Z' 'a-z')/couch-tv-app-$ARCH"
+          docker buildx build --platform "$PLATFORM" --push \
+            -f homeassistant/couch_tv/Dockerfile \
+            --build-arg "BUILD_VERSION=$VERSION" --build-arg "BUILD_ARCH=$ARCH" \
+            -t "$image:$VERSION" -t "$image:latest" .
