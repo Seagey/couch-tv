@@ -3,6 +3,9 @@
 If you already have an AI in Home Assistant (Anthropic, OpenAI, Gemini, Ollama and so on), the
 phone remote's **Ask** can use it instead of Claude Code. Nothing new to pay for or log in to.
 
+Tried so far: Anthropic and OpenAI agents through Ask, and a Gemini agent with typed Assist requests.
+Ollama and other agents have not been tried: tell us how they do.
+
 ## Set it up
 
 1. In Home Assistant, add the couch-tv MCP server to a **new conversation agent** called, for example,
