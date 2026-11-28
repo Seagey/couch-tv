@@ -14,8 +14,8 @@ configuration:
   ask_agent_id:
     name: Conversation agent
     description: >-
-      Only for "home_assistant": which Home Assistant conversation agent answers. Leave empty to
-      use the default one.
+      Only for "home_assistant": which Home Assistant conversation agent answers. It must be set
+      for "home_assistant": empty does not fall back to a default.
   allow_power_off:
     name: Let Home Assistant's assistant turn the TV off
     description: >-

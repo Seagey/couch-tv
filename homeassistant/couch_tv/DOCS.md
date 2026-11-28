@@ -14,7 +14,7 @@ In short:
 3. Each TV is set up once from a computer, as in couch-tv's `docs/SETUP.md`, pointing at this app:
    `BRIDGE_URL=http://<home assistant address>:5400`.
 4. Options: **Pairing key** (empty makes one for you), **Ask assistant** and **Conversation agent**
-   (Ask through a Home Assistant conversation agent; needs a couch-tv version that has it), and
+   (Ask through a Home Assistant conversation agent, which must be chosen; needs a couch-tv version that has it), and
    **Let Home Assistant's assistant turn the TV off** (off).
 5. Home Assistant's MCP integration can use `http://127.0.0.1:5401/mcp` (this computer only).
 

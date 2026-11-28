@@ -17,6 +17,9 @@ remote built in and a small MCP server that Home Assistant's own assistant can u
 - **Not in this first version:** Samsung, LG, Roku and the others that run couch-tv as an app on the
   TV. LG needs LG's own tools, which are not in the app. Run the bridge on a computer for those
   ([SETUP.md](SETUP.md)).
+- **Also not in this first version:** Matter devices (the Matter service needs Node, which is not in
+  the app), and your own photos and scenes. The folder `tv-home/web/backgrounds/mine` is inside the
+  app's image, not in the config folder, so anything put there is lost when the app updates.
 - **Home Assistant OS or Supervised only.** Apps need the Supervisor. A plain Home Assistant Core
   or Container install has no App store: use [the Docker version](DOCKER.md) there.
 
@@ -39,7 +42,7 @@ parts are about filling it in.
 |---|---|---|
 | Pairing key | The password phones type once to use the remote. Empty: the app makes a long one the first time and keeps it. 12 to 128 letters, digits, `-` or `_` if you choose your own. | empty |
 | Ask assistant | `off`, or `home_assistant` to let a Home Assistant conversation agent answer when someone asks the TV in plain words. | `off` |
-| Conversation agent | Which Home Assistant agent answers, for `home_assistant`. Empty uses the default one. | empty |
+| Conversation agent | Which Home Assistant agent answers, for `home_assistant`. Must be set when Ask is `home_assistant`: an empty one does not fall back to a default, and Ask stays unavailable. | empty |
 | Let Home Assistant's assistant turn the TV off | Whether the MCP server (below) offers "turn the TV off". | off |
 
 Do not also set `bridge.pairing_key` in `config.json`. The app refuses to start if both are set, so
@@ -72,7 +75,18 @@ inside a copy of the couch-tv folder on that computer.
 2. Pair the TV (step 3): `.venv/bin/python bridge/pair_tv.py <tv id>`, and for Android and Google TV
    tick **Always allow** when the TV asks "Allow USB debugging?". This fills `bridge/data/` and
    `~/.android/adbkey`.
-3. Copy those into the app's config folder. Mount the Samba share, or use the File editor's upload,
+3. Put couch-tv on the TV, pointing at the app, with the key from the Log tab:
+
+   ```sh
+   TV_IP=<tv address> TV_ID=<tv id> COUCH_CONFIG=<copy of the app's config.json> BRIDGE_KEY=<pairing key> BRIDGE_URL=http://<home assistant address>:5400 APK=couch-tv-home.apk sh tv-home/tools/apply.sh
+   ```
+
+   `TV_ID` is the TV's `id` in `config.json` (without it the first TV is assumed to be called
+   living-room), and `COUCH_CONFIG` is the config file `apply.sh` reads the TV from (the copy you
+   made for the app).
+
+4. Now copy those into the app's config folder (after `apply.sh`, which writes more files into
+   `bridge/data/` that the app needs). Mount the Samba share, or use the File editor's upload,
    then, with `<config folder>` standing for the mounted folder:
 
    ```sh
@@ -82,12 +96,6 @@ inside a copy of the couch-tv folder on that computer.
    ```
 
    Restart the app from its **Info** tab.
-4. Put couch-tv on the TV, pointing at the app, with the key from the Log tab:
-
-   ```sh
-   TV_IP=<tv address> BRIDGE_KEY=<pairing key> BRIDGE_URL=http://<home assistant address>:5400 APK=couch-tv-home.apk sh tv-home/tools/apply.sh
-   ```
-
 5. Open the phone remote's link from the Log tab on a phone. Your TV is listed and the remote works.
 
 Doing another TV is the same again, adding it to the copy of `config.json` first.
@@ -114,16 +122,15 @@ does not start and the rest of the app works the same.
 
 With **Ask assistant** set to `home_assistant`, plain-words requests ("put on something for the
 kids") are answered by one of your Home Assistant conversation agents, so no extra account or key is
-needed. Setting it up: [HOME-ASSISTANT-ASSIST.md](HOME-ASSISTANT-ASSIST.md). It needs a couch-tv
+needed. The conversation agent must be chosen in the app's options. Setting it up: [HOME-ASSISTANT-ASSIST.md](HOME-ASSISTANT-ASSIST.md). It needs a couch-tv
 version that has it; on an older one the option does nothing.
 
 ## Backups
 
-<!-- To be confirmed before this is promised: that Home Assistant's full and partial backups include
-     the app's config folder (app_config) on a real install. -->
-The config folder is meant to be part of the app's backup, so a Home Assistant backup should carry
-your `config.json`, keys and history. Check that your own backup lists **Couch TV** before you rely
-on it, and keep a copy of `config.json` and `adbkey` somewhere safe.
+The config folder is part of the app's backup. Backing up the app and restoring it brought back every
+file in the folder unchanged (checked on a real Home Assistant OS install), and the TVs reconnected
+by themselves. Tick **Couch TV** in your backups, and it is still wise to keep a copy of
+`config.json` and `adbkey` somewhere safe.
 
 ## Take it off
 
@@ -136,6 +143,9 @@ on it, and keep a copy of `config.json` and `adbkey` somewhere safe.
 Home Assistant's Supervisor logs "Can't read ... Invalid app config" for the `config.example.json`
 files in this repository every time it reloads the App store. They are couch-tv's example settings,
 not apps, and the warnings are harmless.
+
+- Home Assistant's MCP integration shows a tool's errors only in its debug logs, so a tool that
+  "does nothing" there is worth a look with debug logging switched on.
 
 ## If it does not work
 

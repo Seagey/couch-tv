@@ -14,7 +14,7 @@ RUN npm ci --no-audit --no-fund --loglevel=error && npm run build --silent
 # Stage 2: Python, the bridge's packages and the files the bridge serves. The folder layout is the
 # repo's own (/app/bridge, /app/remote/dist, ...), so the bridge finds everything where it expects.
 FROM python:3.12-slim-bookworm
-ARG BUILD_VERSION=0.13.17
+ARG BUILD_VERSION=0.13.18
 ARG BUILD_ARCH=amd64
 LABEL io.hass.type="addon" \
       io.hass.version="${BUILD_VERSION}" \

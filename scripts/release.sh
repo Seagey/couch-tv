@@ -217,6 +217,11 @@ do_publish() {
   [ "$(sed -n 2p "$DIST/BUILT-FROM")" = "$(sums_sha)" ] \
     || { echo "dist holds files that build did not make (SHA256SUMS.txt changed since build): run build again"; exit 1; }
   check
+  # the Home Assistant app only updates when its version changes, and its images are built from the release tag
+  if [ -f "$ROOT/homeassistant/couch_tv/config.yaml" ]; then
+    grep -qx "version: \"$VERSION\"" "$ROOT/homeassistant/couch_tv/config.yaml" \
+      || { echo "homeassistant/couch_tv/config.yaml does not say version \"$VERSION\": change it and its CHANGELOG.md first"; exit 1; }
+  fi
   if git -C "$ROOT" rev-parse -q --verify "refs/tags/$tag" >/dev/null; then echo "tag $tag already exists here: stop"; exit 1; fi
   git -C "$ROOT" fetch -q "$REMOTE" || exit 1
   local remote_tags

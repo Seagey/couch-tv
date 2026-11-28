@@ -2,7 +2,7 @@
 # The image is built by .github/workflows/ha-app.yml from the repo root and published per
 # architecture. The owner in "image" below is the one place to change if you publish your own fork.
 name: Couch TV
-version: "0.13.17"
+version: "0.13.18"
 slug: couch_tv
 description: The couch-tv bridge, the phone remote and the TV home's server, on your Home Assistant computer.
 url: https://github.com/Seagey/couch-tv

@@ -4,10 +4,8 @@
 # adbkey and data/. The image itself holds none of it, so an update never loses anything.
 set -e
 
-OPTIONS=/data/options.json
 CFG=/config
 APP=/app
-PORT="${PORT:-5400}"
 
 say() { echo "couch-tv: $*"; }
 
@@ -29,6 +27,8 @@ mkdir -p "$CFG" "$CFG/data"
 export COUCH_CONFIG="$CFG/config.json"
 export COUCH_DATA="$CFG/data"
 export ADB_KEY="$CFG/adbkey"
+# Some files (keep-disabled.json, input names) are found next to the bridge's code, not in COUCH_DATA.
+ln -sfn "$CFG/data" "$APP/bridge/data"
 
 # .env holds secrets such as HOME_ASSISTANT_TOKEN and PLEX_TOKEN. The bridge reads <repo>/.env, so
 # point that at the config folder.
@@ -53,12 +53,19 @@ if python3 -c 'import json,sys;sys.exit(0 if (json.load(open(sys.argv[1])).get("
   exit 1
 fi
 KEY="$(opt pairing_key)"
+GENERATED=0
 if [ -z "$KEY" ]; then
   if [ ! -s "$CFG/pairing_key" ]; then
     python3 -c 'import secrets; print(secrets.token_urlsafe(18))' > "$CFG/pairing_key"
     chmod 600 "$CFG/pairing_key"
+    GENERATED=1
   fi
   KEY="$(cat "$CFG/pairing_key")"
+fi
+if ! python3 -c 'import re,sys;sys.exit(0 if re.fullmatch(r"[A-Za-z0-9_-]{12,128}", sys.argv[1]) else 1)' "$KEY"; then
+  say "the key is not allowed. Use 12 to 128 letters, digits, - or _ in the app's Pairing key option"
+  say "(or empty it, and delete $CFG/pairing_key if that file is the one at fault)."
+  exit 1
 fi
 export BRIDGE_KEY="$KEY"
 
@@ -74,26 +81,55 @@ if [ "$(opt ask_engine)" = "home_assistant" ]; then
   fi
 fi
 
+# The bridge reads bridge.port from config.json itself (5400 when it has none); read it the same way.
+PORT="$(python3 -c 'import json,sys;print(int((json.load(open(sys.argv[1])).get("bridge") or {}).get("port") or 5400))' "$CFG/config.json" 2>/dev/null || echo 5400)"
+
 IP="$(hostname -I 2>/dev/null | cut -d' ' -f1)"
-say "phone remote: pair a phone once by opening http://${IP:-<home assistant address>}:$PORT/?pair=$KEY"
+if [ "$GENERATED" = 1 ]; then
+  say "phone remote: pair a phone once by opening http://${IP:-<home assistant address>}:$PORT/?pair=$KEY"
+  say "(shown this once; it is kept in $CFG/pairing_key)"
+else
+  say "phone remote: pair a phone at http://${IP:-<home assistant address>}:$PORT/ with the key from the app's"
+  say "Configuration tab (Pairing key), or from $CFG/pairing_key when that option is empty."
+fi
 
 cd "$APP"
 python3 bridge/server.py &
 BRIDGE_PID=$!
 
-# The MCP server for Home Assistant's MCP integration (loopback, port 5401). A couch-tv without the
-# HTTP mode just runs the plain version and exits at once: the bridge carries on either way.
+# The MCP server for Home Assistant's MCP integration (loopback, port 5401). If it stops it is
+# started again after a pause that grows to 30 seconds; the bridge carries on either way. A couch-tv
+# without the HTTP mode just runs the plain version and exits at once, so it shows up as repeats.
 if [ "$(opt allow_power_off)" = "true" ]; then export COUCH_MCP_ALLOW_POWER_OFF=1; fi
-BRIDGE_URL="http://127.0.0.1:$PORT" COUCH_MCP_HTTP=1 COUCH_MCP_PORT=5401 python3 bridge/mcp_server.py < /dev/null &
+mcp_loop() {
+  delay=2
+  trap 'kill "$P" 2>/dev/null; exit 0' TERM
+  while :; do
+    BRIDGE_URL="http://127.0.0.1:$PORT" COUCH_MCP_HTTP=1 COUCH_MCP_PORT=5401 python3 bridge/mcp_server.py < /dev/null &
+    P=$!
+    wait "$P" || true
+    say "the MCP server stopped; starting it again in $delay seconds"
+    sleep "$delay" &
+    wait $! || true
+    delay=$((delay * 2)); [ "$delay" -le 30 ] || delay=30
+  done
+}
+mcp_loop &
 MCP_PID=$!
 
-stop() { kill "$BRIDGE_PID" "$MCP_PID" 2>/dev/null || true; }
+TRAPPED=0
+stop() { TRAPPED=1; kill "$BRIDGE_PID" 2>/dev/null || true; kill "$MCP_PID" 2>/dev/null || true; }
 trap stop TERM INT
 
 # If the bridge stops, so does the app (Home Assistant restarts it if it is set to).
 STATUS=0
 wait "$BRIDGE_PID" || STATUS=$?
-stop
-# A stop from Home Assistant (SIGTERM) shows up as 143: that is a clean stop, not a crash.
-[ "$STATUS" -le 128 ] || STATUS=0
+if [ "$TRAPPED" = 1 ]; then
+  # the signal cut the first wait short: wait again for the bridge's real end
+  wait "$BRIDGE_PID" 2>/dev/null && STATUS=0 || { s=$?; [ "$s" = 127 ] || STATUS=$s; }
+fi
+kill "$MCP_PID" 2>/dev/null || true
+wait "$MCP_PID" 2>/dev/null || true
+# Only a stop we were asked for turns the signal's exit code into a clean exit: a crash still fails.
+if [ "$TRAPPED" = 1 ] && { [ "$STATUS" = 143 ] || [ "$STATUS" = 130 ]; }; then STATUS=0; fi
 exit "$STATUS"
