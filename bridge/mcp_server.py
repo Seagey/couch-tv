@@ -22,9 +22,9 @@ from mcp.types import ToolAnnotations
 BRIDGE = os.environ.get("BRIDGE_URL", "http://127.0.0.1:5400")
 ASK_ID = os.environ.get("ASK_ID")
 TV_ID = os.environ.get("TV_ID")  # set by /api/ask: the TV the person asked from
-HTTP = os.environ.get("COUCH_MCP_HTTP") == "1"
+# a per-question stdio child (ASK_ID, from /api/ask) is never the HTTP server, even if the variable leaks in
+HTTP = os.environ.get("COUCH_MCP_HTTP") == "1" and not ASK_ID
 ALLOW_POWER_OFF = os.environ.get("COUCH_MCP_ALLOW_POWER_OFF") == "1"   # HTTP only
-WAIT = float(os.environ.get("COUCH_MCP_WAIT") or 24)   # HTTP only: Home Assistant gives a tool 30 s in all
 try:   # the bridge's pairing key (bridge.pairing_key in config.json, or BRIDGE_KEY), if it has one
     import config
     KEY = config.PAIRING_KEY
@@ -114,6 +114,8 @@ def key(key: str, hold: bool = False, tv: str | None = None) -> dict:
     """Press a remote button. Keys: up down left right ok back home play_pause play pause stop
     next previous rewind fast_forward volume_up volume_down mute power settings menu info guide
     input search captions channel_up channel_down 0-9. hold=true for a long press."""
+    if HTTP and key.strip().lower() in ("power", "sleep") and not ALLOW_POWER_OFF:   # these turn the TV off
+        return NO_POWER_OFF
     return call("POST", "/api/key", {"key": key, "hold": hold}, tv=tv)
 
 
@@ -435,7 +437,7 @@ def tv_says(tv: str | None = None) -> dict:
 
 # ---- HTTP mode (COUCH_MCP_HTTP=1): Home Assistant's MCP client ----
 # It gives a tool 30 s in all, shows the model only text, and sends no token, so: a tool that is not done
-# in WAIT seconds answers "pending" and finishes in the background; no screenshot and no uninstall; names
+# in COUCH_MCP_WAIT (24) seconds answers "pending" and finishes in the background; no screenshot and no uninstall; names
 # start with tv_; the server listens on 127.0.0.1 only (and FastMCP checks the Host header).
 PENDING = {"ok": True, "pending": True, "said": "Still working on it on the TV. Check with tv_now in a minute."}
 HTTP_DROP = {"screenshot", "uninstall_app"}
@@ -443,17 +445,18 @@ HTTP_READ_ONLY = {"now", "find", "apps", "tvs", "history", "taste", "recs", "scr
                   "latest_episode", "both_like", "tv_says", "list_widgets"}
 HTTP_PENDING_NOTE = " In this mode the answer may come back as pending while it carries on: check with tv_now."
 HTTP_NOTES = {"install_app": HTTP_PENDING_NOTE, "restart_app": HTTP_PENDING_NOTE}
-HTTP_TV_NOTE = (" tv: the TV's id from tv_list. Pass it when the home has more than one TV and the person"
-                " named one; leave it out for the default TV.")
+HTTP_TV_NOTE = (" tv: the TV's id from tv_list. Without it the tool uses the bridge's default TV. Pass it when"
+                " the home has more than one TV and the person named one.")
 HTTP_INSTRUCTIONS = (
     "Controls this home's TVs (Android TV, Google TV) through the couch-tv bridge. "
     "Use tv_play to put a show or film on (it finds the app itself), tv_find to see where it streams, "
     "tv_key/tv_volume/tv_launch for remote control, tv_now to see what is on, tv_ui to read the screen. "
-    "Turning the TV off may be refused. There can be more than one TV (tv_list).")
+    "Turning the TV off may be refused. Tools use the bridge's default TV; when the person names a TV, "
+    "pass its id (from tv_list) as tv.")
 
 
 def _within_wait(fn):
-    """Run fn in a thread; if it is not done in WAIT seconds, answer PENDING and let it finish alone."""
+    """Run fn in a thread; if it is not done in COUCH_MCP_WAIT seconds, answer PENDING and let it finish alone."""
     @functools.wraps(fn)
     async def run(*a, **k):
         loop = asyncio.get_running_loop()
@@ -470,7 +473,7 @@ def _within_wait(fn):
                 pass
         threading.Thread(target=work, daemon=True).start()
         try:
-            out = await asyncio.wait_for(asyncio.shield(done), WAIT)
+            out = await asyncio.wait_for(asyncio.shield(done), float(os.environ.get("COUCH_MCP_WAIT") or 24))
         except asyncio.TimeoutError:
             return PENDING
         if isinstance(out, Exception):

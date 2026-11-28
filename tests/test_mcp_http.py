@@ -15,6 +15,7 @@ import sys
 import threading
 import time
 import unittest
+from unittest.mock import patch
 import urllib.error
 import urllib.request
 
@@ -31,6 +32,7 @@ SEEN = []
 
 class FakeBridge(http.server.BaseHTTPRequestHandler):
     delay = 0
+    done = []   # paths the fake has answered in full
 
     def log_message(self, *a):
         pass
@@ -40,6 +42,7 @@ class FakeBridge(http.server.BaseHTTPRequestHandler):
         body = json.loads(self.rfile.read(n)) if n else None
         SEEN.append((self.command, self.path, body, self.headers.get("Authorization")))
         time.sleep(self.delay)
+        FakeBridge.done.append(self.path)
         out = json.dumps({"ok": True}).encode()
         self.send_response(200)
         self.send_header("Content-Length", str(len(out)))
@@ -82,6 +85,7 @@ class HttpMode(unittest.TestCase):
 
     def setUp(self):
         SEEN.clear()
+        FakeBridge.done.clear()
 
     def run_tools(self, work):
         async def go():
@@ -107,6 +111,11 @@ class HttpMode(unittest.TestCase):
         self.assertIn("switched off", r.content[0].text)
         r = self.run_tools(lambda s: s.call_tool("tv_off_after_episode", {}))
         self.assertIn("switched off", r.content[0].text)
+        for k in ("power", "sleep", "POWER"):
+            r = self.run_tools(lambda s: s.call_tool("tv_key", {"key": k}))
+            self.assertIn("switched off", r.content[0].text)
+        r = self.run_tools(lambda s: s.call_tool("tv_power", {"state": "toggle"}))
+        self.assertIn("switched off", r.content[0].text)
         self.assertEqual(SEEN, [])
 
     def test_power_on_works(self):
@@ -123,6 +132,9 @@ class HttpMode(unittest.TestCase):
             FakeBridge.delay = 0
         self.assertLess(took, 3.5)
         self.assertTrue(json.loads(r.content[0].text)["pending"])
+        time.sleep(3)   # the request carries on in the background and the bridge finishes it
+        self.assertIn(("GET", "/api/now"), [x[:2] for x in SEEN])
+        self.assertIn("/api/now", FakeBridge.done)
 
     def test_foreign_host_is_refused(self):
         req = urllib.request.Request("http://127.0.0.1:%d/mcp" % self.port, method="POST", data=b"{}",
@@ -142,6 +154,14 @@ class StdioMode(unittest.TestCase):
         for n in ("play", "find", "key", "now", "tvs", "screenshot", "uninstall_app", "power", "ui", "list_widgets", "tv_says"):
             self.assertIn(n, names)
         self.assertFalse([n for n in names if n.startswith("tv_") and n != "tv_says"])
+
+    def test_power_off_still_reaches_the_bridge(self):
+        import mcp_server
+        seen = []
+        with patch.object(mcp_server, "call", lambda *a, **k: seen.append(a) or {"ok": True}):
+            mcp_server.power("off")
+            mcp_server.key("power")
+        self.assertEqual([a[1] for a in seen], ["/api/power", "/api/key"])
 
 
 if __name__ == "__main__":

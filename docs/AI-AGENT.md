@@ -67,11 +67,11 @@ computer that runs the bridge:
 COUCH_MCP_HTTP=1 BRIDGE_URL=http://127.0.0.1:5400 BRIDGE_KEY=... .venv/bin/python bridge/mcp_server.py
 ```
 
-In Home Assistant, add the Model Context Protocol integration with the address `http://<the computer>:5401/mcp`.
-It listens on `127.0.0.1` only and takes no sign in, because Home Assistant cannot send one. So Home
-Assistant has to run on that same computer, or you put your own private link in front of it (an SSH tunnel,
-for example). Never open a router port to it. It also refuses a request whose `Host` is not `127.0.0.1` or
-`localhost`.
+In Home Assistant, add the Model Context Protocol integration with the address `http://127.0.0.1:5401/mcp`.
+It must be that address: the server listens on `127.0.0.1` only, takes no sign in (Home Assistant cannot
+send one), and refuses any request whose `Host` is not `127.0.0.1` or `localhost`. So Home Assistant has to
+run on the same machine as the bridge (for example the Home Assistant app on that computer). Never open a
+router port to it.
 
 | Setting | What it does |
 |---|---|
@@ -82,10 +82,10 @@ for example). Never open a router port to it. It also refuses a request whose `H
 
 The tool set differs from stdio on purpose:
 
-- Names start with `tv_` (`tv_play`, `tv_key`, `tv_now`). `tvs` is `tv_list`: with more than one TV, pass a TV's id from it as `tv`.
+- Names start with `tv_` (`tv_play`, `tv_key`, `tv_now`). `tvs` is `tv_list`. Tools use the bridge's default TV; with more than one TV, pass a TV's id from `tv_list` as `tv` when the person names one.
 - No `screenshot`: Home Assistant hands the model only text, so a picture would arrive as a wall of letters. `tv_ui` gives the screen as text.
 - No `uninstall_app`. A voice assistant should not remove apps.
-- Turning the TV off (`tv_power` with `off` or `toggle`, and `tv_off_after_episode`) is refused unless `COUCH_MCP_ALLOW_POWER_OFF=1`. Turning it on always works.
+- Turning the TV off (`tv_power` with `off` or `toggle`, the `power` and `sleep` keys of `tv_key`, and `tv_off_after_episode`) is refused unless `COUCH_MCP_ALLOW_POWER_OFF=1`. Turning it on always works.
 - Home Assistant stops a tool after 30 seconds. A tool that is not done in 24 answers `pending` and carries on in the background (installing an app, restarting an app). Ask `tv_now` a little later.
 
 ## The tools for the TV home
