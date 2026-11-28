@@ -144,9 +144,21 @@ def bridge_tvs(known, cfg):
 def bridge_config(known, cfg):
     """What the bridge reads (COUCH_CONFIG). The pairing key is on, so the phone remote needs the code."""
     tvs = bridge_tvs(known, cfg)
-    return {"bridge": {"port": cfg["port"], "pairing_key": cfg["pairing_key"]},
-            "default_tv": tvs[0]["id"] if tvs else "tv", "tvs": tvs or [{"id": "tv", "name": "TV", "label": "TV", "ip": "SET_YOUR_TV_IP"}],
-            "home": {"look": "night"}, "phone_remote": True, "ask": {"enabled": False}}
+    out = {"bridge": {"port": cfg["port"], "pairing_key": cfg["pairing_key"]},
+           "default_tv": tvs[0]["id"] if tvs else "tv", "tvs": tvs or [{"id": "tv", "name": "TV", "label": "TV", "ip": "SET_YOUR_TV_IP"}],
+           "home": {"look": "night"}, "phone_remote": True, "ask": {"enabled": False}}
+    node = _own_node()
+    if node:
+        out["matter"] = {"node": node}      # N13: the Node.js Setup fetched into this folder, when the computer has no usable one
+    return out
+
+
+def _own_node():
+    try:
+        from .. import nodejs
+        return nodejs.for_bridge()
+    except Exception:
+        return None
 
 
 def write_bridge_config(known, cfg, data=None):

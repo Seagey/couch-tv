@@ -330,9 +330,16 @@ class MatterTest(unittest.TestCase):
             sh.matter_code("1234")
 
     def test_computer_needs_node(self):
-        with mock.patch.object(sh, "node_ok", return_value=(False, "v20.1.0")), self.assertRaises(TvError) as e:
+        # N13: with no usable Node, Setup fetches the official one into the Helper's folder (tests/test_nodejs.py); only a computer type it
+        # cannot fetch for is told to get Node itself
+        from couchtv_setup import nodejs
+        boom = TvError("Matter needs Node.js 22.13 or newer, and this computer type cannot fetch it by itself.", "node_platform")
+        with mock.patch.object(sh, "node_ok", return_value=(False, "v20.1.0")), mock.patch.object(nodejs, "ensure", side_effect=boom), \
+                self.assertRaises(TvError) as e:
             sh.matter_add("34970112332")
         self.assertIn("22.13", str(e.exception))
+        self.assertIn("v20.1.0", str(e.exception))
+        self.assertEqual(e.exception.code, "matter_node")
 
 
 sh._real_http = sh.http

@@ -30,6 +30,11 @@ class Controller:
         self.update_state = {"state": "up_to_date", "version": __version__}
         self.quit_event = threading.Event()
         self.on_quit = None
+        try:
+            from .. import nodejs
+            self._node = str(nodejs.helper_node() or "")   # what was there when the bridge was started
+        except Exception:
+            self._node = ""
 
     def _known(self):
         import json
@@ -85,6 +90,23 @@ class Controller:
     def tick(self):
         """Every half minute: hold or release the keep awake assertion (on power, with a Samsung, LG or Roku TV)."""
         self.awake.update(self.cfg)
+        self.follow_node()
+
+    def follow_node(self):
+        """N13: when Setup has fetched Node.js into this folder for Matter, the bridge is told where it is (its config) and restarted once.
+        A cheap look each time (is the file there); never raises."""
+        try:
+            from .. import nodejs
+            here = nodejs.helper_node()
+            here = str(here) if here else ""
+            if here == self._node or self.sup is None:
+                return
+            self._node = here
+            if here and nodejs.for_bridge():
+                hconfig.write_bridge_config(self.known, self.cfg, self.data)
+                self.sup._kill()           # its loop starts it again with the new config within seconds
+        except Exception:
+            pass
 
     def check_updates(self):
         """Looks for a newer release, downloads and checks it (signature, then checksum). Never raises."""

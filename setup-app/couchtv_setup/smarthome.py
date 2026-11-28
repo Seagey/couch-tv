@@ -805,18 +805,30 @@ def matter_add_tv(tv, code, wait=150, poll=3.0):
     raise TvError("That took too long. Make a new code in your home app and try again.", "matter_timeout")
 
 
-def matter_add(code):
+def matter_add(code, progress=lambda f, msg=None: None):
     """An 11 or 21 digit sharing code from Google Home, Apple Home, SmartThings or Alexa, handed to the Couch TV Helper's bridge on this
-    computer (it is the Matter controller for TVs it serves, docs/MATTER.md). It needs Node.js 22.13 or newer on this computer."""
+    computer (it is the Matter controller for TVs it serves, docs/MATTER.md). It needs Node.js 22.13 or newer: the computer's own, or (N13)
+    the official release Setup fetches once into the Helper's own folder (nodejs.py), which the Helper then hands to the bridge."""
     c = matter_code(code)
+    from . import nodejs
     ok, v = node_ok()
+    got = None
     if not ok:
-        raise TvError("Matter on this computer needs Node.js 22.13 or newer (" + (("this computer has " + v) if v else "it is not installed") +
-                      "). Get it from nodejs.org, then try again. Or add the device on a Google TV, which needs no computer.", "matter_node")
+        try:
+            got = nodejs.ensure(lambda f, m=None: progress(0.02 + 0.5 * f, m))
+        except TvError as e:
+            if e.code == "node_platform" and v:
+                raise TvError("Matter on this computer needs Node.js 22.13 or newer (this computer has " + v + "). " + str(e), "matter_node") from e
+            raise
     from .helper import config as hcfg
     cfg = hcfg.load()
-    req = urllib.request.Request("http://127.0.0.1:%d/api/matter/commission" % cfg["port"], data=json.dumps({"code": c}).encode(), method="POST",
-                                 headers={"Content-Type": "application/json", **({"Authorization": "Bearer " + cfg["pairing_key"]} if cfg["pairing_key"] else {})})
+    base = "http://127.0.0.1:%d" % cfg["port"]
+    hdr = {"Content-Type": "application/json", **({"Authorization": "Bearer " + cfg["pairing_key"]} if cfg["pairing_key"] else {})}
+    if got and got["how"] == "downloaded":
+        progress(0.55, "Starting Matter on this computer")
+        _wait_matter_ready(base, hdr)
+    progress(0.6, "Adding it on this computer")
+    req = urllib.request.Request(base + "/api/matter/commission", data=json.dumps({"code": c}).encode(), method="POST", headers=hdr)
     try:
         with urllib.request.urlopen(req, timeout=120) as r:
             return json.loads(r.read(65536).decode("utf-8", "replace"))
@@ -828,3 +840,19 @@ def matter_add(code):
         raise TvError(said.get("message") or "The device was not added. Check the code and that it is on your Wi-Fi.", "matter_failed") from e
     except OSError as e:
         raise TvError("Turn on the Couch TV Helper on this computer first. It looks after Matter devices for your TVs.", "matter_helper") from e
+
+
+def _wait_matter_ready(base, hdr, wait=75, poll=3.0):
+    """After Node.js was fetched: the Helper restarts its bridge with the new path within about half a minute. Waits until the bridge's Matter
+    says it is no longer waiting for Node (best effort: the commission call that follows says what is wrong)."""
+    end = time.monotonic() + wait
+    while time.monotonic() < end:
+        try:
+            req = urllib.request.Request(base + "/api/matter/devices", headers=hdr)
+            with urllib.request.urlopen(req, timeout=8) as r:
+                o = json.loads(r.read(1 << 20).decode("utf-8", "replace"))
+            if o.get("ready") or o.get("reason") not in ("node_missing", "node_old", "starting", None):
+                return
+        except (OSError, ValueError):
+            pass
+        time.sleep(poll)

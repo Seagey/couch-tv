@@ -829,7 +829,7 @@ def smart_api(name, body):
                     progress(0.2, "Adding it on the TV")
                     return smarthome.matter_add_tv(tv, code)
             progress(0.2, "Adding it on this computer")
-            return smarthome.matter_add(code)
+            return smarthome.matter_add(code, progress)
         return run_job("smart-matter", add)
     if name == "save":
         tvs = body.get("tvs")
